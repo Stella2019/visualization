@@ -1,0 +1,68 @@
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: #000;
+    shape-rendering: crispEdges;
+}
+.series {
+    transition: 1s;
+    text-anchor: end;
+}
+.series.lines {
+    stroke-width: 2.0;
+}
+.series.unfocused {
+    opacity: 0.5;
+}
+.series.lines.unfocused {
+    opacity: 0.2;
+}
+
+.brush .extent {
+  stroke: #fff;
+  fill-opacity: .125;
+  shape-rendering: crispEdges;
+}
+
+.choice {
+    display:inline-block;
+    padding: 5px;
+}
+
+#chooseCollection option {
+    text-transform: capitalize;
+}
+
+#legend {
+    position: absolute;
+    display: inline-block;
+}
+.legend_entry {
+    margin: 5px;
+}
+#legend .legend_icon {
+    display: inline-block;
+    width: 25px;
+    height: 25px;
+    border: solid;
+    border-radius: 5px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: 1s;
+}
+#legend .legend_icon.unfocused {
+    opacity: 0.6;
+}
+#legend .legend_icon.off {
+/*    border: solid;*/
+    background-color: white !important;
+}
+#legend .legend_label {
+    display: inline-block;
+    text-transform: capitalize;
+    position: absolute;
+    margin-left: 5px;
+    margin-top: 3px;
+    white-space: nowrap;
+}
