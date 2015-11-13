@@ -3,7 +3,7 @@ Array.prototype.contains = function (element) {
 };
 
 var collections;
-var collection_names = ["SahafiHotelAttack", "Sinai Plane Crash", "NORAD blimp on the loose", "Earthquake in Pakistan and Afghanistan", "Hurricane Patricia - Spanish terms", "Flooding from Patricia", "Hurricane Patricia", "Wilfrid Laurier Lockdown", "Black Lives Matter Collection", "Ankara Bombing", "Hurricane Oho", "Doctors without Borders", "Townhall gunmen", "umpqua college shooting", "Hurricane Joaquin - hurricane terms", "Hurricane Joaquin - flooding terms", "Yemen mosque bombing", "Chile", "Flash Flood", "California Valley Fire", "Grand Mosque accident", "Refugee crisis", "Karachi Explosion", "Chicago Shooting", "Western WA storms", "Tropical Storm Erika", "WA Wildfires - August", "Cotopaxi volcano", "FAA outage", "Chemical Spill - August 2015", "Alaska Earthquake - July 26", "Navy Shooting", "NYSE Stock Exchange Cant Exchange", "India Earthquake"];
+var collection_names = ["SahafiHotelAttack", "Sinai Plane Crash", "NORAD blimp on the loose", "Earthquake in Pakistan and Afghanistan", "Hurricane Patricia - Spanish terms", "Flooding from Patricia", "Hurricane Patricia", "Wilfrid Laurier Lockdown", "Black Lives Matter Collection", "Ankara Bombing", "Hurricane Oho", "Doctors without Borders", "Townhall gunmen", "umpqua college shooting", "Hurricane Joaquin - hurricane terms", "Hurricane Joaquin - flooding terms", "Yemen mosque bombing", "Chile", "Flash Flood", "California Valley Fire", "Grand Mosque accident", "Refugee crisis", "Karachi Explosion", "Chicago Shooting", "Western WA storms", "Tropical Storm Erika", "WA Wildfires - August", "Cotopaxi volcano", "FAA outage", "Chemical Spill - August 2015", "Alaska Earthquake - July 26", "Navy Shooting", "NYSE Stock Exchange Cant Exchange", "India Earthquake", "Paris Shooting", "Paris Collection 2", "Paris Shooting - 3 - New Terms"];
 var data_stacked, series_data, data_csv, total_byTime;
 var select;
 var keywords, keywords_selected;
@@ -316,29 +316,7 @@ function display() {
     // middle of the display.
     focus.area.y0(focus.height / 2)
         .y1(focus.height / 2);
-
-    // Bind new data to the graph
     
-    var series = focus.svg.selectAll(".series")
-        .data(data_stacked);
- 
-    var series_paths = series.enter().append("g")
-        .on("mouseover", highlightKeyword)
-        .on("mouseout", unHighlightKeyword);
-    
-    series.attr("class", function(d) {
-            return "series " + d.id
-        });
-    
-    series.exit().remove();
- 
-    series_paths.append("path")
-        .attr("class", "area")
-        .style("stroke-opacity", 0)
-        .style("fill", function (d) { return color(d.name); })
-        .style("stroke", function (d) { return color(d.name); })
-        .attr("d", function (d) { return focus.area(d.values); });
- 
     // Set the Y Domain
     var y_min = 0;
     if(chart_options.y_scale == "log")
@@ -377,6 +355,28 @@ function display() {
         ax = context.svg.append('g').attr('id', 'context_yAxis');
     ax.attr("class", "context_y axis")
         .call(context.yAxis);
+
+    // Bind new series to the graph
+    
+    var series = focus.svg.selectAll(".series")
+        .data(data_stacked);
+ 
+    var series_paths = series.enter().append("g")
+        .on("mouseover", highlightKeyword)
+        .on("mouseout", unHighlightKeyword);
+    
+    series.attr("class", function(d) {
+            return "series " + d.id
+        });
+    
+    series.exit().remove();
+ 
+    series_paths.append("path")
+        .attr("class", "area")
+        .style("stroke-opacity", 0)
+        .style("fill", function (d) { return color(d.name); })
+        .style("stroke", function (d) { return color(d.name); })
+        .attr("d", function (d) { return focus.area(d.values); });
     
     // Define the parameters of the area
     if (chart_options.display_type === 'lines') {
