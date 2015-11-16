@@ -111,7 +111,7 @@ function changeData() {
     var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
     var collection = collection_names[selectedIndex];
 
-    d3.csv("capture_data/" + collection + ".csv", function(error, data_file) {
+    d3.csv("capture_stats/" + collection + ".csv", function(error, data_file) {
         if (error) throw error;
 	
         data_csv = data_file;
@@ -421,13 +421,17 @@ function brushed() {
 
 function buildInterface() {
     // Collection selection
-    d3.json("capture_data/collections.json", function(error, collections_file) {
+    d3.json("capture_stats/collections.json", function(error, collections_file) {
         if (error) throw error;
         
         // Add collections
         collections_file.sort(compareCollections);
         collections_file.reverse();
         collections = collections_file;
+        
+        collection_names = collections.map(function(collection) {
+            return collection.name;
+        });
         
         select  = d3.select("select#chooseCollection").on('change', changeData);
         var options = select.selectAll("option").data(collection_names);

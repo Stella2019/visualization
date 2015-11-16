@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 
-import json, os, csv
-import argparse, sys, unicodedata
+import json, os, csv, sys
+import argparse, unicodedata
 from pprint import pprint
-import requests
+from datetime import datetime
 from server_messenger import ServerMessenger
 
-server = None;
-options = {};
-collection = {'name': None};
-collection_counts = {};
+server = None
+options = {}
+collection = {'name': None}
+collection_counts = {}
+collection_counts_unique = {}
+collection_tweets = {}
+unique_mask = 1e6
 
 def main():
     parser = argparse.ArgumentParser(description='Parse a raw collection into the important constituents and/or calculate statistics on the collection',
@@ -44,19 +47,40 @@ def parseFile(filename):
     
     # Collect the counts of the keyword for the collection
     global collection_counts
+    global collection_counts_unique
+    unique_set = set()
     
     collection_counts[timestamp] = {'tweets': 0}
+    collection_counts_unique[timestamp] = {'tweets': 0}
     for keyword in collection['keywords']:
         collection_counts[timestamp][keyword] = 0
+        collection_counts_unique[timestamp][keyword] = 0
 
     # Load this time period's JSON file
     with open(filename) as data_file: 
         for line in data_file:
             if len(line) > 5:
                 data = json.loads(line)
-                text = data['text'].lower().split()
+                text = unicodedata.normalize('NFKD', data['text']);
+                
+                hash_value = hash(text) % unique_mask
+                unique = False
+                if(hash_value not in unique_set):
+                    unique_set.add(hash_value)
+                    unique = True
+                    created_at = datetime.strptime(data['created_at'], '%a %b %d %X %z %Y')
+                    
+                    tweet_reduced = {
+                        'timestamp':  datetime.strftime(created_at, '%y%m%d %H%M%S'),
+                        'text': text
+                        }
+                    collection_tweets[data['id_str']] = tweet_reduced
+                    
+                text = text.lower().split()
 
                 collection_counts[timestamp]['tweets'] += 1
+                if(unique):
+                    collection_counts_unique[timestamp]['tweets'] += 1
 
                 # Search for keywords
                 for keyword, keyword_parts in zip(collection['keywords'], collection['keywords_parts']):
@@ -67,6 +91,8 @@ def parseFile(filename):
 
                     if parts_found == len(keyword_parts):
                         collection_counts[timestamp][keyword] += 1
+                        if(unique):
+                            collection_counts_unique[timestamp][keyword] += 1
                         
 def parseDir(path):
     if options.verbose:
@@ -100,15 +126,16 @@ def loadCollection(collection_name):
     while(found is False):
         fetched_data = server.doSimpleJSONGet('jobs/?format=json&page=' + str(pgno))
         
-        if (fetched_data is None):
-            return
-        
         # Search for collection in the fetched data
         for item in fetched_data["results"]:
             if(item["name"] == collection_name):
                 collection = item
                 found = True
                 break
+        
+        
+        if (fetched_data["next"] is None):
+            break
         
         # Not found, continue searching through the next pages
         pgno += 1
@@ -123,11 +150,15 @@ def loadCollection(collection_name):
         
         keywords_parts = unicodedata.normalize('NFKD', keyword.lower().replace('#', '')).split(' ')
         collection["keywords_parts"].append(keywords_parts)
+        
+    # Set other collection variable containers to 0
+    collection_counts_unique = {}
+    collection_tweets = []
     
 def saveCollection():
     # Write results to comma separated values file
     with open('../capture_stats/' + collection["name"] + '.csv', 'w') as out_file:
-        writer = csv.writer(out_file, delimiter=',')
+        writer = csv.writer(out_file, delimiter=',', lineterminator='\n')
         
         # Write column headers
         row = ['timestamp','tweets']
@@ -141,6 +172,28 @@ def saveCollection():
             for keyword in collection["keywords"]:
                 row.append(collection_counts[timestamp][keyword])
             writer.writerow(row)
+            
+        
+    # Write results (UNIQUE) to comma separated values file
+    with open('../capture_stats/' + collection["name"] + '_unique.csv', 'w') as out_file:
+        writer = csv.writer(out_file, delimiter=',', lineterminator='\n')
+        
+        # Write column headers
+        row = ['timestamp','tweets']
+        for keyword_parts in collection["keywords_parts"]:
+            row.append(' '.join(keyword_parts))
+        writer.writerow(row)
+
+        # Write rows
+        for timestamp in sorted(collection_counts_unique):
+            row = [timestamp, collection_counts_unique[timestamp]['tweets']]
+            for keyword in collection["keywords"]:
+                row.append(collection_counts_unique[timestamp][keyword])
+            writer.writerow(row)
+            
+    # Write tweets
+    with open('../capture_stats/' + collection["name"] + '_tweets.json', 'w') as out_file:
+        json.dump(collection_tweets, out_file)
 
 def connectToServer():
     if(options.verbose): print("    Connecting to Captures Database")
@@ -156,87 +209,3 @@ def connectToServer():
 
 if __name__ == "__main__":
     main()
-
-
-#computer = "twcap"
-#
-#with open('collections.json') as file:
-#    collections = json.load(file)
-#    for collection in collections:
-#        keywords = collection["keywords"]
-#        folder = '/var/collect/twcap/data/' + collection["name"] # Boston
-#        if computer == "twcap":
-#            folder = '/var/collect/twcap/captures/' + collection["name"] # Twcap
-#            
-#        if computer in collection["capture"] and os.path.isdir(folder):
-#        
-#            # Calculated Variables
-#            results = {}
-#            keywordsf = []
-#            for keyword in keywords:
-#                keywordsf.append(unicodedata.normalize('NFKD', keyword.lower().replace('#', '')))
-#
-#            # Process
-#            for filename in sorted(os.listdir(folder)):
-#                if filename[-5:] == '.json' and filename[-18:-10].isdigit() and filename[-9:-5].isdigit():
-#
-#                    # Make entry for new timestamp
-#                    timestamp = filename[-18:-5]
-#                    print filename
-#                    results[timestamp] = {'tweets': 0}
-#                    for keyword in keywordsf:
-#                        results[timestamp][keyword] = 0
-#
-#                    # Load this time period's JSON file
-#                    with open(folder + '/' + filename) as data_file: 
-#                        for line in data_file:
-#                            if len(line) > 5:
-#                                data = json.loads(line)
-#                                tfext = data['text'].lower().split()
-#
-#                                results[timestamp]['tweets'] += 1
-#
-#                                # Search for keywords
-#                                for keyword in keywordsf:
-#                                    keyword_parts = keyword.split()
-#                                    parts_found = 0
-#                                    for keyword_part in keyword_parts:
-#                                        if (keyword_part in text) or ("#" + keyword_part in text):
-#                                            parts_found += 1
-#
-#                                    if parts_found == len(keyword_parts):
-#                                        results[timestamp][keyword] += 1
-#
-#                                text = data['text']
-#                                
-#                                results[timestamp]['tweets'] += 1
-#            
-#                                # Search for keywords
-#                                for keyword in keywordsf:
-#                                    if keyword in text.lower():
-#                                        results[timestamp][keyword] += 1
-#
-#            # Write results to comma separated values file
-#            with open('data/' + collection["name"] + '.csv', 'w') as out_file:
-#                writer = csv.writer(out_file, delimiter=',')
-#
-#                # Write column headers
-#                row = ['timestamp','tweets']
-#                for keyword in keywords:
-#                    row.append(keyword.encode('ascii','ignore'))
-#                writer.writerow(row)
-#
-#                # Write rows
-#                for timestamp in sorted(results):
-#                    row = [timestamp, results[timestamp]['tweets']]
-#                    for keyword in keywordsf:
-#                        row.append(results[timestamp][keyword])
-#                    writer.writerow(row)
-#
-## Save the results
-##with open(collection["name"] + '.json', 'w') as out_file:
-##    json.dump(results, out_file)
-#
-## Display results
-##import pprint
-##pprint.pprint(results)
