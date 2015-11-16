@@ -1,1 +1,4 @@
 capture_data
+capture_stats
+local.conf
+*.pyc
