@@ -151,48 +151,35 @@ def loadCollection(collection_name):
         keywords_parts = unicodedata.normalize('NFKD', keyword.lower().replace('#', '')).split(' ')
         collection["keywords_parts"].append(keywords_parts)
         
-    # Set other collection variable containers to 0
-    collection_counts_unique = {}
-    collection_tweets = []
+    # If files exist, load them
+    prefix = '../capture_stats/' + collection["name"];
+    # Write results to file
+    if(os.path.isfile(prefix + '.json')):
+        with open(prefix + '.json', 'r') as out_file:
+            collection_counts = json.load(out_file)
+    else:
+        collection_counts = {}
+        
+    if(os.path.isfile(prefix + '_unique.json')):
+        with open(prefix + '_unique.json', 'r') as out_file:
+            collection_counts_unique = json.load(out_file)
+    else:
+        collection_counts_unique = {}
+        
+    if(os.path.isfile(prefix + '_tweets.json')):
+        with open(prefix + '_tweets.json', 'r') as out_file:
+            collection_tweets = json.load(out_file)
+    else:
+        collection_tweets = {}
     
 def saveCollection():
-    # Write results to comma separated values file
-    with open('../capture_stats/' + collection["name"] + '.csv', 'w') as out_file:
-        writer = csv.writer(out_file, delimiter=',', lineterminator='\n')
-        
-        # Write column headers
-        row = ['timestamp','tweets']
-        for keyword_parts in collection["keywords_parts"]:
-            row.append(' '.join(keyword_parts))
-        writer.writerow(row)
-
-        # Write rows
-        for timestamp in sorted(collection_counts):
-            row = [timestamp, collection_counts[timestamp]['tweets']]
-            for keyword in collection["keywords"]:
-                row.append(collection_counts[timestamp][keyword])
-            writer.writerow(row)
-            
-        
-    # Write results (UNIQUE) to comma separated values file
-    with open('../capture_stats/' + collection["name"] + '_unique.csv', 'w') as out_file:
-        writer = csv.writer(out_file, delimiter=',', lineterminator='\n')
-        
-        # Write column headers
-        row = ['timestamp','tweets']
-        for keyword_parts in collection["keywords_parts"]:
-            row.append(' '.join(keyword_parts))
-        writer.writerow(row)
-
-        # Write rows
-        for timestamp in sorted(collection_counts_unique):
-            row = [timestamp, collection_counts_unique[timestamp]['tweets']]
-            for keyword in collection["keywords"]:
-                row.append(collection_counts_unique[timestamp][keyword])
-            writer.writerow(row)
-            
-    # Write tweets
-    with open('../capture_stats/' + collection["name"] + '_tweets.json', 'w') as out_file:
+    prefix = '../capture_stats/' + collection["name"];
+    # Write results to file
+    with open(prefix + '.json', 'w') as out_file:
+        json.dump(collection_counts, out_file)
+    with open(prefix + '_unique.json', 'w') as out_file:
+        json.dump(collection_counts_unique, out_file)
+    with open(prefix + '_tweets.json', 'w') as out_file:
         json.dump(collection_tweets, out_file)
 
 def connectToServer():
