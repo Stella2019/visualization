@@ -4,7 +4,7 @@ Array.prototype.contains = function (element) {
 
 var collections;
 var collection_names = ["Paris Shooting", "Paris Collection 2", "Paris Shooting - 3 - New Terms", "SahafiHotelAttack", "Sinai Plane Crash", "NORAD blimp on the loose", "Earthquake in Pakistan and Afghanistan", "Hurricane Patricia - Spanish terms", "Flooding from Patricia", "Hurricane Patricia", "Wilfrid Laurier Lockdown", "Black Lives Matter Collection", "Ankara Bombing", "Hurricane Oho", "Doctors without Borders", "Townhall gunmen", "umpqua college shooting", "Hurricane Joaquin - hurricane terms", "Hurricane Joaquin - flooding terms", "Yemen mosque bombing", "Chile", "Flash Flood", "California Valley Fire", "Grand Mosque accident", "Refugee crisis", "Karachi Explosion", "Chicago Shooting", "Western WA storms", "Tropical Storm Erika", "WA Wildfires - August", "Cotopaxi volcano", "FAA outage", "Chemical Spill - August 2015", "Alaska Earthquake - July 26", "Navy Shooting", "NYSE Stock Exchange Cant Exchange", "India Earthquake"];
-var data_stacked, series_data, data_csv, total_byTime;
+var data_stacked, series_data, data_raw, total_byTime;
 var select;
 var keywords, keywords_selected;
 var chart_options = {
@@ -111,24 +111,38 @@ function changeData() {
     var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
     var collection = collection_names[selectedIndex];
 
-    d3.csv("capture_stats/" + collection + ".csv", function(error, data_file) {
+    d3.json("capture_stats/" + collection + ".json", function(error, data_file) {
         if (error) throw error;
 	
-        data_csv = data_file;
+        // Get the timestamps
+        timestamps = Object.keys(data_file).sort();
         
         // Get the keywords
-        keywords = d3.keys(data_csv[0]).filter(function (key) {
+        keywords = d3.keys(data_file[timestamps[0]]).filter(function (key) {
             return key !== "timestamp" && key !== 'tweets';
         });
         
         // Parse dates and ints
-        data_csv.forEach(function (d) {
-            d.timestamp = parseDate(d.timestamp);
-            d.tweets = parseInt(d.tweets);
+        data_raw = [];
+        for (var i = 0; i < timestamps.length; i++) {
+            timestamp = timestamps[i];
+            entry = {
+                timestamp: parseDate(timestamp),
+                tweets: data_file[timestamp]["tweets"]
+            };
             keywords.map(function(keyword) {
-                d[keyword] = parseInt(d[keyword]);
+                entry[keyword] = parseInt(data_file[timestamp][keyword]);
             });
-        });
+            data_raw.push(entry);
+        }
+        
+//        data_raw = data_file.forEach(function (d) {
+//            d.timestamp = parseDate(d.timestamp);
+//            d.tweets = parseInt(d.tweets);
+//            keywords.map(function(keyword) {
+//                d[keyword] = parseInt(d[keyword]);
+//            });
+//        });
         
         
         // Start generate series's data
@@ -141,7 +155,7 @@ function changeData() {
                 id: simplify(name),
                 order: (i + 1) * 100,
                 shown: true, // replaced the map keywords_selected with this at some point
-                sum: data_csv.reduce(function(cur_sum, datapoint) {
+                sum: data_raw.reduce(function(cur_sum, datapoint) {
                     return cur_sum + datapoint[name];
                 }, 0)
             });
@@ -151,8 +165,8 @@ function changeData() {
         buildLegend();
 
         // Set Time Domain and Axis
-        var x_min = data_csv[0].timestamp;
-        var x_max = data_csv[data_csv.length - 1].timestamp;
+        var x_min = timestamps[0];
+        var x_max = timestamps[timestamps.length - 1];
         focus.x.domain([x_min, x_max]).clamp(true);
         context.x.domain([x_min, x_max]);
     
@@ -192,7 +206,7 @@ function prepareData() {
 
             return newdata;
         })
-        .entries(data_csv);
+        .entries(data_raw);
 
     // Convert data to a format the charts can use
     var data_ready = [];
