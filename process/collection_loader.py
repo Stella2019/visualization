@@ -68,13 +68,13 @@ def parseFile(filename):
                 if(hash_value not in unique_set):
                     unique_set.add(hash_value)
                     unique = True
-                    created_at = datetime.strptime(data['created_at'], '%a %b %d %X %z %Y')
-                    
-                    tweet_reduced = {
-                        'timestamp':  datetime.strftime(created_at, '%y%m%d %H%M%S'),
-                        'text': text
-                        }
-                    collection_tweets[data['id_str']] = tweet_reduced
+#                    created_at = datetime.strptime(data['created_at'], '%a %b %d %X %z %Y')
+#                    
+#                    tweet_reduced = {
+#                        'timestamp':  datetime.strftime(created_at, '%y%m%d %H%M%S'),
+#                        'text': text
+#                        }
+#                    collection_tweets[data['id_str']] = tweet_reduced
                     
                 text = text.lower().split()
 
@@ -141,6 +141,16 @@ def loadCollection(collection_name):
         pgno += 1
     
     keywords = collection["twitter_keywords"].split(',');
+    
+    if("Paris" in collection["name"]):
+        keywords.append("Les Halles")
+        keywords.append("Shopping Mall")
+        keywords.append("Concert Hall")
+        keywords.append("Uber")
+        keywords.append("Eiffel")
+        keywords.append("Gamergate")
+    print(keywords)
+    
     collection["keywords"] = []
     collection["keywords_parts"] = []
     
@@ -152,6 +162,9 @@ def loadCollection(collection_name):
         collection["keywords_parts"].append(keywords_parts)
         
     # If files exist, load them
+    global collection_counts
+    global collection_counts_unique
+    
     prefix = '../capture_stats/' + collection["name"];
     # Write results to file
     if(os.path.isfile(prefix + '.json')):
@@ -166,11 +179,11 @@ def loadCollection(collection_name):
     else:
         collection_counts_unique = {}
         
-    if(os.path.isfile(prefix + '_tweets.json')):
-        with open(prefix + '_tweets.json', 'r') as out_file:
-            collection_tweets = json.load(out_file)
-    else:
-        collection_tweets = {}
+#    if(os.path.isfile(prefix + '_tweets.json')):
+#        with open(prefix + '_tweets.json', 'r') as out_file:
+#            collection_tweets = json.load(out_file)
+#    else:
+#        collection_tweets = {}
     
 def saveCollection():
     prefix = '../capture_stats/' + collection["name"];
@@ -179,8 +192,8 @@ def saveCollection():
         json.dump(collection_counts, out_file)
     with open(prefix + '_unique.json', 'w') as out_file:
         json.dump(collection_counts_unique, out_file)
-    with open(prefix + '_tweets.json', 'w') as out_file:
-        json.dump(collection_tweets, out_file)
+#    with open(prefix + '_tweets.json', 'w') as out_file:
+#        json.dump(collection_tweets, out_file)
 
 def connectToServer():
     if(options.verbose): print("    Connecting to Captures Database")

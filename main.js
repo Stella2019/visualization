@@ -10,7 +10,8 @@ var keywords, keywords_selected;
 var chart_options = {
     display_type: "stacked_area",
     resolution: "tenminute",
-    y_scale: "linear"
+    y_scale: "linear",
+    subset: "all"
 }
 
 window.onload = initialize;
@@ -110,8 +111,9 @@ function initialize() {
 function changeData() {
     var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
     var collection = collection_names[selectedIndex];
-
-    d3.json("capture_stats/" + collection + ".json", function(error, data_file) {
+    var unique_suffix = chart_options.subset == "unique" ? "_unique" : "";
+    
+    d3.json("capture_stats/" + collection + unique_suffix + ".json", function(error, data_file) {
         if (error) throw error;
 	
         // Get the timestamps
@@ -135,15 +137,6 @@ function changeData() {
             });
             data_raw.push(entry);
         }
-        
-//        data_raw = data_file.forEach(function (d) {
-//            d.timestamp = parseDate(d.timestamp);
-//            d.tweets = parseInt(d.tweets);
-//            keywords.map(function(keyword) {
-//                d[keyword] = parseInt(d[keyword]);
-//            });
-//        });
-        
         
         // Start generate series's data
         keywords_selected = {};
@@ -482,6 +475,13 @@ function buildInterface() {
         d3.selectAll("#choose_y_scale button:not(#linear)")
             .attr("disabled", "");
         
+        // Add buttons to change the y scale
+        subsets = [
+            {name: "All", id: "all"},
+            {name: "Unique", id: "unique"}
+        ];
+        buildOption("subset", subsets, changeData, 0);
+        
         // Add legend with constituent parts
         legend = {};
         legend.container = d3.select('#legend');
@@ -584,6 +584,37 @@ function buildLegend () {
         .data(function(d) { return [d]; })
         .enter().append('div')
         .attr('class', 'legend_label');
+
+//    legend_entries.selectAll('button.legend_button')
+//        .data(function(d) { return [d]; })
+//        .enter().append('button')
+//        .style('width', '20px')
+//        .on('click', function(d) {
+//        
+//        
+//            document.getElementById(legend.dragover)
+//                .appendChild(this);
+//        
+//            // Set drag tooltip visibility if a category is empty (or now no longer)
+//            legend.container.selectAll('.legend_part').select('.legend_drag_tip')
+//                .style('display', function(legend_part) {
+//                    if(d3.select('#' + legend_part).selectAll('div.legend_entry')[0].length == 0)
+//                        return 'block';
+//                    else
+//                        return 'none';
+//                });
+//        
+//            // Set whether the keyword is active & change style
+//            keywords_selected[d.name] = legend.dragover == 'legend_active';
+//            legend.container.select('.' + d.id + ' .legend_icon')
+//                .classed('off', !keywords_selected[d.name]);
+//        
+//            legend.container_inactive.selectAll('div.legend_entry').sort(compareSeries);
+//            legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
+//
+//            // Refresh the graph
+//            prepareData();
+//        });
     
     legend_entries.exit().remove();
     
