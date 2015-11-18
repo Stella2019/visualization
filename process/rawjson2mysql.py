@@ -12,9 +12,12 @@ serverStorage = None
 options = {}
 collection = {'name': None}
 unique_mask = 1e6
-add_tweet = ("INSERT INTO Tweet "
-             "(ID, Event_ID, Text, Redundant, Type, Username, Timestamp, Origin)"
-             "VALUES (%(ID)s, %(Event_ID)s, %(Text)s, %(Redundant)s, %(Type)s, %(Username)s, %(Timestamp)s, %(Origin)s)")
+add_tweet = ("INSERT IGNORE INTO Tweet "
+             "(ID, Text, Redundant, Type, Username, Timestamp, Origin)"
+             "VALUES (%(ID)s, %(Text)s, %(Redundant)s, %(Type)s, %(Username)s, %(Timestamp)s, %(Origin)s)")
+add_tweet_to_event = ("INSERT INTO TweetInEvent "
+             "(Tweet_ID, Event_ID)"
+             "VALUES (%(Tweet_ID)s, %(Event_ID)s)")
 
 def main():
     parser = argparse.ArgumentParser(description='Parse a raw collection into the important constituents and/or calculate statistics on the collection',
@@ -72,15 +75,14 @@ def parseFile(filename):
                     unique = True
              
 #                if(options.verbose): 
-                    for key in data:
-                        print ("key: %s , value: %s(%s)" % (key, type(data[key]), str(data[key]).encode('utf-8')))
+#                    for key in data:
+#                        print ("key: %s , value: %s(%s)" % (key, type(data[key]), str(data[key]).encode('utf-8')))
                 
                 # Assemble other attridbutes
                 created_at = datetime.strptime(data['created_at'], '%a %b %d %X %z %Y')
                 
                 tweet = {
                     'ID': data['id'],
-                    'Event_ID': collection['id'],
                     'Text': text,
                     'Redundant': not unique,
                     'Type': 'original',
@@ -89,22 +91,28 @@ def parseFile(filename):
                     'Origin': None
                 }
                 
-                if("in_reply_to_status_id_str" in data): 
+                if("in_reply_to_status_id_str" in data and data['in_reply_to_status_id_str'] is not None): 
                     tweet['Origin'] = data['in_reply_to_status_id_str']
                     tweet['Type'] = 'reply'
-                elif("quote_status_id_str" in data): 
+                elif("quote_status_id_str" in data and data['quote_status_id_str'] is not None): 
                     tweet['Origin'] = data['quote_status_id_str']
                     tweet['Type'] = 'quote'
                 elif("retweeted_status" in data and (data['retweeted_status']) is not None):
+                    if('id' in data['retweeted_status']):
+                        tweet['Origin'] = data['retweeted_status']['id']
                     tweet['Type'] = 'retweet'
                 if("user" in data and "screen_name" in data["user"]):
                     tweet['Username'] = data['user']['screen_name']
                 
 #                if(options.verbose): pprint(tweet)
                 
-#                cursor.execute(add_tweet, tweet)
+                cursor.execute(add_tweet, tweet)
+        
+                # Also add to event
+                tweetInEvent = {'Tweet_ID': data['id'], 'Event_ID': collection['id']}
+                cursor.execute(add_tweet_to_event, tweetInEvent)
              
-#    serverStorage.commit()
+    serverStorage.commit()
     cursor.close()
                 
                         
@@ -115,7 +123,6 @@ def parseDir(path):
     for filename in sorted(os.listdir(path)):
         if filename.endswith(".json") and filename[-18:-10].isdigit() and filename[-9:-5].isdigit():
             parseFile(path + "/" + filename)
-        break
 
 def verifyCollection(collection_name):
     if collection['name'] == None:
