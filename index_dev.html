@@ -1,0 +1,45 @@
+<!doctype html>
+
+<html>
+<head>
+    <title>Twitter Capture Visualization</title>
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+    <link rel="stylesheet" type="text/css" href="style.css">
+
+    <!-- Javascript -->
+    <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<!--
+    <script src='graphing_scripts/view.js'></script>
+    <script src='graphing_scripts/model.js'></script>
+    <script src='graphing_scripts/controller.js'></script>
+-->
+    <script src='graphing_scripts/options.js'></script>
+    <script src='graphing_scripts/main_dev.js'></script>
+</head>
+<body>
+
+    <div class='container'>
+        <h3>Twitter Capture Visualization</h3>
+        <div id="choices">
+            <div class="choice">
+                Collection:
+                <select id="chooseCollection"></select>
+            </div>
+        </div>
+
+        <div style='width:1000px'>
+            <svg id="timeseries"></svg>
+            <div id="legend"></div>
+            <div class="text-center">
+                Tweet volume over the whole collection period. Brush over to select time period
+            </div>
+        </div>
+        
+    </div>
+
+</body>
+</html>

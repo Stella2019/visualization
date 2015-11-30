@@ -36,6 +36,10 @@
     text-transform: capitalize;
 }
 
+button:focus {
+    outline: none !important;
+}
+
 /* Legend */
 #legend {
     position: absolute;

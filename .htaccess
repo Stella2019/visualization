@@ -1,0 +1,3 @@
+<Files "local.conf">
+    Require local
+</Files>

@@ -11,6 +11,7 @@ options = {}
 collection = {'name': None}
 collection_counts = {}
 collection_counts_unique = {}
+collection_counts_type = {'original': {}, 'retweet': {}, 'reply': {}, 'quote': {}}
 collection_tweets = {}
 unique_mask = 1e6
 
@@ -48,13 +49,22 @@ def parseFile(filename):
     # Collect the counts of the keyword for the collection
     global collection_counts
     global collection_counts_unique
+    global collection_counts_type
     unique_set = set()
     
     collection_counts[timestamp] = {'tweets': 0}
     collection_counts_unique[timestamp] = {'tweets': 0}
+    collection_counts_type['original'][timestamp] = {'tweets': 0}
+    collection_counts_type['retweet'][timestamp] = {'tweets': 0}
+    collection_counts_type['reply'][timestamp] = {'tweets': 0}
+    collection_counts_type['quote'][timestamp] = {'tweets': 0}
     for keyword in collection['keywords']:
         collection_counts[timestamp][keyword] = 0
         collection_counts_unique[timestamp][keyword] = 0
+        collection_counts_type['original'][timestamp][keyword] = 0
+        collection_counts_type['retweet'][timestamp][keyword] = 0
+        collection_counts_type['reply'][timestamp][keyword] = 0
+        collection_counts_type['quote'][timestamp][keyword] = 0
 
     # Load this time period's JSON file
     with open(filename) as data_file: 
@@ -81,6 +91,15 @@ def parseFile(filename):
                 collection_counts[timestamp]['tweets'] += 1
                 if(unique):
                     collection_counts_unique[timestamp]['tweets'] += 1
+                
+                tweet_type = 'original'
+                if("in_reply_to_status_id_str" in data and data['in_reply_to_status_id_str'] is not None): 
+                    tweet_type = 'reply'
+                elif("quote_status_id_str" in data and data['quote_status_id_str'] is not None): 
+                    tweet_type = 'quote'
+                elif("retweeted_status" in data and (data['retweeted_status']) is not None):
+                    tweet_type = 'retweet'
+                collection_counts_type[tweet_type][timestamp]['tweets'] += 1;
 
                 # Search for keywords
                 for keyword, keyword_parts in zip(collection['keywords'], collection['keywords_parts']):
@@ -93,6 +112,8 @@ def parseFile(filename):
                         collection_counts[timestamp][keyword] += 1
                         if(unique):
                             collection_counts_unique[timestamp][keyword] += 1
+                        collection_counts_type[tweet_type][timestamp][keyword] += 1
+
                         
 def parseDir(path):
     if options.verbose:
@@ -145,11 +166,11 @@ def loadCollection(collection_name):
     if("Paris" in collection["name"]):
         keywords.append("Les Halles")
         keywords.append("Shopping Mall")
+        keywords.append("Bataclan")
         keywords.append("Concert Hall")
-        keywords.append("Uber")
         keywords.append("Eiffel")
-        keywords.append("Gamergate")
-    print(keywords)
+        keywords.append("Louvre")
+        keywords.append("Pompidou")
     
     collection["keywords"] = []
     collection["keywords_parts"] = []
@@ -192,6 +213,14 @@ def saveCollection():
         json.dump(collection_counts, out_file)
     with open(prefix + '_unique.json', 'w') as out_file:
         json.dump(collection_counts_unique, out_file)
+    with open(prefix + '_original.json', 'w') as out_file:
+        json.dump(collection_counts_type['original'], out_file)
+    with open(prefix + '_retweet.json', 'w') as out_file:
+        json.dump(collection_counts_type['retweet'], out_file)
+    with open(prefix + '_reply.json', 'w') as out_file:
+        json.dump(collection_counts_type['reply'], out_file)
+    with open(prefix + '_quote.json', 'w') as out_file:
+        json.dump(collection_counts_type['quote'], out_file)
 #    with open(prefix + '_tweets.json', 'w') as out_file:
 #        json.dump(collection_tweets, out_file)
 

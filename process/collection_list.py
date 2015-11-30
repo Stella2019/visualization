@@ -21,7 +21,7 @@ def main():
         # Search for collection in the fetched data
         for item in fetched_data["results"]:
             item["keywords"] = item["twitter_keywords"].replace(', ', ',').split(',')
-            item["has_stats"] = os.path.exists("../capture_stats/" + item["name"] + ".csv")
+            item["has_stats"] = os.path.exists("../capture_stats/" + item["name"] + ".json")
             item["has_unique_stats"] = os.path.exists("../capture_stats/" + item["name"] + "_unique.csv")
             if(item["has_stats"] and item["total_count"] is not None and item["total_count"] > 1000):
                 collections.append(item)
