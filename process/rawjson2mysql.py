@@ -73,7 +73,7 @@ def parseFile(filename):
             if len(line) > 5:
                 
                 data = json.loads(line)
-                text = unicodedata.normalize('NFKD', data['text']).encode('ascii', 'replace');
+                text = unicodedata.normalize('NFD', data['text']).encode('ascii', 'ignore');
 #                text.replace('\n', '<br />')
 
                 save_tweet = True
