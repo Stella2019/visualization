@@ -38,9 +38,9 @@ function Options() {
             callback: function() { chooseYScale(); }
         });
     options.subset = new Option({
-            labels: ["All", "First Instance", "Original", "Retweet", "Reply", "Quote"],
+            labels: ["All", "Unique", "Original", "Retweet", "Reply", "Quote"],
             ids:    ["all", "unique", "original", "retweet", "reply", "quote"],
-            available: [0, 1, 2, 3, 4, 5],
+            available: [0, 1, 2, 3, 4],
             default: 0,
             callback: function() { changeData(); }
         });

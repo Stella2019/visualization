@@ -5,7 +5,6 @@ Array.prototype.contains = function (element) {
 var collections;
 var collection_names = ["Paris Shooting", "Paris Collection 2", "Paris Shooting - 3 - New Terms", "SahafiHotelAttack", "Sinai Plane Crash", "NORAD blimp on the loose", "Earthquake in Pakistan and Afghanistan", "Hurricane Patricia - Spanish terms", "Flooding from Patricia", "Hurricane Patricia", "Wilfrid Laurier Lockdown", "Black Lives Matter Collection", "Ankara Bombing", "Hurricane Oho", "Doctors without Borders", "Townhall gunmen", "umpqua college shooting", "Hurricane Joaquin - hurricane terms", "Hurricane Joaquin - flooding terms", "Yemen mosque bombing", "Chile", "Flash Flood", "California Valley Fire", "Grand Mosque accident", "Refugee crisis", "Karachi Explosion", "Chicago Shooting", "Western WA storms", "Tropical Storm Erika", "WA Wildfires - August", "Cotopaxi volcano", "FAA outage", "Chemical Spill - August 2015", "Alaska Earthquake - July 26", "Navy Shooting", "NYSE Stock Exchange Cant Exchange", "India Earthquake"];
 var data_stacked, series_data, data_raw, total_byTime;
-var select;
 var keywords, keywords_selected;
 var options = new Options();
 
@@ -103,24 +102,22 @@ function initialize() {
     buildInterface();
 }
 
-function changeData() {
-    var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
-    var collection = collection_names[selectedIndex];
-    var unique_suffix = options.subset.is("all") ? "" : "_" + options.subset.get();
+function loadDataFile(collection, subset, callback) {
+    var filename = "capture_stats/" + collection + (subset != 'all' ? '_' + subset : '') + ".json";
     
-    d3.json("capture_stats/" + collection + unique_suffix + ".json", function(error, data_file) {
+    d3.json(filename, function(error, data_file) {
         if (error) throw error;
-	
+
         // Get the timestamps
         timestamps = Object.keys(data_file).sort();
-        
+
         // Get the keywords
-        keywords = d3.keys(data_file[timestamps[0]]).filter(function (key) {
+        var keywords = d3.keys(data_file[timestamps[0]]).filter(function (key) {
             return key !== "timestamp" && key !== 'tweets';
         });
-        
+
         // Parse dates and ints
-        data_raw = [];
+        data_raw[subset] = [];
         for (var i = 0; i < timestamps.length; i++) {
             timestamp = timestamps[i];
             entry = {
@@ -130,40 +127,84 @@ function changeData() {
             keywords.map(function(keyword) {
                 entry[keyword] = parseInt(data_file[timestamp][keyword]);
             });
-            data_raw.push(entry);
+            data_raw[subset].push(entry);
         }
         
-        // Start generate series's data
-        keywords_selected = {};
-        series_data = [];
-        keywords.forEach(function(name, i) {
-            keywords_selected[name] = true; 
-            series_data.push({
-                name: name,
-                id: simplify(name),
-                order: (i + 1) * 100,
-                shown: true, // replaced the map keywords_selected with this at some point
-                sum: data_raw.reduce(function(cur_sum, datapoint) {
-                    return cur_sum + datapoint[name];
-                }, 0)
-            });
+        d3.selectAll("#choose_subset #" + subset)
+            .attr("disabled", null);
+        
+        callback();
+    });
+}
+    
+function loadCollectionData() {
+    var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
+    var collection = collection_names[selectedIndex];
+    
+    // Turn off all subsets
+    d3.selectAll("#choose_subset button")
+            .attr("disabled", "");
+    
+    data_raw = {};
+    var subset_to_start = options.subset.get();
+    
+    // Load the collection's primary file
+    loadDataFile(collection, subset_to_start, function() {
+        
+        // Get the keywords
+        keywords = d3.keys(data_raw[subset_to_start][0]).filter(function (key) {
+            return key !== "timestamp" && key !== 'tweets';
         });
         
-        // Build Legend
-        buildLegend();
-
         // Set Time Domain and Axis
-        var x_min = timestamps[0];
-        var x_max = timestamps[timestamps.length - 1];
+        var x_min = data_raw[subset_to_start][0].timestamp;
+        var x_max = data_raw[subset_to_start][data_raw[subset_to_start].length - 1].timestamp;
         focus.x.domain([x_min, x_max]).clamp(true);
         context.x.domain([x_min, x_max]);
-    
+
         // Clear brush
         brush.clear();
         plot_area.svg.selectAll('.brush').call(brush);
         
+        // Load the rest of the data (asychronous)
+        options.subset.ids.map(function(subset) {
+            loadDataFile(collection, subset, function() {});
+        });
+        
+        // Load the main series
+        loadNewSeriesData(subset_to_start);
+        
+        // Build Legend
+        keywords_selected = {};
+        keywords.forEach(function(name, i) {
+            keywords_selected[name] = true; 
+        });
+        buildLegend();
+        
+        // Finish preparing the data for loading
         prepareData();
     });
+}
+
+function loadNewSeriesData(subset) {
+    series_data = [];
+    keywords.forEach(function(name, i) {
+        series_data.push({
+            name: name,
+            id: simplify(name),
+            order: (i + 1) * 100,
+            shown: true, // replaced the map keywords_selected with this at some point
+            sum: data_raw[subset].reduce(function(cur_sum, datapoint) {
+                return cur_sum + datapoint[name];
+            }, 0)
+        });
+    });
+}
+
+function changeData() {
+    loadNewSeriesData(options.subset.get());
+    
+    prepareData();
 }
 
 function prepareData() {
@@ -196,7 +237,7 @@ function prepareData() {
 
             return newdata;
         })
-        .entries(data_raw);
+        .entries(data_raw[options.subset.get()]);
 
     // Convert data to a format the charts can use
     var data_ready = [];
@@ -212,6 +253,13 @@ function prepareData() {
         }, 0), 1);
     });
     
+    // Reorder by total size
+    series_data.sort(compareSeries);
+    legend.container_inactive.selectAll('div.legend_entry').sort(compareSeries);
+    legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
+    setColors();
+    
+    // Add the nested data to the series
     series_data.map(function(datum) {
         datum.values = data_ready.map(function(d) {
             return {timestamp: d.timestamp, value: d[datum.name]};
@@ -220,12 +268,6 @@ function prepareData() {
             return Math.max(cur_max, d[datum.name]);
         }, 0);
     });
-    
-    // Reorder by total size
-    series_data.sort(compareSeries);
-    legend.container_inactive.selectAll('div.legend_entry').sort(compareSeries);
-    legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
-    setColors();
     
     // Set Time Domain and Axis appropriate to the resolution
     var x_min = data_ready[0].timestamp;
@@ -442,7 +484,7 @@ function buildInterface() {
             return collection.name;
         });
         
-        select  = d3.select("select#chooseCollection").on('change', changeData);
+        select  = d3.select("select#chooseCollection").on('change', loadCollectionData);
         var select_collections = select.selectAll("option").data(collection_names);
 
         select_collections.enter().append("option").text(function (d) { return d; });
@@ -487,7 +529,7 @@ function buildInterface() {
                 if(d == 'legend_inactive') return 'Drag items to here to hide';
             });
         
-        changeData();
+        loadCollectionData();
     });
 }
 
@@ -500,7 +542,7 @@ function setColors() {
         .style('border-color', function (d) { return color(d.name); });
 }
 
-function buildLegend () {
+function buildLegend (flag_reset) {
     // Make the legend
     var legend_entries = legend.container_active
         .selectAll('div.legend_entry')
