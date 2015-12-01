@@ -22,10 +22,20 @@ add_tweet_to_event = ("INSERT INTO TweetInEvent "
 def main():
     parser = argparse.ArgumentParser(description='Parse a raw collection into the important constituents and/or calculate statistics on the collection',
                                 add_help=True)
-    parser.add_argument("-v", "--verbose", help="Increase output verbosity",
-                    action="store_true")
-    parser.add_argument("-d", "--directory", help="Indicates that the path is pointing to a folder, should handle read all json files within", action="store_true")
-    parser.add_argument("-s", "--statistics", help="Instead of parsing a raw collection, instead just calculate statistics based on a the file(s)", action="store_true")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="Increase output verbosity")
+    parser.add_argument("--printtweets", action="store_true", default=False,
+                        help="Print the text of all tweets, warning: can dramatically increase runtime")
+    parser.add_argument("-d", "--directory", action="store_true",
+                        help="Indicates that the path is pointing to a folder, should handle read all json files within")
+    parser.add_argument("-s", "--statistics", action="store_true",
+                        help="Instead of parsing a raw collection, instead just calculate statistics based on a the file(s)")
+    parser.add_argument("-w", "--words", nargs="+", required=False,
+                        help='To filter the tweets that are accepted, a word or list of words in which one of them must be present in the tweet')
+    parser.add_argument("-b", "--database", action="store",
+                        help="Name of database to use if not one in .conf file")
+    parser.add_argument("-t", "--test", action="store_true", default=False,
+                        help="Just testing the program, don't commit tweets")
     parser.add_argument("path", action="store",
                         help="Path to file/folder where the collections are to be processed.")
     global options
@@ -62,10 +72,17 @@ def parseFile(filename):
         for line in data_file:
             if len(line) > 5:
                 
-                
                 data = json.loads(line)
                 text = unicodedata.normalize('NFKD', data['text']).encode('ascii', 'replace');
 #                text.replace('\n', '<br />')
+
+                save_tweet = True
+                if(options.words):
+                    save_tweet = False
+                    for word in options.words:
+                        save_tweet |= word.lower() in text.lower().decode()
+                if(not save_tweet):
+                    continue
                 
                 # Figure out if it is unique
                 hash_value = hash(text) % unique_mask
@@ -78,7 +95,7 @@ def parseFile(filename):
 #                    for key in data:
 #                        print ("key: %s , value: %s(%s)" % (key, type(data[key]), str(data[key]).encode('utf-8')))
                 
-                # Assemble other attridbutes
+                # Assemble other attributes
                 created_at = datetime.strptime(data['created_at'], '%a %b %d %X %z %Y')
                 
                 tweet = {
@@ -104,7 +121,7 @@ def parseFile(filename):
                 if("user" in data and "screen_name" in data["user"]):
                     tweet['Username'] = data['user']['screen_name']
                 
-#                if(options.verbose): pprint(tweet)
+                if(options.printtweets): pprint(tweet)
                 
                 cursor.execute(add_tweet, tweet)
         
@@ -112,7 +129,8 @@ def parseFile(filename):
                 tweetInEvent = {'Tweet_ID': data['id'], 'Event_ID': collection['id']}
                 cursor.execute(add_tweet_to_event, tweetInEvent)
              
-    serverStorage.commit()
+    if(not options.test):
+        serverStorage.commit()
     cursor.close()
                 
                         
@@ -200,6 +218,9 @@ def connectToServer():
         
         # MySQL Storage
         global serverStorage
+        if(options.database):
+            config["storage"]["database"] = options.database
+        
         serverStorage = mysql.connector.connect(
             user=config["storage"]["user"],
             password=config["storage"]["password"],

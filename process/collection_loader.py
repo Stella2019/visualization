@@ -164,13 +164,12 @@ def loadCollection(collection_name):
     keywords = collection["twitter_keywords"].split(',');
     
     if("Paris" in collection["name"]):
-        keywords.append("Les Halles")
-        keywords.append("Shopping Mall")
-        keywords.append("Bataclan")
-        keywords.append("Concert Hall")
-        keywords.append("Eiffel")
-        keywords.append("Louvre")
-        keywords.append("Pompidou")
+        for new_word in ["Les Halles", "Shopping Mall", "Bataclan", "Concert Hall", "Eiffel", "Louvre", "Pimpidou"]:
+            duplicate = False
+            for existing_word in keywords:
+                duplicate |= new_word.lower() == existing_word.strip().lower() 
+            if(not duplicate):
+                keywords.append(new_word)
     
     collection["keywords"] = []
     collection["keywords_parts"] = []
