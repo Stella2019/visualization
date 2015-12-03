@@ -228,16 +228,24 @@ function changeData() {
 function prepareData() {
     // If we haven't loaded the data yet, tell the user and ask them to wait
     if(data_raw[options.subset.get()] == undefined) {
-        if (confirm(
-            getCurrentCollection().name + ": " + 
-            options.subset.get() + " tweets" +
-            " not loaded yet. \n\n" +
-            "Press OK to try again.")
-           ) {
-            window.setTimeout(prepareData, 1000);
-        } else {
-            // Should mark that the visualization is out of date or something
-        }
+        // Wait a second, then if it still isn't ready, message user that they are waiting
+        window.setTimeout(function() {
+            if(data_raw[options.subset.get()] == undefined) {
+                if (confirm(
+                    getCurrentCollection().name + ": " + 
+                    options.subset.get() + " tweets" +
+                    " not loaded yet. \n\n" +
+                    "Press OK to try again.")
+                   ) {
+                    window.setTimeout(prepareData, 1000);
+                } else {
+                    // Should mark that the visualization is out of date or something
+                }
+                return;
+            } else {
+                prepareData();
+            }
+        }, 1000);
         return;
     }
     
