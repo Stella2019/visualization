@@ -15,11 +15,6 @@
     <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
 
-<!--
-    <script src='graphing_scripts/view.js'></script>
-    <script src='graphing_scripts/model.js'></script>
-    <script src='graphing_scripts/controller.js'></script>
--->
     <script src='scripts/js/options.js'></script>
     <script src='scripts/js/main_dev.js'></script>
 </head>
@@ -27,12 +22,7 @@
 
     <div class='container'>
         <h3>Twitter Capture Visualization</h3>
-        <div id="choices">
-            <div class="choice">
-                Collection:
-                <select id="chooseCollection"></select>
-            </div>
-        </div>
+        <div id="choices"></div>
 
         <div style='width:1000px'>
             <svg id="timeseries"></svg>
@@ -41,7 +31,6 @@
                 Tweet volume over the whole collection period. Brush over to select time period
             </div>
         </div>
-        
     </div>
 
 </body>

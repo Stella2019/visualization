@@ -130,8 +130,8 @@ function loadDataFile(collection, subset, callback) {
             data_raw[subset].push(entry);
         }
         
-        d3.selectAll("#choose_subset #" + subset)
-            .attr("disabled", null);
+//        d3.selectAll("#choose_subset #" + subset)
+//            .attr("disabled", null);
         
         callback();
     });
@@ -147,9 +147,10 @@ function loadDataFile(collection, subset, callback) {
 //}
 
 function getCurrentCollection () {
-    var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
+    var collection_name = options.collection.get();
+    
     return collections.reduce(function(collection, candidate) {
-        if(collection.name == collection_names[selectedIndex])
+        if(collection.name == collection_name)
             return collection;
         return candidate
     }, {});
@@ -159,12 +160,11 @@ function loadCollectionData() {
     var collection = getCurrentCollection();
     
     // Turn off all subsets
-    d3.selectAll("#choose_subset button")
-            .attr("disabled", "");
+//    d3.selectAll("#choose_subset button")
+//            .attr("disabled", "");
     
     data_raw = {};
     var subset_to_start = 'all'; //options.subset.get();
-    
     
     // Load the collection's primary file
     loadDataFile(collection.name, subset_to_start, function() {
@@ -212,7 +212,7 @@ function loadNewSeriesData(subset) {
             id: simplify(name),
             order: (i + 1) * 100,
             shown: true, // replaced the map keywords_selected with this at some point
-            sum: data_raw[subset].reduce(function(cur_sum, datapoint) {
+            sum: data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                 return cur_sum + datapoint[name];
             }, 0)
         });
@@ -226,6 +226,21 @@ function changeData() {
 }
 
 function prepareData() {
+    // If we haven't loaded the data yet, tell the user and ask them to wait
+    if(data_raw[options.subset.get()] == undefined) {
+        if (confirm(
+            getCurrentCollection().name + ": " + 
+            options.subset.get() + " tweets" +
+            " not loaded yet. \n\n" +
+            "Press OK to try again.")
+           ) {
+            window.setTimeout(prepareData, 1000);
+        } else {
+            // Should mark that the visualization is out of date or something
+        }
+        return;
+    }
+    
     // Aggregate on time depending on the resolution
     var data_nested = d3.nest()
         .key(function (d) {
@@ -394,7 +409,7 @@ function display() {
         y_min = 1;
     
     var y_max = 100;
-    if (options.display_type.is('lines')) {
+    if (options.display_type.is('overlap') | options.display_type.is('lines')) {
         y_max = d3.max(data_stacked.map(function (d) {
             return d.max;
         }));
@@ -404,11 +419,12 @@ function display() {
         y_max = d3.max(data_stacked[0].values.map(function (d) {
             return d.value0 + d.value;
         }));
-    }	
-    focus.y.domain([y_min, y_max])
-        .range([focus.height, 0]);
+    }
+    if(!options.y_scale.is("preserve"))
+        focus.y.domain([y_min, y_max])
+            .range([focus.height, 0]);
     
-    if(options.y_scale.is("log")) { // Inform the yAxis
+    if(options.y_scale.is("log")) {
         focus.yAxis.scale(focus.y)
             .tickFormat(focus.y.tickFormat(10, ",.0f"));
     }
@@ -450,7 +466,7 @@ function display() {
         .attr("d", function (d) { return focus.area(d.values); });
     
     // Define the parameters of the area
-    if (options.display_type.is('lines')) {
+    if (options.display_type.is('overlap') | options.display_type.is('lines')) {
         focus.area
             .y0(focus.height)
             .y1(function (d) { return focus.y(d.value); });
@@ -467,6 +483,13 @@ function display() {
     
     // Transition to the new area
     if(options.display_type.is("lines")) {
+        focus.svg.selectAll(".series")
+            .classed("lines", true);
+        transition.select("path.area")
+            .style("fill-opacity", 0)
+            .style("stroke-opacity", 1.0)
+            .attr("d", function(d) { return focus.area(d.values)});
+    } else if(options.display_type.is("overlap")) {
         focus.svg.selectAll(".series")
             .classed("lines", true);
         transition.select("path.area")
@@ -504,15 +527,13 @@ function buildInterface() {
             return collection.name;
         });
         
-        select  = d3.select("select#chooseCollection").on('change', loadCollectionData);
-        var select_collections = select.selectAll("option").data(collection_names);
-
-        select_collections.enter().append("option").text(function (d) { return d; });
+        // Generate options, including collections
+        options.collection.labels = collection_names;
+        options.collection.ids = collection_names;
+        options.collection.available = collection_names.map(function(d, i) { return i; });
+        options.collection.set(collection_names[0]);
         
-        // Add additional options
         options.init();
-//        d3.selectAll("#choose_y_scale button:not(#linear)")
-//            .attr("disabled", "");
         
         // Add legend with constituent parts
         legend = {};
@@ -703,29 +724,6 @@ function compareSeries(a, b) {
         return b.sum - a.sum;
     return a.order - b.order;
 }
-
-function chooseDisplayType() { // Deprecated with the dropdown lists
-    console.log(options.display_type.get());
-    if(options.display_type.is("lines")) {
-        d3.selectAll('#choose_y_scale button')
-            .attr('disabled', null);
-    } else {
-        d3.selectAll('#choose_y_scale button')
-            .attr('disabled', function(d) {
-                return this.id == 'linear' ? null : "";
-            });
-        
-        // Make sure that linear is selected
-        options.y_scale.set("linear");
-        var container = d3.select('#choose_y_scale');
-        container.selectAll(".active").classed("active", false);
-        container.selectAll("#linear").classed("active", true);
-    }
-    
-    chooseYScale();
-}
-
-//options.display_type.callback = function() { console.log("mmmm") };
 
 function setYScale() {
     if(options.y_scale.is("linear")) {

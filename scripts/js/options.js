@@ -30,8 +30,8 @@ function Options() {
         });
     options.display_type = new Option({
             title: "Chart Type",
-            labels: ["Stacked", "Lines", "Stream", "Separate", "100%"],
-            ids:    ["stacked", "lines", "stream", "separate", "percent"],
+            labels: ["Stacked", "Overlap", "Lines", "Stream", "Separate", "100%"],
+            ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
             available: [0, 1, 2, 3, 4],
             default: 0,
             callback: function() { display(); }
@@ -46,9 +46,9 @@ function Options() {
         });
     options.y_scale = new Option({
             title: "Y Scale",
-            labels: ["Linear",  "Power",   "Log"],
-            ids:    ["linear",  "pow",     "log"],
-            available: [0, 1, 2],
+            labels: ["Linear",  "Power", "Log", "Preserve"],
+            ids:    ["linear",  "pow",   "log", "preserve"],
+            available: [0, 1, 2, 3],
             default: 0,
             callback: function() { display(); }
         });
@@ -85,83 +85,6 @@ function Options() {
     this.y_scale = options.y_scale;
     this.subset = options.subset;
     this.shape = options.shape;
-    this.buildButtonSet = function(option) {
-        var set = options[option];
-
-        var superId = "choose_" + option;
-        
-        var choice_container 
-        
-        var inner_container = d3.select("#choices").append("div")
-            .attr("class", "choice")
-            .style("text-transform", "capitalize")
-            .html(" " + set.title + ": ")
-            .append("div")
-                .attr("id", superId)
-                .attr("class", "btn-group");
-
-        inner_container.selectAll("button")
-            .data(set.available)
-            .enter()
-            .append("button")
-                .attr("type", "button")
-                .attr("class", "btn btn-default")
-                .attr("id", function(d) { return set.ids[d]; })
-                .text(function(d) { return set.labels[d]; })
-                .on("click", function(d) {
-                    inner_container.select('.active').classed('active', false);
-                    inner_container.select('#' + set.ids[d]).classed('active', true);
-
-                    set.set(set.ids[d]);
-
-                    set.callback();
-                });
-
-        inner_container.select('#' + set.ids[set.default]).classed('active', true);
-    };
-//    this.buildDropdown = function(option) {
-//        var set = options[option];
-//
-//        var superId = "choose_" + option;
-//        var container = d3.select("#choices").append("div")
-//            .attr("class", "choice")
-//            .style("text-transform", "capitalize")
-////            .html(" " + set.title + ": ")
-//            .append("div")
-//                .attr("id", superId)
-//                .attr("class", "btn-group dropdown");
-//        
-//        container.append("button")
-//            .attr({type: "button",
-//                class: 'btn btn-default dropdown-toggle',
-//                'data-toggle': "dropdown",
-//                'aria-haspopup': true,
-//                'aria-expanded': false})
-//            .html("<strong>" + set.title + ":</strong>" +
-//                  " <span class='current'>Label</span>" +
-//                  " <span class='caret'><span>");
-//
-//        container.append('ul')
-//            .attr({class: 'dropdown-menu'})
-//            .selectAll("li")
-//                .data(set.available)
-//                .enter()
-//                .append("li").append("a")
-//                    .attr("id", function(d) { return option + "_" + set.ids[d]; })
-//                    .attr("href", "#")
-//                    .text(function(d) { return set.labels[d]; })
-//                    .on("click", function(d) {
-//                        container.select('.current')
-//                            .text(set.labels[d]);
-//
-//                        set.set(set.ids[d]);
-//
-//                        set.callback();
-//                    });
-//
-//        container.select('.current')
-//            .text(set.labels[set.default]);
-//    };
 };
 
 Options.prototype = {
@@ -170,15 +93,48 @@ Options.prototype = {
 //        d3.selectAll("#choose_y_scale button:not(#linear)")
 //            .attr("disabled", "");
     },
+    buildButtonSet: function(option) {
+        if(option == '<br>') {
+            d3.select("#choices").append("br")
+            return
+        }
+        
+        var set = this[option];
+        
+        var container = d3.select("#choices").append("div")
+            .attr("class", "choice")
+            .style("text-transform", "capitalize")
+            .html(" " + set.title + ": ")
+            .append("div")
+                .attr("id", superId)
+                .attr("class", "btn-group");
+
+        container.selectAll("button")
+            .data(set.available)
+            .enter()
+            .append("button")
+                .attr("type", "button")
+                .attr("class", "btn btn-default")
+                .attr("id", function(d) { return set.ids[d]; })
+                .text(function(d) { return set.labels[d]; })
+                .on("click", function(d) {
+                    container.select('.active').classed('active', false);
+                    container.select('#' + set.ids[d]).classed('active', true);
+
+                    set.set(set.ids[d]);
+
+                    set.callback();
+                });
+
+        container.select('#' + set.ids[set.default]).classed('active', true);
+    },
     buildDropdown: function(option) {
         if(option == '<br>') {
             d3.select("#choices").append("br")
             return
         }
         
-        console.log(this);
-        console.log(option);
-        var set = options[option];
+        var set = this[option];
 
         var superId = "choose_" + option;
         var container = d3.select("#choices").append("div")
@@ -187,7 +143,7 @@ Options.prototype = {
 //            .html(" " + set.title + ": ")
             .append("div")
                 .attr("id", superId)
-                .attr("class", "btn-group dropdown");
+                .attr("class", "dropdown");
         
         container.append("button")
             .attr({type: "button",
@@ -207,7 +163,11 @@ Options.prototype = {
                 .append("li").append("a")
                     .attr("id", function(d) { return option + "_" + set.ids[d]; })
                     .attr("href", "#")
-                    .text(function(d) { return set.labels[d]; })
+                    .html(function(d) {
+//                        return "<span style='opacity:0'> " + set.title + "&nbsp;</span>" +
+//                            set.labels[d] + "&nbsp;";
+                        return set.labels[d];
+                    })
                     .on("click", function(d) {
                         container.select('.current')
                             .text(set.labels[d]);

@@ -147,9 +147,10 @@ function loadDataFile(collection, subset, callback) {
 //}
 
 function getCurrentCollection () {
-    var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
+    var collection_name = options.collection.get();
+    
     return collections.reduce(function(collection, candidate) {
-        if(collection.name == collection_names[selectedIndex])
+        if(collection.name == collection_name)
             return collection;
         return candidate
     }, {});
@@ -164,7 +165,6 @@ function loadCollectionData() {
     
     data_raw = {};
     var subset_to_start = 'all'; //options.subset.get();
-    
     
     // Load the collection's primary file
     loadDataFile(collection.name, subset_to_start, function() {
@@ -226,16 +226,17 @@ function changeData() {
 }
 
 function prepareData() {
-    // If data is not ready yet, block until it's ready, not a fantastic idea
-    
-    while(data_raw[options.subset.get()] == undefined) {
+    // If we haven't loaded the data yet, tell the user and ask them to wait
+    if(data_raw[options.subset.get()] == undefined) {
         if (confirm(
             getCurrentCollection().name + ": " + 
             options.subset.get() + " tweets" +
-            " not ready yet. \n\n" +
+            " not loaded yet. \n\n" +
             "Press OK to try again.")
            ) {
             window.setTimeout(prepareData, 1000);
+        } else {
+            // Should mark that the visualization is out of date or something
         }
         return;
     }
@@ -408,7 +409,7 @@ function display() {
         y_min = 1;
     
     var y_max = 100;
-    if (options.display_type.is('lines')) {
+    if (options.display_type.is('overlap') | options.display_type.is('lines')) {
         y_max = d3.max(data_stacked.map(function (d) {
             return d.max;
         }));
@@ -418,11 +419,12 @@ function display() {
         y_max = d3.max(data_stacked[0].values.map(function (d) {
             return d.value0 + d.value;
         }));
-    }	
-    focus.y.domain([y_min, y_max])
-        .range([focus.height, 0]);
+    }
+    if(!options.y_scale.is("preserve"))
+        focus.y.domain([y_min, y_max])
+            .range([focus.height, 0]);
     
-    if(options.y_scale.is("log")) { // Inform the yAxis
+    if(options.y_scale.is("log")) {
         focus.yAxis.scale(focus.y)
             .tickFormat(focus.y.tickFormat(10, ",.0f"));
     }
@@ -464,7 +466,7 @@ function display() {
         .attr("d", function (d) { return focus.area(d.values); });
     
     // Define the parameters of the area
-    if (options.display_type.is('lines')) {
+    if (options.display_type.is('overlap') | options.display_type.is('lines')) {
         focus.area
             .y0(focus.height)
             .y1(function (d) { return focus.y(d.value); });
@@ -481,6 +483,13 @@ function display() {
     
     // Transition to the new area
     if(options.display_type.is("lines")) {
+        focus.svg.selectAll(".series")
+            .classed("lines", true);
+        transition.select("path.area")
+            .style("fill-opacity", 0)
+            .style("stroke-opacity", 1.0)
+            .attr("d", function(d) { return focus.area(d.values)});
+    } else if(options.display_type.is("overlap")) {
         focus.svg.selectAll(".series")
             .classed("lines", true);
         transition.select("path.area")
@@ -518,15 +527,13 @@ function buildInterface() {
             return collection.name;
         });
         
-        select  = d3.select("select#chooseCollection").on('change', loadCollectionData);
-        var select_collections = select.selectAll("option").data(collection_names);
-
-        select_collections.enter().append("option").text(function (d) { return d; });
+        // Generate options, including collections
+        options.collection.labels = collection_names;
+        options.collection.ids = collection_names;
+        options.collection.available = collection_names.map(function(d, i) { return i; });
+        options.collection.set(collection_names[0]);
         
-        // Add additional options
         options.init();
-//        d3.selectAll("#choose_y_scale button:not(#linear)")
-//            .attr("disabled", "");
         
         // Add legend with constituent parts
         legend = {};
