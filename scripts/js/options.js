@@ -108,7 +108,7 @@ Options.prototype = {
         };
         
         // Record the state
-        options.recordState(options);
+        options.recordState(options, null, false);
     },
     importState: function(options) {
         try {
@@ -150,7 +150,7 @@ Options.prototype = {
                 options.subset.callback();
         }
     },
-    recordState: function(options, changedItem) {
+    recordState: function(options, changedItem, newState) {
         if(changedItem == undefined) {
             options.state = options.dropdowns.reduce(function(state, dropdown) {
                 if(dropdown != "<br>")
@@ -161,7 +161,11 @@ Options.prototype = {
             options.state[changedItem] = options[changedItem].get();
         }
 
-        history.pushState(null, null, '#' + JSON.stringify(this.state));
+        if(newState == undefined || newState) {
+            history.pushState(null, null, '#' + JSON.stringify(this.state));
+        } else {
+            history.replaceState(null, null, '#' + JSON.stringify(this.state));
+        }
     },
     buildButtonSet: function(option) {
         if(option == '<br>') {
