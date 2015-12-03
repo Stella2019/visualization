@@ -9,15 +9,20 @@ function Option(args) {
 };
 Option.prototype = {
     get: function() { return this.cur; },
-    set: function(choice) { this.cur = choice},
-    is: function(choice) { return this.cur == choice},
+    getLabel: function() { return this.labels[this.indexOf(this.cur)]; },
+    set: function(choice) {
+        if(this.indexOf(choice) > -1)
+            this.cur = choice;
+    },
+    is: function(choice) { return this.cur == choice; },
+    indexOf: function(choice) { return this.ids.indexOf(choice); }
 };
 
 function Options() {
     var self = this;
     
     var options = {};
-    options.sets = ['collection', 'subset', 'resolution', '<br>',
+    options.dropdowns = ['collection', 'subset', 'resolution', '<br>',
                     'display_type', 'y_scale', 'shape']; 
     
     options.collection = new Option({
@@ -77,7 +82,8 @@ function Options() {
             callback: function() { console.log("Series changed"); }
         });
     
-    this.sets = options.sets;
+    this.dropdowns = options.dropdowns;
+    this.state = {};
     
     this.collection = options.collection;
     this.display_type = options.display_type;
@@ -89,9 +95,73 @@ function Options() {
 
 Options.prototype = {
     init: function() {
-        this.sets.map(this.buildDropdown, this);
+        var options = this;
+        
+        options.dropdowns.map(options.buildDropdown, options);
 //        d3.selectAll("#choose_y_scale button:not(#linear)")
 //            .attr("disabled", "");
+        
+        // Import the current state
+        options.importState(options);
+        window.onpopstate = function() {
+            options.importState(options)
+        };
+        
+        // Record the state
+        options.recordState(options);
+    },
+    importState: function(options) {
+        try {
+            state = JSON.parse(window.location.hash.slice(1));
+        } catch(err) {
+            return;
+        }
+        
+        // Figure out what options should be different
+        var changed = [];
+        Object.keys(state).map(function(option) {
+            if(option in options && !options[option].is(state[option])) {
+                // Record this change
+                console.info("Changed " + option + 
+                            " from " + options[option].get() +
+                            " to " + state[option]);
+                changed.push(option);
+                
+                // Change the state entry
+                options[option].set(state[option]);
+                options.state[option] = state[option];
+                
+                // Change the interface
+                if(options.dropdowns.indexOf(option) > -1) {
+                    d3.select("#choose_" + option).select('.current')
+                        .text(options[option].getLabel());
+                }
+            }
+        });
+        
+        // If the program has been initialized
+        if(data_raw != undefined) {
+            // Render changes
+            // Right now this function is VERY manual, should make a more explicit data flow
+
+            if(changed.indexOf("collection") > -1)
+                options.collection.callback();
+            else
+                options.subset.callback();
+        }
+    },
+    recordState: function(options, changedItem) {
+        if(changedItem == undefined) {
+            options.state = options.dropdowns.reduce(function(state, dropdown) {
+                if(dropdown != "<br>")
+                    state[dropdown] = options[dropdown].get();
+                return state;
+            }, {});
+        } else {
+            options.state[changedItem] = options[changedItem].get();
+        }
+
+        history.pushState(null, null, '#' + JSON.stringify(this.state));
     },
     buildButtonSet: function(option) {
         if(option == '<br>') {
@@ -134,7 +204,8 @@ Options.prototype = {
             return
         }
         
-        var set = this[option];
+        var options = this;
+        var set = options[option];
 
         var superId = "choose_" + option;
         var container = d3.select("#choices").append("div")
@@ -162,7 +233,7 @@ Options.prototype = {
                 .enter()
                 .append("li").append("a")
                     .attr("id", function(d) { return option + "_" + set.ids[d]; })
-                    .attr("href", "#")
+//                    .attr("href", "")
                     .html(function(d) {
 //                        return "<span style='opacity:0'> " + set.title + "&nbsp;</span>" +
 //                            set.labels[d] + "&nbsp;";
@@ -172,12 +243,19 @@ Options.prototype = {
                         container.select('.current')
                             .text(set.labels[d]);
 
+//                        state[option] = set.ids[d];
+////                        console.log(JSON.stringify(this.state));
+//                        history.pushState(null, null,'#' + JSON.stringify(state));
+////                        window.location.hash = '#' + JSON.stringify(this.state);
                         set.set(set.ids[d]);
+                        options.recordState(options, option);
 
                         set.callback();
                     });
 
+        // Save the current value to the interface and the history
         container.select('.current')
             .text(set.labels[set.default]);
+        options.state[option] = set.ids[set.default];
     }
 }
