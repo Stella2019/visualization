@@ -130,26 +130,44 @@ function loadDataFile(collection, subset, callback) {
             data_raw[subset].push(entry);
         }
         
-        d3.selectAll("#choose_subset #" + subset)
-            .attr("disabled", null);
+//        d3.selectAll("#choose_subset #" + subset)
+//            .attr("disabled", null);
         
         callback();
     });
 }
+
+//function getFreshData(search_term) {
+//    var url = "http://hcde.conradnied.com/emcomp/visualization/getKeywordTimeFreq.php";
+//    url += '?table_id=' + collection.
+//    
+//    d3.csv('?table_id=112&search_term=halles', function() {
+//    });
+//           
+//}
+
+function getCurrentCollection () {
+    var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
+    return collections.reduce(function(collection, candidate) {
+        if(collection.name == collection_names[selectedIndex])
+            return collection;
+        return candidate
+    }, {});
+}
     
 function loadCollectionData() {
-    var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
-    var collection = collection_names[selectedIndex];
+    var collection = getCurrentCollection();
     
     // Turn off all subsets
-    d3.selectAll("#choose_subset button")
-            .attr("disabled", "");
+//    d3.selectAll("#choose_subset button")
+//            .attr("disabled", "");
     
     data_raw = {};
-    var subset_to_start = options.subset.get();
+    var subset_to_start = 'all'; //options.subset.get();
+    
     
     // Load the collection's primary file
-    loadDataFile(collection, subset_to_start, function() {
+    loadDataFile(collection.name, subset_to_start, function() {
         
         // Get the keywords
         keywords = d3.keys(data_raw[subset_to_start][0]).filter(function (key) {
@@ -168,7 +186,7 @@ function loadCollectionData() {
         
         // Load the rest of the data (asychronous)
         options.subset.ids.map(function(subset) {
-            loadDataFile(collection, subset, function() {});
+            loadDataFile(collection.name, subset, function() {});
         });
         
         // Load the main series
@@ -194,7 +212,7 @@ function loadNewSeriesData(subset) {
             id: simplify(name),
             order: (i + 1) * 100,
             shown: true, // replaced the map keywords_selected with this at some point
-            sum: data_raw[subset].reduce(function(cur_sum, datapoint) {
+            sum: data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                 return cur_sum + datapoint[name];
             }, 0)
         });
@@ -208,6 +226,20 @@ function changeData() {
 }
 
 function prepareData() {
+    // If data is not ready yet, block until it's ready, not a fantastic idea
+    
+    while(data_raw[options.subset.get()] == undefined) {
+        if (confirm(
+            getCurrentCollection().name + ": " + 
+            options.subset.get() + " tweets" +
+            " not ready yet. \n\n" +
+            "Press OK to try again.")
+           ) {
+            window.setTimeout(prepareData, 1000);
+        }
+        return;
+    }
+    
     // Aggregate on time depending on the resolution
     var data_nested = d3.nest()
         .key(function (d) {
@@ -316,6 +348,8 @@ function prepareData() {
 }
 
 function display() {
+    setYScale();
+    
     if (options.display_type.is("wiggle")) {
         stack.offset("wiggle");
     } else if (options.display_type.is("stream_expand")) {
@@ -491,9 +525,8 @@ function buildInterface() {
         
         // Add additional options
         options.init();
-        d3.selectAll("#choose_y_scale button:not(#linear)")
-            .attr("disabled", "");
-        
+//        d3.selectAll("#choose_y_scale button:not(#linear)")
+//            .attr("disabled", "");
         
         // Add legend with constituent parts
         legend = {};
@@ -685,30 +718,7 @@ function compareSeries(a, b) {
     return a.order - b.order;
 }
 
-function chooseDisplayType() {
-    console.log(options.display_type.get());
-    if(options.display_type.is("lines")) {
-        d3.selectAll('#choose_y_scale button')
-            .attr('disabled', null);
-    } else {
-        d3.selectAll('#choose_y_scale button')
-            .attr('disabled', function(d) {
-                return this.id == 'linear' ? null : "";
-            });
-        
-        // Make sure that linear is selected
-        options.y_scale.set("linear");
-        var container = d3.select('#choose_y_scale');
-        container.selectAll(".active").classed("active", false);
-        container.selectAll("#linear").classed("active", true);
-    }
-    
-    chooseYScale();
-}
-
-//options.display_type.callback = function() { console.log("mmmm") };
-
-function chooseYScale() {
+function setYScale() {
     if(options.y_scale.is("linear")) {
         focus.y = d3.scale.linear()
             .range([focus.height, 0]);
@@ -726,7 +736,6 @@ function chooseYScale() {
         focus.yAxis.scale(focus.y)
             .tickFormat(focus.y.tickFormat(10, ",.0f"));
     }
-    display();
 }
 
 function simplify(str) {

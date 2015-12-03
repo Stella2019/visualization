@@ -3,17 +3,10 @@ Array.prototype.contains = function (element) {
 };
 
 var collections;
-var collection_names = [];
+var collection_names = ["Paris Shooting", "Paris Collection 2", "Paris Shooting - 3 - New Terms", "SahafiHotelAttack", "Sinai Plane Crash", "NORAD blimp on the loose", "Earthquake in Pakistan and Afghanistan", "Hurricane Patricia - Spanish terms", "Flooding from Patricia", "Hurricane Patricia", "Wilfrid Laurier Lockdown", "Black Lives Matter Collection", "Ankara Bombing", "Hurricane Oho", "Doctors without Borders", "Townhall gunmen", "umpqua college shooting", "Hurricane Joaquin - hurricane terms", "Hurricane Joaquin - flooding terms", "Yemen mosque bombing", "Chile", "Flash Flood", "California Valley Fire", "Grand Mosque accident", "Refugee crisis", "Karachi Explosion", "Chicago Shooting", "Western WA storms", "Tropical Storm Erika", "WA Wildfires - August", "Cotopaxi volcano", "FAA outage", "Chemical Spill - August 2015", "Alaska Earthquake - July 26", "Navy Shooting", "NYSE Stock Exchange Cant Exchange", "India Earthquake"];
 var data_stacked, series_data, data_raw, total_byTime;
-var select;
 var keywords, keywords_selected;
-var chart_options = {
-    display_type: "stacked_area",
-    resolution: "tenminute",
-    y_scale: "linear",
-    subset: "all",
-    shape: "basis"
-}
+var options = new Options();
 
 window.onload = initialize;
 
@@ -74,11 +67,11 @@ function initialize() {
     drag = d3.behavior.drag();
     
     focus.area = d3.svg.area()
-        .interpolate("basis")
+        .interpolate(options.shape.get())
         .x(function (d) { return focus.x(d.timestamp); });
 
     context.area = d3.svg.area()
-        .interpolate("basis")
+        .interpolate(options.shape.get())
         .x(function(d) { return context.x(d.timestamp); })
         .y0(context.height)
         .y1(function(d) { return context.y(d.tweets); });
@@ -109,25 +102,22 @@ function initialize() {
     buildInterface();
 }
 
-
-function newData() {
-    var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
-    var collection = collection_names[selectedIndex];
-    var unique_suffix = chart_options.subset == "unique" ? "_unique" : "";
+function loadDataFile(collection, subset, callback) {
+    var filename = "capture_stats/" + collection + (subset != 'all' ? '_' + subset : '') + ".json";
     
-    d3.json("capture_stats/" + collection + unique_suffix + ".json", function(error, data_file) {
+    d3.json(filename, function(error, data_file) {
         if (error) throw error;
-	
+
         // Get the timestamps
         timestamps = Object.keys(data_file).sort();
-        
+
         // Get the keywords
-        keywords = d3.keys(data_file[timestamps[0]]).filter(function (key) {
+        var keywords = d3.keys(data_file[timestamps[0]]).filter(function (key) {
             return key !== "timestamp" && key !== 'tweets';
         });
-        
+
         // Parse dates and ints
-        data_raw = [];
+        data_raw[subset] = [];
         for (var i = 0; i < timestamps.length; i++) {
             timestamp = timestamps[i];
             entry = {
@@ -137,104 +127,102 @@ function newData() {
             keywords.map(function(keyword) {
                 entry[keyword] = parseInt(data_file[timestamp][keyword]);
             });
-            data_raw.push(entry);
+            data_raw[subset].push(entry);
         }
         
-        // Start generate series's data
-        keywords_selected = {};
-        series_data = [];
-        keywords.forEach(function(name, i) {
-            keywords_selected[name] = true; 
-            series_data.push({
-                name: name,
-                id: simplify(name),
-                order: (i + 1) * 100,
-                shown: true, // replaced the map keywords_selected with this at some point
-                sum: data_raw.reduce(function(cur_sum, datapoint) {
-                    return cur_sum + datapoint[name];
-                }, 0)
-            });
+        d3.selectAll("#choose_subset #" + subset)
+            .attr("disabled", null);
+        
+        callback();
+    });
+}
+
+//function getFreshData(search_term) {
+//    var url = "http://hcde.conradnied.com/emcomp/visualization/getKeywordTimeFreq.php";
+//    url += '?table_id=' + collection.
+//    
+//    d3.csv('?table_id=112&search_term=halles', function() {
+//    });
+//           
+//}
+
+function getCurrentCollection () {
+    var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
+    return collections.reduce(function(collection, candidate) {
+        if(collection.name == collection_names[selectedIndex])
+            return collection;
+        return candidate
+    }, {});
+}
+    
+function loadCollectionData() {
+    var collection = getCurrentCollection();
+    
+    // Turn off all subsets
+    d3.selectAll("#choose_subset button")
+            .attr("disabled", "");
+    
+    data_raw = {};
+    var subset_to_start = 'all'; //options.subset.get();
+    
+    
+    // Load the collection's primary file
+    loadDataFile(collection.name, subset_to_start, function() {
+        
+        // Get the keywords
+        keywords = d3.keys(data_raw[subset_to_start][0]).filter(function (key) {
+            return key !== "timestamp" && key !== 'tweets';
         });
         
-        // Build Legend
-        buildLegend();
-
         // Set Time Domain and Axis
-        var x_min = timestamps[0];
-        var x_max = timestamps[timestamps.length - 1];
+        var x_min = data_raw[subset_to_start][0].timestamp;
+        var x_max = data_raw[subset_to_start][data_raw[subset_to_start].length - 1].timestamp;
         focus.x.domain([x_min, x_max]).clamp(true);
         context.x.domain([x_min, x_max]);
-    
+
         // Clear brush
         brush.clear();
         plot_area.svg.selectAll('.brush').call(brush);
         
+        // Load the rest of the data (asychronous)
+        options.subset.ids.map(function(subset) {
+            loadDataFile(collection.name, subset, function() {});
+        });
+        
+        // Load the main series
+        loadNewSeriesData(subset_to_start);
+        
+        // Build Legend
+        keywords_selected = {};
+        keywords.forEach(function(name, i) {
+            keywords_selected[name] = true; 
+        });
+        buildLegend();
+        
+        // Finish preparing the data for loading
         prepareData();
     });
 }
 
+function loadNewSeriesData(subset) {
+    series_data = [];
+    keywords.forEach(function(name, i) {
+        series_data.push({
+            name: name,
+            id: simplify(name),
+            order: (i + 1) * 100,
+            shown: true, // replaced the map keywords_selected with this at some point
+            sum: data_raw[subset].reduce(function(cur_sum, datapoint) {
+                return cur_sum + datapoint[name];
+            }, 0)
+        });
+    });
+}
 
 function changeData() {
-    var selectedIndex = d3.select("select#chooseCollection").property('selectedIndex');
-    var collection = collection_names[selectedIndex];
-    var unique_suffix = chart_options.subset == "unique" ? "_unique" : "";
+    loadNewSeriesData(options.subset.get());
     
-    d3.json("capture_stats/" + collection + unique_suffix + ".json", function(error, data_file) {
-        if (error) throw error;
-	
-        // Get the timestamps
-        timestamps = Object.keys(data_file).sort();
-        
-        // Get the keywords
-        keywords = d3.keys(data_file[timestamps[0]]).filter(function (key) {
-            return key !== "timestamp" && key !== 'tweets';
-        });
-        
-        // Parse dates and ints
-        data_raw = [];
-        for (var i = 0; i < timestamps.length; i++) {
-            timestamp = timestamps[i];
-            entry = {
-                timestamp: parseDate(timestamp),
-                tweets: data_file[timestamp]["tweets"]
-            };
-            keywords.map(function(keyword) {
-                entry[keyword] = parseInt(data_file[timestamp][keyword]);
-            });
-            data_raw.push(entry);
-        }
-        
-        // Start generate series's data
-        keywords_selected = {};
-        series_data = [];
-        keywords.forEach(function(name, i) {
-            keywords_selected[name] = true; 
-            series_data.push({
-                name: name,
-                id: simplify(name),
-                order: (i + 1) * 100,
-                shown: true, // replaced the map keywords_selected with this at some point
-                sum: data_raw.reduce(function(cur_sum, datapoint) {
-                    return cur_sum + datapoint[name];
-                }, 0)
-            });
-        });
-        
-        // Build Legend
-        buildLegend();
-
-        // Set Time Domain and Axis
-        var x_min = timestamps[0];
-        var x_max = timestamps[timestamps.length - 1];
-        focus.x.domain([x_min, x_max]).clamp(true);
-        context.x.domain([x_min, x_max]);
-    
-        // Clear brush
-        brush.clear();
-        plot_area.svg.selectAll('.brush').call(brush);
-        
-        prepareData();
-    });
+    prepareData();
 }
 
 function prepareData() {
@@ -242,9 +230,11 @@ function prepareData() {
     var data_nested = d3.nest()
         .key(function (d) {
             time = new Date(d.timestamp);
-            if(chart_options.resolution == "hour" || chart_options.resolution == "day")
+            if(options.resolution.is('tenminute'))
+                time.setMinutes(Math.floor(time.getMinutes() / 10) * 10);
+            if(options.resolution.is('hour') || options.resolution.is("day"))
                 time.setMinutes(0);
-            if(chart_options.resolution == "day")
+            if(options.resolution.is("day"))
                 time.setHours(0);
             return time;
         })
@@ -265,7 +255,7 @@ function prepareData() {
 
             return newdata;
         })
-        .entries(data_raw);
+        .entries(data_raw[options.subset.get()]);
 
     // Convert data to a format the charts can use
     var data_ready = [];
@@ -281,6 +271,13 @@ function prepareData() {
         }, 0), 1);
     });
     
+    // Reorder by total size
+    series_data.sort(compareSeries);
+    legend.container_inactive.selectAll('div.legend_entry').sort(compareSeries);
+    legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
+    setColors();
+    
+    // Add the nested data to the series
     series_data.map(function(datum) {
         datum.values = data_ready.map(function(d) {
             return {timestamp: d.timestamp, value: d[datum.name]};
@@ -289,12 +286,6 @@ function prepareData() {
             return Math.max(cur_max, d[datum.name]);
         }, 0);
     });
-    
-    // Reorder by total size
-    series_data.sort(compareSeries);
-    legend.container_inactive.selectAll('div.legend_entry').sort(compareSeries);
-    legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
-    setColors();
     
     // Set Time Domain and Axis appropriate to the resolution
     var x_min = data_ready[0].timestamp;
@@ -316,6 +307,9 @@ function prepareData() {
             return Math.max(cur_max, series["tweets"]);
         }, 0)])
             .range([context.height, 0]);
+    
+    context.area
+        .interpolate(options.shape.get());
     
     context.svg.selectAll(".x, .area").remove();
     context.svg.append("path")
@@ -340,18 +334,20 @@ function prepareData() {
 }
 
 function display() {
-    if (chart_options.display_type == "stream_wiggle") {
+    setYScale();
+    
+    if (options.display_type.is("wiggle")) {
         stack.offset("wiggle");
-    } else if (chart_options.display_type == "stream_expand") {
+    } else if (options.display_type.is("stream_expand")) {
         stack.offset("expand");
-    } else if (chart_options.display_type == "stream_silhouette") {
+    } else if (options.display_type.is("stream")) {
         stack.offset("silhouette");
     } else {
         stack.offset("zero");
     }
 
     // Set stack representation of data
-    if(chart_options.display_type === "percent_area") {
+    if(options.display_type.is("percent")) {
         data_100 = series_data.map(function(series) {
             var new_series = JSON.parse(JSON.stringify(series));
             new_series.values = new_series.values.map(function(datum, i) {
@@ -370,7 +366,7 @@ function display() {
     // Change data for display
     n_series = data_stacked.length;
     n_datapoints = data_stacked[0].values.length;
-    if(chart_options.display_type == "stream_separate") {
+    if(options.display_type.is("separate")) {
         for (var i = n_series - 1; i >= 0; i--) {
             data_stacked[i].offset = 0;
             if(i < n_series - 1) {
@@ -387,20 +383,22 @@ function display() {
     
     // I want the starting chart to emanate from the
     // middle of the display.
-    focus.area.y0(focus.height / 2)
+    focus.area
+        .interpolate(options.shape.get())
+        .y0(focus.height / 2)
         .y1(focus.height / 2);
     
     // Set the Y Domain
     var y_min = 0;
-    if(chart_options.y_scale == "log")
+    if(options.y_scale.is("log"))
         y_min = 1;
     
     var y_max = 100;
-    if (chart_options.display_type == 'lines') {
+    if (options.display_type.is('lines')) {
         y_max = d3.max(data_stacked.map(function (d) {
             return d.max;
         }));
-    } else if (chart_options.display_type == 'percent_area') {
+    } else if (options.display_type.is('percent')) {
         y_max = 100;
     } else {
         y_max = d3.max(data_stacked[0].values.map(function (d) {
@@ -410,7 +408,7 @@ function display() {
     focus.y.domain([y_min, y_max])
         .range([focus.height, 0]);
     
-    if(chart_options.y_scale == "log") { // Inform the yAxis
+    if(options.y_scale.is("log")) { // Inform the yAxis
         focus.yAxis.scale(focus.y)
             .tickFormat(focus.y.tickFormat(10, ",.0f"));
     }
@@ -452,7 +450,7 @@ function display() {
         .attr("d", function (d) { return focus.area(d.values); });
     
     // Define the parameters of the area
-    if (chart_options.display_type === 'lines') {
+    if (options.display_type.is('lines')) {
         focus.area
             .y0(focus.height)
             .y1(function (d) { return focus.y(d.value); });
@@ -468,7 +466,7 @@ function display() {
         .duration(750)
     
     // Transition to the new area
-    if(chart_options.display_type == "lines") {
+    if(options.display_type.is("lines")) {
         focus.svg.selectAll(".series")
             .classed("lines", true);
         transition.select("path.area")
@@ -506,47 +504,15 @@ function buildInterface() {
             return collection.name;
         });
         
-        select  = d3.select("select#chooseCollection").on('change', changeData);
-        var options = select.selectAll("option").data(collection_names);
+        select  = d3.select("select#chooseCollection").on('change', loadCollectionData);
+        var select_collections = select.selectAll("option").data(collection_names);
 
-        options.enter().append("option").text(function (d) { return d; });
+        select_collections.enter().append("option").text(function (d) { return d; });
         
-        // Add display type selection
-        display_types = [
-            {name: "Stacked", id: "stacked_area"},
-//            {name: "Overlap", id: "overlap_area"},
-            {name: "Overlap", id: "lines"},
-            {name: "Stream", id: "stream_silhouette"},
-//            {name: "Wiggle", id: "stream_wiggle"},
-            {name: "Separate", id: "stream_separate"},
-            {name: "100%", id: "percent_area"}
-        ];
-        buildOption("display_type", display_types, chooseDisplayType, 0);
-        
-        // Add buttons to change the time resolution
-        resolutions = [
-            {name: "Day", id: "day"},
-            {name: "Hour", id: "hour"},
-            {name: "10 Minute", id: "tenminute"}
-        ];
-        buildOption("resolution", resolutions, prepareData, 1);
-        
-        // Add buttons to change the y scale
-        yscales = [
-            {name: "Linear", id: "linear"},
-            {name: "Power", id: "pow"},
-            {name: "Log", id: "log"}
-        ];
-        buildOption("y_scale", yscales, chooseYScale, 0);
-        d3.selectAll("#choose_y_scale button:not(#linear)")
-            .attr("disabled", "");
-        
-        // Add buttons to change the y scale
-        subsets = [
-            {name: "All", id: "all"},
-            {name: "Unique", id: "unique"}
-        ];
-        buildOption("subset", subsets, changeData, 0);
+        // Add additional options
+        options.init();
+//        d3.selectAll("#choose_y_scale button:not(#linear)")
+//            .attr("disabled", "");
         
         // Add legend with constituent parts
         legend = {};
@@ -582,7 +548,7 @@ function buildInterface() {
                 if(d == 'legend_inactive') return 'Drag items to here to hide';
             });
         
-        changeData();
+        loadCollectionData();
     });
 }
 
@@ -595,7 +561,7 @@ function setColors() {
         .style('border-color', function (d) { return color(d.name); });
 }
 
-function buildLegend () {
+function buildLegend (flag_reset) {
     // Make the legend
     var legend_entries = legend.container_active
         .selectAll('div.legend_entry')
@@ -738,38 +704,9 @@ function compareSeries(a, b) {
     return a.order - b.order;
 }
 
-function buildOption(type, values, callBack, default_option){
-    var superId = "choose_" + type;
-    var container = d3.select("#choices").append("div")
-        .attr("class", "choice")
-        .style("text-transform", "capitalize")
-        .html(" " + type.replace("_", " ") + ": ")
-        .append("div")
-        .attr("id", superId)
-        .attr("class", "btn-group");
-    
-    container.selectAll("button")
-        .data(values)
-        .enter()
-        .append("button")
-        .attr("type", "button")
-        .attr("class", "btn btn-default")
-        .attr("id", function(d) { return d.id; })
-        .text(function(d) { return d.name; })
-        .on("click", function(d) {
-            container.select('.active').classed('active', false);
-            container.select('#' + d.id).classed('active', true);
-            chart_options[type] = d.id;
-        
-            callBack();
-        });
-    
-    container.select('#' + values[default_option].id).classed('active', true);
-    chart_options[type] = values[default_option].id;
-}
-
-function chooseDisplayType() {
-    if(chart_options.display_type == "lines") {
+function chooseDisplayType() { // Deprecated with the dropdown lists
+    console.log(options.display_type.get());
+    if(options.display_type.is("lines")) {
         d3.selectAll('#choose_y_scale button')
             .attr('disabled', null);
     } else {
@@ -779,7 +716,7 @@ function chooseDisplayType() {
             });
         
         // Make sure that linear is selected
-        chart_options.y_scale = "linear";
+        options.y_scale.set("linear");
         var container = d3.select('#choose_y_scale');
         container.selectAll(".active").classed("active", false);
         container.selectAll("#linear").classed("active", true);
@@ -788,25 +725,26 @@ function chooseDisplayType() {
     chooseYScale();
 }
 
-function chooseYScale() {
-    if(chart_options.y_scale == "linear") {
+//options.display_type.callback = function() { console.log("mmmm") };
+
+function setYScale() {
+    if(options.y_scale.is("linear")) {
         focus.y = d3.scale.linear()
             .range([focus.height, 0]);
         focus.yAxis.scale(focus.y)
             .tickFormat(null);
-    } else if(chart_options.y_scale == "pow") {
+    } else if(options.y_scale.is("pow")) {
         focus.y = d3.scale.sqrt()
             .range([focus.height, 0]);
         focus.yAxis.scale(focus.y)
             .tickFormat(null);
-    } else if(chart_options.y_scale == "log") {
+    } else if(options.y_scale.is("log")) {
         focus.y = d3.scale.log()
             .clamp(true)
             .range([focus.height, 0]);
         focus.yAxis.scale(focus.y)
             .tickFormat(focus.y.tickFormat(10, ",.0f"));
     }
-    display();
 }
 
 function simplify(str) {
