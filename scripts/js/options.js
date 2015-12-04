@@ -40,7 +40,7 @@ function Options() {
         });
     options.resolution = new Option({
             title: "Resolution",
-            labels: ["Day", "Hour", "10 Minute", "Minute"],
+            labels: ["Day", "Hour", "10 Minutes", "Minute"],
             ids:    ["day", "hour", "tenminute", "minute"],
             available: [0, 1, 2, 3],
             default: 2,
@@ -56,7 +56,7 @@ function Options() {
         });
     options.subset = new Option({
             title: "Subset",
-            labels: ["All", "Distinct", "Original Tweets", "Retweets", "Replies", "Quotes"],
+            labels: ["All", "Distinct", "Original", "Retweet", "Reply", "Quote"],
             ids:    ["all", "unique", "original", "retweet", "reply", "quote"],
             available: [0, 1, 2, 3, 4],
             default: 0,

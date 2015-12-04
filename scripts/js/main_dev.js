@@ -99,6 +99,15 @@ function initialize() {
         .attr("class", "context")
         .attr("transform", "translate(" + context.margin.left + "," + context.margin.top + ")");
     
+    focus.svg.append("text")
+        .attr('id', 'y_label')
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - focus.margin.left)
+        .attr("x", 0 - (focus.height / 2))
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .text("Count of <Subset> Tweets Every <Resolution>");
+    
     buildInterface();
 }
 
@@ -328,6 +337,11 @@ function prepareData() {
         .attr('transform', 'translate(0,' + focus.height + ')')
         .transition().duration(1000)
         .call(focus.xAxis);
+    
+    // Set the Y-Axis label
+    focus.svg.select('#y_label')
+        .text("Count of " + options.subset.getLabel() + " Tweets"
+              + " Every " + options.resolution.getLabel() + "");
     
     // Display values on the context chart
     context.y.domain([0, data_ready.reduce(function (cur_max, series) {
