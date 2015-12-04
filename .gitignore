@@ -1,4 +1,6 @@
 capture_data
 capture_stats
+scripts/js/external
+scripts/css/external
 local.conf
 *.pyc

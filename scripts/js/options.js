@@ -1,11 +1,9 @@
-function Option(args) {
-    this.title = args.title;
-    this.labels = args.labels;
-    this.ids = args.ids;
-    this.available = args.available;
-    this.default = args.default;
+function Option(args) {    
+    Object.keys(args).map(function(item) {
+        this[item] = args[item];
+    }, this);
+    
     this.cur = this.ids[this.default];
-    this.callback = args.callback;
 };
 Option.prototype = {
     get: function() { return this.cur; },
@@ -19,11 +17,10 @@ Option.prototype = {
 };
 
 function Options() {
-    var self = this;
-    
     var options = {};
     options.dropdowns = ['collection', 'subset', 'resolution', '<br>',
                     'display_type', 'y_scale', 'shape']; 
+    options.timefields = ['time_min', 'time_max']; 
     
     options.collection = new Option({
             title: "Collection",
@@ -75,29 +72,45 @@ function Options() {
         });
     options.series = new Option({
             title: "Series",
-            labels: ["Terms", "Tweet Types"],
-            ids:    ["terms", "types"],
+            labels: ["None", "Terms", "Tweet Types"],
+            ids:    ["none", "terms", "types"],
             available: [0, 1],
             default: 0,
-            callback: function() { console.log("Series changed"); }
+            callback: function() { console.log("Time Minimum changed"); }
+        });
+    options.time_min = new Option({
+            title: "Begin",
+            labels: ["2000-01-01 00:00"],
+            ids:    [new Date("2000-01-01 00:00")],
+            available: [0],
+            default: 0,
+            callback: function() { setFocusTime('input_field'); }
+        });
+    options.time_max = new Option({
+            title: "End",
+            labels: ["2000-01-01 00:00"],
+            ids:    [new Date("2000-01-01 00:00")],
+            available: [0],
+            default: 0,
+            callback: function() { setFocusTime('input_field'); }
         });
     
-    this.dropdowns = options.dropdowns;
-    this.state = {};
     
-    this.collection = options.collection;
-    this.display_type = options.display_type;
-    this.resolution = options.resolution;
-    this.y_scale = options.y_scale;
-    this.subset = options.subset;
-    this.shape = options.shape;
+    // push holder variables and option sets into the list
+    this.state = {};
+    Object.keys(options).map(function(item) {
+        this[item] = options[item];
+    }, this);
 };
 
 Options.prototype = {
     init: function() {
         var options = this;
         
+        // Build options
         options.dropdowns.map(options.buildDropdown, options);
+        options.buildTimeWindow(options);
+        
 //        d3.selectAll("#choose_y_scale button:not(#linear)")
 //            .attr("disabled", "");
         
@@ -122,9 +135,9 @@ Options.prototype = {
         Object.keys(state).map(function(option) {
             if(option in options && !options[option].is(state[option])) {
                 // Record this change
-                console.info("Changed " + option + 
-                            " from " + options[option].get() +
-                            " to " + state[option]);
+                console.info("Import option " + option + 
+                            ": from [" + options[option].get() + "]" +
+                            " to [" + state[option] + "]");
                 changed.push(option);
                 
                 // Change the state entry
@@ -136,11 +149,15 @@ Options.prototype = {
                     d3.select("#choose_" + option).select('.current')
                         .text(options[option].getLabel());
                 }
+                if(["time_min", "time_max"].indexOf(option) > -1) {
+                    d3.select("#choose_" + option).select('.current')
+                        .text(options[option].getLabel());
+                }
             }
         });
         
         // If the program has been initialized
-        if(data_raw != undefined) {
+        if(changed.length > 0 && data_raw != undefined) {
             // Render changes
             // Right now this function is VERY manual, should make a more explicit data flow
 
@@ -205,7 +222,7 @@ Options.prototype = {
     buildDropdown: function(option) {
         if(option == '<br>') {
             d3.select("#choices").append("br")
-            return
+            return;
         }
         
         var options = this;
@@ -261,5 +278,68 @@ Options.prototype = {
         container.select('.current')
             .text(set.labels[set.default]);
         options.state[option] = set.ids[set.default];
+    },
+    buildTimeWindow: function(options) {
+ 
+        var container = d3.select("#chart-bottom").append("div")
+            .attr("class", "choice form-inline");
+//            .html("<strong>Time Window:</strong> ");
+
+        container.append("input")
+            .style('width', '140px') // add 40 px for timezones
+            .attr("id", "choose_time_min")
+            .attr("class", "form-control");
+        container.append("text")
+            .text("  to  ");
+        container.append("input")
+            .style('width', '140px')
+            .attr("id", "choose_time_max")
+            .attr("class", "form-control");
+ 
+        var startDateTextBox = $('#choose_time_min');
+        var endDateTextBox = $('#choose_time_max');
+        
+        startDateTextBox.datetimepicker({ 
+            dateFormat: 'yy-mm-dd',
+            timeFormat: 'HH:mm', // HH:mm z for timezone
+            onClose: function(dateText, inst) {
+                if (endDateTextBox.val() != '') {
+                    var testStartDate = startDateTextBox.datetimepicker('getDate');
+                    var testEndDate = endDateTextBox.datetimepicker('getDate');
+                    if (testStartDate > testEndDate)
+                        endDateTextBox.datetimepicker('setDate', testStartDate);
+                } else {
+                    endDateTextBox.val(dateText);
+                }
+            },
+            onSelect: function (selectedDateTime){
+                var date = startDateTextBox.datetimepicker('getDate');
+                endDateTextBox.datetimepicker('option', 'minDate', date);
+                options.time_min.set(date);
+                options.time_min.callback();
+            }
+        });
+        endDateTextBox.datetimepicker({
+            dateFormat: 'yy-mm-dd',
+            timeFormat: 'HH:mm',
+            onClose: function(dateText, inst) {
+                if (startDateTextBox.val() != '') {
+                    var testStartDate = startDateTextBox.datetimepicker('getDate');
+                    var testEndDate = endDateTextBox.datetimepicker('getDate');
+                    if (testStartDate > testEndDate)
+                        startDateTextBox.datetimepicker('setDate', testEndDate);
+                } else {
+                    startDateTextBox.val(dateText);
+                }
+            },
+            onSelect: function (selectedDateTime){
+                var date = endDateTextBox.datetimepicker('getDate');
+                endDateTextBox.datetimepicker('option', 'maxDate', date);
+                options.time_max.set(date);
+                options.time_max.callback();
+            }
+        });
+        
+//        d3.selectAll('#ui-datepicker-div button').classed('btn btn-default', true);
     }
 }

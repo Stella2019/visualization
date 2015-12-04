@@ -6,14 +6,20 @@
 
     
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+    <link rel="stylesheet" type='text/css' href="scripts/css/external/bootstrap.min.css">
+    <link rel="stylesheet" type='text/css' href="scripts/css/external/bootstrap-theme.min.css">
+    <link rel="stylesheet" type='text/css' href="scripts/css/external/jquery-ui-timepicker-addon.min.css">
+    <link rel='stylesheet' type='text/css' href='scripts/css/external/jquery-ui-slider.css'>
+    <link rel="stylesheet" type="text/css" href="scripts/css/external/jquery-bootstrap-datepicker.css">
+    
     <link rel="stylesheet" type="text/css" href="scripts/css/style.css">
 
     <!-- Javascript -->
-    <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
-    <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+    <script src="scripts/js/external/jquery-1.11.3.min.js"></script>
+    <script src="scripts/js/external/jquery-ui.min.js"></script>
+    <script src="scripts/js/external/d3.v3.min.js" charset="utf-8"></script>
+    <script src="scripts/js/external/bootstrap.min.js"></script>
+    <script src="scripts/js/external/jquery-ui-timepicker-addon.min.js"></script>
 
     <script src='scripts/js/options.js'></script>
     <script src='scripts/js/main.js'></script>
@@ -24,11 +30,13 @@
         <h3>Twitter Capture Visualization</h3>
         <div id="choices"></div>
 
-        <div style='width:1000px'>
+        <div id="charts" style='width:1000px'>
             <svg id="timeseries"></svg>
             <div id="legend"></div>
-            <div class="text-center">
-                Tweet volume over the whole collection period. Brush over to select time period
+            <div id="chart-bottom" class="text-center">
+                <div style="padding: 10px">
+                    Tweet volume over the whole collection period. Manually enter or brush over to focus on time.
+                </div>
             </div>
         </div>
         

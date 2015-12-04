@@ -62,7 +62,7 @@ function initialize() {
 
     brush = d3.svg.brush()
         .x(context.x)
-        .on("brush", brushed);
+        .on("brush", function() { setFocusTime('brush'); } );
     
     drag = d3.behavior.drag();
     
@@ -311,10 +311,7 @@ function prepareData() {
     });
     
     // Set Time Domain and Axis appropriate to the resolution
-    var x_min = data_ready[0].timestamp;
-    var x_max = data_ready[data_ready.length - 1].timestamp;
-    context.x.domain([x_min, x_max]);
-    focus.x.domain(brush.empty() ? context.x.domain() : brush.extent());
+    setContextTime(data_ready[0].timestamp, data_ready[data_ready.length - 1].timestamp);
     
     // Display the xAxis
     var ax = focus.svg.select("g#xAxis");
@@ -513,7 +510,66 @@ function display() {
     }
 }
 
-function brushed() {
+function setContextTime(time_min, time_max) {
+    // Establish the maximum and minimum time of the data series
+    
+    // Set the context and focus domains
+    context.x.domain([time_min, time_max]);
+    focus.x.domain(brush.empty() ? context.x.domain() : brush.extent());
+    
+    // Set the time option
+    options.time_min.set(time_min);
+    options.time_min.min = time_min;
+    options.time_max.set(time_max);
+    options.time_max.max = time_max;
+    
+    // Set the manual field constraints
+    var startDateTextBox = $('#choose_time_min');
+    var endDateTextBox = $('#choose_time_max');
+    startDateTextBox.datetimepicker('option', 'minDate', time_min);
+    startDateTextBox.datetimepicker('option', 'maxDate', time_max);
+    startDateTextBox.datetimepicker("setDate", time_min);
+    endDateTextBox.datetimepicker('option', 'minDate', time_min);
+    endDateTextBox.datetimepicker('option', 'maxDate', time_max);
+    endDateTextBox.datetimepicker("setDate", time_max);
+}
+
+function setFocusTime(origin) {
+    var startDateTextBox = $('#choose_time_min');
+    var endDateTextBox = $('#choose_time_max');
+    
+    if(origin == "brush") {
+        var times = brush.extent();
+        
+        startDateTextBox.datetimepicker("setDate", times[0]);
+          endDateTextBox.datetimepicker("setDate", times[1]);
+        
+        options.time_min.set(times[0]);
+        options.time_max.set(times[1]);
+    } else if(origin == "input_field") {
+        var starttime = startDateTextBox.datetimepicker('getDate');
+        var endtime   =   endDateTextBox.datetimepicker('getDate');
+        
+        if(starttime < options.time_min.min) {
+            starttime = options.time_min.min
+            startDateTextBox.datetimepicker('setDate', starttime);
+        }
+        if(endtime > options.time_max.max) {
+            endtime = options.time_max.max
+            endDateTextBox.datetimepicker('setDate', endtime);
+        }
+        
+        // Update the brush
+        brush.extent([starttime, endtime])
+        brush(d3.select(".brush").transition());
+        brush.event(d3.select(".brush").transition())
+        
+        options.time_min.set(starttime);
+        options.time_max.set(endtime);
+    } else { // The min and max possible
+        
+    }
+
     focus.x.domain(brush.empty() ? context.x.domain() : brush.extent());
     focus.svg.selectAll("path.area")
         .attr("d", function(d) { return focus.area(d.values)});
