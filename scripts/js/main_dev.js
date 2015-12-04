@@ -288,6 +288,13 @@ function prepareData() {
         data_ready.push(new_data);
     });
     
+    // Add a duplicate entry if there is only one data point
+    if(data_ready.length == 1) {
+        var dup = $.extend({}, data_ready[0]);
+        dup.timestamp = new Date(dup.timestamp.getTime() + 60000);
+        data_ready.push(dup);
+    }
+    
     total_byTime = data_ready.map(function(datum) {
         return Math.max(keywords.reduce(function(running_sum, word) {
             return running_sum += datum[word];
@@ -512,26 +519,45 @@ function display() {
 
 function setContextTime(time_min, time_max) {
     // Establish the maximum and minimum time of the data series
+    var startTime = options.time_min.get();
+    var endTime =   options.time_max.get();
+    
+    if(startTime.getTime() == endTime.getTime()) {
+        startTime = time_min;
+        endTime = time_max;
+    } else {
+        if(startTime < time_min || startTime > time_max)
+            startTime = time_min;
+        if(endTime < time_min || endTime > time_max)
+            endTime = time_max;
+    }
     
     // Set the context and focus domains
     context.x.domain([time_min, time_max]);
-    focus.x.domain(brush.empty() ? context.x.domain() : brush.extent());
+    focus.x.domain(brush.empty() ? [startTime, endTime] : brush.extent());
+    
+    // Initialize the brush if it isn't identical
+    if(startTime != time_min || endTime != time_max) {
+        brush.extent([startTime, endTime]);
+    }
     
     // Set the time option
-    options.time_min.set(time_min);
+    options.time_min.set(startTime);
     options.time_min.min = time_min;
-    options.time_max.set(time_max);
+    options.time_max.set(endTime);
     options.time_max.max = time_max;
     
     // Set the manual field constraints
     var startDateTextBox = $('#choose_time_min');
-    var endDateTextBox = $('#choose_time_max');
     startDateTextBox.datetimepicker('option', 'minDate', time_min);
-    startDateTextBox.datetimepicker('option', 'maxDate', time_max);
-    startDateTextBox.datetimepicker("setDate", time_min);
-    endDateTextBox.datetimepicker('option', 'minDate', time_min);
+    startDateTextBox.datetimepicker('option', 'maxDate', endTime);
+    startDateTextBox.datetimepicker("setDate", startTime);
+    
+    var endDateTextBox = $('#choose_time_max');
+    endDateTextBox.datetimepicker('option', 'minDate', startTime);
     endDateTextBox.datetimepicker('option', 'maxDate', time_max);
-    endDateTextBox.datetimepicker("setDate", time_max);
+    endDateTextBox.datetimepicker("setDate", endTime);
+    
 }
 
 function setFocusTime(origin) {
@@ -566,10 +592,13 @@ function setFocusTime(origin) {
         
         options.time_min.set(starttime);
         options.time_max.set(endtime);
-    } else { // The min and max possible
+    } else { // The min and max possible?
         
     }
-
+    
+    options.recordState(options, 'time_min');
+    options.recordState(options, 'time_max');
+    
     focus.x.domain(brush.empty() ? context.x.domain() : brush.extent());
     focus.svg.selectAll("path.area")
         .attr("d", function(d) { return focus.area(d.values)});

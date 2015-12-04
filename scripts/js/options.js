@@ -9,7 +9,7 @@ Option.prototype = {
     get: function() { return this.cur; },
     getLabel: function() { return this.labels[this.indexOf(this.cur)]; },
     set: function(choice) {
-        if(this.indexOf(choice) > -1)
+        if(this.custom_entries_allowed || this.indexOf(choice) > -1)
             this.cur = choice;
     },
     is: function(choice) { return this.cur == choice; },
@@ -40,9 +40,9 @@ function Options() {
         });
     options.resolution = new Option({
             title: "Resolution",
-            labels: ["Day",     "Hour",    "10 Minute"],
-            ids:    ["day",     "hour",    "tenminute"],
-            available: [0, 1, 2],
+            labels: ["Day", "Hour", "10 Minute", "Minute"],
+            ids:    ["day", "hour", "tenminute", "minute"],
+            available: [0, 1, 2, 3],
             default: 2,
             callback: function() { prepareData(); }
         });
@@ -56,7 +56,7 @@ function Options() {
         });
     options.subset = new Option({
             title: "Subset",
-            labels: ["All", "Unique", "Original Tweets", "Retweets", "Replies", "Quotes"],
+            labels: ["All", "Distinct", "Original Tweets", "Retweets", "Replies", "Quotes"],
             ids:    ["all", "unique", "original", "retweet", "reply", "quote"],
             available: [0, 1, 2, 3, 4],
             default: 0,
@@ -76,7 +76,7 @@ function Options() {
             ids:    ["none", "terms", "types"],
             available: [0, 1],
             default: 0,
-            callback: function() { console.log("Time Minimum changed"); }
+            callback: function() { console.log("Series changed"); }
         });
     options.time_min = new Option({
             title: "Begin",
@@ -84,6 +84,7 @@ function Options() {
             ids:    [new Date("2000-01-01 00:00")],
             available: [0],
             default: 0,
+            custom_entries_allowed: true,
             callback: function() { setFocusTime('input_field'); }
         });
     options.time_max = new Option({
@@ -92,6 +93,7 @@ function Options() {
             ids:    [new Date("2000-01-01 00:00")],
             available: [0],
             default: 0,
+            custom_entries_allowed: true,
             callback: function() { setFocusTime('input_field'); }
         });
     
@@ -110,9 +112,6 @@ Options.prototype = {
         // Build options
         options.dropdowns.map(options.buildDropdown, options);
         options.buildTimeWindow(options);
-        
-//        d3.selectAll("#choose_y_scale button:not(#linear)")
-//            .attr("disabled", "");
         
         // Import the current state
         options.importState(options);
@@ -133,23 +132,24 @@ Options.prototype = {
         // Figure out what options should be different
         var changed = [];
         Object.keys(state).map(function(option) {
-            if(option in options && !options[option].is(state[option])) {
+            var value = state[option];
+            if(["time_min", "time_max"].indexOf(option) > -1) {
+                value = new Date(value);
+            }
+            
+            if(option in options && !options[option].is(value)) {
                 // Record this change
                 console.info("Import option " + option + 
                             ": from [" + options[option].get() + "]" +
-                            " to [" + state[option] + "]");
+                            " to [" + value + "]");
                 changed.push(option);
                 
                 // Change the state entry
-                options[option].set(state[option]);
-                options.state[option] = state[option];
+                options[option].set(value);
+                options.state[option] = value;
                 
                 // Change the interface
                 if(options.dropdowns.indexOf(option) > -1) {
-                    d3.select("#choose_" + option).select('.current')
-                        .text(options[option].getLabel());
-                }
-                if(["time_min", "time_max"].indexOf(option) > -1) {
                     d3.select("#choose_" + option).select('.current')
                         .text(options[option].getLabel());
                 }
@@ -316,6 +316,7 @@ Options.prototype = {
                 var date = startDateTextBox.datetimepicker('getDate');
                 endDateTextBox.datetimepicker('option', 'minDate', date);
                 options.time_min.set(date);
+                
                 options.time_min.callback();
             }
         });
@@ -336,6 +337,7 @@ Options.prototype = {
                 var date = endDateTextBox.datetimepicker('getDate');
                 endDateTextBox.datetimepicker('option', 'maxDate', date);
                 options.time_max.set(date);
+                
                 options.time_max.callback();
             }
         });
