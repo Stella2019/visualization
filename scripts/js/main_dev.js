@@ -74,7 +74,7 @@ function initialize() {
         .interpolate(options.shape.get())
         .x(function(d) { return context.x(d.timestamp); })
         .y0(context.height)
-        .y1(function(d) { return context.y(d.tweets); });
+        .y1(function(d) { return context.y(d._total_); });
     
     stack = d3.layout.stack()
         .values(function (d) { return d.values; })
@@ -112,7 +112,7 @@ function initialize() {
 }
 
 function loadDataFile(collection, subset, callback) {
-    var filename = "capture_stats/" + collection + (subset != 'all' ? '_' + subset : '') + ".json";
+    var filename = "capture_stats/" + collection + '_' + subset + ".json";
     
     d3.json(filename, function(error, data_file) {
         if (error) throw error;
@@ -122,7 +122,7 @@ function loadDataFile(collection, subset, callback) {
 
         // Get the keywords
         var keywords = d3.keys(data_file[timestamps[0]]).filter(function (key) {
-            return key !== "timestamp" && key !== 'tweets';
+            return key !== "timestamp" && key !== '_total_';
         });
 
         // Parse dates and ints
@@ -131,7 +131,7 @@ function loadDataFile(collection, subset, callback) {
             timestamp = timestamps[i];
             entry = {
                 timestamp: parseDate(timestamp),
-                tweets: data_file[timestamp]["tweets"]
+                '_total_': data_file[timestamp]["_total_"]
             };
             keywords.map(function(keyword) {
                 entry[keyword] = parseInt(data_file[timestamp][keyword]);
@@ -180,7 +180,7 @@ function loadCollectionData() {
         
         // Get the keywords
         keywords = d3.keys(data_raw[subset_to_start][0]).filter(function (key) {
-            return key !== "timestamp" && key !== 'tweets';
+            return key !== "timestamp" && key !== '_total_';
         });
         
         // Set Time Domain and Axis
@@ -242,7 +242,7 @@ function prepareData() {
             if(data_raw[options.subset.get()] == undefined) {
                 if (confirm(
                     getCurrentCollection().name + ": " + 
-                    options.subset.get() + " tweets" +
+                    options.subset.get() + " _total_" +
                     " not loaded yet. \n\n" +
                     "Press OK to try again.")
                    ) {
@@ -272,8 +272,8 @@ function prepareData() {
         })
         .rollup(function (leaves) {
             newdata = {timestamp: leaves[0].timestamp};
-            newdata.tweets = leaves.reduce(function(sum, cur) {
-                return sum + cur.tweets;
+            newdata['_total_'] = leaves.reduce(function(sum, cur) {
+                return sum + cur['_total_'];
             }, 0);
             keywords.map(function(keyword) {
                 if(keywords_selected[keyword]) {
@@ -345,7 +345,7 @@ function prepareData() {
     
     // Display values on the context chart
     context.y.domain([0, data_ready.reduce(function (cur_max, series) {
-            return Math.max(cur_max, series["tweets"]);
+            return Math.max(cur_max, series["_total_"]);
         }, 0)])
             .range([context.height, 0]);
     

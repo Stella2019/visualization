@@ -56,8 +56,8 @@ function Options() {
         });
     options.subset = new Option({
             title: "Subset",
-            labels: ["All", "Distinct", "Original", "Retweet", "Reply", "Quote"],
-            ids:    ["all", "unique", "original", "retweet", "reply", "quote"],
+            labels: ["All", "Distinct", "Original", "Retweet", "Reply"],//, "Quote"],
+            ids:    ["all", "distinct", "original", "retweet", "reply"],//, "quote"],
             available: [0, 1, 2, 3, 4],
             default: 0,
             callback: function() { changeData(); }
