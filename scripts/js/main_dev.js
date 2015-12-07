@@ -7,10 +7,11 @@ var collection_names = ["Paris Shooting", "Paris Collection 2", "Paris Shooting 
 var data_stacked, series_data, data_raw, total_byTime;
 var keywords, keywords_selected;
 var options = new Options();
+var ddd;
 
 window.onload = initialize;
 
-var parseDate, formatPercent,
+var formatDate,
     color,
     area, stack,
     brush, drag;
@@ -27,8 +28,7 @@ function initialize() {
     context.width  = focus.width;
     context.height = plot_area.height - context.margin.top - context.margin.bottom;
 
-    parseDate = d3.time.format("%Y%m%d_%H%M").parse;
-    formatPercent = d3.format(".0%");
+    formatDate = d3.time.format("%Y-%m-%d %H:%M:%S");
 
     focus.x = d3.time.scale()
         .range([0, focus.width]);
@@ -112,54 +112,95 @@ function initialize() {
 }
 
 function loadDataFile(collection, subset, callback) {
-    var filename = "capture_stats/" + collection + '_' + subset + ".json";
-    
-    d3.json(filename, function(error, data_file) {
-        if (error) throw error;
+//    var filename = "capture_stats/" + collection + '_' + subset + ".json";
+    var filename = "scripts/php/getSavedKeywordTimeFreq.php?event_id=" + collection.ID;
+
+    d3.csv(filename, function(error, data_file) {
+        if (error) {
+            alert("Sorry! File not found");
+            return;
+        }
 
         // Get the timestamps
-        timestamps = Object.keys(data_file).sort();
-
-        // Get the keywords
-        var keywords = d3.keys(data_file[timestamps[0]]).filter(function (key) {
-            return key !== "timestamp" && key !== '_total_';
-        });
-
-        // Parse dates and ints
-        data_raw[subset] = [];
-        for (var i = 0; i < timestamps.length; i++) {
-            timestamp = timestamps[i];
-            entry = {
-                timestamp: parseDate(timestamp),
-                '_total_': data_file[timestamp]["_total_"]
-            };
-            keywords.map(function(keyword) {
-                entry[keyword] = parseInt(data_file[timestamp][keyword]);
+        timestamps = Array.from(new Set(data_file.map(function(d) {return d.Time}))).sort();
+        keywords = Array.from(new Set(data_file.map(function(d) {return d.Keyword})));
+        keywords.pop(); // remove _total_, hopefully
+        
+        // Fill in missing timestamps
+        var first_timestamp = timestamps[0];
+        var last_timestamp = timestamps[timestamps.length - 1];
+        
+        var new_timestamps = [];
+        
+        for(var timestamp = new Date(first_timestamp);
+            timestamp <= new Date(last_timestamp);
+            timestamp.setMinutes(timestamp.getMinutes() + 1)) {
+            new_timestamps.push(formatDate(timestamp));
+        }
+        timestamps = new_timestamps;
+        
+        var data_raw0 = {};
+        // Create matrix to hold values
+        options.subset.ids.map(function(subset) {
+            data_raw0[subset] = {};
+            data_raw[subset] = {};
+            timestamps.map(function (timestamp) {
+                var entry = {
+                    timestamp: new Date(timestamp),
+                    "_total_": 0
+                };
+                keywords.map(function(keyword) {
+                    entry[keyword] = 0;
+                });
+                
+                data_raw0[subset][timestamp] = entry;
             });
-            data_raw[subset].push(entry);
+        });
+        
+        // Input values from the loaded file
+        for(row in data_file) {
+            var timestamp = data_file[row]['Time'];
+            var keyword = data_file[row]['Keyword'];
+            
+            if(typeof data_file[row] !== 'object')
+                continue;
+            
+            data_raw0['all'][timestamp][keyword] = parseInt(data_file[row]['Count']);
+            data_raw0['distinct'][timestamp][keyword] = parseInt(data_file[row]['Distinct']);
+            data_raw0['original'][timestamp][keyword] = parseInt(data_file[row]['Original']);
+            data_raw0['retweet'][timestamp][keyword] = parseInt(data_file[row]['Retweet']);
+            data_raw0['reply'][timestamp][keyword] = parseInt(data_file[row]['Reply']);
         }
         
-//        d3.selectAll("#choose_subset #" + subset)
-//            .attr("disabled", null);
+        options.subset.ids.map(function(subset) {
+            data_raw[subset] = [];
+            for(row in data_raw0[subset]) {
+                data_raw[subset].push(data_raw0[subset][row]);
+            }
+        });
+//            
+//            for (var i = 0; i < timestamps.length; i++) {
+//                timestamp = timestamps[i];
+//                entry = {
+//                    timestamp: parseDate(timestamp),
+//                    '_total_': data_file[timestamp]["_total_"]
+//                };
+//                keywords.map(function(keyword) {
+//                    entry[keyword] = parseInt(data_file[timestamp][keyword]);
+//                });
+//                data_raw[subset].push(entry);
+//            }
+//        }
         
         callback();
     });
 }
 
-//function getFreshData(search_term) {
-//    var url = "http://hcde.conradnied.com/emcomp/visualization/getKeywordTimeFreq.php";
-//    url += '?table_id=' + collection.
-//    
-//    d3.csv('?table_id=112&search_term=halles', function() {
-//    });
-//           
-//}
-
 function getCurrentCollection () {
     var collection_name = options.collection.get();
     
     return collections.reduce(function(collection, candidate) {
-        if(collection.name == collection_name)
+        if(collection.Name == collection_name)
             return collection;
         return candidate
     }, {});
@@ -168,20 +209,16 @@ function getCurrentCollection () {
 function loadCollectionData() {
     var collection = getCurrentCollection();
     
-    // Turn off all subsets
-//    d3.selectAll("#choose_subset button")
-//            .attr("disabled", "");
-    
     data_raw = {};
     var subset_to_start = 'all'; //options.subset.get();
     
     // Load the collection's primary file
-    loadDataFile(collection.name, subset_to_start, function() {
+    loadDataFile(collection, subset_to_start, function() {
         
         // Get the keywords
-        keywords = d3.keys(data_raw[subset_to_start][0]).filter(function (key) {
-            return key !== "timestamp" && key !== '_total_';
-        });
+//        keywords = d3.keys(data_raw[subset_to_start][0]).filter(function (key) {
+//            return key !== "timestamp" && key !== '_total_';
+//        });
         
         // Set Time Domain and Axis
         var x_min = data_raw[subset_to_start][0].timestamp;
@@ -193,10 +230,10 @@ function loadCollectionData() {
         brush.clear();
         plot_area.svg.selectAll('.brush').call(brush);
         
-        // Load the rest of the data (asychronous)
-        options.subset.ids.map(function(subset) {
-            loadDataFile(collection.name, subset, function() {});
-        });
+//        // Load the rest of the data (asychronous) // no unnecessary
+//        options.subset.ids.map(function(subset) {
+//            loadDataFile(collection.Name, subset, function() {});
+//        });
         
         // Load the main series
         loadNewSeriesData(subset_to_start);
@@ -622,7 +659,7 @@ function setFocusTime(origin) {
 
 function buildInterface() {
     // Collection selection
-    d3.json("capture_stats/collections.json", function(error, collections_file) {
+    d3.csv("scripts/php/getCollections.php", function(error, collections_file) {
         if (error) throw error;
         
         // Add collections
@@ -631,7 +668,7 @@ function buildInterface() {
         collections = collections_file;
         
         collection_names = collections.map(function(collection) {
-            return collection.name;
+            return collection.Name;
         });
         
         // Generate options, including collections
@@ -820,9 +857,9 @@ function chooseKeywords(keyword) {
 }
 
 function compareCollections(a, b) {
-    if(a.starttime < b.starttime) 
+    if(a.StartTime < b.StartTime) 
         return -1;
-    if(a.starttime > b.starttime)
+    if(a.StartTime > b.StartTime)
         return 1;
     return 0;
 }

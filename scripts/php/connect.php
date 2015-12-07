@@ -9,8 +9,10 @@
         echo 'Authentication Cancelled';
         exit;
     }
-    if($_SERVER['PHP_AUTH_USER'] != $conf['authentication']['username'] ||
-       $_SERVER['PHP_AUTH_PW'] != $conf['authentication']['password']) {
+    if(($_SERVER['PHP_AUTH_USER'] != $conf['authentication']['username'] ||
+       $_SERVER['PHP_AUTH_PW'] != $conf['authentication']['password']) &&
+        ($_SERVER['PHP_AUTH_USER'] != $conf['authentication2']['username'] ||
+       $_SERVER['PHP_AUTH_PW'] != $conf['authentication2']['password'])) {
         die("Invalid Username/Password");
     }
 
