@@ -12,8 +12,9 @@ serverStorage = None
 options = {}
 types = ['all', 'distinct', 'original', 'retweet', 'reply'] # omitting quotes for now since Twitter doesn't really use them
 collection = {'name': None}
-collection_counts = {}
+#collection_counts = {}
 collection_tweets = {}
+minutes = {}
 
 distinct_mask = 1e6
 local_timezone = pytz.timezone('America/Los_Angeles')
@@ -87,17 +88,22 @@ def parseFile(filename):
         cursor = serverStorage.cursor()
     
     # Initialize different types of counts
-    for minute in range(11):
-        timestamp_minute = timestamp + timedelta(seconds=60*minute)
-#        timestamp_minute = datetime.strftime(timestamp_minute, '%Y-%m-%d %H:%M')
-        timestamp_minute = datetime.strftime(timestamp_minute, '%Y%m%d_%H%M')
-#        timestamp_minute = timestamp[:-1] + str(minute);
+    if(minutes):
+        for count_type in types:
+            minutes[count_type][0] = {'_total_': minutes[count_type][10]['_total_']}
+            for keyword in collection['keywords']:
+                minutes[count_type][0][keyword] = minutes[count_type][10][keyword]
+    else:
+        for count_type in types:
+            minutes[count_type] = {0: {'_total_': 0}}
+            for keyword in collection['keywords']:
+                minutes[count_type][0][keyword] = 0
     
-        if(timestamp_minute not in collection_counts['all']):
-            for count_type in types:
-                collection_counts[count_type][timestamp_minute] = {'_total_': 0}
-                for keyword in collection['keywords']:
-                    collection_counts[count_type][timestamp_minute][keyword] = 0
+    for minute in range(1, 11):
+        for count_type in types:
+            minutes[count_type][minute] = {'_total_': 0}
+            for keyword in collection['keywords']:
+                minutes[count_type][minute][keyword] = 0
 
     # Load this time period's JSON file
     with open(filename) as data_file: 
@@ -160,20 +166,25 @@ def parseFile(filename):
                     cursor.execute(add_tweet, tweet)
         
                     # Also add to event
-                    tweetInEvent = {'Tweet_ID': data['id'], 'Event_ID': collection['id']}
+                    tweetInEvent = {
+                        'Tweet_ID': data['id'],
+                        'Event_ID': collection['id']
+                    }
                     cursor.execute(add_tweet_to_event, tweetInEvent)
                     
-                # If the minute is outside of the 10minute file, throw it away and write it down)
-#                if(timestamp_minute[-2] != timestamp_str[-2]):
-#                    print(timestamp_minute)
-#                    continue
+                # Figure out which minte we are at in the file
+                minute = 0
+                if(timestamp_minute[-2] != timestamp_str[-2]):
+                    minute = 10
+                else:
+                    minute = int(timestamp_minute[-1])
                 
                 # Count the tweet by its type
-                collection_counts["all"][timestamp_minute]['_total_'] += 1
+                minutes["all"][minute]['_total_'] += 1
                 if(distinct):
-                    collection_counts["distinct"][timestamp_minute]['_total_'] += 1
+                    minutes["distinct"][minute]['_total_'] += 1
                 if(tweet["Type"] in types):
-                    collection_counts[tweet["Type"]][timestamp_minute]['_total_'] += 1
+                    minutes[tweet["Type"]][minute]['_total_'] += 1
                 
                 # Next, increment counts if the text has the main keywords
 
@@ -185,11 +196,11 @@ def parseFile(filename):
                             parts_found += 1
 
                     if parts_found == len(keyword_parts):
-                        collection_counts["all"][timestamp_minute][keyword] += 1
+                        minutes["all"][minute][keyword] += 1
                         if(distinct):
-                            collection_counts["distinct"][timestamp_minute][keyword] += 1
+                            minutes["distinct"][minute][keyword] += 1
                         if(tweet["Type"] in types):
-                            collection_counts[tweet["Type"]][timestamp_minute][keyword] += 1
+                            minutes[tweet["Type"]][minute][keyword] += 1
                         
     if(options.database):
         # Push the numbers for each minute
@@ -204,11 +215,11 @@ def parseFile(filename):
                 'Event_ID': collection["id"],
                 'Time': timestamp_minute,
                 'Keyword': keyword,
-                'Count': collection_counts["all"][time_key][keyword],
-                'Distinct': collection_counts["distinct"][time_key][keyword],
-                'Original': collection_counts["original"][time_key][keyword],
-                'Retweet': collection_counts["retweet"][time_key][keyword],
-                'Reply': collection_counts["reply"][time_key][keyword]
+                'Count':    minutes["all"][minute][keyword],
+                'Distinct': minutes["distinct"][minute][keyword],
+                'Original': minutes["original"][minute][keyword],
+                'Retweet':  minutes["retweet"][minute][keyword],
+                'Reply':    minutes["reply"][minute][keyword]
             }
 
             if(data['Count'] > 0):
@@ -219,11 +230,11 @@ def parseFile(filename):
                     'Event_ID': collection["id"],
                     'Time': timestamp_minute,
                     'Keyword': keyword,
-                    'Count': collection_counts["all"][time_key][keyword],
-                    'Distinct': collection_counts["distinct"][time_key][keyword],
-                    'Original': collection_counts["original"][time_key][keyword],
-                    'Retweet': collection_counts["retweet"][time_key][keyword],
-                    'Reply': collection_counts["reply"][time_key][keyword]
+                    'Count':    minutes["all"][minute][keyword],
+                    'Distinct': minutes["distinct"][minute][keyword],
+                    'Original': minutes["original"][minute][keyword],
+                    'Retweet':  minutes["retweet"][minute][keyword],
+                    'Reply':    minutes["reply"][minute][keyword]
                 }
 
                 if(data['Count'] > 0):
@@ -237,9 +248,14 @@ def parseDir(path):
     if options.verbose:
         print ("Parsing All JSON Files in: " + path)
     
+#    i = 0
     for filename in sorted(os.listdir(path)):
         if filename.endswith(".json") and filename[-18:-10].isdigit() and filename[-9:-5].isdigit():
             parseFile(path + "/" + filename)
+#            
+#            i += 1
+#            if(i == 2):
+#                return
 
 def verifyCollection(collection_name):
     if collection['name'] == None:
@@ -301,7 +317,7 @@ def loadCollection(collection_name):
     
     # Push the collection to the storage database if it exists
     if(options.database):
-        cursor = serverStorage.cursor()
+        cursor = serverStorage.cursor()  
         
         event = {
             'ID': collection["id"],
@@ -309,10 +325,18 @@ def loadCollection(collection_name):
             'Description': collection["description"],
             'Keywords': collection["twitter_keywords"],
             'OldKeywords': '',
-            'StartTime': collection["started"].replace("Z", "").replace("T", " "),
-            'StopTime': collection["stopped"].replace("Z", "").replace("T", " "),
             'TweetsCollected': collection["total_count"]
         }
+        
+        if('started' in collection and collection["started"]):
+            event['StartTime'] = collection["started"].replace("Z", "").replace("T", " ")
+        else:
+            event['StartTime'] = None 
+        
+        if('stopped' in collection and collection["stopped"]):
+            event['StopTime'] = collection["stopped"].replace("Z", "").replace("T", " ")
+        else:
+            event['StopTime'] = None 
         
         cursor.execute("SET FOREIGN_KEY_CHECKS=0")
         cursor.execute(add_event, event)
@@ -322,11 +346,9 @@ def loadCollection(collection_name):
             serverStorage.commit()
         cursor.close()
 
-    # If files exist, load them
-    global collection_counts
-    
-    for count_type in types:
-        collection_counts[count_type] = {}
+    # If files exist, load them        
+    global minutes
+    minutes = {}
     
     # Preload files, temporarily disabled, pending new design
 #    prefix = '../capture_stats/' + collection["name"];
@@ -346,9 +368,19 @@ def loadCollection(collection_name):
 def saveCollection():
     prefix = '../../capture_stats/' + collection["name"];
     # Write results to file
-    for count_type in types:
-        with open(prefix + '_' + count_type + '.json', 'w') as out_file:
-            json.dump(collection_counts[count_type], out_file)
+#    for count_type in types:
+        
+#        filename = prefix + '_' + count_type + '.json'
+#        if(os.path.isfile(filename)):
+#            out_file = open(prefix + '_' + count_type + '.json', 'a')
+#        else:
+#            out_file = open(prefix + '_' + count_type + '.json', 'w')
+#            
+#        pprint(out_file)
+#            
+#        out_file = open(, 'w')
+#        with open(prefix + '_' + count_type + '.json', 'w') as out_file:
+#            json.dump(collection_counts[count_type], out_file)
 
 def connectToServer():
     if(options.verbose): print("    Connecting to Captures Database")
