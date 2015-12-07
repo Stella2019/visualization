@@ -79,7 +79,7 @@ function Options() {
             labels: ["None", "Terms", "Tweet Types", "Distinct/Not"],
             ids:    ["none", "terms", "types", "distinct"],
             available: [0, 1, 2, 3],
-            default: 0,
+            default: 1,
             callback: function() { changeSeries('all'); }
         });
     options.time_min = new Option({

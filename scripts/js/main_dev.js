@@ -207,6 +207,8 @@ function getCurrentCollection () {
 }
     
 function loadCollectionData() {
+    toggleLoading(true);
+    
     var collection = getCurrentCollection();
     
     data_raw = {};
@@ -664,6 +666,9 @@ function display() {
             .style("fill-opacity", 1.0)
             .attr("d", function(d) { return focus.area(d.values)});
     }
+    
+        
+    toggleLoading(false);
 }
 
 function setContextTime(time_min, time_max) {
@@ -755,7 +760,26 @@ function setFocusTime(origin) {
         .call(focus.xAxis);
 }
 
+function toggleLoading(toggle) {
+    if(toggle) {
+        $('#charts').spin({
+            lines: 15,
+            color: '#555',
+            length: 50,
+            width: 10,
+            radius: 25});
+        d3.select('#charts')
+            .style("opacity", 0.5);
+    } else {
+        $('#charts').spin(false);
+        d3.select('#charts')
+            .style("opacity", 1);
+    }
+}
+
 function buildInterface() {
+    toggleLoading(true);
+    
     // Collection selection
     d3.csv("scripts/php/getCollections.php", function(error, collections_file) {
         if (error) throw error;
