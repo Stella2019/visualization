@@ -21,7 +21,7 @@ local_timezone = pytz.timezone('America/Los_Angeles')
 
 add_tweet = ("INSERT IGNORE INTO Tweet "
              "(ID, Text, Redundant, Type, Username, Timestamp, Origin)"
-             "VALUES (%(ID)s, %(Text)s, %(Distinct)s, %(Type)s, %(Username)s, %(Timestamp)s, %(Origin)s)")
+             "VALUES (%(ID)s, %(Text)s, %(Redundant)s, %(Type)s, %(Username)s, %(Timestamp)s, %(Origin)s)")
 add_tweet_to_event = ("INSERT IGNORE INTO TweetInEvent "
              "(Tweet_ID, Event_ID)"
              "VALUES (%(Tweet_ID)s, %(Event_ID)s)")

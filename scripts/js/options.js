@@ -19,7 +19,11 @@ Option.prototype = {
 function Options() {
     var options = {};
     options.dropdowns = ['collection', 'subset', 'resolution', '<br>',
-                    'display_type', 'y_scale', 'shape']; 
+                    'display_type', 'y_scale', 'shape', 'series']; 
+    
+//    if (window.location.href.indexOf('index_dev.html') > -1) {
+//        options.dropdowns.push('series');
+//    }
     options.timefields = ['time_min', 'time_max']; 
     
     options.collection = new Option({
@@ -34,7 +38,7 @@ function Options() {
             title: "Chart Type",
             labels: ["Stacked", "Overlap", "Lines", "Stream", "Separate", "100%"],
             ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
-            available: [0, 1, 2, 3, 4],
+            available: [0, 1, 2, 3, 4, 5],
             default: 0,
             callback: function() { display(); }
         });
@@ -72,11 +76,11 @@ function Options() {
         });
     options.series = new Option({
             title: "Series",
-            labels: ["None", "Terms", "Tweet Types"],
-            ids:    ["none", "terms", "types"],
-            available: [0, 1],
+            labels: ["None", "Terms", "Tweet Types", "Distinct/Not"],
+            ids:    ["none", "terms", "types", "distinct"],
+            available: [0, 1, 2, 3],
             default: 0,
-            callback: function() { console.log("Series changed"); }
+            callback: function() { changeSeries('all'); }
         });
     options.time_min = new Option({
             title: "Begin",

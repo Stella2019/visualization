@@ -5,7 +5,7 @@ Array.prototype.contains = function (element) {
 var collections;
 var collection_names = ["Paris Shooting", "Paris Collection 2", "Paris Shooting - 3 - New Terms", "SahafiHotelAttack", "Sinai Plane Crash", "NORAD blimp on the loose", "Earthquake in Pakistan and Afghanistan", "Hurricane Patricia - Spanish terms", "Flooding from Patricia", "Hurricane Patricia", "Wilfrid Laurier Lockdown", "Black Lives Matter Collection", "Ankara Bombing", "Hurricane Oho", "Doctors without Borders", "Townhall gunmen", "umpqua college shooting", "Hurricane Joaquin - hurricane terms", "Hurricane Joaquin - flooding terms", "Yemen mosque bombing", "Chile", "Flash Flood", "California Valley Fire", "Grand Mosque accident", "Refugee crisis", "Karachi Explosion", "Chicago Shooting", "Western WA storms", "Tropical Storm Erika", "WA Wildfires - August", "Cotopaxi volcano", "FAA outage", "Chemical Spill - August 2015", "Alaska Earthquake - July 26", "Navy Shooting", "NYSE Stock Exchange Cant Exchange", "India Earthquake"];
 var data_stacked, series_data, data_raw, total_byTime;
-var keywords, keywords_selected;
+var keywords, series, series_selected;
 var options = new Options();
 var ddd;
 
@@ -235,35 +235,98 @@ function loadCollectionData() {
 //            loadDataFile(collection.Name, subset, function() {});
 //        });
         
-        // Load the main series
-        loadNewSeriesData(subset_to_start);
-        
-        // Build Legend
-        keywords_selected = {};
-        keywords.forEach(function(name, i) {
-            keywords_selected[name] = true; 
-        });
-        buildLegend();
-        
-        // Finish preparing the data for loading
-        prepareData();
+        changeSeries(subset_to_start);
     });
 }
 
 function loadNewSeriesData(subset) {
     series_data = [];
-    keywords.forEach(function(name, i) {
+    
+    if(options.series.is('terms')) {
+        series.forEach(function(name, i) {
+            series_data.push({
+                name: name,
+                id: simplify(name),
+                order: (i + 1) * 100,
+                shown: true, // replaced the map series_selected with this at some point
+                sum: data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                    return cur_sum + datapoint[name];
+                }, 0)
+            });
+        });
+    } else if(options.series.is('types')) {
+        series.forEach(function(name, i) {
+            series_data.push({
+                name: name,
+                id: simplify(name),
+                order: (i + 1) * 100,
+                shown: true, // replaced the map series_selected with this at some point
+                sum: data_raw[name].reduce(function(cur_sum, datapoint) { // Can change subset
+                    return cur_sum + datapoint['_total_'];
+                }, 0)
+            });
+        });
+    } else if(options.series.is('distinct')) {
+        var name = 'distinct'; i = 0;
         series_data.push({
             name: name,
             id: simplify(name),
             order: (i + 1) * 100,
-            shown: true, // replaced the map keywords_selected with this at some point
-            sum: data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
-                return cur_sum + datapoint[name];
+            shown: true, // replaced the map series_selected with this at some point
+            sum: data_raw[name].reduce(function(cur_sum, datapoint) { // Can change subset
+                return cur_sum + datapoint['_total_'];
             }, 0)
         });
-    });
+        name = 'redundant'; i = 1;
+        series_data.push({
+            name: name,
+            id: simplify(name),
+            order: (i + 1) * 100,
+            shown: true, // replaced the map series_selected with this at some point
+            sum: data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                return cur_sum + datapoint['_total_'] - series_data[0].sum;
+            }, 0)
+        });
+    } else { // implicit none
+        var name = 'all'; i = 0;
+        series_data.push({
+            name: name,
+            id: simplify(name),
+            order: (i + 1) * 100,
+            shown: true, // replaced the map series_selected with this at some point
+            sum: data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                return cur_sum + datapoint['_total_'];
+            }, 0)
+        });
+    }
 }
+
+function changeSeries(subset) {
+    // Determine the series on the chart
+    if(options.series.is('terms')) {
+        series = keywords;
+    } else if(options.series.is('types')) {
+        series = ['original', 'retweet', 'reply'];
+    } else if(options.series.is('distinct')) {
+        series = ['distinct', 'redundant'];
+    } else {
+        series = ['all'];
+    }
+    
+    // Load the main series
+    loadNewSeriesData(subset);
+
+    // Build Legend
+    series_selected = {};
+    series.forEach(function(name, i) {
+        series_selected[name] = true; 
+    });
+    buildLegend();
+
+    // Finish preparing the data for loading
+    prepareData();   
+}
+
 
 function changeData() {
     loadNewSeriesData(options.subset.get());
@@ -296,6 +359,34 @@ function prepareData() {
     }
     
     // Aggregate on time depending on the resolution
+    var data_nested_entries;
+    if(options.series.is('types')) {
+        data_nested_entries = []; // think about it
+        for(var i = 0; i < data_raw['all'].length; i++) {
+            entry = {
+                timestamp: data_raw['all'][i]['timestamp'],
+                _total_: data_raw['all'][i]['_total_'],
+                original: data_raw['original'][i]['_total_'],
+                retweet: data_raw['retweet'][i]['_total_'],
+                reply: data_raw['reply'][i]['_total_']
+            }
+            data_nested_entries.push(entry);
+        }
+    } else if(options.series.is('distinct')) {
+        data_nested_entries = []; // think about it
+        for(var i = 0; i < data_raw['all'].length; i++) {
+            entry = {
+                timestamp: data_raw['all'][i]['timestamp'],
+                _total_: data_raw['all'][i]['_total_'],
+                distinct: data_raw['distinct'][i]['_total_'],
+                redundant: data_raw['all'][i]['_total_'] - data_raw['distinct'][i]['_total_'],
+            }
+            data_nested_entries.push(entry);
+        }
+    } else {
+        data_nested_entries = data_raw[options.subset.get()];
+    }
+                
     var data_nested = d3.nest()
         .key(function (d) {
             time = new Date(d.timestamp);
@@ -312,19 +403,26 @@ function prepareData() {
             newdata['_total_'] = leaves.reduce(function(sum, cur) {
                 return sum + cur['_total_'];
             }, 0);
-            keywords.map(function(keyword) {
-                if(keywords_selected[keyword]) {
-                    newdata[keyword] = leaves.reduce(function(sum, leaf) {
-                        return sum + leaf[keyword];
-                    }, 0);
-                } else {
-                    newdata[keyword] = 0;
-                }
-            });
+            
+            if(options.series.is('none')) {
+                newdata['all'] = leaves.reduce(function(sum, leaf) {
+                    return sum + leaf['_total_'];
+                }, 0);
+            } else {
+                series.map(function(name) {
+                    if(series_selected[name]) {
+                        newdata[name] = leaves.reduce(function(sum, leaf) {
+                            return sum + leaf[name];
+                        }, 0);
+                    } else {
+                        newdata[name] = 0;
+                    }
+                });
+            }
 
             return newdata;
         })
-        .entries(data_raw[options.subset.get()]);
+        .entries(data_nested_entries);
 
     // Convert data to a format the charts can use
     var data_ready = [];
@@ -342,7 +440,7 @@ function prepareData() {
     }
     
     total_byTime = data_ready.map(function(datum) {
-        return Math.max(keywords.reduce(function(running_sum, word) {
+        return Math.max(series.reduce(function(running_sum, word) {
             return running_sum += datum[word];
         }, 0), 1);
     });
@@ -449,7 +547,7 @@ function display() {
             data_stacked[i].offset = 0;
             if(i < n_series - 1) {
                 data_stacked[i].offset = data_stacked[i + 1].offset;
-                if(keywords_selected[data_stacked[i + 1].name])
+                if(series_selected[data_stacked[i + 1].name])
                     data_stacked[i].offset += data_stacked[i + 1].max;
             }
             
@@ -760,9 +858,9 @@ function buildLegend (flag_reset) {
                 });
         
             // Set whether the keyword is active & change style
-            keywords_selected[d.name] = legend.dragover == 'legend_active';
+            series_selected[d.name] = legend.dragover == 'legend_active';
             legend.container.select('.' + d.id + ' .legend_icon')
-                .classed('off', !keywords_selected[d.name]);
+                .classed('off', !series_selected[d.name]);
         
             legend.container_inactive.selectAll('div.legend_entry').sort(compareSeries);
             legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
@@ -802,9 +900,9 @@ function buildLegend (flag_reset) {
 //                });
 //        
 //            // Set whether the keyword is active & change style
-//            keywords_selected[d.name] = legend.dragover == 'legend_active';
+//            series_selected[d.name] = legend.dragover == 'legend_active';
 //            legend.container.select('.' + d.id + ' .legend_icon')
-//                .classed('off', !keywords_selected[d.name]);
+//                .classed('off', !series_selected[d.name]);
 //        
 //            legend.container_inactive.selectAll('div.legend_entry').sort(compareSeries);
 //            legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
@@ -848,10 +946,10 @@ function unHighlightKeyword(keyword) {
         .classed('unfocused', false);
 }
 
-function chooseKeywords(keyword) {
-    keywords_selected[keyword] = !keywords_selected[keyword];
-    d3.select('.' + simplify(keyword) + ' .legend_icon')
-        .classed('off', !keywords_selected[keyword]);
+function chooseKeywords(name) {
+    series_selected[name] = !series_selected[name];
+    d3.select('.' + simplify(name) + ' .legend_icon')
+        .classed('off', !series_selected[name]);
     
     prepareData();
 }
