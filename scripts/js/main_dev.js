@@ -114,6 +114,29 @@ function initialize() {
 function loadDataFile(collection, subset, callback) {
 //    var filename = "capture_stats/" + collection + '_' + subset + ".json";
     var filename = "scripts/php/getSavedKeywordTimeFreq.php?event_id=" + collection.ID;
+    
+    if(!options.time_limit.is('all')) {
+        var time_limit = new Date(getCurrentCollection().StartTime);
+        
+        // Roll Back UTC (this is NOT the right way to do this)
+        time_limit.setHours(time_limit.getHours() - 8);
+        
+        if(options.time_limit.is('3h')) {
+            time_limit.setHours(time_limit.getHours() + 3);
+        } else if(options.time_limit.is('12h')) {
+            time_limit.setHours(time_limit.getHours() + 12);
+        } else if(options.time_limit.is('1d')) {
+            time_limit.setDate(time_limit.getDate() + 1);
+        } else if(options.time_limit.is('3d')) {
+            time_limit.setDate(time_limit.getDate() + 3);
+        } else if(options.time_limit.is('1w')) {
+            time_limit.setDate(time_limit.getDate() + 7);
+        }
+        
+        filename += '&time_limit="' + formatDate(time_limit) + '"';
+    } 
+    
+    console.log(filename);
 
     d3.csv(filename, function(error, data_file) {
         if (error) {
@@ -328,7 +351,6 @@ function changeSeries(subset) {
     // Finish preparing the data for loading
     prepareData();   
 }
-
 
 function changeData() {
     loadNewSeriesData(options.subset.get());
@@ -572,20 +594,26 @@ function display() {
         y_min = 1;
     
     var y_max = 100;
-    if (options.display_type.is('overlap') | options.display_type.is('lines')) {
-        y_max = d3.max(data_stacked.map(function (d) {
-            return d.max;
-        }));
-    } else if (options.display_type.is('percent')) {
-        y_max = 100;
+    if(options.y_max_toggle.get()) {
+        y_max = options.y_max.get();
     } else {
-        y_max = d3.max(data_stacked[0].values.map(function (d) {
-            return d.value0 + d.value;
-        }));
+        if (options.display_type.is('overlap') | options.display_type.is('lines')) {
+            y_max = d3.max(data_stacked.map(function (d) {
+                return d.max;
+            }));
+        } else if (options.display_type.is('percent')) {
+            y_max = 100;
+        } else {
+            y_max = d3.max(data_stacked[0].values.map(function (d) {
+                return d.value0 + d.value;
+            }));
+        }
+        options.y_max.update(y_max);
+        options.y_max.set(y_max);
     }
-    if(!options.y_scale.is("preserve"))
-        focus.y.domain([y_min, y_max])
-            .range([focus.height, 0]);
+//    if(!options.y_scale.is("preserve"))
+    focus.y.domain([y_min, y_max])
+        .range([focus.height, 0]);
     
     if(options.y_scale.is("log")) {
         focus.yAxis.scale(focus.y)
@@ -676,7 +704,7 @@ function setContextTime(time_min, time_max) {
     var startTime = options.time_min.get();
     var endTime =   options.time_max.get();
     
-    if(startTime.getTime() == endTime.getTime()) {
+    if(startTime.getTime() == endTime.getTime() || !options.time_save.get()) {
         startTime = time_min;
         endTime = time_max;
     } else {
@@ -691,15 +719,15 @@ function setContextTime(time_min, time_max) {
     focus.x.domain(brush.empty() ? [startTime, endTime] : brush.extent());
     
     // Initialize the brush if it isn't identical
-    if(startTime != time_min || endTime != time_max) {
+    if(startTime > time_min || endTime < time_max) {
         brush.extent([startTime, endTime]);
     }
     
     // Set the time option
     options.time_min.set(startTime);
-    options.time_min.min = time_min;
+    options.time_min.min = new Date(time_min);
     options.time_max.set(endTime);
-    options.time_max.max = time_max;
+    options.time_max.max = new Date(time_max);
     
     // Set the manual field constraints
     var startDateTextBox = $('#choose_time_min');
@@ -711,43 +739,72 @@ function setContextTime(time_min, time_max) {
     endDateTextBox.datetimepicker('option', 'minDate', startTime);
     endDateTextBox.datetimepicker('option', 'maxDate', time_max);
     endDateTextBox.datetimepicker("setDate", endTime);
-    
 }
 
 function setFocusTime(origin) {
     var startDateTextBox = $('#choose_time_min');
     var endDateTextBox = $('#choose_time_max');
+    var startTime, endTime;
+    var brushEvent = false;
     
+    // Get time from the originator of this request
     if(origin == "brush") {
         var times = brush.extent();
+        startTime = times[0];
+        endTime   = times[1];
         
-        startDateTextBox.datetimepicker("setDate", times[0]);
-          endDateTextBox.datetimepicker("setDate", times[1]);
-        
-        options.time_min.set(times[0]);
-        options.time_max.set(times[1]);
+        brushEvent = true;
     } else if(origin == "input_field") {
-        var starttime = startDateTextBox.datetimepicker('getDate');
-        var endtime   =   endDateTextBox.datetimepicker('getDate');
-        
-        if(starttime < options.time_min.min) {
-            starttime = options.time_min.min
-            startDateTextBox.datetimepicker('setDate', starttime);
+        startTime = startDateTextBox.datetimepicker('getDate');
+        endTime   =   endDateTextBox.datetimepicker('getDate');
+    } else if(origin == "button_time_to_start") { // The min and max possible?
+        startTime = new Date(options.time_min.min);
+    } else if(origin == "button_time_minus_6h") { // The min and max possible?
+        startTime = options.time_min.get();
+        startTime.setHours(startTime.getHours() - 6);
+    } else if(origin == "button_time_minus_1h") { // The min and max possible?
+        startTime = options.time_min.get();
+        startTime.setHours(startTime.getHours() - 1);
+    } else if(origin == "button_time_to_end") { // The min and max possible?
+        endTime   = new Date(options.time_max.max);
+    } else if(origin == "button_time_plus_1h") { // The min and max possible?
+        startTime = options.time_min.get();
+        startTime.setHours(startTime.getHours() + 1);
+    } else if(origin == "button_time_plus_6h") { // The min and max possible?
+        startTime = options.time_min.get();
+        startTime.setHours(startTime.getHours() + 6);
+    }
+    
+    if(!startTime)
+        startTime = options.time_min.get();
+    if(!endTime)
+        endTime   = options.time_max.get();
+    
+    // Bound the start and end times
+    if(startTime < options.time_min.min)
+        startTime = new Date(options.time_min.min);
+    if(endTime > options.time_max.max)
+        endTime = new Date(options.time_max.max);
+    if(startTime >= endTime ) {
+        startTime = new Date(options.time_min.min);
+        endTime = new Date(options.time_max.max);
+    }
+    
+    startDateTextBox.datetimepicker("setDate", startTime);
+      endDateTextBox.datetimepicker("setDate", endTime);
+    
+    options.time_min.set(startTime);
+    options.time_max.set(endTime);
+
+    if(startTime > options.time_min.min || endTime < options.time_max.max) {    
+        if(!brushEvent) {
+            // Update the brush
+            brush.extent([startTime, endTime])
+            brush(d3.select(".brush").transition());
+            brush.event(d3.select(".brush").transition())
         }
-        if(endtime > options.time_max.max) {
-            endtime = options.time_max.max
-            endDateTextBox.datetimepicker('setDate', endtime);
-        }
-        
-        // Update the brush
-        brush.extent([starttime, endtime])
-        brush(d3.select(".brush").transition());
-        brush.event(d3.select(".brush").transition())
-        
-        options.time_min.set(starttime);
-        options.time_max.set(endtime);
-    } else { // The min and max possible?
-        
+    } else {
+        d3.selectAll(".brush").call(brush.clear());//brush.clear();
     }
     
     options.recordState(options, 'time_min');
@@ -763,7 +820,7 @@ function setFocusTime(origin) {
 function toggleLoading(toggle) {
     if(toggle) {
         $('#charts').spin({
-            lines: 15,
+            lines: 11,
             color: '#555',
             length: 50,
             width: 10,
