@@ -51,6 +51,21 @@
     min-width: 150px;
     text-align: center;
 }
+#choose_collection .popover {
+    min-width: 350px;
+}
+dl.collection_popover {
+    margin-bottom: 0px !important;
+}
+.collection_popover dt {
+    width: 70px;
+}
+.collection_popover dd {
+    margin-left: 85px;
+    text-align: left;
+    min-width: 200px !important;
+/*    width: auto !important;*/
+}
 
 button:focus {
     outline: none !important;
@@ -60,12 +75,13 @@ button:focus {
 #legend {
     position: absolute;
     display: inline-block;
+    padding: 5px;
 }
 .legend_part {
-    margin:5px;
+/*    margin:5px;*/
     min-width: 200px;
     min-height: 50px;
-    border: double #ddd;
+    border: solid #ddd;
     border-radius: 5px;
 }
 .legend_entry {
@@ -81,12 +97,16 @@ button:focus {
     cursor: pointer;
     transition: 1s;
 }
+.legend_icon.focused {
+/*    opacity;*/
+}
 .legend_icon.unfocused {
     opacity: 0.6;
 }
 .legend_icon.off {
 /*    border: solid;*/
     background-color: white !important;
+    background-blend-mode: color-burn;
 }
 .legend_label {
     display: inline-block;
