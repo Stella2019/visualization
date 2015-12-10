@@ -113,7 +113,7 @@ function initialize() {
 
 function loadDataFile(collection, subset, callback) {
 //    var filename = "capture_stats/" + collection + '_' + subset + ".json";
-    var url = "scripts/php/getSavedKeywordTimeFreq.php";
+    var url = "scripts/php/getEventTweetCounts.php";
     url += "?event_id=" + collection.ID;
     
     if(!options.time_limit.is('all')) {
@@ -332,7 +332,7 @@ function changeSeries(subset) {
     } else if(options.series.is('types')) {
         series_names = ['original', 'retweet', 'reply'];
     } else if(options.series.is('distinct')) {
-        series = ['distinct', 'redundant'];
+        series_names = ['distinct', 'redundant'];
     } else {
         series_names = ['all'];
     }
@@ -643,8 +643,8 @@ function display() {
 //               legend.toggleSeries(d);
 //            if(options.plot_click.is('gettweets')) {
                 var xy = d3.mouse(this);
-                var startTime = focus.x.invert(xy[0] - 10);
-                var stopTime = focus.x.invert(xy[0] + 10);
+                var startTime = focus.x.invert(xy[0] - 1);
+                var stopTime = focus.x.invert(xy[0] + 1);
                 getTweets(d, startTime, stopTime);
 //            }
         });
@@ -893,13 +893,32 @@ function buildInterface() {
     });
 }
 
+function genEventTweetCount() {
+    var url = "scripts/php/genEventTweetCounts.php";
+    url += "?event_id=" + getCurrentCollection().ID;
+    
+//    startTime.setHours(startTime.getHours() - 8); // temporary UTC/PST fix
+    url += '&time_min="' + formatDate(options.time_min.min) + '"';
+    
+//    stopTime.setHours(stopTime.getHours() - 8); // temporary UTC/PST fix
+    url += '&time_max="' + formatDate(options.time_max.max) + '"';
+    
+    url += '&text_search=' + options.add_term.get();
+    
+    console.info(url);
+    d3.text(url, function(error, data) {
+        console.debug(error);
+        console.info(data);
+    });
+}
+
 function getTweets(series, startTime, stopTime) {
-    var url = "scripts/php/getRepresentativeTweet.php";
+    var url = "scripts/php/getTweets.php";
     url += "?event_id=" + getCurrentCollection().ID;
     var title = "";
     
     if(options.subset.is("distinct")) {
-        url += '&redun=0';
+        url += '&distinct=1';
         title += 'Distinct ';
     } else if(!options.subset.is('all')) {
         url += '&type=' + options.subset.get();
@@ -908,24 +927,24 @@ function getTweets(series, startTime, stopTime) {
     title += 'Tweets';
     
     if(options.series.is("terms")) {
-        if(series.name.split(" ").length > 1)
-            url += '&text_search="+' + series.name.split(" ").join(" +") + '"';
-        else
-            url += '&text_search="' + series.name + '"';
+//        if(series.name.split(" ").length > 1)
+//            url += '&text_search="' + series.name.split(" ").join("|") + '"';
+//        else
+            url += '&text_search=' + series.name;
         title += ' with text "' + series.name + '"';
     } else if(options.series.is("types")) {
         url += '&type=' + series.name;
         title += ' of type ' + series.name;
     } else if(options.series.is("distinct")) {
-        url += '&redun=' + (series.name == "distinct" ? 0 : 1);
+        url += '&distinct=' + (series.name == "distinct" ? 1 : 0);
         title += ' that are ' + (series.name == "distinct" ? 'distinct' : 'not distinct')
     }
     
-    startTime.setHours(startTime.getHours() - 8); // temporary UTC/PST fix
+//    startTime.setHours(startTime.getHours() - 8); // temporary UTC/PST fix
     url += '&time_min="' + formatDate(startTime) + '"';
     title += " between <br />" + formatDate(startTime);
     
-    stopTime.setHours(stopTime.getHours() - 8); // temporary UTC/PST fix
+//    stopTime.setHours(stopTime.getHours() - 8); // temporary UTC/PST fix
     url += '&time_max="' + formatDate(stopTime) + '"';
     title += " and " + formatDate(stopTime);
     
@@ -934,6 +953,7 @@ function getTweets(series, startTime, stopTime) {
         
         d3.select('#selectedTweetsModal .modal-title')
             .html(title);
+        
         var modal_body = d3.select('#selectedTweetsModal .modal-body');
         modal_body.selectAll('*').remove();
         
@@ -941,19 +961,15 @@ function getTweets(series, startTime, stopTime) {
         if(data.indexOf('Maximum execution time') >= 0) {
             modal_body.append('div')
                 .attr('class', 'text-center')
-                .html("Error retrieving tweets. <br /><br />Query took too long");
-        } else if (data.indexOf('Fatal error') >= 0) {
-//            } else {
-                modal_body.append('div')
-                    .attr('class', 'text-center')
-                    .text("Error retrieving tweets. <br /><br />" + data);
-//            }
+                .html("Error retrieving tweets. <br /><br /> Query took too long");
+        } else if (data.indexOf('Fatal error') >= 0 || data.indexOf('Errormessage') >= 0) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br /> " + data);
         } else if (error) {
-//            } else {
-                modal_body.append('div')
-                    .attr('class', 'text-center')
-                    .text("Error retrieving tweets. <br /><br />" + error);
-//            }
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br /> " + error);
         } else {
             data = JSON.parse(data);
             
@@ -969,6 +985,7 @@ function getTweets(series, startTime, stopTime) {
                     .attr('class', 'list-group-item')
                     .html(function(d) {
                         var content = "<span class='badge'># " + d['ID'] + " </span>";
+                        content += d['Timestamp'] + ' ';
                         content += d['Username'] + " said: ";
                         content += "<br />";
                         content += d['Text'];
@@ -980,6 +997,11 @@ function getTweets(series, startTime, stopTime) {
                             content += ' of # ' + d['Origin']
                         return content;
                     });
+                
+                d3.json(url.replace('getTweets.php', 'getTweets_Count.php'), function(count) {
+                    d3.select('#selectedTweetsModal .modal-title')
+                        .html(count[0]['count'] + " " + title);
+                });
             }
         }
         

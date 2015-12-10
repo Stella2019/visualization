@@ -11,7 +11,7 @@
         "SELECT " .
         "   Tweet.ID, " .
         "   Tweet.Text, " .
-        "   not Tweet.Redundant as 'Distinct', " .
+        "   Tweet.Distinct, " .
         "   Tweet.Type, " .
         "   Tweet.Username, " .
         "   Tweet.Timestamp, " .
@@ -20,20 +20,26 @@
         "JOIN TweetInEvent " .
         "	ON TweetInEvent.Tweet_ID = Tweet.ID " .
         "WHERE TweetInEvent.Event_ID = " . $event_id . " " .
-        "   AND Tweet.Timestamp > " . $time_min . " " .
-        "   AND Tweet.Timestamp < " . $time_max . " ";
+        "   AND Tweet.Timestamp >= " . $time_min . " " .
+        "   AND Tweet.Timestamp <= " . $time_max . " ";
 
     if(isset($_GET["type"])) {
         $query = $query . "   AND Tweet.Type = '" . $_GET["type"] . "'  ";
     }
     if(isset($_GET["redun"])) {
-        $query = $query . "   AND Tweet.Redundant = '" . $_GET["redun"] . "'  ";
+        $query = $query . "   AND Tweet.Distinct = '" . $_GET["distinct"] . "'  ";
     }
     if(isset($_GET["text_search"])) {
-        $query = $query . "   AND MATCH(Tweet.Text) AGAINST ('" . $_GET["text_search"] . "' in BOOLEAN MODE) > 0  ";
+        foreach(explode(' ', $_GET["text_search"]) as $term) {
+            $query = $query . "   AND LOWER(Tweet.Text) REGEXP '" . $term . "' ";
+        }
     }
 
-    $query = $query . "LIMIT 5;";
+    if(isset($_GET["limit"])) {
+        $query = $query . " LIMIT " . $_GET["limit"] . ";";
+    } else {
+        $query = $query . " LIMIT 5;";
+    }
 
     include 'printJSON.php';
 ?>

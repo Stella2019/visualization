@@ -46,7 +46,7 @@ function Options() {
             callback: function() { loadCollectionData(); }
         });
     options.display_type = new Option({
-            title: "Chart Type",
+            title: "Plot Type",
             labels: ["Stacked", "Overlap", "Lines", "Stream", "Separate", "100%"],
             ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
             available: [0, 1, 2, 3, 4, 5],
@@ -138,6 +138,14 @@ function Options() {
             default: 2,
             callback: function() { loadCollectionData(); }
         });
+    options.plot_click = new Option({
+            title: "On Plot Click",
+            labels: ["Deselect", "Get Tweets"],
+            ids:    ["deselect", "gettweets"],
+            available: [0, 1],
+            default: 0,
+            callback: function() { console.log("Changed plot click"); }
+        });
     
     
     // push holder variables and option sets into the list
@@ -174,6 +182,7 @@ Options.prototype = {
     importState: function(options) {
         try {
             state = JSON.parse(window.location.hash.slice(1));
+            console.debug(state);
         } catch(err) {
             return;
         }
@@ -307,7 +316,7 @@ Options.prototype = {
         
         // Add title
         container.append('span')
-            .attr('class', 'input-group-addon primary')
+            .attr('class', 'input-group-addon')
             .html(set.title);
         
         // Add toggle option
@@ -317,7 +326,7 @@ Options.prototype = {
             title: "Save " + set.title + " State",
             styles: ["btn btn-default", "btn btn-primary"],
             labels: ["<span class='glyphicon glyphicon-pencil'></span>", "<span class='glyphicon glyphicon-pencil'></span>"],
-            tooltips: ["Click to enable manual mode", "Click to enable automatic mode"],
+            tooltips: ["Click to toggle manual mode", "Click to toggle automatic mode"],
             //            labels: ["Auto", "Manual"],
 //            labels: [set.title, set.title],
 //            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Auto", "<span class='glyphicon glyphicon-ok-circle'></span> Manual"],
@@ -363,7 +372,8 @@ Options.prototype = {
                 'data-toggle': "popover",
                 'data-trigger': "hover",
                 'data-placement': "bottom",
-                'data-content': "Tooltip on bottom"})
+                'data-content': "Tooltip on bottom"
+            })
             .on('click', function(d) {
                 var saving = !options[toggleOption].get();
                 options[toggleOption].set(saving);

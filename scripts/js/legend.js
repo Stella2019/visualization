@@ -77,8 +77,11 @@ Legend.prototype = {
             series.shown = true; 
         }, this);
         
+        this.container_terms.select('.legend_title')
+            .html(options.series.getLabel());
+        
         // Add new entries
-        var entries = legend.container_terms
+        var entries = this.container_terms
             .selectAll('div.legend_entry')
             .data(this.data);
 

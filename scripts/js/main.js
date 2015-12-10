@@ -5,7 +5,7 @@ Array.prototype.contains = function (element) {
 var collections;
 var collection_names = ["Paris Shooting", "Paris Collection 2", "Paris Shooting - 3 - New Terms", "SahafiHotelAttack", "Sinai Plane Crash", "NORAD blimp on the loose", "Earthquake in Pakistan and Afghanistan", "Hurricane Patricia - Spanish terms", "Flooding from Patricia", "Hurricane Patricia", "Wilfrid Laurier Lockdown", "Black Lives Matter Collection", "Ankara Bombing", "Hurricane Oho", "Doctors without Borders", "Townhall gunmen", "umpqua college shooting", "Hurricane Joaquin - hurricane terms", "Hurricane Joaquin - flooding terms", "Yemen mosque bombing", "Chile", "Flash Flood", "California Valley Fire", "Grand Mosque accident", "Refugee crisis", "Karachi Explosion", "Chicago Shooting", "Western WA storms", "Tropical Storm Erika", "WA Wildfires - August", "Cotopaxi volcano", "FAA outage", "Chemical Spill - August 2015", "Alaska Earthquake - July 26", "Navy Shooting", "NYSE Stock Exchange Cant Exchange", "India Earthquake"];
 var data_stacked, series_data, data_raw, total_byTime;
-var keywords, series, series_selected;
+var keywords, series_names;
 var options = new Options();
 var ddd;
 
@@ -113,7 +113,8 @@ function initialize() {
 
 function loadDataFile(collection, subset, callback) {
 //    var filename = "capture_stats/" + collection + '_' + subset + ".json";
-    var filename = "scripts/php/getSavedKeywordTimeFreq.php?event_id=" + collection.ID;
+    var url = "scripts/php/getEventTweetCounts.php";
+    url += "?event_id=" + collection.ID;
     
     if(!options.time_limit.is('all')) {
         var time_limit = new Date(getCurrentCollection().StartTime);
@@ -133,12 +134,10 @@ function loadDataFile(collection, subset, callback) {
             time_limit.setDate(time_limit.getDate() + 7);
         }
         
-        filename += '&time_limit="' + formatDate(time_limit) + '"';
+        url += '&time_limit="' + formatDate(time_limit) + '"';
     } 
-    
-    console.log(filename);
 
-    d3.csv(filename, function(error, data_file) {
+    d3.csv(url, function(error, data_file) {
         if (error) {
             alert("Sorry! File not found");
             return;
@@ -220,7 +219,7 @@ function loadDataFile(collection, subset, callback) {
 }
 
 function getCurrentCollection () {
-    var collection_name = options.collection.get();
+    var collection_name = options.collection.getLabel();
     
     return collections.reduce(function(collection, candidate) {
         if(collection.Name == collection_name)
@@ -268,7 +267,7 @@ function loadNewSeriesData(subset) {
     series_data = [];
     
     if(options.series.is('terms')) {
-        series.forEach(function(name, i) {
+        series_names.forEach(function(name, i) {
             series_data.push({
                 name: name,
                 id: simplify(name),
@@ -280,7 +279,7 @@ function loadNewSeriesData(subset) {
             });
         });
     } else if(options.series.is('types')) {
-        series.forEach(function(name, i) {
+        series_names.forEach(function(name, i) {
             series_data.push({
                 name: name,
                 id: simplify(name),
@@ -329,24 +328,20 @@ function loadNewSeriesData(subset) {
 function changeSeries(subset) {
     // Determine the series on the chart
     if(options.series.is('terms')) {
-        series = keywords;
+        series_names = keywords;
     } else if(options.series.is('types')) {
-        series = ['original', 'retweet', 'reply'];
+        series_names = ['original', 'retweet', 'reply'];
     } else if(options.series.is('distinct')) {
-        series = ['distinct', 'redundant'];
+        series_names = ['distinct', 'redundant'];
     } else {
-        series = ['all'];
+        series_names = ['all'];
     }
     
     // Load the main series
     loadNewSeriesData(subset);
 
-    // Build Legend
-    series_selected = {};
-    series.forEach(function(name, i) {
-        series_selected[name] = true; 
-    });
-    buildLegend();
+    // Build Legend    
+    legend.populate(series_data);
 
     // Finish preparing the data for loading
     prepareData();   
@@ -433,13 +428,13 @@ function prepareData() {
                     return sum + leaf['_total_'];
                 }, 0);
             } else {
-                series.map(function(name) {
-                    if(series_selected[name]) {
-                        newdata[name] = leaves.reduce(function(sum, leaf) {
-                            return sum + leaf[name];
+                series_data.map(function(series) {
+                    if(series.shown) {
+                        newdata[series.name] = leaves.reduce(function(sum, leaf) {
+                            return sum + leaf[series.name];
                         }, 0);
                     } else {
-                        newdata[name] = 0;
+                        newdata[series.name] = 0;
                     }
                 });
             }
@@ -464,15 +459,15 @@ function prepareData() {
     }
     
     total_byTime = data_ready.map(function(datum) {
-        return Math.max(series.reduce(function(running_sum, word) {
+        return Math.max(series_names.reduce(function(running_sum, word) {
             return running_sum += datum[word];
         }, 0), 1);
     });
     
     // Reorder by total size
     series_data.sort(compareSeries);
-    legend.container_inactive.selectAll('div.legend_entry').sort(compareSeries);
-    legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
+    legend.container_terms.selectAll('div.legend_entry').sort(compareSeries);
+//    legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
     setColors();
     
     // Add the nested data to the series
@@ -571,7 +566,7 @@ function display() {
             data_stacked[i].offset = 0;
             if(i < n_series - 1) {
                 data_stacked[i].offset = data_stacked[i + 1].offset;
-                if(series_selected[data_stacked[i + 1].name])
+                if(series_data[i + 1].shown)
                     data_stacked[i].offset += data_stacked[i + 1].max;
             }
             
@@ -640,8 +635,19 @@ function display() {
         .data(data_stacked);
  
     var series_paths = series.enter().append("g")
-        .on("mouseover", highlightKeyword)
-        .on("mouseout", unHighlightKeyword);
+//        .on("mouseover", function(d) {console.log(d);})
+        .on("mouseover", legend.highlightSeries)
+        .on("mouseout", legend.unHighlightSeries)
+        .on("click", function(d) {
+//            if(options.plot_click.is('deselect'))
+//               legend.toggleSeries(d);
+//            if(options.plot_click.is('gettweets')) {
+                var xy = d3.mouse(this);
+                var startTime = focus.x.invert(xy[0] - 1);
+                var stopTime = focus.x.invert(xy[0] + 1);
+                getTweets(d, startTime, stopTime);
+//            }
+        });
     
     series.attr("class", function(d) {
             return "series " + d.id
@@ -852,47 +858,135 @@ function buildInterface() {
         
         // Generate options, including collections
         options.collection.labels = collection_names;
-        options.collection.ids = collection_names;
+        options.collection.ids = collection_names.map(function(name) { return simplify(name); } );
         options.collection.available = collection_names.map(function(d, i) { return i; });
         options.collection.set(collection_names[0]);
         
         options.init();
         
-        // Add legend with constituent parts
-        legend = {};
-        legend.container = d3.select('#legend');
-        
-        legend.container_active = legend.container.append('div')
-            .data(['legend_active']);
-        legend.container_inactive = legend.container.append('div')
-            .data(['legend_inactive']);
-        
-        var legend_parts = legend.container.selectAll('div')
-            .attr('id', function(d) { return d; })
-            .attr('class', 'legend_part')
-            .attr('droppable', "")
-            .on('dragover', function(d) {
-                    d3.event.preventDefault();
-                    legend.dragover = d;
-            })
-        
-        legend_parts.append('div')
-            .attr('class', 'legend_title text-center')
-            .style({'font-weight': 'bold', margin: '5px'})
-            .text(function(d) {
-                if(d == 'legend_active') return 'Series';
-                if(d == 'legend_inactive') return 'Hidden Series';
+        // Add additional information for collections
+        collection_names.map(function(name, i) {
+            var content = '<dl class="dl-horizontal collection_popover">';
+            var collection = collections[i];
+            Object.keys(collection).map(function(key) {
+                content += "<dt>" + key + "</dt>";
+                content += "<dd>" + collection[key] + "</dd>";
             });
-        legend_parts.append('div')
-            .attr('class', 'legend_drag_tip text-center')
-            .style({'font-style': 'italic', margin: '5px', color: '#ddd'})
-            .style('display', 'none')
-            .text(function(d) {
-                if(d == 'legend_active') return 'Drag items to here to show';
-                if(d == 'legend_inactive') return 'Drag items to here to hide';
-            });
+            content += "</dl>";
+            
+            d3.select('#collection_' + simplify(name))
+                .attr({
+                    'class': 'collection_option',
+                    'data-toggle': "popover",
+                    'data-trigger': "hover",
+                    'data-placement': "right",
+                    'data-content': content}
+                 );
+        });
+        $('.collection_option').popover({html: true});
+        
+        // Initialize Legend
+        legend = new Legend();
+        legend.init();
         
         loadCollectionData();
+    });
+}
+
+function getTweets(series, startTime, stopTime) {
+    var url = "scripts/php/getTweets.php";
+    url += "?event_id=" + getCurrentCollection().ID;
+    var title = "";
+    
+    if(options.subset.is("distinct")) {
+        url += '&distinct=1';
+        title += 'Distinct ';
+    } else if(!options.subset.is('all')) {
+        url += '&type=' + options.subset.get();
+        title += options.subset.getLabel() + ' ';
+    }
+    title += 'Tweets';
+    
+    if(options.series.is("terms")) {
+//        if(series.name.split(" ").length > 1)
+//            url += '&text_search="' + series.name.split(" ").join("|") + '"';
+//        else
+            url += '&text_search=' + series.name;
+        title += ' with text "' + series.name + '"';
+    } else if(options.series.is("types")) {
+        url += '&type=' + series.name;
+        title += ' of type ' + series.name;
+    } else if(options.series.is("distinct")) {
+        url += '&distinct=' + (series.name == "distinct" ? 1 : 0);
+        title += ' that are ' + (series.name == "distinct" ? 'distinct' : 'not distinct')
+    }
+    
+//    startTime.setHours(startTime.getHours() - 8); // temporary UTC/PST fix
+    url += '&time_min="' + formatDate(startTime) + '"';
+    title += " between <br />" + formatDate(startTime);
+    
+//    stopTime.setHours(stopTime.getHours() - 8); // temporary UTC/PST fix
+    url += '&time_max="' + formatDate(stopTime) + '"';
+    title += " and " + formatDate(stopTime);
+    
+    console.info(url);
+    d3.text(url, function(error, data) {
+        
+        d3.select('#selectedTweetsModal .modal-title')
+            .html(title);
+        
+        var modal_body = d3.select('#selectedTweetsModal .modal-body');
+        modal_body.selectAll('*').remove();
+        
+        
+        if(data.indexOf('Maximum execution time') >= 0) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br /> Query took too long");
+        } else if (data.indexOf('Fatal error') >= 0 || data.indexOf('Errormessage') >= 0) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br /> " + data);
+        } else if (error) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br /> " + error);
+        } else {
+            data = JSON.parse(data);
+            
+            if(data.length == 0) {
+                modal_body.append('div')
+                    .attr('class', 'text-center')
+                    .text("No tweets found in this selection.");
+            } else {
+                modal_body.append('ul')
+                    .attr('class', 'list-group')
+                    .selectAll('li').data(data).enter()
+                    .append('li')
+                    .attr('class', 'list-group-item')
+                    .html(function(d) {
+                        var content = "<span class='badge'># " + d['ID'] + " </span>";
+                        content += d['Timestamp'] + ' ';
+                        content += d['Username'] + " said: ";
+                        content += "<br />";
+                        content += d['Text'];
+                        content += "<br />";
+                        if(d['Distinct'] == '1')
+                            content += 'distinct ';
+                        content += d['Type'];
+                        if(d['Origin'])
+                            content += ' of # ' + d['Origin']
+                        return content;
+                    });
+                
+                d3.json(url.replace('getTweets.php', 'getTweets_Count.php'), function(count) {
+                    d3.select('#selectedTweetsModal .modal-title')
+                        .html(count[0]['count'] + " " + title);
+                });
+            }
+        }
+        
+        $('#selectedTweetsModal').modal();
     });
 }
 
@@ -903,136 +997,6 @@ function setColors() {
     legend.container.selectAll('div.legend_icon')
         .style('background-color', function (d) { return color(d.name); })
         .style('border-color', function (d) { return color(d.name); });
-}
-
-function buildLegend (flag_reset) {
-    // Make the legend
-    var legend_entries = legend.container_active
-        .selectAll('div.legend_entry')
-        .data(series_data);
-    legend.container_inactive.selectAll('.legend_entry').remove();
-    legend.container_inactive.select('.legend_drag_tip')
-        .style('display', 'block');
-
-    legend_entries.enter().append('div')
-        .attr('id', function(d) {
-            return 'legend_' + d.id;
-        })
-        .attr('class', function(d) {
-            return 'legend_entry draggable ' + d.id;
-        })
-//        .on('click', chooseKeywords)
-        .on('mouseover', highlightKeyword)
-        .on('mouseout', unHighlightKeyword)
-        .attr('draggable', true)
-        .on('dragend', function(d) {
-            document.getElementById(legend.dragover)
-                .appendChild(this);
-        
-            // Set drag tooltip visibility if a category is empty (or now no longer)
-            legend.container.selectAll('.legend_part').select('.legend_drag_tip')
-                .style('display', function(legend_part) {
-                    if(d3.select('#' + legend_part).selectAll('div.legend_entry')[0].length == 0)
-                        return 'block';
-                    else
-                        return 'none';
-                });
-        
-            // Set whether the keyword is active & change style
-            series_selected[d.name] = legend.dragover == 'legend_active';
-            legend.container.select('.' + d.id + ' .legend_icon')
-                .classed('off', !series_selected[d.name]);
-        
-            legend.container_inactive.selectAll('div.legend_entry').sort(compareSeries);
-            legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
-
-            // Refresh the graph
-            prepareData();
-        });
-//        .call(drag);
-
-    legend_entries.selectAll('div.legend_icon')
-        .data(function(d) { return [d]; })
-        .enter().append('div')
-        .attr('class', 'legend_icon');
-
-    legend_entries.selectAll('div.legend_label')
-        .data(function(d) { return [d]; })
-        .enter().append('div')
-        .attr('class', 'legend_label');
-
-//    legend_entries.selectAll('button.legend_button')
-//        .data(function(d) { return [d]; })
-//        .enter().append('button')
-//        .style('width', '20px')
-//        .on('click', function(d) {
-//        
-//        
-//            document.getElementById(legend.dragover)
-//                .appendChild(this);
-//        
-//            // Set drag tooltip visibility if a category is empty (or now no longer)
-//            legend.container.selectAll('.legend_part').select('.legend_drag_tip')
-//                .style('display', function(legend_part) {
-//                    if(d3.select('#' + legend_part).selectAll('div.legend_entry')[0].length == 0)
-//                        return 'block';
-//                    else
-//                        return 'none';
-//                });
-//        
-//            // Set whether the keyword is active & change style
-//            series_selected[d.name] = legend.dragover == 'legend_active';
-//            legend.container.select('.' + d.id + ' .legend_icon')
-//                .classed('off', !series_selected[d.name]);
-//        
-//            legend.container_inactive.selectAll('div.legend_entry').sort(compareSeries);
-//            legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
-//
-//            // Refresh the graph
-//            prepareData();
-//        });
-    
-    legend_entries.exit().remove();
-    
-    legend_entries
-        .attr('class', function(d) {
-            return 'legend_entry ' + d.id;
-        });
-    
-    legend.container.selectAll('div.legend_icon')
-        .classed('off', false);
-    
-    legend.container.selectAll('div.legend_label')
-        .text(function (d) {
-            return d.name;
-        });
-}
-
-function highlightKeyword(keyword) {
-    if((typeof keyword) != "string")
-        keyword = keyword.name;
-    
-    d3.selectAll('.series, .legend_icon')
-        .classed('focused', false)
-        .classed('unfocused', true);
-    d3.selectAll('.series.' + simplify(keyword) + ', .' + simplify(keyword) + ' .legend_icon')
-        .classed('unfocused', false)
-        .classed('focused', true);
-}
-
-function unHighlightKeyword(keyword) {
-    
-    d3.selectAll('.series, .legend_icon')
-        .classed('focused', false)
-        .classed('unfocused', false);
-}
-
-function chooseKeywords(name) {
-    series_selected[name] = !series_selected[name];
-    d3.select('.' + simplify(name) + ' .legend_icon')
-        .classed('off', !series_selected[name]);
-    
-    prepareData();
 }
 
 function compareCollections(a, b) {

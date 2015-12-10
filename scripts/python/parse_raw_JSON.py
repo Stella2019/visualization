@@ -20,8 +20,8 @@ distinct_mask = 1e6
 local_timezone = pytz.timezone('America/Los_Angeles')
 
 add_tweet = ("INSERT IGNORE INTO Tweet "
-             "(ID, Text, Redundant, Type, Username, Timestamp, Origin)"
-             "VALUES (%(ID)s, %(Text)s, %(Redundant)s, %(Type)s, %(Username)s, %(Timestamp)s, %(Origin)s)")
+             "(ID, Text, `Distinct`, Type, Username, Timestamp, Origin)"
+             "VALUES (%(ID)s, %(Text)s, %(Distinct)s, %(Type)s, %(Username)s, %(Timestamp)s, %(Origin)s)")
 add_tweet_to_event = ("INSERT IGNORE INTO TweetInEvent "
              "(Tweet_ID, Event_ID)"
              "VALUES (%(Tweet_ID)s, %(Event_ID)s)")
@@ -139,7 +139,7 @@ def parseFile(filename):
                 tweet = {
                     'ID': data['id'],
                     'Text': text,
-                    'Redundant': not distinct,
+                    'Distinct': distinct,
                     'Type': 'original',
                     'Username': None,
                     'Timestamp': timestamp_exact,
