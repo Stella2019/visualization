@@ -8,6 +8,7 @@
 }
 .series {
     transition: 1s;
+    cursor: zoom-in;
     text-anchor: end;
 }
 .series.lines {

@@ -3,6 +3,8 @@
 
     // Get input from user
     $event_id = $_GET["event_id"];
+    $time_min = $_GET["time_min"];
+    $time_max = $_GET["time_max"];
 
     // Execute Query
     $query = "" .
@@ -18,11 +20,20 @@
         "JOIN TweetInEvent " .
         "	ON TweetInEvent.Tweet_ID = Tweet.ID " .
         "WHERE TweetInEvent.Event_ID = " . $event_id . " " .
-            Timestamp LIKE '2015-11-13 21:40%' " .
-        "   AND Tweet.Type LIKE '%' " .
-        "	AND Tweet.Redundant LIKE '0' " .
-        "LIMIT 1;"
+        "   AND Tweet.Timestamp > " . $time_min . " " .
+        "   AND Tweet.Timestamp < " . $time_max . " ";
 
+    if(isset($_GET["type"])) {
+        $query = $query . "   AND Tweet.Type = '" . $_GET["type"] . "'  ";
+    }
+    if(isset($_GET["redun"])) {
+        $query = $query . "   AND Tweet.Redundant = '" . $_GET["redun"] . "'  ";
+    }
+    if(isset($_GET["text_search"])) {
+        $query = $query . "   AND MATCH(Tweet.Text) AGAINST ('" . $_GET["text_search"] . "' in BOOLEAN MODE) > 0  ";
+    }
 
-    include 'printResults.php';
+    $query = $query . "LIMIT 5;";
+
+    include 'printJSON.php';
 ?>

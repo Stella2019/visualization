@@ -25,7 +25,7 @@ function Options() {
     
     var options = {};
     options.topmenu = ['collection', 'subset', 'resolution', 'time_limit', '<br>',
-                    'display_type', 'y_scale', 'y_max', 'shape', 'series', 'plot_click']; 
+                    'display_type', 'y_scale', 'y_max', 'shape', 'series']; 
     
 //    if (window.location.href.indexOf('index_dev.html') > -1) {
 //        options.dropdowns.push('series');

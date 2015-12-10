@@ -113,7 +113,8 @@ function initialize() {
 
 function loadDataFile(collection, subset, callback) {
 //    var filename = "capture_stats/" + collection + '_' + subset + ".json";
-    var filename = "scripts/php/getSavedKeywordTimeFreq.php?event_id=" + collection.ID;
+    var url = "scripts/php/getSavedKeywordTimeFreq.php";
+    url += "?event_id=" + collection.ID;
     
     if(!options.time_limit.is('all')) {
         var time_limit = new Date(getCurrentCollection().StartTime);
@@ -133,12 +134,10 @@ function loadDataFile(collection, subset, callback) {
             time_limit.setDate(time_limit.getDate() + 7);
         }
         
-        filename += '&time_limit="' + formatDate(time_limit) + '"';
+        url += '&time_limit="' + formatDate(time_limit) + '"';
     } 
-    
-    console.log(filename);
 
-    d3.csv(filename, function(error, data_file) {
+    d3.csv(url, function(error, data_file) {
         if (error) {
             alert("Sorry! File not found");
             return;
@@ -640,10 +639,14 @@ function display() {
         .on("mouseover", legend.highlightSeries)
         .on("mouseout", legend.unHighlightSeries)
         .on("click", function(d) {
-            if(options.plot_click.is('deselect'))
-               legend.toggleSeries(d);
-            if(options.plot_click.is('gettweets'))
-               getTweets(d);
+//            if(options.plot_click.is('deselect'))
+//               legend.toggleSeries(d);
+//            if(options.plot_click.is('gettweets')) {
+                var xy = d3.mouse(this);
+                var startTime = focus.x.invert(xy[0] - 10);
+                var stopTime = focus.x.invert(xy[0] + 10);
+                getTweets(d, startTime, stopTime);
+//            }
         });
     
     series.attr("class", function(d) {
@@ -890,7 +893,98 @@ function buildInterface() {
     });
 }
 
-function getTweets(series) {
+function getTweets(series, startTime, stopTime) {
+    var url = "scripts/php/getRepresentativeTweet.php";
+    url += "?event_id=" + getCurrentCollection().ID;
+    var title = "";
+    
+    if(options.subset.is("distinct")) {
+        url += '&redun=0';
+        title += 'Distinct ';
+    } else if(!options.subset.is('all')) {
+        url += '&type=' + options.subset.get();
+        title += options.subset.getLabel() + ' ';
+    }
+    title += 'Tweets';
+    
+    if(options.series.is("terms")) {
+        if(series.name.split(" ").length > 1)
+            url += '&text_search="+' + series.name.split(" ").join(" +") + '"';
+        else
+            url += '&text_search="' + series.name + '"';
+        title += ' with text "' + series.name + '"';
+    } else if(options.series.is("types")) {
+        url += '&type=' + series.name;
+        title += ' of type ' + series.name;
+    } else if(options.series.is("distinct")) {
+        url += '&redun=' + (series.name == "distinct" ? 0 : 1);
+        title += ' that are ' + (series.name == "distinct" ? 'distinct' : 'not distinct')
+    }
+    
+    startTime.setHours(startTime.getHours() - 8); // temporary UTC/PST fix
+    url += '&time_min="' + formatDate(startTime) + '"';
+    title += " between <br />" + formatDate(startTime);
+    
+    stopTime.setHours(stopTime.getHours() - 8); // temporary UTC/PST fix
+    url += '&time_max="' + formatDate(stopTime) + '"';
+    title += " and " + formatDate(stopTime);
+    
+    console.info(url);
+    d3.text(url, function(error, data) {
+        
+        d3.select('#selectedTweetsModal .modal-title')
+            .html(title);
+        var modal_body = d3.select('#selectedTweetsModal .modal-body');
+        modal_body.selectAll('*').remove();
+        
+        
+        if(data.indexOf('Maximum execution time') >= 0) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br />Query took too long");
+        } else if (data.indexOf('Fatal error') >= 0) {
+//            } else {
+                modal_body.append('div')
+                    .attr('class', 'text-center')
+                    .text("Error retrieving tweets. <br /><br />" + data);
+//            }
+        } else if (error) {
+//            } else {
+                modal_body.append('div')
+                    .attr('class', 'text-center')
+                    .text("Error retrieving tweets. <br /><br />" + error);
+//            }
+        } else {
+            data = JSON.parse(data);
+            
+            if(data.length == 0) {
+                modal_body.append('div')
+                    .attr('class', 'text-center')
+                    .text("No tweets found in this selection.");
+            } else {
+                modal_body.append('ul')
+                    .attr('class', 'list-group')
+                    .selectAll('li').data(data).enter()
+                    .append('li')
+                    .attr('class', 'list-group-item')
+                    .html(function(d) {
+                        var content = "<span class='badge'># " + d['ID'] + " </span>";
+                        content += d['Username'] + " said: ";
+                        content += "<br />";
+                        content += d['Text'];
+                        content += "<br />";
+                        if(d['Distinct'] == '1')
+                            content += 'distinct ';
+                        content += d['Type'];
+                        if(d['Origin'])
+                            content += ' of # ' + d['Origin']
+                        return content;
+                    });
+            }
+        }
+        
+        $('#selectedTweetsModal').modal();
+    });
 }
 
 function setColors() {
