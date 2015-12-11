@@ -281,10 +281,12 @@ function loadNewSeriesData(subset) {
         collection = getCurrentCollection();
 
         series_data.map(function(datum) {
-            if(collection.Keywords.toLowerCase().indexOf(datum.name.toLowerCase()) > -1)
-                datum.isKeyword = true;
-            else if(collection.OldKeywords.toLowerCase().indexOf(datum.name.toLowerCase()) > -1)
-                datum.isOldKeyword = true;
+            datum.isKeyword = collection.Keywords.reduce(function(prev, keyword) {
+                return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
+            }, false);
+            datum.isOldKeyword = collection.OldKeywords.reduce(function(prev, keyword) {
+                return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
+            }, false);
             
             datum.sum = data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                 return cur_sum + datapoint[datum.name];
@@ -325,7 +327,6 @@ function loadNewSeriesData(subset) {
             }, 0);
         });
     }
-    console.log(series_data);
 }
 
 function changeSeries(subset) {
@@ -871,12 +872,11 @@ function buildInterface() {
             return collection.Name;
         });
         collections.map(function(collection) {
-            collection.Keywords = collection.Keywords.split(', ');
-            console.log(collection.StartTime);
+            collection.Keywords = collection.Keywords.split(/,[ ]*/);
+            collection.OldKeywords = collection.OldKeywords.split(/,[ ]*/);
             collection.StartTime = new Date(collection.StartTime);
-            console.log(collection.StartTime);
-            console.log(collection.StartTime.getTimezoneOffset());
-            console.log(new Date().getTimezoneOffset());
+            collection.StartTime.setMinutes(collection.StartTime.getMinutes()
+                                           -collection.StartTime.getTimezoneOffset());
             if(collection.StopTime)
                 collection.StopTime = new Date(collection.StopTime);
             else
@@ -891,19 +891,19 @@ function buildInterface() {
         
         options.init();
         
-        console.log(collections[0]);
-        
         // Add additional information for collections
         collection_names.map(function(name, i) {
             var content = '<dl class="dl-horizontal collection_popover">';
             var collection = collections[i];
             Object.keys(collection).map(function(key) {
                 content += "<dt>" + key + "</dt>";
+                
                 if(collection[key] instanceof Date) {
                     var date = new Date(collection[key]);
-//                    date.setHours(date.getHours
-                    
                     content += "<dd>" + formatDate(date) + "</dd>";
+                } else if(collection[key] instanceof Array) {
+                    var arr = collection[key].join(", ");
+                    content += "<dd>" + arr + "</dd>";
                 } else {
                     content += "<dd>" + collection[key] + "</dd>";
                 }

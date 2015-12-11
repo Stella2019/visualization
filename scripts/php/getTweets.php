@@ -21,7 +21,7 @@
         "	ON TweetInEvent.Tweet_ID = Tweet.ID " .
         "WHERE TweetInEvent.Event_ID = " . $event_id . " " .
         "   AND Tweet.Timestamp >= " . $time_min . " " .
-        "   AND Tweet.Timestamp <= " . $time_max . " ";
+        "   AND Tweet.Timestamp < " . $time_max . " ";
 
     if(isset($_GET["type"])) {
         $query = $query . "   AND Tweet.Type = '" . $_GET["type"] . "'  ";

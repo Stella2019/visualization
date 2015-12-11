@@ -139,6 +139,8 @@ def parseDir(path):
         print ("Parsing All JSON Files in: " + path)
     
     for filename in sorted(os.listdir(path)):
+        if os.path.isdir(path + "/" + filename):
+            parseDir(path + "/" + filename)
         if filename.endswith(".json") and filename[-18:-10].isdigit() and filename[-9:-5].isdigit():
             parseFile(path + "/" + filename)
 
