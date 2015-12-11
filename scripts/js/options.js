@@ -24,7 +24,7 @@ function Options() {
     var self = this;
     
     var options = {};
-    options.topmenu = ['collection', 'subset', 'resolution', 'time_limit', '<br>',
+    options.topmenu = ['collection', 'subset', 'resolution', 'time_limit', 'add_term', '<br>',
                     'display_type', 'y_scale', 'y_max', 'shape', 'series']; 
     
 //    if (window.location.href.indexOf('index_dev.html') > -1) {
@@ -146,7 +146,16 @@ function Options() {
             default: 0,
             callback: function() { console.log("Changed plot click"); }
         });
-    
+    options.add_term = new Option({
+            title: "Add Term",
+            labels: ["New Term"],
+            ids:    ["new"],
+            available: [0],
+            default: 0,
+            custom_entries_allowed: true,   
+            textfieldconfirm: true,
+            callback: function() { genEventTweetCount(); }
+        });
     
     // push holder variables and option sets into the list
     this.state = {};
@@ -294,13 +303,15 @@ Options.prototype = {
             if (option == '<br>') {
                 d3.select("#choices").append("br")
             } else if(options[option].textfield) {
-                options.buildTextField(options, option);
+                options.buildTextToggle(options, option);
+            } else if(options[option].textfieldconfirm) {
+                options.buildTextConfirm(options, option);
             } else { // Dropdown
                 options.buildDropdown(options, option);
             }
         });
     },
-    buildTextField: function(options, option) {
+    buildTextToggle: function(options, option) {
         var set = options[option];
         
         // Make container
@@ -399,6 +410,43 @@ Options.prototype = {
         options.state[toggleOption] = options[toggleOption].get();
         options.state[option] = set.ids[set.default];
     },
+    buildTextConfirm: function(options, option) {
+        var set = options[option];
+        
+        // Make container
+        var superId = "choose_" + option;
+        var container = d3.select("#choices").append("div")
+            .attr("class", "choice")
+            .style("display", "inline-table")
+            .style("vertical-align", "top")
+            .style("text-transform", "capitalize")
+            .append("div")
+                .attr("id", superId)
+                .attr("class", "input-group");
+        
+        // Add title
+        container.append('span')
+            .attr('class', 'input-group-addon')
+            .html(set.title);
+        
+        container.append("input")
+            .attr("id", "input_" + option)
+            .style("width", "120px")
+            .attr("class", "text-center form-control")
+            .html(set.labels[set.default])
+            .on('keyup', function(d) {
+                set.set(this.value);
+            });
+        
+        container.append('div')
+            .attr('class', 'input-group-btn')
+            .append('button')
+            .html("<span class='glyphicon glyphicon-search'></span>")
+            .attr('class', 'btn btn-primary')
+            .on('click', options[option].callback);
+        
+        options.state[option] = set.ids[set.default];
+    },
     buildDropdown: function(options, option) {
         var set = options[option];
 
@@ -421,6 +469,7 @@ Options.prototype = {
         
         container.select('button').append('span')
             .attr('class', 'current')
+            .style('text-transform', 'capitalize')
             .html('Label');
 
         container.select('button').append('text')
