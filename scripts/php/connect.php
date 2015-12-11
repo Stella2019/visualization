@@ -4,7 +4,7 @@
     $conf = json_decode(file_get_contents($file), true);
 
     if (!isset($_SERVER['PHP_AUTH_USER'])) {
-        header('WWW-Authenticate: Basic realm="Benson Store Database"');
+        header('WWW-Authenticate: Basic realm="Rumoring DRG Login"');
         header('HTTP/1.0 401 Unauthorized');
         echo 'Authentication Cancelled';
         exit;

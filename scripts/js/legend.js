@@ -1,7 +1,7 @@
 function Legend() {
     self = this;
     self.container = [];
-    self.container_terms = [];
+    self.container_series = [];
     self.data = [];
     self.mouseOverToggle = false;
     self.mouseOverToggleState = true;
@@ -59,14 +59,27 @@ Legend.prototype = {
     init: function() {
         this.container = d3.select('#legend');
         
-        this.container_terms = this.container.append('div')
+        this.container_series = this.container.append('div')
             .attr('class', 'legend_part')
             .data(['legend_active']);
         
-        this.container_terms.append('div')
+        this.container_series.append('div')
             .attr('class', 'legend_title text-center')
             .style({'font-weight': 'bold', margin: '5px'})
             .text('Terms');
+        
+        var legend_key = this.container.append('div')
+            .attr('id', 'legend_key')
+            .append('dl').selectAll()
+            .data([
+                {term: "&nbsp;", label: "Final Capture Term"},
+                {term: "&#x271d;", label: "Old Capture Term"},
+                {term: "*", label: "New Term"}
+            ]);
+        
+       legend_key.enter().insert("dt").html(function(d) { return d.term });
+       legend_key.enter().insert("dd").html(function(d) { return d.label });
+                    
     },
     populate: function(series_data) {
         // Save data
@@ -77,11 +90,13 @@ Legend.prototype = {
             series.shown = true; 
         }, this);
         
-        this.container_terms.select('.legend_title')
+        this.container_series.select('.legend_title')
             .html(options.series.getLabel());
+        d3.select('#legend_key')
+            .style('display', (options.series.is('terms') ? 'block' : 'none'));
         
         // Add new entries
-        var entries = this.container_terms
+        var entries = this.container_series
             .selectAll('div.legend_entry')
             .data(this.data);
 
@@ -117,7 +132,7 @@ Legend.prototype = {
                 return 'legend_entry ' + d.id;
             });
         
-        this.container_terms.on('mouseout', function(d) {
+        this.container_series.on('mouseout', function(d) {
             d3.event.stopPropagation();
         });
         this.container.on('mouseout', self.endToggle);
@@ -126,8 +141,15 @@ Legend.prototype = {
             .classed('off', false);
 
         this.container.selectAll('div.legend_label')
-            .text(function (d) {
-                return d.name;
+            .html(function (d) {
+                var name = d.name;
+                if(options.series.is('terms')) {
+                    if(d.isOldKeyword)
+                        name += ' &#x271d;';
+                    else if(!d.isKeyword)
+                        name += ' *';
+                }
+                return name;
             });
     }
 }

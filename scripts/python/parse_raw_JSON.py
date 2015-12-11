@@ -42,7 +42,7 @@ def main():
     parser.add_argument("-d", "--directory", action="store_true",
                         help="Indicates that the path is pointing to a folder, should handle read all json files within")
     parser.add_argument("-s", "--statistics", action="store_true",
-                        help="Instead of parsing a raw collection, instead just calculate statistics based on a the file(s)")
+                        help="Calculate statistics & save them")
     parser.add_argument("-w", "--words", nargs="+", required=False,
                         help='To filter the tweets that are accepted, a word or list of words in which one of them must be present in the tweet')
     parser.add_argument("-b", "--database", action="store",
@@ -58,17 +58,14 @@ def main():
     global options
     options = parser.parse_args()
     
-    if(options.statistics):
-        pass
+    if(options.directory):
+        parseDir(options.path)
     else:
-        if(options.directory):
-            parseDir(options.path)
-        else:
-            parseFile(options.path)
-        saveCollection()
-    
-        if(serverStorage is not None):
-            serverStorage.close()
+        parseFile(options.path)
+    saveCollection()
+
+    if(serverStorage is not None):
+        serverStorage.close()
         
 def parseFile(filename):
     collection_name = filename[0:-18].rsplit('/',1)[-1]
@@ -149,8 +146,8 @@ def parseFile(filename):
                 if("in_reply_to_status_id_str" in data and data['in_reply_to_status_id_str'] is not None): 
                     tweet['Origin'] = data['in_reply_to_status_id_str']
                     tweet['Type'] = 'reply'
-                elif("quote_status_id_str" in data and data['quote_status_id_str'] is not None): 
-                    tweet['Origin'] = data['quote_status_id_str']
+                elif("quoted_status_id_str" in data and data['quoted_status_id_str'] is not None): 
+                    tweet['Origin'] = data['quoted_status_id_str']
                     tweet['Type'] = 'quote'
                 elif("retweeted_status" in data and (data['retweeted_status']) is not None):
                     if('id' in data['retweeted_status']):
@@ -203,29 +200,15 @@ def parseFile(filename):
                             minutes[tweet["Type"]][minute][keyword] += 1
                         
     if(options.database):
-        # Push the numbers for each minute
-        for minute in range(10):
-#            timestamp_minute = timestamp_str[:-1] + str(minute);
-            timestamp_minute = timestamp + timedelta(seconds=60*minute)
-            time_key = datetime.strftime(timestamp_minute, '%Y%m%d_%H%M')
-            timestamp_minute = datetime.strftime(timestamp_minute, '%Y-%m-%d %H:%M')
-            
-            keyword = "_total_"
-            data = {
-                'Event_ID': collection["id"],
-                'Time': timestamp_minute,
-                'Keyword': keyword,
-                'Count':    minutes["all"][minute][keyword],
-                'Distinct': minutes["distinct"][minute][keyword],
-                'Original': minutes["original"][minute][keyword],
-                'Retweet':  minutes["retweet"][minute][keyword],
-                'Reply':    minutes["reply"][minute][keyword]
-            }
+        
+        if(options.statistics):
+            # Push the numbers for each minute
+            for minute in range(10):
+                timestamp_minute = timestamp + timedelta(seconds=60*minute)
+                time_key = datetime.strftime(timestamp_minute, '%Y%m%d_%H%M')
+                timestamp_minute = datetime.strftime(timestamp_minute, '%Y-%m-%d %H:%M')
 
-            if(data['Count'] > 0):
-                cursor.execute(add_event_tweet_count, data)    
-                
-            for keyword in collection['keywords']:
+                keyword = "_total_"
                 data = {
                     'Event_ID': collection["id"],
                     'Time': timestamp_minute,
@@ -238,7 +221,22 @@ def parseFile(filename):
                 }
 
                 if(data['Count'] > 0):
-                    cursor.execute(add_event_tweet_count, data) 
+                    cursor.execute(add_event_tweet_count, data)    
+
+                for keyword in collection['keywords']:
+                    data = {
+                        'Event_ID': collection["id"],
+                        'Time': timestamp_minute,
+                        'Keyword': keyword,
+                        'Count':    minutes["all"][minute][keyword],
+                        'Distinct': minutes["distinct"][minute][keyword],
+                        'Original': minutes["original"][minute][keyword],
+                        'Retweet':  minutes["retweet"][minute][keyword],
+                        'Reply':    minutes["reply"][minute][keyword]
+                    }
+
+                    if(data['Count'] > 0):
+                        cursor.execute(add_event_tweet_count, data) 
         
         if(not options.test):
             serverStorage.commit()
@@ -269,6 +267,65 @@ def verifyCollection(collection_name):
         saveCollection()
         loadCollection(collection_name)
         
+        
+def getKeywords(collection):
+    # Find the right connection
+    modifications = []
+    
+    found = False
+    pgno = 1
+    while(found is False):
+        fetched_data = serverCapture.doSimpleJSONGet('jobmodifications/?format=json&page=' + str(pgno))
+        
+        # Search for collection in the fetched data
+        for item in fetched_data["results"]:
+            if(item["job_id"] == collection["id"]):
+                modifications.append(json.loads(item["changes"]))
+        
+        if (fetched_data["next"] is None):
+            break
+        
+        # Not found, continue searching through the next pages
+        pgno += 1
+    
+    # Get deleted terms
+    deleted_words = [];
+    for mod in modifications:
+        if('twitter_keywords' in mod):
+            deleted_words.extend(mod['twitter_keywords']['deletions'])
+            
+    all_keywords = collection["twitter_keywords"].split(',')
+    old_keywords = [];
+    for new_word in deleted_words:
+        duplicate = False
+        for existing_word in all_keywords:
+            duplicate |= new_word.lower() == existing_word.strip().lower()
+        if(not duplicate):
+            old_keywords.append(new_word)
+            all_keywords.append(new_word)
+    
+    collection["old_keywords"] = ", ".join(old_keywords)
+    
+    if("Paris" in collection["name"]):
+        for new_word in ["Paris", "Les Halles", "Shopping Mall", "Bataclan", "Concert Hall", "Eiffel", "Louvre", "Pimpidou"]:
+            duplicate = False
+            for existing_word in all_keywords:
+                duplicate |= new_word.lower() == existing_word.strip().lower() 
+            if(not duplicate):
+                all_keywords.append(new_word)
+    
+    collection["keywords"] = []
+    collection["keywords_parts"] = []
+    
+    for keyword in all_keywords:
+        keyword = keyword.strip()
+        collection["keywords"].append(keyword)
+        
+        keywords_parts = unicodedata.normalize('NFD', keyword.lower().replace('#', '')).split(' ')
+        collection["keywords_parts"].append(keywords_parts)
+    
+    return collection
+    
 def loadCollection(collection_name):
     global collection
     
@@ -288,32 +345,13 @@ def loadCollection(collection_name):
                 found = True
                 break
         
-        
         if (fetched_data["next"] is None):
             break
         
         # Not found, continue searching through the next pages
         pgno += 1
     
-    keywords = collection["twitter_keywords"].split(',');
-    
-    if("Paris" in collection["name"]):
-        for new_word in ["Paris", "Les Halles", "Shopping Mall", "Bataclan", "Concert Hall", "Eiffel", "Louvre", "Pimpidou"]:
-            duplicate = False
-            for existing_word in keywords:
-                duplicate |= new_word.lower() == existing_word.strip().lower() 
-            if(not duplicate):
-                keywords.append(new_word)
-    
-    collection["keywords"] = []
-    collection["keywords_parts"] = []
-    
-    for keyword in keywords:
-        keyword = keyword.strip()
-        collection["keywords"].append(keyword)
-        
-        keywords_parts = unicodedata.normalize('NFD', keyword.lower().replace('#', '')).split(' ')
-        collection["keywords_parts"].append(keywords_parts)
+    collection = getKeywords(collection)
     
     # Push the collection to the storage database if it exists
     if(options.database):
@@ -324,7 +362,7 @@ def loadCollection(collection_name):
             'Name': collection["name"],
             'Description': collection["description"],
             'Keywords': collection["twitter_keywords"],
-            'OldKeywords': '',
+            'OldKeywords': collection["old_keywords"],
             'TweetsCollected': collection["total_count"]
         }
         

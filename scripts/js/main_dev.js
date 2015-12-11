@@ -3,7 +3,7 @@ Array.prototype.contains = function (element) {
 };
 
 var collections;
-var collection_names = ["Paris Shooting", "Paris Collection 2", "Paris Shooting - 3 - New Terms", "SahafiHotelAttack", "Sinai Plane Crash", "NORAD blimp on the loose", "Earthquake in Pakistan and Afghanistan", "Hurricane Patricia - Spanish terms", "Flooding from Patricia", "Hurricane Patricia", "Wilfrid Laurier Lockdown", "Black Lives Matter Collection", "Ankara Bombing", "Hurricane Oho", "Doctors without Borders", "Townhall gunmen", "umpqua college shooting", "Hurricane Joaquin - hurricane terms", "Hurricane Joaquin - flooding terms", "Yemen mosque bombing", "Chile", "Flash Flood", "California Valley Fire", "Grand Mosque accident", "Refugee crisis", "Karachi Explosion", "Chicago Shooting", "Western WA storms", "Tropical Storm Erika", "WA Wildfires - August", "Cotopaxi volcano", "FAA outage", "Chemical Spill - August 2015", "Alaska Earthquake - July 26", "Navy Shooting", "NYSE Stock Exchange Cant Exchange", "India Earthquake"];
+var collection_names = [];
 var data_stacked, series_data, data_raw, total_byTime;
 var keywords, series_names;
 var options = new Options();
@@ -232,6 +232,10 @@ function loadCollectionData() {
     toggleLoading(true);
     
     var collection = getCurrentCollection();
+    if($.isEmptyObject(collection)) {
+        toggleLoading(false);
+        return;
+    }
     
     data_raw = {};
     var subset_to_start = 'all'; //options.subset.get();
@@ -264,65 +268,64 @@ function loadCollectionData() {
 }
 
 function loadNewSeriesData(subset) {
-    series_data = [];
+    series_data = series_names.map(function(name, i) {
+        return {
+            name: name,
+            id: simplify(name),
+            order: (i + 1) * 100,
+            shown: true
+        };
+    });
     
     if(options.series.is('terms')) {
-        series_names.forEach(function(name, i) {
-            series_data.push({
-                name: name,
-                id: simplify(name),
-                order: (i + 1) * 100,
-                shown: true, // replaced the map series_selected with this at some point
-                sum: data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
-                    return cur_sum + datapoint[name];
-                }, 0)
-            });
+        collection = getCurrentCollection();
+
+        series_data.map(function(datum) {
+            if(collection.Keywords.toLowerCase().indexOf(datum.name.toLowerCase()) > -1)
+                datum.isKeyword = true;
+            else if(collection.OldKeywords.toLowerCase().indexOf(datum.name.toLowerCase()) > -1)
+                datum.isOldKeyword = true;
+            
+            datum.sum = data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                return cur_sum + datapoint[datum.name];
+            }, 0);
         });
     } else if(options.series.is('types')) {
-        series_names.forEach(function(name, i) {
-            series_data.push({
-                name: name,
-                id: simplify(name),
-                order: (i + 1) * 100,
-                shown: true, // replaced the map series_selected with this at some point
-                sum: data_raw[name].reduce(function(cur_sum, datapoint) { // Can change subset
+        series_data.map(function(datum) {
+            if(datum.name == 'quote')
+                datum.sum = data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                     return cur_sum + datapoint['_total_'];
-                }, 0)
-            });
+                }, 0);
+            else
+                datum.sum = data_raw[datum.name].reduce(function(cur_sum, datapoint) { // Can change subset
+                    return cur_sum + datapoint['_total_'];
+                }, 0);
         });
+        
+        // Subtract the first three sums from the all sum to make the quote sum, presuming repeat is in the fourth place
+        series_data[3].sum -= series_data[0].sum + series_data[1].sum + series_data[2].sum;
     } else if(options.series.is('distinct')) {
-        var name = 'distinct'; i = 0;
-        series_data.push({
-            name: name,
-            id: simplify(name),
-            order: (i + 1) * 100,
-            shown: true, // replaced the map series_selected with this at some point
-            sum: data_raw[name].reduce(function(cur_sum, datapoint) { // Can change subset
-                return cur_sum + datapoint['_total_'];
-            }, 0)
+        series_data.map(function(datum) {
+            if(datum.name == 'distinct')
+                datum.sum = data_raw['distinct'].reduce(function(cur_sum, datapoint) { // Can change subset
+                    return cur_sum + datapoint['_total_'];
+                }, 0);
+            else
+                datum.sum = data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                    return cur_sum + datapoint['_total_'];
+                }, 0);
         });
-        name = 'redundant'; i = 1;
-        series_data.push({
-            name: name,
-            id: simplify(name),
-            order: (i + 1) * 100,
-            shown: true, // replaced the map series_selected with this at some point
-            sum: data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
-                return cur_sum + datapoint['_total_'] - series_data[0].sum;
-            }, 0)
-        });
+        
+        // Subtract the distinct sum from the all sum to make the repeat sum, presuming repeat is in the second place
+        series_data[1].sum -= series_data[0].sum;
     } else { // implicit none
-        var name = 'all'; i = 0;
-        series_data.push({
-            name: name,
-            id: simplify(name),
-            order: (i + 1) * 100,
-            shown: true, // replaced the map series_selected with this at some point
-            sum: data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+        series_data.map(function(datum) {
+            datum.sum = data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                 return cur_sum + datapoint['_total_'];
-            }, 0)
+            }, 0);
         });
     }
+    console.log(series_data);
 }
 
 function changeSeries(subset) {
@@ -330,9 +333,9 @@ function changeSeries(subset) {
     if(options.series.is('terms')) {
         series_names = keywords;
     } else if(options.series.is('types')) {
-        series_names = ['original', 'retweet', 'reply'];
+        series_names = ['original', 'retweet', 'reply', 'quote'];
     } else if(options.series.is('distinct')) {
-        series_names = ['distinct', 'redundant'];
+        series_names = ['distinct', 'repeat'];
     } else {
         series_names = ['all'];
     }
@@ -389,6 +392,7 @@ function prepareData() {
                 retweet: data_raw['retweet'][i]['_total_'],
                 reply: data_raw['reply'][i]['_total_']
             }
+            entry.quote = entry['_total_'] - entry['original'] - entry['retweet'] - entry['reply'];
             data_nested_entries.push(entry);
         }
     } else if(options.series.is('distinct')) {
@@ -398,7 +402,7 @@ function prepareData() {
                 timestamp: data_raw['all'][i]['timestamp'],
                 _total_: data_raw['all'][i]['_total_'],
                 distinct: data_raw['distinct'][i]['_total_'],
-                redundant: data_raw['all'][i]['_total_'] - data_raw['distinct'][i]['_total_'],
+                repeat: data_raw['all'][i]['_total_'] - data_raw['distinct'][i]['_total_'],
             }
             data_nested_entries.push(entry);
         }
@@ -466,8 +470,7 @@ function prepareData() {
     
     // Reorder by total size
     series_data.sort(compareSeries);
-    legend.container_terms.selectAll('div.legend_entry').sort(compareSeries);
-//    legend.container_active.selectAll('div.legend_entry').sort(compareSeries);
+    legend.container_series.selectAll('div.legend_entry').sort(compareSeries);
     setColors();
     
     // Add the nested data to the series
@@ -560,6 +563,11 @@ function display() {
     
     // Change data for display
     n_series = data_stacked.length;
+    if(n_series == 0) {
+        toggleLoading(false);
+        alert('No data');
+        return;
+    }
     n_datapoints = data_stacked[0].values.length;
     if(options.display_type.is("separate")) {
         for (var i = n_series - 1; i >= 0; i--) {
@@ -635,18 +643,24 @@ function display() {
         .data(data_stacked);
  
     var series_paths = series.enter().append("g")
-//        .on("mouseover", function(d) {console.log(d);})
         .on("mouseover", legend.highlightSeries)
         .on("mouseout", legend.unHighlightSeries)
         .on("click", function(d) {
-//            if(options.plot_click.is('deselect'))
-//               legend.toggleSeries(d);
-//            if(options.plot_click.is('gettweets')) {
-                var xy = d3.mouse(this);
-                var startTime = focus.x.invert(xy[0] - 1);
-                var stopTime = focus.x.invert(xy[0] + 1);
-                getTweets(d, startTime, stopTime);
-//            }
+            var xy = d3.mouse(this);
+            var time = focus.x.invert(xy[0]);
+            var coeff = 1000 * 60; // get a minute on other side
+            if(options.resolution.is('tenminute')) {
+                coeff *= 10;
+            } else if(options.resolution.is('hour')) {
+                coeff *= 60;
+            } else if(options.resolution.is('day')) {
+                coeff *= 60 * 24;
+            }
+            var date = new Date();  //or use any other date
+            var startTime = new Date(Math.round(time.getTime() / coeff) * coeff)
+            var stopTime = new Date(startTime.getTime() + coeff)
+            
+            getTweets(d, startTime, stopTime);
         });
     
     series.attr("class", function(d) {
@@ -844,7 +858,7 @@ function buildInterface() {
     toggleLoading(true);
     
     // Collection selection
-    d3.csv("scripts/php/getCollections.php", function(error, collections_file) {
+    d3.json("scripts/php/getCollections.php", function(error, collections_file) {
         if (error) throw error;
         
         // Add collections
@@ -852,8 +866,21 @@ function buildInterface() {
         collections_file.reverse();
         collections = collections_file;
         
+        // Get new data
         collection_names = collections.map(function(collection) {
             return collection.Name;
+        });
+        collections.map(function(collection) {
+            collection.Keywords = collection.Keywords.split(', ');
+            console.log(collection.StartTime);
+            collection.StartTime = new Date(collection.StartTime);
+            console.log(collection.StartTime);
+            console.log(collection.StartTime.getTimezoneOffset());
+            console.log(new Date().getTimezoneOffset());
+            if(collection.StopTime)
+                collection.StopTime = new Date(collection.StopTime);
+            else
+                collection.StopTime = "Ongoing";
         });
         
         // Generate options, including collections
@@ -864,13 +891,22 @@ function buildInterface() {
         
         options.init();
         
+        console.log(collections[0]);
+        
         // Add additional information for collections
         collection_names.map(function(name, i) {
             var content = '<dl class="dl-horizontal collection_popover">';
             var collection = collections[i];
             Object.keys(collection).map(function(key) {
                 content += "<dt>" + key + "</dt>";
-                content += "<dd>" + collection[key] + "</dd>";
+                if(collection[key] instanceof Date) {
+                    var date = new Date(collection[key]);
+//                    date.setHours(date.getHours
+                    
+                    content += "<dd>" + formatDate(date) + "</dd>";
+                } else {
+                    content += "<dd>" + collection[key] + "</dd>";
+                }
             });
             content += "</dl>";
             

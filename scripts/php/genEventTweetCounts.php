@@ -8,7 +8,7 @@
 
     // Execute Query
     $query = "" .
-        "INSERT INTO EventTweetCount " .
+        "REPLACE INTO EventTweetCount " .
         "(Event_ID, `Time`, Keyword, count, `Distinct`, `Original`, Retweet, Reply) " .
         "SELECT " .
         "    " . $event_id . " as 'Event_ID', " .
