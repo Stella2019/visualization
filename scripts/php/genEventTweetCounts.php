@@ -41,9 +41,9 @@
         "GROUP BY Tweets.time " .
         "ORDER BY Tweets.time ";
 
-print $query;
-
     $result = $mysqli->query($query);
      
+    print $query;
+
     $mysqli->close();
 ?>

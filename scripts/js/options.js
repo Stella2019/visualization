@@ -24,8 +24,9 @@ function Options() {
     var self = this;
     
     var options = {};
-    options.topmenu = ['collection', 'subset', 'resolution', 'time_limit', 'add_term', '<br>',
-                    'display_type', 'y_scale', 'y_max', 'shape', 'series']; 
+    options.topmenu = ['collection', 'time_limit', 'add_term', '<br>',
+                    'series', 'subset', 'resolution', '<br>',
+                    'display_type', 'shape', 'color_scale', 'y_scale', 'y_max']; 
     
 //    if (window.location.href.indexOf('index_dev.html') > -1) {
 //        options.dropdowns.push('series');
@@ -35,7 +36,7 @@ function Options() {
     options.record = ['collection', 'subset', 'resolution', 'time_limit',
                       'display_type', 'y_scale', 'shape', 'series',
                       'time_save', 'time_min', 'time_max',
-                      'y_max_toggle', 'y_max'];
+                      'y_max_toggle', 'y_max', 'color_scale'];
     
     options.collection = new Option({
             title: "Collection",
@@ -155,6 +156,14 @@ function Options() {
             custom_entries_allowed: true,   
             textfieldconfirm: true,
             callback: function() { genEventTweetCount(); }
+        });
+    options.color_scale = new Option({
+            title: "Color Scale",
+            labels: ["10", "20", "20b", "20c"],
+            ids:    ["category10", 'category20', 'category20b', 'category20c'],
+            available: [0, 1, 2, 3],
+            default: 0,
+            callback: function() { prepareData(); }
         });
     
     // push holder variables and option sets into the list
@@ -336,7 +345,8 @@ Options.prototype = {
         options[toggleOption] = new Option({
             title: "Save " + set.title + " State",
             styles: ["btn btn-default", "btn btn-primary"],
-            labels: ["<span class='glyphicon glyphicon-pencil'></span>", "<span class='glyphicon glyphicon-pencil'></span>"],
+            labels: ["Auto", "Manual"],
+//            labels: ["<span class='glyphicon glyphicon-pencil'></span>", "<span class='glyphicon glyphicon-pencil'></span>"],
             tooltips: ["Click to toggle manual mode", "Click to toggle automatic mode"],
             //            labels: ["Auto", "Manual"],
 //            labels: [set.title, set.title],
@@ -435,8 +445,18 @@ Options.prototype = {
             .attr("class", "text-center form-control")
             .html(set.labels[set.default])
             .on('keyup', function(d) {
-                set.set(this.value);
+                if (d3.event.keyCode == 13) {
+                    options[option].callback();
+                } else {
+                    set.set(this.value);
+                }
             });
+        
+        options[option].reset = function(value) {
+            set.set("");
+            document.getElementById("input_" + option)
+                .value = "";
+        };
         
         container.append('div')
             .attr('class', 'input-group-btn')

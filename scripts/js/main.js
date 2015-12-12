@@ -7,14 +7,13 @@ var collection_names = [];
 var data_stacked, series_data, data_raw, total_byTime;
 var keywords, series_names;
 var options = new Options();
-var ddd;
 
 window.onload = initialize;
 
 var formatDate,
     color,
     area, stack,
-    brush, drag;
+    brush, spin;
 var plot_area, focus, context, legend;
 
 function initialize() {
@@ -40,7 +39,7 @@ function initialize() {
     context.y = d3.scale.linear()
         .range([context.height, 0]);
 
-    color = d3.scale.category10();
+    setColorScale();
 
     focus.xAxis = d3.svg.axis()
         .scale(focus.x)
@@ -64,7 +63,17 @@ function initialize() {
         .x(context.x)
         .on("brush", function() { setFocusTime('brush'); } );
     
-    drag = d3.behavior.drag();
+    var opts = {
+        lines: 11,
+        color: '#000',
+        length: 50,
+        width: 10,
+        radius: 25,
+        top: focus.margin.top + focus.height / 2 + "px",
+        left: focus.margin.left + focus.width / 2 + "px"
+    };
+    
+    spin = new Spinner(opts);
     
     focus.area = d3.svg.area()
         .interpolate(options.shape.get())
@@ -120,7 +129,7 @@ function loadDataFile(collection, subset, callback) {
         var time_limit = new Date(getCurrentCollection().StartTime);
         
         // Roll Back UTC (this is NOT the right way to do this)
-        time_limit.setHours(time_limit.getHours() - 8);
+//        time_limit.setHours(time_limit.getHours() - 8);
         
         if(options.time_limit.is('3h')) {
             time_limit.setHours(time_limit.getHours() + 3);
@@ -673,8 +682,6 @@ function display() {
     series_paths.append("path")
         .attr("class", "area")
         .style("stroke-opacity", 0)
-        .style("fill", function (d) { return color(d.name); })
-        .style("stroke", function (d) { return color(d.name); })
         .attr("d", function (d) { return focus.area(d.values); });
     
     // Define the parameters of the area
@@ -700,6 +707,8 @@ function display() {
         transition.select("path.area")
             .style("fill-opacity", 0)
             .style("stroke-opacity", 1.0)
+        .style("fill", function (d) { return color(d.name); })
+        .style("stroke", function (d) { return d3.rgb(color(d.name)).darker(); })
             .attr("d", function(d) { return focus.area(d.values)});
     } else if(options.display_type.is("overlap")) {
         focus.svg.selectAll(".series")
@@ -707,12 +716,17 @@ function display() {
         transition.select("path.area")
             .style("fill-opacity", 0.1)
             .style("stroke-opacity", 1.0)
+        .style("fill", function (d) { return color(d.name); })
+        .style("stroke", function (d) { return d3.rgb(color(d.name)).darker(); })
             .attr("d", function(d) { return focus.area(d.values)});
     } else {
         focus.svg.selectAll(".series")
             .classed("lines", false);
         transition.select("path.area")
-            .style("fill-opacity", 1.0)
+            .style("fill-opacity", 0.8)
+            .style("stroke-opacity", 1.0)
+        .style("fill", function (d) { return color(d.name); })
+        .style("stroke", function (d) { return d3.rgb(color(d.name)).darker(); })
             .attr("d", function(d) { return focus.area(d.values)});
     }
     
@@ -840,16 +854,11 @@ function setFocusTime(origin) {
 
 function toggleLoading(toggle) {
     if(toggle) {
-        $('#charts').spin({
-            lines: 11,
-            color: '#555',
-            length: 50,
-            width: 10,
-            radius: 25});
+        $('#timeseries_div').append(spin.spin().el);
         d3.select('#charts')
             .style("opacity", 0.5);
     } else {
-        $('#charts').spin(false);
+        spin.stop();
         d3.select('#charts')
             .style("opacity", 1);
     }
@@ -930,21 +939,70 @@ function buildInterface() {
 }
 
 function genEventTweetCount() {
+    var event_id = getCurrentCollection().ID;
+    var search_term = options.add_term.get().toLowerCase();
+    // Generate PHP query
     var url = "scripts/php/genEventTweetCounts.php";
-    url += "?event_id=" + getCurrentCollection().ID;
-    
-//    startTime.setHours(startTime.getHours() - 8); // temporary UTC/PST fix
+    url += "?event_id=" + event_id;
     url += '&time_min="' + formatDate(options.time_min.min) + '"';
-    
-//    stopTime.setHours(stopTime.getHours() - 8); // temporary UTC/PST fix
     url += '&time_max="' + formatDate(options.time_max.max) + '"';
-    
-    url += '&text_search=' + options.add_term.get();
-    
+    url += '&text_search=' + search_term;
     console.info(url);
+    
+    // Start progress bar
+    options.add_term.reset();
+    $("#input_add_term").blur();
+    d3.select("#choose_add_term").append('div')
+        .attr('id', 'new_keyword_progress_div')
+        .attr('class', 'progress')
+        .style({
+            position: 'absolute',
+            top: '0px',
+            left: '0px',
+            width: '100%',
+            height: '100%',
+            opacity: 0.5,
+            'z-index': 3
+        })
+        .append('div')
+        .attr({
+            id: "new_keyword_progress",
+            class: "progress-bar progress-bar-striped active",
+            role: "progressbar",
+            'aria-valuenow': "100",
+            'aria-valuemin': "0",
+            'aria-valuemax': "100",
+        })
+        .style('width', '100%');
+        
+    var timescale = d3.time.scale()
+        .range([0, 100])
+        .domain(context.x.domain());
+    
+//    var check = setInterval(function() {
+//        var url = "scripts/php/getEventTweetCount_Keyword_Stats.php";
+//        url += "?event_id=" + event_id;
+//        url += '&keyword=' + search_term;
+//        
+//        d3.json(url, function(error, data) {
+//            if(error) return;
+//            var progress = Math.floor(timescale(new Date(data[0].time)));
+//            d3.select('#new_keyword_progress')
+//                .attr('aria-valuenow', progress + "")
+//                .style('width', progress + "%");
+//        });
+//    }, 2000);
+
     d3.text(url, function(error, data) {
         console.debug(error);
         console.info(data);
+        if(error || data.substring(0, 7) != "REPLACE") {
+            alert("Problem generating new series");
+        }
+        
+        d3.select('#new_keyword_progress_div').remove();
+//        clearInterval(check);
+        loadCollectionData();
     });
 }
 
@@ -1046,12 +1104,25 @@ function getTweets(series, startTime, stopTime) {
 }
 
 function setColors() {
-    // Set color values
-    color.domain(series_data.map(function(entry) {return entry.name;}));
+    setColorScale();
+//    console.log(series_data.map(function(entry) {return entry.name;}));
     
-    legend.container.selectAll('div.legend_icon')
-        .style('background-color', function (d) { return color(d.name); })
-        .style('border-color', function (d) { return color(d.name); });
+    // Set color values
+    color.domain(series_data.map(function(series) {return series.name;}));
+    
+    series_data.map(function(series) {
+        series.fill = color(series.name);
+        series.stroke = d3.rgb(color(series.name)).darker();
+        
+        d3.select("." + series.id + " .legend_icon")
+            .style('fill', series.fill)
+            .style('stroke', series.stroke);
+//        console.log(series);
+    });
+    
+//    legend.container.selectAll('.legend_icon')
+//        .style('fill', function (d) { return d.fill; })
+//        .style('stroke', function (d) { return d.stroke; });
 }
 
 function compareCollections(a, b) {
@@ -1084,6 +1155,26 @@ function setYScale() {
             .range([focus.height, 0]);
         focus.yAxis.scale(focus.y)
             .tickFormat(focus.y.tickFormat(10, ",.0f"));
+    }
+}
+
+function setColorScale() {
+    switch(options.color_scale.get()) {
+        case "category10":
+            color = d3.scale.category10();
+            break;
+        case "category20":
+            color = d3.scale.category20();
+            break;
+        case "category20b":
+            color = d3.scale.category20b();
+            break;
+        case "category20c":
+            color = d3.scale.category20c();
+            break;
+        default:
+            color = d3.scale.category10();
+            break;
     }
 }
 

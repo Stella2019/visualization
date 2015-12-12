@@ -7,7 +7,7 @@
 
     // Execute Query
     $query = "" .
-        "SELECT COUNT(*), MAX(TC.Time) " .
+        "SELECT COUNT(*) as count, MAX(TC.Time) as time " .
         "FROM EventTweetCount TC " .
         "WHERE TC.Event_ID = " . $event_id .
         "    AND TC.Keyword = '" . $keyword . "' " .

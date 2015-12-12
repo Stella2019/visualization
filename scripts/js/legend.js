@@ -86,7 +86,7 @@ Legend.prototype = {
         this.data = series_data;
         
         // Get series data
-        series_data.map(function(series) {
+        this.data.map(function(series) {
             series.shown = true; 
         }, this);
         
@@ -110,14 +110,24 @@ Legend.prototype = {
             .on('mouseover', this.highlightSeries)
             .on('mouseout', this.unHighlightSeries);
 
-        entries.selectAll('div.legend_icon')
+        var legend_icons = entries.selectAll('svg.legend_icon_svg')
             .data(function(d) { return [d]; })
-            .enter().append('div')
+            .enter()
+            .append('svg')
+            .attr({
+                class: "legend_icon_svg",
+                width: 25, height: 25
+            })
             .on('mousedown', this.startToggle)
-//            .on('click', this.toggleSeries)
             .on('mouseover', this.hoverOverSeries)
-            .on('mouseup', this.endToggle) // or container.mouseout
-            .attr('class', 'legend_icon');
+            .on('mouseup', this.endToggle)
+            .append('rect')
+            .attr({
+                class: "legend_icon",
+                x: 2.5, y: 2.5,
+                rx: 5, ry: 5,
+                width: 20, height: 20
+            });
 
         entries.selectAll('div.legend_label')
             .data(function(d) { return [d]; })
@@ -128,6 +138,9 @@ Legend.prototype = {
         entries.exit().remove();
 
         entries
+            .attr('id', function(d) {
+                return 'legend_' + d.id;
+            })
             .attr('class', function(d) {
                 return 'legend_entry ' + d.id;
             });

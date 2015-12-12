@@ -1,5 +1,9 @@
 
 /* Chart Display */
+#timeseries_div, #legend {
+    display: inline-block;
+    position: relative;
+}
 .axis path,
 .axis line {
     fill: none;
@@ -86,8 +90,15 @@ button:focus {
     min-height: 50px;
 }
 .legend_entry {
-    margin: 5px;
+/*    margin: 5px;*/
 }
+.legend_icon_svg {
+    display: inline-block;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: 1s;
+}
+/*
 .legend_icon {
     display: inline-block;
     width: 25px;
@@ -98,6 +109,7 @@ button:focus {
     cursor: pointer;
     transition: 1s;
 }
+*/
 .legend_icon.focused {
 /*    opacity;*/
 }
@@ -106,8 +118,7 @@ button:focus {
 }
 .legend_icon.off {
 /*    border: solid;*/
-    background-color: white !important;
-    background-blend-mode: color-burn;
+    fill-opacity: 0.1;
 }
 .legend_label {
     display: inline-block;
