@@ -1105,7 +1105,6 @@ function getTweets(series, startTime, stopTime) {
 
 function setColors() {
     setColorScale();
-//    console.log(series_data.map(function(entry) {return entry.name;}));
     
     // Set color values
     color.domain(series_data.map(function(series) {return series.name;}));
@@ -1117,12 +1116,7 @@ function setColors() {
         d3.select("." + series.id + " .legend_icon")
             .style('fill', series.fill)
             .style('stroke', series.stroke);
-//        console.log(series);
     });
-    
-//    legend.container.selectAll('.legend_icon')
-//        .style('fill', function (d) { return d.fill; })
-//        .style('stroke', function (d) { return d.stroke; });
 }
 
 function compareCollections(a, b) {
