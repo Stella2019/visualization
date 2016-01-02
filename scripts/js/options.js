@@ -36,7 +36,8 @@ function Options() {
     options.record = ['collection', 'subset', 'resolution', 'time_limit',
                       'display_type', 'y_scale', 'shape', 'series',
                       'time_save', 'time_min', 'time_max',
-                      'y_max_toggle', 'y_max', 'color_scale'];
+                      'y_max_toggle', 'y_max', 'color_scale'];//,
+//                      'terms_selected'];
     
     options.collection = new Option({
             title: "Collection",
@@ -44,7 +45,9 @@ function Options() {
             ids:    ["none"],
             available: [0],
             default: 0,
-            callback: function() { loadCollectionData(); }
+            callback: function() {
+                options.terms_selected.set("");
+                loadCollectionData(); }
         });
     options.display_type = new Option({
             title: "Plot Type",
@@ -73,7 +76,7 @@ function Options() {
     options.shape = new Option({
             title: "Shape",
             labels: ["Linear",  "Basis",   "Step"],
-            ids:    ["linear",  "basis",   "step"],
+            ids:    ["linear",  "basis-open",   "step-before"],
             available: [0, 1, 2],
             default: 1,
             callback: function() { prepareData(); }
@@ -108,7 +111,7 @@ function Options() {
             title: "Save Time State",
             styles: ["btn btn-default", "btn btn-primary"],
             labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Saving", "<span class='glyphicon glyphicon-ok-circle'></span> Saving"],
-            ids:    [false, true],
+            ids:    ["false", "true"],
             available: [0, 1],
             default: 0,
             callback: function() { self.recordState(self); }
@@ -165,6 +168,15 @@ function Options() {
             default: 0,
             callback: function() { prepareData(); }
         });
+    options.terms_selected = new Option({
+            title: "Terms Selected",
+            labels: [""],
+            ids:    [''],
+            available: [0],
+            default: 0,
+            custom_entries_allowed: true, 
+            callback: function() { prepareData(); }
+        });
     
     // push holder variables and option sets into the list
     this.state = {};
@@ -198,9 +210,19 @@ Options.prototype = {
         options.recordState(options, null, false);
     },
     importState: function(options) {
+        var state;
         try {
-            state = JSON.parse(window.location.hash.slice(1));
-            console.debug(state);
+//            state = JSON.parse(window.location.hash.slice(1));
+//            console.debug(state);
+            var strstate = window.location.hash.slice(2);
+            if(strstate.length <= 0)
+                return;
+            var arrstate = strstate.split('&');
+            state = arrstate.reduce(function(s, d) {
+                var kv = d.split('=');
+                s[kv[0]] = kv[1].slice(1, kv[1].length -1);
+                return s;
+            }, {});
         } catch(err) {
             return;
         }
@@ -260,10 +282,16 @@ Options.prototype = {
             options.state[changedItem] = options[changedItem].get();
         }
 
+//        strstate = '#' + JSON.stringify(this.state);
+        arrstate = Object.keys(options.state).map(function(d) {
+                return d + '="' + options.state[d] + '"';
+            });
+        strstate = '#!' + arrstate.join('&');
+        
         if(newState == undefined || newState) {
-            history.pushState(null, null, '#' + JSON.stringify(this.state));
+            history.pushState(null, null, strstate);
         } else {
-            history.replaceState(null, null, '#' + JSON.stringify(this.state));
+            history.replaceState(null, null, strstate);
         }
     },
     buildButtonSet: function(option) {
@@ -351,7 +379,7 @@ Options.prototype = {
             //            labels: ["Auto", "Manual"],
 //            labels: [set.title, set.title],
 //            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Auto", "<span class='glyphicon glyphicon-ok-circle'></span> Manual"],
-            ids:    [false, true],
+            ids:    ["false", "true"],
             available: [0, 1],
             default: 0,
             callback: function() {
@@ -360,7 +388,7 @@ Options.prototype = {
             },
             styleFunc: function() {
                 d3.select('#input_' + option)
-                    .attr('disabled', options[toggleOption].get() ? null : true);
+                    .attr('disabled', options[toggleOption].get() == "true" ? null : true);
                 d3.select('#choice_' + toggleOption)
                     .attr('class', function() {
                         return options[toggleOption].styles[options[toggleOption].indexCur()];
@@ -396,8 +424,8 @@ Options.prototype = {
                 'data-content': "Tooltip on bottom"
             })
             .on('click', function(d) {
-                var saving = !options[toggleOption].get();
-                options[toggleOption].set(saving);
+                var saving = !(options[toggleOption].get() == "true");
+                options[toggleOption].set(saving ? "true" : "false");
                 options[toggleOption].styleFunc();
             
                 if(saving) {
@@ -607,8 +635,8 @@ Options.prototype = {
         left_buttons.append('button')
             .attr('id', 'choice_time_save')
             .on('click', function(d) {
-                var saving = !options.time_save.get();
-                options.time_save.set(saving);
+                var saving = !(options.time_save.get() == "true");
+                options.time_save.set(saving ? "true" : "false");
                 options.time_save.styleFunc();
             
                 if(saving) {

@@ -24,6 +24,12 @@
 .series.lines.unfocused {
     opacity: 0.2;
 }
+/*
+.column_hover {o
+    cursor: zoom-in;
+    z-index: 10;
+}
+*/
 
 /* Options */
 .brush .extent {
@@ -127,6 +133,25 @@ button:focus {
     margin-left: 5px;
     margin-top: 3px;
     white-space: nowrap;
+    max-width: 135px;
+    overflow: hidden;
+    transition-duration: 0.5s;
+}
+.legend_label:hover {
+    max-width: 250px;
+}
+
+.legend_only {
+    float:right;
+    margin-top: 3px;
+    margin-right: 5px;
+    color: #bbb;
+    z-index: 10;
+    position: relative;
+}
+.legend_only:hover {
+    cursor: pointer;
+    color: black;
 }
 
 #legend_key {
@@ -148,3 +173,4 @@ button:focus {
     min-width: 150px;
     padding-top: 5px;
 }
+

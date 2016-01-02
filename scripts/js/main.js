@@ -5,7 +5,7 @@ Array.prototype.contains = function (element) {
 var collections;
 var collection_names = [];
 var data_stacked, series_data, data_raw, total_byTime;
-var keywords, series_names;
+var timestamps, timestamps_nested, keywords, series_names;
 var options = new Options();
 
 window.onload = initialize;
@@ -116,6 +116,15 @@ function initialize() {
         .attr("dy", "1em")
         .style("text-anchor", "middle")
         .text("Count of <Subset> Tweets Every <Resolution>");
+    
+    focus.svg.append("path")
+//                .attr("d", function(d) { return focus.area(d); })
+        .attr('class', 'column_hover')
+        .style('display', 'none')
+        .style('fill', 'black')
+        .style('stroke', 'black')
+        .style('fill-opacity', '0.2')
+        .style('stroke-opacity', '0.6');
     
     buildInterface();
 }
@@ -402,7 +411,8 @@ function prepareData() {
                 retweet: data_raw['retweet'][i]['_total_'],
                 reply: data_raw['reply'][i]['_total_']
             }
-            entry.quote = entry['_total_'] - entry['original'] - entry['retweet'] - entry['reply'];
+            entry.quote = entry['_total_'] - entry['original'] 
+                        - entry['retweet'] - entry['reply'];
             data_nested_entries.push(entry);
         }
     } else if(options.series.is('distinct')) {
@@ -456,6 +466,8 @@ function prepareData() {
             return newdata;
         })
         .entries(data_nested_entries);
+    
+    timestamps_nested = data_nested.map(function(item) { return item.key; });
 
     // Convert data to a format the charts can use
     var data_ready = [];
@@ -467,7 +479,7 @@ function prepareData() {
     
     // Add a duplicate entry if there is only one data point
     if(data_ready.length == 1) {
-        var dup = $.extend({}, data_ready[0]);
+        var dup = $.extend({}, data_ready[0]); // cheap cloning
         dup.timestamp = new Date(dup.timestamp.getTime() + 60000);
         data_ready.push(dup);
     }
@@ -607,7 +619,7 @@ function display() {
         y_min = 1;
     
     var y_max = 100;
-    if(options.y_max_toggle.get()) {
+    if(options.y_max_toggle.get() == "true") {
         y_max = options.y_max.get();
     } else {
         if (options.display_type.is('overlap') | options.display_type.is('lines')) {
@@ -653,7 +665,7 @@ function display() {
         .data(data_stacked);
  
     var series_paths = series.enter().append("g")
-        .on("mouseover", legend.highlightSeries)
+//        .on("mouseover", legend.highlightSeries)
         .on("mouseout", legend.unHighlightSeries)
         .on("click", function(d) {
             var xy = d3.mouse(this);
@@ -666,11 +678,64 @@ function display() {
             } else if(options.resolution.is('day')) {
                 coeff *= 60 * 24;
             }
-            var date = new Date();  //or use any other date
             var startTime = new Date(Math.round(time.getTime() / coeff) * coeff)
             var stopTime = new Date(startTime.getTime() + coeff)
             
             getTweets(d, startTime, stopTime);
+        })
+        .on("mouseover", legend.highlightSeries)
+        .on("mouseout", function(d) {
+            focus.svg.select('path.column_hover')
+                .style('display', 'none');
+            
+            legend.unHighlightSeries(d)
+        })
+        .on("mousemove", function(d) {
+            var xy = d3.mouse(this);
+            var time = focus.x.invert(xy[0]);
+            var coeff = 1000 * 60; // get a minute on other side
+            if(options.resolution.is('tenminute')) {
+                coeff *= 10;
+            } else if(options.resolution.is('hour')) {
+                coeff *= 60;
+            } else if(options.resolution.is('day')) {
+                coeff *= 60 * 24;
+            }
+            var startTime = new Date(Math.floor(time.getTime() / coeff) * coeff)
+            var stopTime = new Date(startTime.getTime() + coeff)
+            
+            var focus_column = focus.svg.select('path.column_hover');
+            var old_data = focus_column.data();
+            
+//            var value_i = Math.floor(xy[0] / focus.width * d.values.length);
+            var value_i = timestamps_nested.indexOf(startTime + "") + 1;
+            var value = d.values[value_i].value;
+            var value0 = d.values[value_i].value0;
+            
+            if(!old_data || old_data.series != d.id ||
+               old_data.startTime != startTime || old_data.stopTime != stopTime) {
+                
+                focus_column.data([{
+                    series: d.id,
+                    startTime: startTime,
+                    stopTime: stopTime,
+                    value: value,
+                    value0: value0
+                }]);
+
+                focus_column
+                    .transition()
+                    .duration(50)
+                    .attr("d", 
+                        focus.area([
+                            {timestamp: startTime, value: value, value0: value0},
+                            {timestamp: stopTime, value: value, value0: value0}
+                        ]))
+                    .style('display', 'block');
+            }
+            
+            if(!old_data || old_data.series != d.id)
+                legend.highlightSeries(d);
         });
     
     series.attr("class", function(d) {
@@ -739,7 +804,7 @@ function setContextTime(time_min, time_max) {
     var startTime = options.time_min.get();
     var endTime =   options.time_max.get();
     
-    if(startTime.getTime() == endTime.getTime() || !options.time_save.get()) {
+    if(startTime.getTime() == endTime.getTime() || options.time_save.get() == "false") {
         startTime = time_min;
         endTime = time_max;
     } else {
@@ -881,8 +946,10 @@ function buildInterface() {
             return collection.Name;
         });
         collections.map(function(collection) {
-            collection.Keywords = collection.Keywords.split(/,[ ]*/);
-            collection.OldKeywords = collection.OldKeywords.split(/,[ ]*/);
+            collection.Keywords = collection.Keywords.trim().split(/,[ ]*/);
+            collection.OldKeywords = collection.OldKeywords.trim().split(/,[ ]*/);
+            if(collection.OldKeywords.length == 1 && collection.OldKeywords[0] == "")
+                collection.OldKeywords = [];
             collection.StartTime = new Date(collection.StartTime);
             collection.StartTime.setMinutes(collection.StartTime.getMinutes()
                                            -collection.StartTime.getTimezoneOffset());
@@ -1007,6 +1074,7 @@ function genEventTweetCount() {
 }
 
 function getTweets(series, startTime, stopTime) {
+//    console.log(series, startTime, stopTime);
     var url = "scripts/php/getTweets.php";
     url += "?event_id=" + getCurrentCollection().ID;
     var title = "";
