@@ -47,18 +47,12 @@ function Legend() {
             return others_shown;
         }, false);
         
-        d3.selectAll('.legend_only')
-            .style('display', 'none');
         d3.selectAll('.' + series.id + ' .legend_only')
-            .style('display', 'block')
             .text(others_shown ? 'only' : 'show all');
         
         self.highlightSeries(series);
     };
     self.hoverLegendEntryEnd = function(series) {
-        d3.selectAll('.' + series.id + ' .legend_only')
-            .style('display', 'none');
-        
         self.unHighlightSeries(series);
     };
     self.unHighlightSeries = function(series) {
@@ -101,6 +95,7 @@ function Legend() {
         prepareData();
     };
     self.hoverOverSeries = function(series) { //chooseKeyword
+        window.getSelection().removeAllRanges()
         if(self.mouseOverToggle && series.shown != self.mouseOverToggleState) {
             self.toggleSeries(series);
         }
@@ -117,21 +112,41 @@ Legend.prototype = {
             .text('Terms');
         
         this.container_series = this.container.append('div')
-            .attr('class', 'legend_part')
-            .data(['legend_active']);
+            .attr('class', 'legend_series_list');
         
-        var legend_key = this.container.append('div')
-            .attr('id', 'legend_key')
-            .append('dl').selectAll()
+//        var legend_key = this.container.append('div')
+//            .attr('id', 'legend_key')
+//            .append('dl').selectAll()
+//            .data([
+//                {term: "&nbsp;", label: "Final Capture Term"},
+//                {term: "&#x271d;", label: "Old Capture Term"},
+//                {term: "*", label: "New Term"}
+//            ]);
+//        
+//        legend_key.enter().insert("dt").html(function(d) { return d.term });
+//        legend_key.enter().insert("dd").html(function(d) { return d.label });
+        
+        this.key = this.container.append('div')
+            .attr('id', 'legend_key');
+        
+        var legend_key_entries = this.key.selectAll('div')
             .data([
-                {term: "&nbsp;", label: "Final Capture Term"},
-                {term: "&#x271d;", label: "Old Capture Term"},
-                {term: "*", label: "New Term"}
-            ]);
+                {term: "&nbsp;", label: "Capture Term", id: 'capture'},
+                {term: "&#x271d;", label: "Removed Capture Term", id: 'removed'},
+                {term: "*", label: "Term Added Later", id: 'added'}
+            ])
+            .enter().append('div')
+            .attr('class', function(d) {
+                return 'legend_key_entry legend_key_' + d.id;
+            });
         
-       legend_key.enter().insert("dt").html(function(d) { return d.term });
-       legend_key.enter().insert("dd").html(function(d) { return d.label });
-                    
+        legend_key_entries.append('div')
+            .attr('class', 'legend_key_term')
+            .html(function(d) { return d.term; });
+        
+        legend_key_entries.append('div')
+            .attr('class', 'legend_key_label')
+            .html(function(d) { return d.label; });                    
     },
     populate: function(series_data) {
         // Save data
@@ -142,27 +157,12 @@ Legend.prototype = {
             series.shown = true; 
         }, this);
         
-//        var terms_selected = options.terms_selected.get();
-//        if(terms_selected.length > 0) {
-//            var terms_selected_dict = {};
-//            console.log(terms_selected);
-//            terms_selected.split(',').map(function(term_pair) {
-//                var kv = term_pair.split(':');
-//                terms_selected_dict[kv[0]] = kv[1] == "1";
-//            }, this);
-//            
-//            this.data.map(function(series) {
-//                if(terms_selected_dict[series.id] !== undefined) {
-//                    series.shown = terms_selected_dict[series.id];
-//                }
-//            });
-//        }
-        
-        
         this.container.select('.legend_title')
             .html(options.series.getLabel());
-        d3.select('#legend_key')
-            .style('display', (options.series.is('terms') ? 'block' : 'none'));
+        
+        // Hide table entries
+//        d3.select('#legend_key')
+//            .style('display', (options.series.is('terms') ? 'table' : 'none'));
         
         // Add new entries
         var entries = this.container_series
@@ -179,7 +179,14 @@ Legend.prototype = {
             .on('mouseover', this.hoverLegendEntry)
             .on('mouseout', this.hoverLegendEntryEnd);
 
-        new_entries.append('svg')
+        var legend_icon_divs = new_entries.append('div')
+            .attr('class', 'legend_icon');
+        
+        legend_icon_divs.append('span')
+            .attr('class', 'glyphicon')
+            .on('click', function() { return false; });
+        
+        legend_icon_divs.append('svg')
             .attr({
                 class: "legend_icon_svg",
                 width: 25, height: 25
@@ -189,7 +196,7 @@ Legend.prototype = {
             .on('mouseup', this.endToggle)
             .append('rect')
             .attr({
-                class: "legend_icon",
+                class: "legend_icon_rect",
                 x: 2.5, y: 2.5,
                 rx: 5, ry: 5,
                 width: 20, height: 20
@@ -201,7 +208,7 @@ Legend.prototype = {
         new_entries.append('div')
             .attr('class', 'legend_only')
             .text('only')
-            .style('display', 'none')
+//            .style('display', 'none')
             .on('click', this.toggleSingle);
 
         // Remove entries
@@ -229,17 +236,34 @@ Legend.prototype = {
 //            });
         this.container.selectAll('rect.legend_icon')
             .classed('off', false);
+        
+        var legend_key_has = {
+            capture: false,
+            removed: false,
+            added: false
+        };
 
         this.container.selectAll('div.legend_label')
             .html(function (d) {
                 var name = d.name;
                 if(options.series.is('terms')) {
-                    if(d.isOldKeyword)
+                    if(d.isOldKeyword) {
                         name += ' &#x271d;';
-                    else if(!d.isKeyword)
+                        legend_key_has.removed = true;
+                    }else if(!d.isKeyword) {
                         name += ' *';
+                        legend_key_has.added = true;
+                    } else {
+                        legend_key_has.capture = true;
+                    }
                 }
                 return name;
             });
+        
+        Object.keys(legend_key_has).map(function(key) {
+            console.log(key, legend_key_has[key]);
+            this.key.select('.legend_key_' + key)
+                .classed('hidden', !legend_key_has[key]);
+        }, this);
     }
 }

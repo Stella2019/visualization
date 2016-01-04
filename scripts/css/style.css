@@ -84,38 +84,57 @@ button:focus {
 
 /* Legend */
 #legend {
+    min-width: 200px;
     position: absolute;
     display: inline-block;
     padding: 5px;
     border: solid #ddd;
     border-radius: 5px;
 }
-.legend_part {
-/*    margin:5px;*/
+.legend_series_list {
+    margin: 5px;
     min-width: 200px;
     min-height: 50px;
 }
 .legend_entry {
-/*    margin: 5px;*/
+    display: table-row;
 }
-.legend_icon_svg {
-    display: inline-block;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: 1s;
+.legend_icon {
+    display: table-cell;
+    vertical-align: middle;
+    position: relative;
+}
+.legend_icon .glyphicon {
+/*    float: left;*/
+/*    right: -50%;*/
+    line-height: 1.9;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    width: 100%;
+    text-align: center;
 }
 /*
-.legend_icon {
-    display: inline-block;
-    width: 25px;
-    height: 25px;
-    border: solid;
-    border-radius: 5px;
-    white-space: nowrap;
+.legend_icon:hover .glyphicon {
+    opacity: 1;
     cursor: pointer;
-    transition: 1s;
 }
 */
+.legend_series_list:hover .glyphicon {
+    opacity: 1;
+    cursor: pointer;
+}
+.legend_icon .glyphicon:before {
+    content: "\e105";
+}
+.legend_icon.off .glyphicon:before {
+    content: "\e106";
+}
+.legend_icon_svg {
+    cursor: pointer;
+    transition: 1s;
+    display: block;
+}
 .legend_icon.focused {
 /*    opacity;*/
 }
@@ -127,50 +146,44 @@ button:focus {
     fill-opacity: 0.1;
 }
 .legend_label {
-    display: inline-block;
+    display: table-cell;
     text-transform: capitalize;
-    position: absolute;
-    margin-left: 5px;
-    margin-top: 3px;
-    white-space: nowrap;
-    max-width: 135px;
-    overflow: hidden;
-    transition-duration: 0.5s;
-}
-.legend_label:hover {
-    max-width: 250px;
+    vertical-align: middle;
+    padding: 5px;
 }
 
 .legend_only {
-    float:right;
-    margin-top: 3px;
-    margin-right: 5px;
-    color: #bbb;
-    z-index: 10;
-    position: relative;
+    display: table-cell;
+    opacity: 0;
+    width: 60px;
+    text-align: right;
+    vertical-align: middle;
+}
+.legend_entry:hover .legend_only {
+    opacity: 0.5;
 }
 .legend_only:hover {
+    opacity: 0.9 !important;
     cursor: pointer;
-    color: black;
 }
 
 #legend_key {
-    text-align: center;
+    display: table;
+    margin: auto;
 }
-#legend_key dl {
-    display: inline-block;
-    margin-bottom: 5px;
+.legend_key_entry {
+    display: table-row;
 }
-#legend_key dt {
-    float: left;
-    width: 20px;
-    padding-left: 5px;
+.legend_key_entry.hidden {
+    display: none;
+}
+.legend_key_term {
+    display: table-cell;
     padding-right: 5px;
     padding-top: 5px;
 }
-#legend_key dd {
-    text-align: left;
-    min-width: 150px;
+.legend_key_label {
+    display: table-cell;
     padding-top: 5px;
 }
 
