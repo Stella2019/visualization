@@ -26,7 +26,7 @@ function Options() {
     var options = {};
     options.topmenu = ['collection', 'time_limit', 'add_term', '<br>',
                     'series', 'subset', 'resolution', '<br>',
-                    'display_type', 'shape', 'color_scale', 'y_scale', 'y_max']; 
+                    'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'context_line']; 
     
 //    if (window.location.href.indexOf('index_dev.html') > -1) {
 //        options.dropdowns.push('series');
@@ -36,7 +36,8 @@ function Options() {
     options.record = ['collection', 'subset', 'resolution', 'time_limit',
                       'display_type', 'y_scale', 'shape', 'series',
                       'time_save', 'time_min', 'time_max',
-                      'y_max_toggle', 'y_max', 'color_scale'];//,
+                      'y_max_toggle', 'y_max', 'color_scale',
+                      'context_line'];//,
 //                      'terms_selected'];
     
     options.collection = new Option({
@@ -75,10 +76,10 @@ function Options() {
         });
     options.shape = new Option({
             title: "Shape",
-            labels: ["Linear",  "Basis",   "Step"],
+            labels: ["Linear",  "Basis",        "Step"],
             ids:    ["linear",  "basis-open",   "step-before"],
             available: [0, 1, 2],
-            default: 1,
+            default: 2,
             callback: function() { prepareData(); }
         });
     options.series = new Option({
@@ -86,7 +87,7 @@ function Options() {
             labels: ["None", "Terms", "Tweet Types", "Distinct/Not"],
             ids:    ["none", "terms", "types", "distinct"],
             available: [0, 1, 2, 3],
-            default: 0,
+            default: 1,
             callback: function() { changeSeries('all'); }
         });
     options.y_scale = new Option({
@@ -103,7 +104,7 @@ function Options() {
             ids:    [0],
             available: [0],
             default: 0,
-            textfield: true,
+            type: "textfieldautoman",
             custom_entries_allowed: true,
             callback: function() { display(); }
         });
@@ -114,7 +115,21 @@ function Options() {
             ids:    ["false", "true"],
             available: [0, 1],
             default: 0,
-            callback: function() { self.recordState(self); }
+            type: "toggle",
+            callback: function() { 
+                var saving = !(options.time_save.is("true"));
+                if(saving) {
+                    if(options.record.indexOf('time_min') == -1)
+                        options.record.push('time_min');
+                    if(options.record.indexOf('time_max') == -1)
+                        options.record.push('time_max');
+                } else {
+                    if(options.record.indexOf('time_min') > -1)
+                        options.record.splice(options.record.indexOf('time_min'), 1);
+                    if(options.record.indexOf('time_max')>  -1)
+                        options.record.splice(options.record.indexOf('time_max'), 1);
+                }
+            }
         });
     options.time_min = new Option({
             title: "Begin",
@@ -157,7 +172,7 @@ function Options() {
             available: [0],
             default: 0,
             custom_entries_allowed: true,   
-            textfieldconfirm: true,
+            type: "textfieldconfirm",
             callback: function() { genEventTweetCount(); }
         });
     options.color_scale = new Option({
@@ -165,7 +180,7 @@ function Options() {
             labels: ["10", "20", "20b", "20c"],
             ids:    ["category10", 'category20', 'category20b', 'category20c'],
             available: [0, 1, 2, 3],
-            default: 0,
+            default: 1,
             callback: function() { prepareData(); }
         });
     options.terms_selected = new Option({
@@ -176,6 +191,16 @@ function Options() {
             default: 0,
             custom_entries_allowed: true, 
             callback: function() { prepareData(); }
+        });
+    options.context_line = new Option({
+            title: "Show total",
+            styles: ["btn btn-default", "btn btn-primary"],
+            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Total Line", "<span class='glyphicon glyphicon-ok-circle'></span> Show Total Line"],
+            ids:    ["false", "true"],
+            available: [0, 1],
+            default: 1,
+            type: "toggle",
+            callback: function() { display(); }
         });
     
     // push holder variables and option sets into the list
@@ -232,7 +257,7 @@ Options.prototype = {
         Object.keys(state).map(function(option) {
             var value = state[option];
             if(["time_min", "time_max"].indexOf(option) > -1) {
-                if(options.time_save.is(false))
+                if(options.time_save.is("false"))
                     return;
                 
                 value = new Date(value);
@@ -339,14 +364,53 @@ Options.prototype = {
         options.topmenu.map(function(option) {
             if (option == '<br>') {
                 d3.select("#choices").append("br")
-            } else if(options[option].textfield) {
+            } else if(options[option].type == 'textfieldautoman') {
                 options.buildTextToggle(options, option);
-            } else if(options[option].textfieldconfirm) {
+            } else if(options[option].type == 'textfieldconfirm') {
                 options.buildTextConfirm(options, option);
+            } else if(options[option].type == 'toggle') {
+                options.buildToggle(options, option);
             } else { // Dropdown
                 options.buildDropdown(options, option);
             }
         });
+    },
+    buildToggle: function(options, option) {
+        var set = options[option];
+        
+        var superId = "choose_" + option;
+        set.styleFunc = function() {
+            d3.select('#' + superId + "_button")
+                .attr('class', function() {
+                    return set.styles[set.indexCur()];
+                })
+                .html(function() {
+                    return set.getLabel();
+                });
+        }
+        
+        // Make container
+        var container = d3.select("#choices").append("div")
+            .attr("class", "choice")
+            .style("display", "inline-table")
+            .style("vertical-align", "top")
+            .style("text-transform", "capitalize")
+            .append("div")
+                .attr("id", superId)
+                .attr("class", "input-group");
+        
+        container.append('button')
+            .attr('id', superId + "_button")
+            .on('click', function(d) {
+                var toggle = !(set.get() == "true");
+                set.set(toggle ? "true" : "false");
+                set.styleFunc();
+                options.recordState(options, option);
+            
+                set.callback();
+            });
+        
+        set.styleFunc();
     },
     buildTextToggle: function(options, option) {
         var set = options[option];
@@ -376,7 +440,6 @@ Options.prototype = {
             labels: ["Auto", "Manual"],
 //            labels: ["<span class='glyphicon glyphicon-pencil'></span>", "<span class='glyphicon glyphicon-pencil'></span>"],
             tooltips: ["Click to toggle manual mode", "Click to toggle automatic mode"],
-            //            labels: ["Auto", "Manual"],
 //            labels: [set.title, set.title],
 //            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Auto", "<span class='glyphicon glyphicon-ok-circle'></span> Manual"],
             ids:    ["false", "true"],
@@ -635,21 +698,10 @@ Options.prototype = {
         left_buttons.append('button')
             .attr('id', 'choice_time_save')
             .on('click', function(d) {
-                var saving = !(options.time_save.get() == "true");
+                var saving = !(options.time_save.is("true"));
                 options.time_save.set(saving ? "true" : "false");
                 options.time_save.styleFunc();
-            
-                if(saving) {
-                    if(options.record.indexOf('time_min') == -1)
-                        options.record.push('time_min');
-                    if(options.record.indexOf('time_max') == -1)
-                        options.record.push('time_max');
-                } else {
-                    if(options.record.indexOf('time_min') > -1)
-                        options.record.splice(options.record.indexOf('time_min'), 1);
-                    if(options.record.indexOf('time_max')>  -1)
-                        options.record.splice(options.record.indexOf('time_max'), 1);
-                }
+                options.recordState(options);
             
                 options.time_save.callback();
             });

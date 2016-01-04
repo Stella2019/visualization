@@ -12,7 +12,7 @@
 }
 .series {
     transition: 1s;
-    cursor: zoom-in;
+    cursor: pointer; /*zoom-in;*/
     text-anchor: end;
 }
 .series.lines {
@@ -23,6 +23,15 @@
 }
 .series.lines.unfocused {
     opacity: 0.2;
+}
+.series .area {
+    stroke-opacity: 1.0;
+}
+.context_line {
+    fill: none;
+    stroke: black;
+    stroke-opacity: 1.0;
+    stroke-width: 3px;
 }
 /*
 .column_hover {o

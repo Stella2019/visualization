@@ -4,7 +4,8 @@ Array.prototype.contains = function (element) {
 
 var collections;
 var collection_names = [];
-var data_stacked, series_data, data_raw, total_byTime;
+var data_stacked, series_data, data_raw;
+var total_byTime, context_byTime;
 var timestamps, timestamps_nested, keywords, series_names;
 var options = new Options();
 
@@ -36,6 +37,8 @@ function initialize() {
 
     focus.y = d3.scale.linear()
         .range([focus.height, 0]);
+    focus.y_context = d3.scale.linear()
+        .range([focus.height, 0]);
     context.y = d3.scale.linear()
         .range([context.height, 0]);
 
@@ -53,6 +56,9 @@ function initialize() {
     focus.yAxis = d3.svg.axis()
         .scale(focus.y)
         .orient("left");
+    focus.yAxis_context = d3.svg.axis()
+        .scale(focus.y_context)
+        .orient("right");
     
     context.yAxis = d3.svg.axis()
         .scale(context.y)
@@ -76,6 +82,9 @@ function initialize() {
     spin = new Spinner(opts);
     
     focus.area = d3.svg.area()
+        .interpolate(options.shape.get())
+        .x(function (d) { return focus.x(d.timestamp); });
+    focus.area_context = d3.svg.area()
         .interpolate(options.shape.get())
         .x(function (d) { return focus.x(d.timestamp); });
 
@@ -489,6 +498,9 @@ function prepareData() {
             return running_sum += datum[word];
         }, 0), 1);
     });
+    context_byTime = data_ready.map(function(datum) {
+        return {timestamp: datum.timestamp, value: datum['_total_']};
+    });
     
     // Reorder by total size
     series_data.sort(compareSeries);
@@ -619,25 +631,41 @@ function display() {
         y_min = 1;
     
     var y_max = 100;
+    var biggest_datapoint = // data is defined by its own maxes
+        d3.max(data_stacked.map(function (d) {
+            return d.max;
+        }));
+    var highest_datapoint = // because of stacked data
+        d3.max(data_stacked[0].values.map(function (d) {
+            return d.value0 + d.value;
+        }));
+    var biggest_totalpoint = 
+        d3.max(context_byTime.map(function (d) {
+            return d.value;
+        }));
+    
     if(options.y_max_toggle.get() == "true") {
         y_max = options.y_max.get();
     } else {
         if (options.display_type.is('overlap') | options.display_type.is('lines')) {
-            y_max = d3.max(data_stacked.map(function (d) {
-                return d.max;
-            }));
+            y_max = biggest_datapoint;
+            
+            if(options.context_line.is("true"))
+                y_max = Math.max(y_max, biggest_totalpoint);
         } else if (options.display_type.is('percent')) {
             y_max = 100;
         } else {
-            y_max = d3.max(data_stacked[0].values.map(function (d) {
-                return d.value0 + d.value;
-            }));
+            y_max = highest_datapoint;
+            if(options.context_line.is("true"))
+                y_max = Math.max(y_max, biggest_totalpoint);
         }
         options.y_max.update(y_max);
         options.y_max.set(y_max);
     }
-//    if(!options.y_scale.is("preserve"))
+    
     focus.y.domain([y_min, y_max])
+        .range([focus.height, 0]);
+    focus.y_context.domain([y_min, y_max])
         .range([focus.height, 0]);
     
     if(options.y_scale.is("log")) {
@@ -658,6 +686,8 @@ function display() {
         ax = context.svg.append('g').attr('id', 'context_yAxis');
     ax.attr("class", "context_y axis")
         .call(context.yAxis);
+    
+    display_context_line();
 
     // Bind new series to the graph
     
@@ -745,9 +775,9 @@ function display() {
     series.exit().remove();
  
     series_paths.append("path")
-        .attr("class", "area")
-        .style("stroke-opacity", 0)
-        .attr("d", function (d) { return focus.area(d.values); });
+        .attr("class", "area");
+//        .style("stroke-opacity", 0)
+//        .attr("d", function (d) { return focus.area(d.values); });
     
     // Define the parameters of the area
     if (options.display_type.is('overlap') | options.display_type.is('lines')) {
@@ -766,36 +796,18 @@ function display() {
         .duration(750)
     
     // Transition to the new area
-    if(options.display_type.is("lines")) {
-        focus.svg.selectAll(".series")
-            .classed("lines", true);
-        transition.select("path.area")
-            .style("fill-opacity", 0)
-            .style("stroke-opacity", 1.0)
-        .style("fill", function (d) { return color(d.name); })
-        .style("stroke", function (d) { return d3.rgb(color(d.name)).darker(); })
-            .attr("d", function(d) { return focus.area(d.values)});
-    } else if(options.display_type.is("overlap")) {
-        focus.svg.selectAll(".series")
-            .classed("lines", true);
-        transition.select("path.area")
-            .style("fill-opacity", 0.1)
-            .style("stroke-opacity", 1.0)
-        .style("fill", function (d) { return color(d.name); })
-        .style("stroke", function (d) { return d3.rgb(color(d.name)).darker(); })
-            .attr("d", function(d) { return focus.area(d.values)});
-    } else {
-        focus.svg.selectAll(".series")
-            .classed("lines", false);
-        transition.select("path.area")
-            .style("fill-opacity", 0.8)
-            .style("stroke-opacity", 1.0)
-        .style("fill", function (d) { return color(d.name); })
-        .style("stroke", function (d) { return d3.rgb(color(d.name)).darker(); })
-            .attr("d", function(d) { return focus.area(d.values)});
-    }
+    var fill_opacity = options.display_type.is("lines") ? 0.0 : 
+                    (options.display_type.is("overlap") ? 0.1 : 0.8);
     
-        
+    focus.svg.selectAll(".series")
+        .classed("lines", false);
+    transition.select("path.area")
+        .style("fill", function (d) { return color(d.name); })
+        .style("fill-opacity", fill_opacity)
+        .style("stroke", function (d) { return d3.rgb(color(d.name)).darker(); })
+//        .style("stroke-opacity", 1.0)
+        .attr("d", function(d) { return focus.area(d.values)});
+            
     toggleLoading(false);
 }
 
@@ -913,6 +925,8 @@ function setFocusTime(origin) {
     focus.x.domain(brush.empty() ? context.x.domain() : brush.extent());
     focus.svg.selectAll("path.area")
         .attr("d", function(d) { return focus.area(d.values)});
+    focus.svg.selectAll("path.area_context")
+        .attr("d", function(d) { return focus.area_context(d)});
     focus.svg.select(".x.axis")
         .call(focus.xAxis);
 }
@@ -1074,7 +1088,6 @@ function genEventTweetCount() {
 }
 
 function getTweets(series, startTime, stopTime) {
-//    console.log(series, startTime, stopTime);
     var url = "scripts/php/getTweets.php";
     url += "?event_id=" + getCurrentCollection().ID;
     var title = "";
@@ -1200,19 +1213,68 @@ function compareSeries(a, b) {
     return a.order - b.order;
 }
 
+function display_context_line() {    
+    // Find or create context line
+    var container = focus.svg.select("g#y_context");
+    if(!container[0][0]) {
+        container = focus.svg.append('g')
+            .attr('id', 'y_context');
+        container.append('path')
+            .attr('class', 'area_context context_line')
+    }
+    
+    // Update Data
+    container.data([context_byTime]);
+    
+    transition = container
+        .transition()
+        .duration(750);
+    
+    var multiplier = 1;
+    if(options.display_type.is('percent')) {
+        var biggest_totalpoint = context_byTime.reduce(function (cur_max, d) {
+            return Math.max(cur_max, d.value);
+        }, 0);
+        multiplier = 100 / biggest_totalpoint;
+    }
+        
+    focus.area_context
+        .interpolate(options.shape.get())
+        .y0(focus.height)
+        .y1(function (d) { return focus.y_context(d.value * multiplier); });
+    
+    if(options.context_line.is("false"))
+        focus.area_context.y1(focus.height);
+    
+    transition.select("path.area_context")
+        .attr("d", function(d) { return focus.area_context(d)});
+    
+    // Set visibility
+    legend.key.select('.legend_key_context_line')
+        .classed('hidden', options.context_line.is("false"));
+//    container.style('display', options.context_line.is("true") ? 'block' : 'none');
+}
+
 function setYScale() {
     if(options.y_scale.is("linear")) {
         focus.y = d3.scale.linear()
+            .range([focus.height, 0]);
+        focus.y_context = d3.scale.linear()
             .range([focus.height, 0]);
         focus.yAxis.scale(focus.y)
             .tickFormat(null);
     } else if(options.y_scale.is("pow")) {
         focus.y = d3.scale.sqrt()
             .range([focus.height, 0]);
+        focus.y_context = d3.scale.sqrt()
+            .range([focus.height, 0]);
         focus.yAxis.scale(focus.y)
             .tickFormat(null);
     } else if(options.y_scale.is("log")) {
         focus.y = d3.scale.log()
+            .clamp(true)
+            .range([focus.height, 0]);
+        focus.y_context = d3.scale.log()
             .clamp(true)
             .range([focus.height, 0]);
         focus.yAxis.scale(focus.y)

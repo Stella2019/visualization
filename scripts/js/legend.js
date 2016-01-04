@@ -5,6 +5,14 @@ function Legend() {
     self.data = [];
     self.mouseOverToggle = false;
     self.mouseOverToggleState = true;
+    self.key_data = [
+        {term: "&nbsp;", label: "Capture Term", id: 'capture', has: false},
+        {term: "&#x271d;", label: "Removed Capture Term", id: 'removed', has: false},
+        {term: "*", label: "Term Added Later", id: 'added', has: false},
+        {term: "<svg height=10 width=10><line x1=0 y1=10 x2=10 y2=0 class='context_line' /></svg>",
+            label: "Tweet Volume", id: 'context_line', has: false}
+    ];
+    
     
     // Function
     self.startToggle = function(series) {
@@ -130,11 +138,7 @@ Legend.prototype = {
             .attr('id', 'legend_key');
         
         var legend_key_entries = this.key.selectAll('div')
-            .data([
-                {term: "&nbsp;", label: "Capture Term", id: 'capture'},
-                {term: "&#x271d;", label: "Removed Capture Term", id: 'removed'},
-                {term: "*", label: "Term Added Later", id: 'added'}
-            ])
+            .data(legend.key_data)
             .enter().append('div')
             .attr('class', function(d) {
                 return 'legend_key_entry legend_key_' + d.id;
@@ -237,11 +241,9 @@ Legend.prototype = {
         this.container.selectAll('rect.legend_icon')
             .classed('off', false);
         
-        var legend_key_has = {
-            capture: false,
-            removed: false,
-            added: false
-        };
+        this.key_data.map(function(item) {
+            item.has = false;
+        });
 
         this.container.selectAll('div.legend_label')
             .html(function (d) {
@@ -249,21 +251,20 @@ Legend.prototype = {
                 if(options.series.is('terms')) {
                     if(d.isOldKeyword) {
                         name += ' &#x271d;';
-                        legend_key_has.removed = true;
+                        legend.key_data[1].has = true; // removed
                     }else if(!d.isKeyword) {
                         name += ' *';
-                        legend_key_has.added = true;
+                        legend.key_data[2].has = true; // added
                     } else {
-                        legend_key_has.capture = true;
+                        legend.key_data[0].has = true; // capture
                     }
                 }
                 return name;
             });
         
-        Object.keys(legend_key_has).map(function(key) {
-            console.log(key, legend_key_has[key]);
-            this.key.select('.legend_key_' + key)
-                .classed('hidden', !legend_key_has[key]);
+        this.key_data.map(function(item) {
+            this.key.select('.legend_key_' + item.id)
+                .classed('hidden', !item.has);
         }, this);
     }
 }
