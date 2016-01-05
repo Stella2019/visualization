@@ -52,6 +52,8 @@ def main():
                         help="Just testing the program, don't commit tweets")
     parser.add_argument("-e", "--events", nargs="+", required=False,
                         help='List event numbers to be grouped into aggregate event')
+    parser.add_argument("-c", "--config", required=False, default='../../local.conf',
+                        help='Name of configuration file')
     parser.add_argument("path", action="store",
                         help="Path to file/folder where the collections are to be processed.")
     global options
@@ -422,7 +424,7 @@ def saveCollection():
 def connectToServer():
     if(options.verbose): print("    Connecting to Captures Database")
     
-    with open('../../local.conf') as config_file:
+    with open(options.config) as config_file:
         global serverCapture
         config = json.load(config_file)
         

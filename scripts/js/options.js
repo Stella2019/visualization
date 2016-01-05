@@ -227,6 +227,7 @@ Options.prototype = {
         //
         options.y_max_toggle.styleFunc();
         options.time_save.styleFunc();
+        options.context_line.styleFunc();
         $(function () {
             $('[data-toggle="popover"]').popover()
         })
@@ -409,8 +410,6 @@ Options.prototype = {
             
                 set.callback();
             });
-        
-        set.styleFunc();
     },
     buildTextToggle: function(options, option) {
         var set = options[option];

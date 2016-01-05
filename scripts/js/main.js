@@ -977,7 +977,7 @@ function buildInterface() {
         options.collection.labels = collection_names;
         options.collection.ids = collection_names.map(function(name) { return simplify(name); } );
         options.collection.available = collection_names.map(function(d, i) { return i; });
-        options.collection.set(collection_names[0]);
+        options.collection.set(simplify(collection_names[0]));
         
         options.init();
         
