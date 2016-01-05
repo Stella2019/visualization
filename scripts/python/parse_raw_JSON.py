@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import json, os, csv, sys
-import argparse, unicodedata, pytz
+import json, os, re, csv, sys
+import argparse, unicodedata
 from pprint import pprint
 from datetime import datetime, timedelta
 from server_messenger import ServerMessenger
@@ -17,7 +17,6 @@ collection_tweets = {}
 minutes = {}
 
 distinct_mask = 1e6
-local_timezone = pytz.timezone('America/Los_Angeles')
 
 add_tweet = ("INSERT IGNORE INTO Tweet "
              "(ID, Text, `Distinct`, Type, Username, Timestamp, Origin)"
@@ -110,6 +109,7 @@ def parseFile(filename):
                 text = unicodedata.normalize('NFD', data['text']).encode('ascii', 'ignore');
                 
                 split_text = str(text).lower().split()
+#                split_text = re.sub('[^0-9a-zA-Z]+', ' ', str(text).lower()).split();
                 # at some point remove urls (recognized by http)
                 
                 push_this_tweet = True
@@ -127,8 +127,7 @@ def parseFile(filename):
                 
                 # Get attributes of tweet
                 # Assemble other attributes
-                created_at = datetime.strptime(data['created_at'], '%a %b %d %X %z %Y')
-                created_at = created_at.astimezone(local_timezone)
+                created_at = datetime.fromtimestamp(int(data['timestamp_ms']) / 1000);
                 
                 timestamp_exact = datetime.strftime(created_at, '%Y-%m-%d %H:%M:%S')
                 timestamp_minute = datetime.strftime(created_at, '%Y%m%d_%H%M')
