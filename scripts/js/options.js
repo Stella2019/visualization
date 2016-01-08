@@ -77,7 +77,7 @@ function Options() {
     options.shape = new Option({
             title: "Shape",
             labels: ["Linear",  "Basis",        "Step"],
-            ids:    ["linear",  "basis-open",   "step-before"],
+            ids:    ["linear",  "basis-open",   "step-after"],
             available: [0, 1, 2],
             default: 2,
             callback: function() { prepareData(); }
@@ -151,9 +151,9 @@ function Options() {
         });
     options.time_limit = new Option({
             title: "Tweets in",
-            labels: ["First 3 Hours", "First 12 Hours", "First Day", "First 3 Days", "First Week", "All time"],
-            ids:    ["3h", "12h", "1d", "3d", '1w', 'all'],
-            available: [0, 1, 2, 3, 4, 5],
+            labels: ["First 3 Hours", "First 12 Hours", "First 24 Hours", "First 3 Days", "First Week", "All time", "Latest Week", "Latest 3 Days", "Latest 24 Hours", "Latest 12 Hours", "Latest 3 Hours"],
+            ids:    ["3h", "12h", "1d", "3d", '1w', 'all', '-1w', '-3d', '-1d', '-12h', '-3h'],
+            available: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             default: 2,
             callback: function() { loadCollectionData(); }
         });
@@ -564,7 +564,6 @@ Options.prototype = {
         var container = d3.select("#choices").append("div")
             .attr("class", "choice")
             .style("text-transform", "capitalize")
-//            .html(" " + set.title + ": ")
             .append("div")
                 .attr("id", superId)
                 .attr("class", "dropdown");
@@ -594,20 +593,13 @@ Options.prototype = {
                 .enter()
                 .append("li").append("a")
                     .attr("id", function(d) { return option + "_" + set.ids[d]; })
-//                    .attr("href", "")
                     .html(function(d) {
-//                        return "<span style='opacity:0'> " + set.title + "&nbsp;</span>" +
-//                            set.labels[d] + "&nbsp;";
                         return set.labels[d];
                     })
                     .on("click", function(d) {
                         container.select('.current')
                             .text(set.labels[d]);
-
-//                        state[option] = set.ids[d];
-////                        console.log(JSON.stringify(this.state));
-//                        history.pushState(null, null,'#' + JSON.stringify(state));
-////                        window.location.hash = '#' + JSON.stringify(this.state);
+                        
                         set.set(set.ids[d]);
                         options.recordState(options, option);
 

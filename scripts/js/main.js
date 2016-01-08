@@ -144,24 +144,36 @@ function loadDataFile(collection, subset, callback) {
     url += "?event_id=" + collection.ID;
     
     if(!options.time_limit.is('all')) {
-        var time_limit = new Date(getCurrentCollection().StartTime);
+        var time_limit = options.time_limit.get()
+        var sign = time_limit.slice(0, 1) == '-' ? -1 : 1;
         
-        // Roll Back UTC (this is NOT the right way to do this)
-//        time_limit.setHours(time_limit.getHours() - 8);
+        console.log(time_limit.slice(0, 1), sign);
+        time_limit = time_limit.slice(-2);
+        var hours_diff = 0;
         
-        if(options.time_limit.is('3h')) {
-            time_limit.setHours(time_limit.getHours() + 3);
-        } else if(options.time_limit.is('12h')) {
-            time_limit.setHours(time_limit.getHours() + 12);
-        } else if(options.time_limit.is('1d')) {
-            time_limit.setDate(time_limit.getDate() + 1);
-        } else if(options.time_limit.is('3d')) {
-            time_limit.setDate(time_limit.getDate() + 3);
-        } else if(options.time_limit.is('1w')) {
-            time_limit.setDate(time_limit.getDate() + 7);
+        if(time_limit == '3h') {
+            hours_diff = 3;
+        } else if(time_limit == '2h') { // 12h, but we sliced it
+            hours_diff = 12;
+        } else if(time_limit == '1d') {
+            hours_diff = 24;
+        } else if(time_limit == '3d') {
+            hours_diff = 24 * 3;
+        } else if(time_limit == '1w') {
+            hours_diff = 24 * 7;
         }
         
-        url += '&time_limit="' + formatDate(time_limit) + '"';
+        if(sign == -1)
+            time_limit = new Date();
+        else
+            time_limit = new Date(getCurrentCollection().StartTime);
+        
+        time_limit.setHours(time_limit.getHours() + hours_diff * sign);
+
+        if(sign == -1)
+            url += '&time_min="' + formatDate(time_limit) + '"';
+        else
+            url += '&time_max="' + formatDate(time_limit) + '"';
     } 
 
     d3.csv(url, function(error, data_file) {
@@ -172,12 +184,16 @@ function loadDataFile(collection, subset, callback) {
 
         // Get the timestamps
         timestamps = Array.from(new Set(data_file.map(function(d) {return d.Time}))).sort();
+        if(timestamps.length == 0)
+            timestamps = [formatDate(new Date())];
         keywords = Array.from(new Set(data_file.map(function(d) {return d.Keyword})));
         keywords.pop(); // remove _total_, hopefully
         
         // Fill in missing timestamps
         var first_timestamp = timestamps[0];
         var last_timestamp = timestamps[timestamps.length - 1];
+        if(options.time_limit.get().slice(0, 1) == '-')
+            last_timestamp = formatDate(new Date());
         
         var new_timestamps = [];
         
@@ -708,7 +724,7 @@ function display() {
             } else if(options.resolution.is('day')) {
                 coeff *= 60 * 24;
             }
-            var startTime = new Date(Math.round(time.getTime() / coeff) * coeff)
+            var startTime = new Date(Math.floor(time.getTime() / coeff) * coeff)
             var stopTime = new Date(startTime.getTime() + coeff)
             
             getTweets(d, startTime, stopTime);
@@ -738,7 +754,7 @@ function display() {
             var old_data = focus_column.data();
             
 //            var value_i = Math.floor(xy[0] / focus.width * d.values.length);
-            var value_i = timestamps_nested.indexOf(startTime + "") + 1;
+            var value_i = timestamps_nested.indexOf(startTime + "");
             var value = d.values[value_i].value;
             var value0 = d.values[value_i].value0;
             
