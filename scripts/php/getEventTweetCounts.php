@@ -8,8 +8,11 @@
     $query = "SELECT * FROM EventTweetCount " .
              "WHERE Event_ID = " . $event_id;
 
-    if(isset($_GET["time_limit"])) {
-        $query = $query . " AND EventTweetCount.Time <= " . $_GET["time_limit"];
+    if(isset($_GET["time_min"])) {
+        $query = $query . " AND EventTweetCount.Time >= " . $_GET["time_min"];
+    }
+    if(isset($_GET["time_max"])) {
+        $query = $query . " AND EventTweetCount.Time < " . $_GET["time_max"];
     }
 
     $query = $query . ";";

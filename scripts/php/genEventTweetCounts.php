@@ -34,7 +34,7 @@
         "        AND Tweet.Timestamp <= " . $time_max . " ";
 
     foreach(explode(' ', $_GET["text_search"]) as $term) {
-        $query = $query . "   AND LOWER(Tweet.Text) REGEXP '" . $term . "' ";
+        $query = $query . "   AND LOWER(Tweet.Text) REGEXP '[[:<:]]" . $term . "[[:>:]]' ";
     }
 
     $query = $query . ") Tweets " .
