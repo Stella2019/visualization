@@ -13,7 +13,18 @@
        $_SERVER['PHP_AUTH_PW'] != $conf['authentication']['password']) &&
         ($_SERVER['PHP_AUTH_USER'] != $conf['authentication2']['username'] ||
        $_SERVER['PHP_AUTH_PW'] != $conf['authentication2']['password'])) {
-        die("Invalid Username/Password");
+        
+        // Try again, something was asked wrong
+        header('WWW-Authenticate: Basic realm="Rumoring DRG Login"');
+        header('HTTP/1.0 401 Unauthorized');
+        echo 'Authentication Cancelled';
+        exit;
+    }
+    if(($_SERVER['PHP_AUTH_USER'] != $conf['authentication']['username'] ||
+       $_SERVER['PHP_AUTH_PW'] != $conf['authentication']['password']) &&
+        ($_SERVER['PHP_AUTH_USER'] != $conf['authentication2']['username'] ||
+       $_SERVER['PHP_AUTH_PW'] != $conf['authentication2']['password'])) {
+        die('Authentication failed');
     }
 
     // Initiate connection
