@@ -10,9 +10,9 @@ import mysql.connector
 serverCapture = None
 serverStorage = None
 options = {}
-types = ['all', 'distinct', 'original', 'retweet', 'reply'] # omitting quotes for now since Twitter doesn't really use them
+types = ['all', 'distinct', 'original', 'retweet', 'reply', 'quote']
+found_in_types = ['any', 'text', 'quote', 'url']
 collection = {'name': None}
-#collection_counts = {}
 collection_tweets = {}
 minutes = {}
 
@@ -27,9 +27,9 @@ add_tweet_to_event = ("INSERT IGNORE INTO TweetInEvent "
 add_event = ("REPLACE INTO Event "
              "(ID, Name, Description, Keywords, OldKeywords, StartTime, StopTime, TweetsCollected)"
              "VALUES (%(ID)s, %(Name)s, %(Description)s, %(Keywords)s, %(OldKeywords)s, %(StartTime)s, %(StopTime)s, %(TweetsCollected)s)")
-add_event_tweet_count = ("INSERT IGNORE INTO EventTweetCount "
-             "(Event_ID, Time, Keyword, Count, `Distinct`, Original, Retweet, Reply) "
-             "VALUES (%(Event_ID)s, %(Time)s, %(Keyword)s, %(Count)s, %(Distinct)s, %(Original)s, %(Retweet)s, %(Reply)s)")
+add_tweet_count = ("REPLACE INTO TweetCount "
+             "(Event_ID, Time, Timesource, Found_In, Keyword, Count, `Distinct`, Original, Retweet, Reply, Quote) "
+             "VALUES (%(Event_ID)s, %(Time)s, %(Timesource)s, %(Found_In)s, %(Keyword)s, %(Count)s, %(Distinct)s, %(Original)s, %(Retweet)s, %(Reply)s, %(Quote)s)")
 
 def main():
     parser = argparse.ArgumentParser(description='Parse a raw collection into the important constituents and/or calculate statistics on the collection',
@@ -69,8 +69,16 @@ def main():
         serverStorage.close()
         
 def parseFile(filename):
-    collection_name = filename[0:-18].rsplit('/',1)[-1]
-    timestamp_str = filename[-18:-5]
+    
+    # Keep track of version of the file
+    filename_with_content = filename
+    version = 0
+    if(filename[-7:-5].isdigit() and filename[-8] == '_'):
+        version = int(filename[-7:-5]) + 1
+        filename_with_content = filename[:-8] + '.json'
+    
+    collection_name = filename_with_content[0:-18].rsplit('/',1)[-1]
+    timestamp_str = filename_with_content[-18:-5]
     timestamp = datetime.strptime(timestamp_str, '%Y%m%d_%H%M')
     
     if(options.verbose): print ("Parsing File: " + collection_name + " @ " + timestamp_str)
@@ -86,33 +94,23 @@ def parseFile(filename):
         cursor = serverStorage.cursor()
     
     # Initialize different types of counts
-    if(minutes):
-        for count_type in types:
-            minutes[count_type][0] = {'_total_': minutes[count_type][10]['_total_']}
-            for keyword in collection['keywords']:
-                minutes[count_type][0][keyword] = minutes[count_type][10][keyword]
-    else:
-        for count_type in types:
-            minutes[count_type] = {0: {'_total_': 0}}
-            for keyword in collection['keywords']:
-                minutes[count_type][0][keyword] = 0
-    
-    for minute in range(1, 11):
-        for count_type in types:
-            minutes[count_type][minute] = {'_total_': 0}
-            for keyword in collection['keywords']:
-                minutes[count_type][minute][keyword] = 0
+    for count_type in types:
+        minutes[count_type] = {}
+        for minute in range(0, 11):
+            minutes[count_type][minute] = {}
+            for found_in in found_in_types:
+                minutes[count_type][minute][found_in] = {'_total_': 0}
+                for keyword in collection['keywords']:
+                    minutes[count_type][minute][found_in][keyword] = 0
 
     # Load this time period's JSON file
     with open(filename) as data_file: 
         for line in data_file:
             if len(line) > 5:
                 data = json.loads(line)
-                text = unicodedata.normalize('NFD', data['text']).encode('ascii', 'ignore');
+                text = unicodedata.normalize('NFD', data['text']).encode('ascii', 'replace').decode('ascii', 'replace');
                 
-                split_text = str(text).lower().split()
-#                split_text = re.sub('[^0-9a-zA-Z]+', ' ', str(text).lower()).split();
-                # at some point remove urls (recognized by http)
+                # at some point remove urls from text (recognized by http)
                 
                 push_this_tweet = True
                 if(options.words):
@@ -178,66 +176,81 @@ def parseFile(filename):
                     minute = int(timestamp_minute[-1])
                 
                 # Count the tweet by its type
-                minutes["all"][minute]['_total_'] += 1
-                if(distinct):
-                    minutes["distinct"][minute]['_total_'] += 1
-                if(tweet["Type"] in types):
-                    minutes[tweet["Type"]][minute]['_total_'] += 1
+                keyword = '_total_'
+                for found_in in found_in_types:
+                    minutes["all"][minute][found_in][keyword] += 1
+                    if(distinct):
+                        minutes["distinct"][minute][found_in][keyword] += 1
+                    if(tweet["Type"] in types):
+                        minutes[tweet["Type"]][minute][found_in][keyword] += 1
                 
                 # Next, increment counts if the text has the main keywords
 
                 # Search for keywords
-                for keyword, keyword_parts in zip(collection['keywords'], collection['keywords_parts']):
-                    parts_found = 0
-                    for keyword_part in keyword_parts:
-                        if (keyword_part in split_text) or ("#" + keyword_part in split_text):
-                            parts_found += 1
-
-                    if parts_found == len(keyword_parts):
-                        minutes["all"][minute][keyword] += 1
+                keywords_found_in = checkMetaData(data)
+                for found_in in found_in_types:
+                    for keyword in keywords_found_in[found_in]:
+                        minutes["all"][minute][found_in][keyword] += 1
                         if(distinct):
-                            minutes["distinct"][minute][keyword] += 1
+                            minutes["distinct"][minute][found_in][keyword] += 1
                         if(tweet["Type"] in types):
-                            minutes[tweet["Type"]][minute][keyword] += 1
+                            minutes[tweet["Type"]][minute][found_in][keyword] += 1
+                            
+                # Search for them in other parts
+#                if not keywords_found_in['any']:
+#                    print()
+#                    print(text)
+#                    print(data['id_str'])
+#                    printNestedWithKeywords(data)
                         
     if(options.database):
         
         if(options.statistics):
             # Push the numbers for each minute
-            for minute in range(10):
-                timestamp_minute = timestamp + timedelta(seconds=60*minute)
-                time_key = datetime.strftime(timestamp_minute, '%Y%m%d_%H%M')
-                timestamp_minute = datetime.strftime(timestamp_minute, '%Y-%m-%d %H:%M')
+            for found_in in found_in_types:
+                for minute in range(11):
+                    version_this = version;
+                    if(minute == 10):
+                        version_this = -1 - version_this;
+                    timestamp_minute = timestamp + timedelta(seconds=60*minute)
+                    time_key = datetime.strftime(timestamp_minute, '%Y%m%d_%H%M')
+                    timestamp_minute = datetime.strftime(timestamp_minute, '%Y-%m-%d %H:%M')
 
-                keyword = "_total_"
-                data = {
-                    'Event_ID': collection["id"],
-                    'Time': timestamp_minute,
-                    'Keyword': keyword,
-                    'Count':    minutes["all"][minute][keyword],
-                    'Distinct': minutes["distinct"][minute][keyword],
-                    'Original': minutes["original"][minute][keyword],
-                    'Retweet':  minutes["retweet"][minute][keyword],
-                    'Reply':    minutes["reply"][minute][keyword]
-                }
-
-                if(data['Count'] > 0):
-                    cursor.execute(add_event_tweet_count, data)    
-
-                for keyword in collection['keywords']:
+                    keyword = "_total_"
                     data = {
                         'Event_ID': collection["id"],
                         'Time': timestamp_minute,
+                        'Timesource': version_this,
                         'Keyword': keyword,
-                        'Count':    minutes["all"][minute][keyword],
-                        'Distinct': minutes["distinct"][minute][keyword],
-                        'Original': minutes["original"][minute][keyword],
-                        'Retweet':  minutes["retweet"][minute][keyword],
-                        'Reply':    minutes["reply"][minute][keyword]
+                        'Found_In': found_in,
+                        'Count':    minutes["all"][minute][found_in][keyword],
+                        'Distinct': minutes["distinct"][minute][found_in][keyword],
+                        'Original': minutes["original"][minute][found_in][keyword],
+                        'Retweet':  minutes["retweet"][minute][found_in][keyword],
+                        'Reply':    minutes["reply"][minute][found_in][keyword],
+                        'Quote':    minutes["quote"][minute][found_in][keyword]
                     }
 
                     if(data['Count'] > 0):
-                        cursor.execute(add_event_tweet_count, data) 
+                        cursor.execute(add_tweet_count, data)    
+
+                    for keyword in collection['keywords']:
+                        data = {
+                            'Event_ID': collection["id"],
+                            'Time': timestamp_minute,
+                            'Timesource': version_this,
+                            'Keyword': keyword,
+                            'Found_In': found_in,
+                            'Count':    minutes["all"][minute][found_in][keyword],
+                            'Distinct': minutes["distinct"][minute][found_in][keyword],
+                            'Original': minutes["original"][minute][found_in][keyword],
+                            'Retweet':  minutes["retweet"][minute][found_in][keyword],
+                            'Reply':    minutes["reply"][minute][found_in][keyword],
+                            'Quote':    minutes["quote"][minute][found_in][keyword]
+                        }
+
+                        if(data['Count'] > 0):
+                            cursor.execute(add_tweet_count, data) 
         
         if(not options.test):
             serverStorage.commit()
@@ -247,14 +260,15 @@ def parseDir(path):
     if options.verbose:
         print ("Parsing All JSON Files in: " + path)
     
-#    i = 0
     for filename in sorted(os.listdir(path)):
-        if filename.endswith(".json") and filename[-18:-10].isdigit() and filename[-9:-5].isdigit():
+        fn = filename
+        version = 0;
+        if(fn[-7:-5].isdigit() and fn[-8] == '_'):
+            version = int(fn[-7:-5]) + 1
+            fn = fn[:-8] + '.json'
+        
+        if fn.endswith(".json") and fn[-18:-10].isdigit() and fn[-9:-5].isdigit():
             parseFile(path + "/" + filename)
-#            
-#            i += 1
-#            if(i == 2):
-#                return
 
 def verifyCollection(collection_name):
     if collection['name'] == None:
@@ -388,20 +402,6 @@ def loadCollection(collection_name):
     # If files exist, load them        
     global minutes
     minutes = {}
-    
-    # Preload files, temporarily disabled, pending new design
-#    prefix = '../capture_stats/' + collection["name"];
-#    if(os.path.isfile(prefix + '.json')):
-#        with open(prefix + '.json', 'r') as out_file:
-#            collection_counts = json.load(out_file)
-#    else:
-#        collection_counts = {}
-#        
-#    if(os.path.isfile(prefix + '_unique.json')):
-#        with open(prefix + '_unique.json', 'r') as out_file:
-#            collection_counts_unique = json.load(out_file)
-#    else:
-#        collection_counts_unique = {}
         
     
 def saveCollection():
@@ -444,6 +444,135 @@ def connectToServer():
                 host=config["storage"]["host"],
                 database=config["storage"]["database"]
             )
+            
+def printNested(obj, level=0):
+    if(type(obj) is dict):
+        for key in obj:
+            if(type(obj[key]) is str):
+                text = obj[key].encode('ascii', 'replace').decode('ascii', 'replace');
+                print("  " * level + key + ": " + text)
+            elif(type(obj[key]) is int or type(obj[key]) is bool or not obj[key]):
+                text = str(obj[key]);
+                print("  " * level + key + ": " + text)
+            else:
+                print("  " * level + key + ":")
+                printNested(obj[key], level + 1)
+    elif(type(obj) is list):
+        for i, item in enumerate(obj):
+            if(type(item) is str):
+                text = item.encode('ascii', 'replace').decode('ascii', 'replace');
+                print("  " * level + str(i) + ": " + text)
+            elif(type(item) is int or type(item) is bool or not item):
+                text = str(item);
+                print("  " * level + str(i) + ": " + text)
+            else:
+                print("  " * level + str(i) + ":")
+                printNested(item, level + 1)
+    elif(type(obj) is str):
+        text = obj.encode('ascii', 'replace').decode('ascii', 'replace');
+        print('  ' * level + text)
+    else:
+        text = str(obj).encode('ascii', 'replace').decode('ascii', 'replace');
+        print('  ' * level + text)
+        
+def printNestedWithKeywords(obj, pre="  "):
+    if(type(obj) is dict):
+        for key in obj:
+            if(type(obj[key]) is str):
+                text = obj[key].encode('ascii', 'replace').decode('ascii', 'replace');
+                if(hasKeywords(text)):
+                    print(pre + "." + key + ": " + text)
+            elif(type(obj[key]) is int or type(obj[key]) is bool or not obj[key]):
+                text = str(obj[key]);
+                if(hasKeywords(text)):
+                    print(pre + "." + key + ": " + text)
+            else:
+                printNestedWithKeywords(obj[key], pre + '.' + key)
+    elif(type(obj) is list):
+        for i, item in enumerate(obj):
+            if(type(item) is str):
+                text = item.encode('ascii', 'replace').decode('ascii', 'replace');
+                if(hasKeywords(text)):
+                    print(pre + '[' + str(i) + "]: " + text)
+            elif(type(item) is int or type(item) is bool or not item):
+                text = str(item);
+                if(hasKeywords(text)):
+                    print(pre + '[' + str(i) + "]:" + text)
+            else:
+                printNestedWithKeywords(item, pre + '[' + str(i) + ']')
+    elif(type(obj) is str):
+        text = obj.encode('ascii', 'replace').decode('ascii', 'replace');
+        if(hasKeywords(text)):
+            print(pre + ": " + text)
+    else:
+        text = str(obj).encode('ascii', 'replace').decode('ascii', 'replace');
+        if(hasKeywords(text)):
+            print(pre + ": " + text)
+        
+def hasKeywords(text):
+    text = text.encode('ascii', 'replace').decode('ascii', 'replace').lower()
+    found = []
+    
+    for keyword, keyword_parts in zip(collection['keywords'], collection['keywords_parts']):
+        parts_found = 0
+        for keyword_part in keyword_parts:
+            if (re.search('\\b' + keyword_part + '\\b', text)):
+                parts_found += 1
+        
+        if parts_found == len(keyword_parts):
+            found.append(keyword)
+                
+    return found
+
+def l_unique(a):
+    return list(set(a))
+def l_intersect(a, b):
+    return list(set(a) & set(b))
+def l_union(a, b):
+    return list(set(a) | set(b))
+
+def checkMetaData(data):
+    found_in = {
+        'any': [],
+        'text': [],
+        'quote': [],
+        'url': []
+    }
+    
+    # This doesn't exist, return the empty list
+    if(not data):
+        return found_in
+    
+    # Search Text
+    if('text' in data):
+        found_in['text'] = hasKeywords(data['text']);
+        
+    # Search Expanded URL
+    if('entities' in data and 'urls' in data['entities']):
+        for url in data['entities']['urls']:
+            if('display_url' in url):
+                found_in['url'] = l_union(found_in['url'], hasKeywords(url['display_url']))
+            if('expanded_url' in url):
+                found_in['url'] = l_union(found_in['url'], hasKeywords(url['expanded_url']))
+        
+    # Search Quoted Status
+    if('quoted_status' in data):
+        found_in_quote = checkMetaData(data['quoted_status'])
+        found_in['quote'] = l_union(found_in['quote'], found_in_quote['text'])
+        found_in['quote'] = l_union(found_in['quote'], found_in_quote['quote'])
+        found_in['url']    = l_union(found_in['url'],    found_in_quote['url'])
+    
+    # Search Retweeted Status
+    if('retweeted_status' in data):
+        found_in_quote = checkMetaData(data['retweeted_status'])
+        found_in['quote'] = l_union(found_in['quote'], found_in_quote['text'])
+        found_in['quote'] = l_union(found_in['quote'], found_in_quote['quote'])
+        found_in['url']    = l_union(found_in['url'],    found_in_quote['url'])
+    
+    found_in['any'] = l_union(found_in['text'], found_in['quote'])
+    found_in['any'] = l_union(found_in['any'],  found_in['url'])
+       
+    return found_in
 
 if __name__ == "__main__":
     main()
