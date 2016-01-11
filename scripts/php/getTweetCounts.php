@@ -9,12 +9,12 @@
              "    `Time`, ".
              "    Found_In, ".
              "    Keyword, ".
-             "    SUM(`Count`) as 'Count', ".
-             "    SUM(`Distinct`) as 'Distinct', ".
-             "    SUM(`Original`) as 'Original', ".
-             "    SUM(Retweet) as 'Retweet', ".
-             "    SUM(Reply) as 'Reply', ".
-             "    SUM(Quote) as 'Quote'".
+             "    SUM(`Count`) as 'all', ".
+             "    SUM(`Distinct`) as 'distinct', ".
+             "    SUM(`Original`) as 'original', ".
+             "    SUM(Retweet) as 'retweet', ".
+             "    SUM(Reply) as 'reply', ".
+             "    SUM(Quote) as 'quote'".
              "FROM TweetCount " .
              "WHERE Event_ID = " . $event_id;
 

@@ -177,82 +177,83 @@ Display.prototype = {
             .style('fill-opacity', '0.2')
             .style('stroke-opacity', '0.6');
         
-        this.buildInterface();
+        data.loadCollections();
     },
-    buildInterface: function () {
-        this.toggleLoading(true);
+    loadCollections: function () {
+        disp.toggleLoading(true);
 
         // Collection selection
-        d3.json("scripts/php/getCollections.php", function(error, collections_file) {
-            if (error) throw error;
+        d3.json("scripts/php/getCollections.php", data.parseCollectionsFile);
+    },
+    parseCollectionsFile: function(error, collections_file) {
+        if (error) throw error;
 
-            // Add collections
-            collections_file.sort(util.compareCollections);
-            collections_file.reverse();
-            data.collections = collections_file;
+        // Add collections
+        collections_file.sort(util.compareCollections);
+        collections_file.reverse();
+        data.collections = collections_file;
 
-            // Get new data
-            data.collection_names = data.collections.map(function(collection) {
-                return collection.Name;
-            });
-            data.collections.map(function(collection) {
-                collection.Keywords = collection.Keywords.trim().split(/,[ ]*/);
-                collection.OldKeywords = collection.OldKeywords.trim().split(/,[ ]*/);
-                if(collection.OldKeywords.length == 1 && collection.OldKeywords[0] == "")
-                    collection.OldKeywords = [];
-                collection.StartTime = new Date(collection.StartTime);
-                collection.StartTime.setMinutes(collection.StartTime.getMinutes()
-                                               -collection.StartTime.getTimezoneOffset());
-                if(collection.StopTime)
-                    collection.StopTime = new Date(collection.StopTime);
-                else
-                    collection.StopTime = "Ongoing";
-            });
-
-            // Generate options, including collections
-            options.collection.labels = data.collection_names;
-            options.collection.ids = data.collection_names.map(function(name) { return util.simplify(name); } );
-            options.collection.available = data.collection_names.map(function(d, i) { return i; });
-            options.collection.set(util.simplify(data.collection_names[0]));
-
-            options.init();
-
-            // Add additional information for collections
-            data.collection_names.map(function(name, i) {
-                var content = '<dl class="dl-horizontal collection_popover">';
-                var collection = data.collections[i];
-                Object.keys(collection).map(function(key) {
-                    content += "<dt>" + key + "</dt>";
-
-                    if(collection[key] instanceof Date) {
-                        var date = new Date(collection[key]);
-                        content += "<dd>" + util.formatDate(date) + "</dd>";
-                    } else if(collection[key] instanceof Array) {
-                        var arr = collection[key].join(", ");
-                        content += "<dd>" + arr + "</dd>";
-                    } else {
-                        content += "<dd>" + collection[key] + "</dd>";
-                    }
-                });
-                content += "</dl>";
-
-                d3.select('#collection_' + util.simplify(name))
-                    .attr({
-                        'class': 'collection_option',
-                        'data-toggle': "popover",
-                        'data-trigger': "hover",
-                        'data-placement': "right",
-                        'data-content': content}
-                     );
-            });
-            $('.collection_option').popover({html: true});
-
-            // Initialize Legend
-            legend = new Legend();
-            legend.init();
-
-            data.loadCollectionData();
+        // Get new data
+        data.collection_names = data.collections.map(function(collection) {
+            return collection.Name;
         });
+        data.collections.map(function(collection) {
+            collection.Keywords = collection.Keywords.trim().split(/,[ ]*/);
+            collection.OldKeywords = collection.OldKeywords.trim().split(/,[ ]*/);
+            if(collection.OldKeywords.length == 1 && collection.OldKeywords[0] == "")
+                collection.OldKeywords = [];
+            collection.StartTime = new Date(collection.StartTime);
+            collection.StartTime.setMinutes(collection.StartTime.getMinutes()
+                                           -collection.StartTime.getTimezoneOffset());
+            if(collection.StopTime)
+                collection.StopTime = new Date(collection.StopTime);
+            else
+                collection.StopTime = "Ongoing";
+        });
+
+        // Generate options, including collections
+        options.collection.labels = data.collection_names;
+        options.collection.ids = data.collection_names.map(function(name) { return util.simplify(name); } );
+        options.collection.available = data.collection_names.map(function(d, i) { return i; });
+        options.collection.set(util.simplify(data.collection_names[0]));
+
+        options.init();
+
+        // Add additional information for collections
+        data.collection_names.map(function(name, i) {
+            var content = '<dl class="dl-horizontal collection_popover">';
+            var collection = data.collections[i];
+            Object.keys(collection).map(function(key) {
+                content += "<dt>" + key + "</dt>";
+
+                if(collection[key] instanceof Date) {
+                    var date = new Date(collection[key]);
+                    content += "<dd>" + util.formatDate(date) + "</dd>";
+                } else if(collection[key] instanceof Array) {
+                    var arr = collection[key].join(", ");
+                    content += "<dd>" + arr + "</dd>";
+                } else {
+                    content += "<dd>" + collection[key] + "</dd>";
+                }
+            });
+            content += "</dl>";
+
+            d3.select('#collection_' + util.simplify(name))
+                .attr({
+                    'class': 'collection_option',
+                    'data-toggle': "popover",
+                    'data-trigger': "hover",
+                    'data-placement': "right",
+                    'data-content': content}
+                 );
+        });
+        $('.collection_option').popover({html: true});
+
+        // Initialize Legend
+        legend = new Legend();
+        legend.init();
+
+        data.loadCollectionData();
     },
     display: function() {
         // Set the Y Scale
@@ -274,7 +275,7 @@ Display.prototype = {
 
         // Set stack representation of data
         if(options.display_type.is("percent")) {
-            data_100 = data.series_data.map(function(series) {
+            data_100 = data.series.map(function(series) {
                 var new_series = JSON.parse(JSON.stringify(series));
                 new_series.values = new_series.values.map(function(datum, i) {
                     var new_datum = datum;
@@ -284,30 +285,30 @@ Display.prototype = {
                 });
                 return new_series;            
             });
-            data.data_stacked = data.stack(data_100);
+            data.stacked = data.stack(data_100);
         } else {
-            data.data_stacked = data.stack(data.series_data);
+            data.stacked = data.stack(data.series);
         }
 
         // Change data for display
-        var n_series = data.data_stacked.length;
+        var n_series = data.stacked.length;
         if(n_series == 0) {
             disp.toggleLoading(false);
             alert('No data');
             return;
         }
-        n_datapoints = data.data_stacked[0].values.length;
+        n_datapoints = data.stacked[0].values.length;
         if(options.display_type.is("separate")) {
             for (var i = n_series - 1; i >= 0; i--) {
-                data.data_stacked[i].offset = 0;
+                data.stacked[i].offset = 0;
                 if(i < n_series - 1) {
-                    data.data_stacked[i].offset = data.data_stacked[i + 1].offset;
-                    if(data.series_data[i + 1].shown)
-                        data.data_stacked[i].offset += data.data_stacked[i + 1].max;
+                    data.stacked[i].offset = data.stacked[i + 1].offset;
+                    if(data.series[i + 1].shown)
+                        data.stacked[i].offset += data.stacked[i + 1].max;
                 }
 
-                data.data_stacked[i].values.map(function(datum) {
-                    datum.value0 = data.data_stacked[i].offset;
+                data.stacked[i].values.map(function(datum) {
+                    datum.value0 = data.stacked[i].offset;
                 });
             }
         } 
@@ -326,11 +327,11 @@ Display.prototype = {
 
         var y_max = 100;
         var biggest_datapoint = // data is defined by its own maxes
-            d3.max(data.data_stacked.map(function (d) {
+            d3.max(data.stacked.map(function (d) {
                 return d.max;
             }));
         var highest_datapoint = // because of stacked data
-            d3.max(data.data_stacked[0].values.map(function (d) {
+            d3.max(data.stacked[0].values.map(function (d) {
                 return d.value0 + d.value;
             }));
         var biggest_totalpoint = 
@@ -386,7 +387,7 @@ Display.prototype = {
         // Bind new series to the graph
 
         var series = disp.focus.svg.selectAll(".series")
-            .data(data.data_stacked);
+            .data(data.stacked);
 
         var series_paths = series.enter().append("g")
     //        .on("mouseover", legend.highlightSeries)
@@ -624,9 +625,9 @@ Display.prototype = {
         disp.setColorScale();
 
         // Set color values
-        disp.color.domain(data.series_data.map(function(series) {return series.name;}));
+        disp.color.domain(data.series.map(function(series) {return series.name;}));
 
-        data.series_data.map(function(series) {
+        data.series.map(function(series) {
             series.fill = disp.color(series.name);
             series.stroke = d3.rgb(disp.color(series.name)).darker();
 

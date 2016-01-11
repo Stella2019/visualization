@@ -1,24 +1,32 @@
 function Data() {
     var self = this;
     
+    // Time
     self.time = {
         timestamps: [],
-        load_min: new Date(),
-        load_max: new Date()
+        collection_min: new Date(),
+        collection_max: new Date(),
+        min: new Date(),
+        max: new Date()
     };
+    self.timestamps = {};
+    self.timestamps_nested = {};
     
+    // Collection info
     self.collection = {};
     self.collections = {};
     self.collection_names = [];
-    self.data_stacked = {};
-    self.series_data = {};
-    self.data_raw = {};
+    
+    // Data
+    self.stacked = {}; // formerly data_stacked
+    self.series = {}; // formerly series_data
+    self.all = {}; // formerly data_raw
     self.total_byTime = [];
     self.context_byTime = [];
-    self.timestamps = {};
-    self.timestamps_nested = {};
+    
+    // Series
     self.keywords = {};
-    self.series_names = {};
+    self.series_names = [];
     self.stack = {};
     
     self.init();
@@ -37,14 +45,116 @@ Data.prototype = {
             })
             .order("reverse");
     },
-    getCollections: function() {
-        
-    },
-    loadDataFile: function(collection, subset, callback) {
-        var url = "scripts/php/getTweetCounts.php";
-        url += "?event_id=" + collection.ID;
+    loadCollections: function () {
+        disp.toggleLoading(true);
 
-        if(!options.time_limit.is('all')) {
+        // Collection selection
+        d3.json("scripts/php/getCollections.php", data.parseCollectionsFile);
+    },
+    parseCollectionsFile: function(error, collections_file) {
+        if (error) throw error;
+
+        // Add collections
+        collections_file.sort(util.compareCollections);
+        collections_file.reverse();
+        data.collections = collections_file;
+
+        // Get new data
+        data.collection_names = data.collections.map(function(collection) {
+            return collection.Name;
+        });
+        data.collections.map(function(collection) {
+            collection.Keywords = collection.Keywords.trim().split(/,[ ]*/);
+            collection.OldKeywords = collection.OldKeywords.trim().split(/,[ ]*/);
+            if(collection.OldKeywords.length == 1 && collection.OldKeywords[0] == "")
+                collection.OldKeywords = [];
+            collection.StartTime = new Date(collection.StartTime);
+            collection.StartTime.setMinutes(collection.StartTime.getMinutes()
+                                           -collection.StartTime.getTimezoneOffset());
+            if(collection.StopTime)
+                collection.StopTime = new Date(collection.StopTime);
+            else
+                collection.StopTime = "Ongoing";
+        });
+
+        // Generate options, including collections
+        options.collection.labels = data.collection_names;
+        options.collection.ids = data.collection_names.map(function(name) { return util.simplify(name); } );
+        options.collection.available = data.collection_names.map(function(d, i) { return i; });
+        options.collection.set(util.simplify(data.collection_names[0]));
+
+        options.init();
+
+        // Add additional information for collections
+        data.collection_names.map(function(name, i) {
+            var content = '<dl class="dl-horizontal collection_popover">';
+            var collection = data.collections[i];
+            Object.keys(collection).map(function(key) {
+                content += "<dt>" + key + "</dt>";
+
+                if(collection[key] instanceof Date) {
+                    var date = new Date(collection[key]);
+                    content += "<dd>" + util.formatDate(date) + "</dd>";
+                } else if(collection[key] instanceof Array) {
+                    var arr = collection[key].join(", ");
+                    content += "<dd>" + arr + "</dd>";
+                } else {
+                    content += "<dd>" + collection[key] + "</dd>";
+                }
+            });
+            content += "</dl>";
+
+            d3.select('#collection_' + util.simplify(name))
+                .attr({
+                    'class': 'collection_option',
+                    'data-toggle': "popover",
+                    'data-trigger': "hover",
+                    'data-placement': "right",
+                    'data-content': content}
+                 );
+        });
+        $('.collection_option').popover({html: true});
+
+        // Initialize Legend
+        legend = new Legend();
+        legend.init();
+
+        data.setCollection();
+    },
+    setCollection: function() {
+        var collection_name = options.collection.getLabel();
+        
+        data.collection = data.collections.reduce(function(collection, candidate) {
+            if(collection.Name == collection_name)
+                return collection;
+            return candidate
+        }, {});
+        
+        data.loadCollectionData();
+    },
+    loadCollectionData: function() {
+        disp.toggleLoading(true);
+
+        // If there is no collection information, end, we cannot do this yet
+        if($.isEmptyObject(data.collection)) {
+            disp.toggleLoading(false);
+            return;
+        }
+
+        // Clear the raw data object
+        data.all = {};
+        
+        // Get times from collection
+        data.time.collection_min = new Date(data.collection.StartTime);
+        if(data.collection.StopTime == "Ongoing") {
+            data.time.collection_max = new Date();
+        }
+        
+        // Get times to load
+        if(options.time_limit.is('all')) {
+            data.time.min = new Date(data.time.collection_min);
+            data.time.max = new Date(data.time.collection_max);
+        } else {
             var time_limit = options.time_limit.get()
             var sign = time_limit.slice(0, 1) == '-' ? -1 : 1;
 
@@ -63,215 +173,117 @@ Data.prototype = {
                 hours_diff = 24 * 7;
             }
 
-            if(sign == -1)
-                time_limit = new Date();
-            else
-                time_limit = new Date(this.getCurrentCollection().StartTime);
-
-            time_limit.setHours(time_limit.getHours() + hours_diff * sign);
-
-            if(sign == -1)
-                url += '&time_min="' + util.formatDate(time_limit) + '"';
-            else
-                url += '&time_max="' + util.formatDate(time_limit) + '"';
+            if(sign == -1) {
+                data.time.min = new Date(data.time.collection_max);
+                data.time.min.setHours(data.time.min.getHours() + hours_diff * sign);
+                
+                data.time.max = new Date(data.time.collection_max);
+            } else {
+                data.time.min = new Date(data.time.collection_min);
+                
+                data.time.max = new Date(data.time.collection_min);
+                data.time.max.setHours(data.time.max.getHours() + hours_diff * sign);
+            }
         } 
 
-        d3.csv(url, function(error, data_file) {
-            if (error) {
-                alert("Sorry! File not found");
-                return;
-            }
-
-            // Get the timestamps
-            data.timestamps = Array.from(new Set(data_file.map(function(d) {return d.Time}))).sort();
-            if(data.timestamps.length == 0)
-                data.timestamps = [util.formatDate(new Date())];
-            data.keywords = Array.from(new Set(data_file.map(function(d) {return d.Keyword})));
-            data.keywords = data.keywords.reduce(function(arr, word) {
-                if(word != '_total_')
-                    arr.push(word);
-                return arr;
-            }, [])
-
-            // Fill in missing timestamps
-            var first_timestamp = data.timestamps[0];
-            var last_timestamp = data.timestamps[data.timestamps.length - 1];
-            if(options.time_limit.get().slice(0, 1) == '-')
-                last_timestamp = util.formatDate(new Date());
-
-            var new_timestamps = [];
-
-            for(var timestamp = new Date(first_timestamp);
-                timestamp <= new Date(last_timestamp);
-                timestamp.setMinutes(timestamp.getMinutes() + 1)) {
-                new_timestamps.push(util.formatDate(timestamp));
-            }
-            data.timestamps = new_timestamps;
-
-            var data_raw0 = {};
-            // Create matrix to hold values
-            options.found_in.ids.map(function(found_in) {
-                data_raw0[found_in] = {}
-                options.subset.ids.map(function(subset) {
-                    data_raw0[found_in][subset] = {};
-                    data.timestamps.map(function (timestamp) {
-                        var entry = {
-                            timestamp: new Date(timestamp),
-                            "_total_": 0
-                        };
-                        data.keywords.map(function(keyword) {
-                            entry[keyword] = 0;
-                        });
-
-                        data_raw0[found_in][subset][timestamp] = entry;
-                    });
-                });
-            });
-
-            // Input values from the loaded file
-            for(row in data_file) {
-                var timestamp = data_file[row]['Time'];
-                var found_in = data_file[row]['Found_In'];
-                var keyword = data_file[row]['Keyword'];
-
-                if(typeof data_file[row] !== 'object')
-                    continue;
-
-                data_raw0[found_in]['all'][timestamp][keyword] = parseInt(data_file[row]['Count']);
-                data_raw0[found_in]['distinct'][timestamp][keyword] = parseInt(data_file[row]['Distinct']);
-                data_raw0[found_in]['original'][timestamp][keyword] = parseInt(data_file[row]['Original']);
-                data_raw0[found_in]['retweet'][timestamp][keyword] = parseInt(data_file[row]['Retweet']);
-                data_raw0[found_in]['reply'][timestamp][keyword] = parseInt(data_file[row]['Reply']);
-                data_raw0[found_in]['quote'][timestamp][keyword] = parseInt(data_file[row]['Quote']);
-            }
-
-            options.found_in.ids.map(function(found_in) {
-                data.all[found_in] = {}
-
-                options.subset.ids.map(function(subset) {
-                    data.all[found_in][subset] = [];
-                    for(row in data_raw0[found_in][subset]) {
-                        data.all[found_in][subset].push(data_raw0[found_in][subset][row]);
-                    }
-                });
-            });
-    //            
-    //            for (var i = 0; i < timestamps.length; i++) {
-    //                timestamp = timestamps[i];
-    //                entry = {
-    //                    timestamp: parseDate(timestamp),
-    //                    '_total_': data_file[timestamp]["_total_"]
-    //                };
-    //                keywords.map(function(keyword) {
-    //                    entry[keyword] = parseInt(data_file[timestamp][keyword]);
-    //                });
-    //                data_raw[subset].push(entry);
-    //            }
-    //        }
-
-            callback();
-        });
+        // Load the collection's primary file
+        data.loadDataFile();
     },
-    getCurrentCollection: function() {
-        var collection_name = options.collection.getLabel();
-
-        return data.collections.reduce(function(collection, candidate) {
-            if(collection.Name == collection_name)
-                return collection;
-            return candidate
-        }, {});
+    loadDataFile: function() {
+        var url = "scripts/php/getTweetCounts.php";
+        url += "?event_id=" + data.collection.ID;
+        url += '&time_min="' + util.formatDate(data.time.min) + '"';
+        url += '&time_max="' + util.formatDate(data.time.max) + '"';
+        
+        d3.csv(url, this.parseCSVData);
     },
-    loadCollectionData: function() {
-        disp.toggleLoading(true);
-
-        var collection = data.getCurrentCollection();
-        if($.isEmptyObject(collection)) {
-            disp.toggleLoading(false);
+    parseCSVData: function(error, data_file) {
+        if (error) {
+            alert("Sorry! File not found");
             return;
         }
 
-        data.all = {};
-        var subset_to_start = 'all'; //options.subset.get();
+        // Get the timestamps
+        data.timestamps = Array.from(new Set(data_file.map(function(d) {return d.Time}))).sort();
+        if(data.timestamps.length == 0)
+            data.timestamps = [util.formatDate(new Date())];
+        data.keywords = Array.from(new Set(data_file.map(function(d) {return d.Keyword})));
+        data.keywords = data.keywords.reduce(function(arr, word) {
+            if(word != '_total_')
+                arr.push(word);
+            return arr;
+        }, [])
 
-        // Load the collection's primary file
-        data.loadDataFile(collection, subset_to_start, function() {
+        // Fill in missing timestamps
+        data.time.min = new Date(data.timestamps[0]);
+        data.time.max = new Date(data.timestamps[data.timestamps.length - 1]);
+        if(options.time_limit.get().slice(0, 1) == '-')
+            last_timestamp = util.formatDate(new Date());
 
-            // Get the keywords
-    //        keywords = d3.keys(data_raw[subset_to_start][0]).filter(function (key) {
-    //            return key !== "timestamp" && key !== '_total_';
-    //        });
+        var new_timestamps = [];
+        for(var timestamp = new Date(data.time.min);
+            timestamp <= data.time.max;
+            timestamp.setMinutes(timestamp.getMinutes() + 1)) {
+            new_timestamps.push(util.formatDate(timestamp));
+        }
+        data.timestamps = new_timestamps;
 
-            // Set Time Domain and Axis
-            var x_min = data.all['Any'][subset_to_start][0].timestamp;
-            var x_max = data.all['Any'][subset_to_start][data.all['Any'][subset_to_start].length - 1].timestamp;
-            disp.focus.x.domain([x_min, x_max]).clamp(true);
-            disp.context.x.domain([x_min, x_max]);
+        var data_raw0 = {};
+        // Create matrix to hold values
+        options.found_in.ids.map(function(found_in) {
+            data_raw0[found_in] = {}
+            options.subset.ids.map(function(subset) {
+                data_raw0[found_in][subset] = {};
+                data.timestamps.map(function (timestamp) {
+                    var entry = {
+                        timestamp: new Date(timestamp),
+                        "_total_": 0
+                    };
+                    data.keywords.map(function(keyword) {
+                        entry[keyword] = 0;
+                    });
 
-            // Clear brush
-            disp.brush.clear();
-            disp.plot_area.svg.selectAll('.brush').call(disp.brush);
-
-    //        // Load the rest of the data (asychronous) // no unnecessary
-    //        options.subset.ids.map(function(subset) {
-    //            loadDataFile(collection.Name, subset, function() {});
-    //        });
-
-            data.changeSeries(subset_to_start);
+                    data_raw0[found_in][subset][timestamp] = entry;
+                });
+            });
         });
-    },
-    loadNewSeriesData: function(subset) {
-        var found_in = options.found_in.get();
-        data.series_data = data.series_names.map(function(name, i) {
-            return {
-                name: name,
-                id: util.simplify(name),
-                order: (i + 1) * 100,
-                shown: true
-            };
-        });
 
-        if(options.series.is('terms')) {
-            var collection = data.getCurrentCollection();
+        // Input values from the loaded file
+        for(row in data_file) {
+            var timestamp = data_file[row]['Time'];
+            var found_in = data_file[row]['Found_In'];
+            var keyword = data_file[row]['Keyword'];
 
-            data.series_data.map(function(datum) {
-                datum.isKeyword = collection.Keywords.reduce(function(prev, keyword) {
-                    return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
-                }, false);
-                datum.isOldKeyword = collection.OldKeywords.reduce(function(prev, keyword) {
-                    return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
-                }, false);
+            if(typeof data_file[row] !== 'object')
+                continue;
 
-                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
-                    return cur_sum + datapoint[datum.name];
-                }, 0);
-            });
-        } else if(options.series.is('types')) {
-            data.series_data.map(function(datum) {
-                datum.sum = data.all[found_in][datum.name].reduce(function(cur_sum, datapoint) { // Can change subset
-                    return cur_sum + datapoint['_total_'];
-                }, 0);
-            });
-        } else if(options.series.is('distinct')) {
-            data.series_data.map(function(datum) {
-                if(datum.name == 'distinct')
-                    datum.sum = data.all[found_in]['distinct'].reduce(function(cur_sum, datapoint) { // Can change subset
-                        return cur_sum + datapoint['_total_'];
-                    }, 0);
-                else
-                    datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
-                        return cur_sum + datapoint['_total_'];
-                    }, 0);
-            });
-
-            // Subtract the distinct sum from the all sum to make the repeat sum, presuming repeat is in the second place
-            data.series_data[1].sum -= data.series_data[0].sum;
-        } else { // implicit none
-            data.series_data.map(function(datum) {
-                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
-                    return cur_sum + datapoint['_total_'];
-                }, 0);
+            options.subset.ids.map(function(subset) {
+                data_raw0[found_in][subset][timestamp][keyword] =
+                    parseInt(data_file[row][subset]);
             });
         }
+
+        options.found_in.ids.map(function(found_in) {
+            data.all[found_in] = {}
+
+            options.subset.ids.map(function(subset) {
+                data.all[found_in][subset] = [];
+                for(row in data_raw0[found_in][subset]) {
+                    data.all[found_in][subset].push(data_raw0[found_in][subset][row]);
+                }
+            });
+        });
+
+        
+        // Set Time Domain and Axis
+        disp.focus.x.domain(  [data.time.min, data.time.max]).clamp(true);
+        disp.context.x.domain([data.time.min, data.time.max]);
+
+        // Clear brush
+        disp.brush.clear();
+        disp.plot_area.svg.selectAll('.brush').call(disp.brush);
+
+        data.changeSeries('all');
     },
     changeSeries: function(subset) {
         // Determine the series on the chart
@@ -288,16 +300,68 @@ Data.prototype = {
         // Load the main series
         data.loadNewSeriesData(subset);
 
-        // Build Legend    
-        legend.populate(data.series_data);
+        // Populate Legend    
+        legend.populate();
 
         // Finish preparing the data for loading
         data.prepareData();   
     },
     changeData: function() {
-        data.loadNewSeriesData(options.subset.get());
+        this.loadNewSeriesData(options.subset.get());
 
-        data.prepareData();
+        this.prepareData();
+    },
+    loadNewSeriesData: function(subset) {
+        var found_in = options.found_in.get();
+        data.series = data.series_names.map(function(name, i) {
+            return {
+                name: name,
+                id: util.simplify(name),
+                order: (i + 1) * 100,
+                shown: true
+            };
+        });
+
+        if(options.series.is('terms')) {
+            data.series.map(function(datum) {
+                datum.isKeyword = data.collection.Keywords.reduce(function(prev, keyword) {
+                    return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
+                }, false);
+                datum.isOldKeyword = data.collection.OldKeywords.reduce(function(prev, keyword) {
+                    return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
+                }, false);
+
+                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                    return cur_sum + datapoint[datum.name];
+                }, 0);
+            });
+        } else if(options.series.is('types')) {
+            data.series.map(function(datum) {
+                datum.sum = data.all[found_in][datum.name].reduce(function(cur_sum, datapoint) { // Can change subset
+                    return cur_sum + datapoint['_total_'];
+                }, 0);
+            });
+        } else if(options.series.is('distinct')) {
+            data.series.map(function(datum) {
+                if(datum.name == 'distinct')
+                    datum.sum = data.all[found_in]['distinct'].reduce(function(cur_sum, datapoint) { // Can change subset
+                        return cur_sum + datapoint['_total_'];
+                    }, 0);
+                else
+                    datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                        return cur_sum + datapoint['_total_'];
+                    }, 0);
+            });
+
+            // Subtract the distinct sum from the all sum to make the repeat sum, presuming repeat is in the second place
+            data.series[1].sum -= data.series[0].sum;
+        } else { // implicit none
+            data.series.map(function(datum) {
+                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                    return cur_sum + datapoint['_total_'];
+                }, 0);
+            });
+        }
     },
     prepareData: function() {
         var found_in = options.found_in.get();
@@ -377,7 +441,7 @@ Data.prototype = {
                         return sum + leaf['_total_'];
                     }, 0);
                 } else {
-                    data.series_data.map(function(series) {
+                    data.series.map(function(series) {
                         if(series.shown) {
                             newdata[series.name] = leaves.reduce(function(sum, leaf) {
                                 return sum + leaf[series.name];
@@ -419,12 +483,12 @@ Data.prototype = {
         });
 
         // Reorder by total size
-        data.series_data.sort(util.compareSeries);
+        data.series.sort(util.compareSeries);
         legend.container_series.selectAll('div.legend_entry').sort(util.compareSeries);
         disp.setColors();
 
         // Add the nested data to the series
-        data.series_data.map(function(datum) {
+        data.series.map(function(datum) {
 
             datum.values = data_ready.map(function(d) {
                 return {timestamp: d.timestamp, value: d[datum.name]};

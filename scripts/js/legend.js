@@ -135,12 +135,9 @@ Legend.prototype = {
             .attr('class', 'legend_key_label')
             .html(function(d) { return d.label; });                    
     },
-    populate: function(series_data) {
-        // Save data
-        this.data = series_data;
-        
+    populate: function() {        
         // Get series data
-        this.data.map(function(series) {
+        data.series.map(function(series) {
             series.shown = true; 
         }, this);
         
@@ -154,7 +151,7 @@ Legend.prototype = {
         // Add new entries
         var entries = this.container_series
             .selectAll('div.legend_entry')
-            .data(this.data);
+            .data(data.series);
 
         var new_entries = entries.enter().append('div')
             .attr('id', function(d) {

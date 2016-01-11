@@ -46,9 +46,7 @@ function Options() {
             ids:    ["none"],
             available: [0],
             default: 0,
-            callback: function() {
-                options.terms_selected.set("");
-                data.loadCollectionData(); }
+            callback: function() { data.setCollection(); }
         });
     options.display_type = new Option({
             title: "Plot Type",
@@ -151,7 +149,7 @@ function Options() {
         });
     options.time_limit = new Option({
             title: "Tweets in",
-            labels: ["First 3 Hours", "First 12 Hours", "First 24 Hours", "First 3 Days", "First Week", "All time", "Latest Week", "Latest 3 Days", "Latest 24 Hours", "Latest 12 Hours", "Latest 3 Hours"],
+            labels: ["First 3 Hours", "First 12 Hours", "First 24 Hours", "First 3 Days", "First Week", "All time", "Last Week", "Last 3 Days", "Last 24 Hours", "Last 12 Hours", "Last 3 Hours"],
             ids:    ["3h", "12h", "1d", "3d", '1w', 'all', '-1w', '-3d', '-1d', '-12h', '-3h'],
             available: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             default: 2,
