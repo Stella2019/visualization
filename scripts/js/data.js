@@ -146,12 +146,12 @@ Data.prototype = {
             }
 
             options.found_in.ids.map(function(found_in) {
-                data.data_raw[found_in] = {}
+                data.all[found_in] = {}
 
                 options.subset.ids.map(function(subset) {
-                    data.data_raw[found_in][subset] = [];
+                    data.all[found_in][subset] = [];
                     for(row in data_raw0[found_in][subset]) {
-                        data.data_raw[found_in][subset].push(data_raw0[found_in][subset][row]);
+                        data.all[found_in][subset].push(data_raw0[found_in][subset][row]);
                     }
                 });
             });
@@ -190,7 +190,7 @@ Data.prototype = {
             return;
         }
 
-        data.data_raw = {};
+        data.all = {};
         var subset_to_start = 'all'; //options.subset.get();
 
         // Load the collection's primary file
@@ -202,8 +202,8 @@ Data.prototype = {
     //        });
 
             // Set Time Domain and Axis
-            var x_min = data.data_raw['Any'][subset_to_start][0].timestamp;
-            var x_max = data.data_raw['Any'][subset_to_start][data.data_raw['Any'][subset_to_start].length - 1].timestamp;
+            var x_min = data.all['Any'][subset_to_start][0].timestamp;
+            var x_max = data.all['Any'][subset_to_start][data.all['Any'][subset_to_start].length - 1].timestamp;
             disp.focus.x.domain([x_min, x_max]).clamp(true);
             disp.context.x.domain([x_min, x_max]);
 
@@ -241,24 +241,24 @@ Data.prototype = {
                     return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
                 }, false);
 
-                datum.sum = data.data_raw[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                     return cur_sum + datapoint[datum.name];
                 }, 0);
             });
         } else if(options.series.is('types')) {
             data.series_data.map(function(datum) {
-                datum.sum = data.data_raw[found_in][datum.name].reduce(function(cur_sum, datapoint) { // Can change subset
+                datum.sum = data.all[found_in][datum.name].reduce(function(cur_sum, datapoint) { // Can change subset
                     return cur_sum + datapoint['_total_'];
                 }, 0);
             });
         } else if(options.series.is('distinct')) {
             data.series_data.map(function(datum) {
                 if(datum.name == 'distinct')
-                    datum.sum = data.data_raw[found_in]['distinct'].reduce(function(cur_sum, datapoint) { // Can change subset
+                    datum.sum = data.all[found_in]['distinct'].reduce(function(cur_sum, datapoint) { // Can change subset
                         return cur_sum + datapoint['_total_'];
                     }, 0);
                 else
-                    datum.sum = data.data_raw[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                    datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                         return cur_sum + datapoint['_total_'];
                     }, 0);
             });
@@ -267,7 +267,7 @@ Data.prototype = {
             data.series_data[1].sum -= data.series_data[0].sum;
         } else { // implicit none
             data.series_data.map(function(datum) {
-                datum.sum = data.data_raw[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                     return cur_sum + datapoint['_total_'];
                 }, 0);
             });
@@ -303,10 +303,10 @@ Data.prototype = {
         var found_in = options.found_in.get();
 
         // If we haven't loaded the data yet, tell the user and ask them to wait
-        if(data.data_raw[found_in][options.subset.get()] == undefined) {
+        if(data.all[found_in][options.subset.get()] == undefined) {
             // Wait a second, then if it still isn't ready, message user that they are waiting
             window.setTimeout(function() {
-                if(data.data_raw[found_in][options.subset.get()] == undefined) {
+                if(data.all[found_in][options.subset.get()] == undefined) {
                     if (confirm(
                         getCurrentCollection().name + ": " + 
                         options.subset.get() + " _total_" +
@@ -329,30 +329,30 @@ Data.prototype = {
         var data_nested_entries;
         if(options.series.is('types')) {
             data_nested_entries = []; // think about it
-            for(var i = 0; i < data.data_raw[found_in]['all'].length; i++) {
+            for(var i = 0; i < data.all[found_in]['all'].length; i++) {
                 entry = {
-                    timestamp: data.data_raw[found_in]['all'][i]['timestamp'],
-                    _total_: data.data_raw[found_in]['all'][i]['_total_'],
-                    original: data.data_raw[found_in]['original'][i]['_total_'],
-                    retweet: data.data_raw[found_in]['retweet'][i]['_total_'],
-                    reply: data.data_raw[found_in]['reply'][i]['_total_'],
-                    quote: data.data_raw[found_in]['quote'][i]['_total_']
+                    timestamp: data.all[found_in]['all'][i]['timestamp'],
+                    _total_: data.all[found_in]['all'][i]['_total_'],
+                    original: data.all[found_in]['original'][i]['_total_'],
+                    retweet: data.all[found_in]['retweet'][i]['_total_'],
+                    reply: data.all[found_in]['reply'][i]['_total_'],
+                    quote: data.all[found_in]['quote'][i]['_total_']
                 }
                 data_nested_entries.push(entry);
             }
         } else if(options.series.is('distinct')) {
             data_nested_entries = []; // think about it
-            for(var i = 0; i < data.data_raw[found_in]['all'].length; i++) {
+            for(var i = 0; i < data.all[found_in]['all'].length; i++) {
                 entry = {
-                    timestamp: data.data_raw[found_in]['all'][i]['timestamp'],
-                    _total_: data.data_raw[found_in]['all'][i]['_total_'],
-                    distinct: data.data_raw[found_in]['distinct'][i]['_total_'],
-                    repeat: data.data_raw[found_in]['all'][i]['_total_'] - data.data_raw[found_in]['distinct'][i]['_total_'],
+                    timestamp: data.all[found_in]['all'][i]['timestamp'],
+                    _total_: data.all[found_in]['all'][i]['_total_'],
+                    distinct: data.all[found_in]['distinct'][i]['_total_'],
+                    repeat: data.all[found_in]['all'][i]['_total_'] - data.all[found_in]['distinct'][i]['_total_'],
                 }
                 data_nested_entries.push(entry);
             }
         } else {
-            data_nested_entries = data.data_raw[found_in][options.subset.get()];
+            data_nested_entries = data.all[found_in][options.subset.get()];
         }
 
         var data_nested = d3.nest()

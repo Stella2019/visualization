@@ -288,7 +288,7 @@ Options.prototype = {
         });
         
         // If the program has been initialized
-        if(changed.length > 0 && data.data_raw != undefined) {
+        if(changed.length > 0 && data.all != undefined) {
             // Render changes
             // Right now this function is VERY manual, should make a more explicit data flow
 
