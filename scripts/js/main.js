@@ -7,16 +7,19 @@ var util = {
         return "l" + str.replace(/[\s\.#]+/g, '_');
     },
     compareCollections: function(a, b) {
-        if(a.StartTime < b.StartTime) 
-            return -1;
-        if(a.StartTime > b.StartTime)
-            return 1;
-        return 0;
+        return util.compareDates(new Date(a.StartTime), new Date(b.StartTime));
     },
     compareSeries: function(a, b) {
         if(a.sum !== undefined && b.sum !== undefined)
             return b.sum - a.sum;
         return a.order - b.order;
+    },
+    compareDates: function(a, b) {
+        if(a < b) 
+            return -1;
+        if(a > b)
+            return 1;
+        return 0;
     }
 }
 

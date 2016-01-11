@@ -57,6 +57,8 @@ Data.prototype = {
 
         // Get new data
         data.collection_names = data.collections.map(function(collection) {
+            if('DisplayName' in collection && collection['DisplayName'] && collection['DisplayName'] != "null")
+                return collection['DisplayName'];
             return collection.Name;
         });
         data.collections.map(function(collection) {

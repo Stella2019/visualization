@@ -244,6 +244,71 @@ Display.prototype = {
             .y0(focus.height / 2)
             .y1(focus.height / 2);
 
+        disp.setYAxes();
+        disp.showTotalLine();
+
+        // Bind new series to the graph
+
+        var series = disp.focus.svg.selectAll(".series")
+            .data(data.stacked);
+
+        var series_paths = series.enter().append("g")
+    //        .on("mouseover", legend.highlightSeries)
+            .on("mouseout", legend.unHighlightSeries)
+            .on("click", function(d) {
+                var time = disp.getTimeHoveringOverAxis(this);
+
+                data.getTweets(d, time.min, time.max);
+            })
+            .on("mouseover", legend.highlightSeries)
+            .on("mouseout", function(d) {
+                disp.focus.svg.select('path.column_hover')
+                    .style('display', 'none');
+
+                legend.unHighlightSeries(d)
+            })
+            .on("mousemove", disp.seriesHover);
+
+        series.attr("class", function(d) {
+                return "series " + d.id
+            });
+
+        series.exit().remove();
+
+        series_paths.append("path")
+            .attr("class", "area");
+
+        // Define the parameters of the area
+        if (options.display_type.is('overlap') | options.display_type.is('lines')) {
+            disp.focus.area
+                .y0(disp.focus.height)
+                .y1(function (d) { return disp.focus.y(d.value); });
+        } else {
+            disp.focus.area
+                .y0(function (d) { return disp.focus.y(d.value0); })
+                .y1(function (d) { return disp.focus.y(d.value0 + d.value); });
+        }
+
+        // here we create the transition
+        var transition = disp.focus.svg.selectAll(".series")
+            .transition()
+            .duration(750)
+
+        // Transition to the new area
+        var fill_opacity = options.display_type.is("lines") ? 0.0 : 
+                        (options.display_type.is("overlap") ? 0.1 : 0.8);
+
+        disp.focus.svg.selectAll(".series")
+            .classed("lines", false);
+        transition.select("path.area")
+            .style("fill", function (d) { return disp.color(d.name); })
+            .style("fill-opacity", fill_opacity)
+            .style("stroke", function (d) { return d3.rgb(disp.color(d.name)).darker(); })
+            .attr("d", function(d) { return disp.focus.area(d.values)});
+
+        disp.toggleLoading(false);
+    },
+    setYAxes: function() {
         // Set the Y Domain
         var y_min = 0;
         if(options.y_scale.is("log"))
@@ -291,7 +356,7 @@ Display.prototype = {
             disp.focus.yAxis.scale(disp.focus.y)
                 .tickFormat(disp.focus.y.tickFormat(10, ",.0f"));
         }
-
+        
         // Create y Axises
         var ax = disp.focus.svg.select("g#yAxis");
         if(!ax[0][0])
@@ -305,127 +370,6 @@ Display.prototype = {
             ax = disp.context.svg.append('g').attr('id', 'context_yAxis');
         ax.attr("class", "context_y axis")
             .call(disp.context.yAxis);
-
-        disp.total_line();
-
-        // Bind new series to the graph
-
-        var series = disp.focus.svg.selectAll(".series")
-            .data(data.stacked);
-
-        var series_paths = series.enter().append("g")
-    //        .on("mouseover", legend.highlightSeries)
-            .on("mouseout", legend.unHighlightSeries)
-            .on("click", function(d) {
-                var xy = d3.mouse(this);
-                var time = disp.focus.x.invert(xy[0]);
-                var coeff = 1000 * 60; // get a minute on other side
-                if(options.resolution.is('tenminute')) {
-                    coeff *= 10;
-                } else if(options.resolution.is('hour')) {
-                    coeff *= 60;
-                } else if(options.resolution.is('day')) {
-                    coeff *= 60 * 24;
-                }
-                var startTime = new Date(Math.floor(time.getTime() / coeff) * coeff)
-                var stopTime = new Date(startTime.getTime() + coeff)
-
-                data.getTweets(d, startTime, stopTime);
-            })
-            .on("mouseover", legend.highlightSeries)
-            .on("mouseout", function(d) {
-                disp.focus.svg.select('path.column_hover')
-                    .style('display', 'none');
-
-                legend.unHighlightSeries(d)
-            })
-            .on("mousemove", function(d) {
-                var xy = d3.mouse(this);
-                var time = disp.focus.x.invert(xy[0]);
-                var coeff = 1000 * 60; // get a minute on other side
-                if(options.resolution.is('tenminute')) {
-                    coeff *= 10;
-                } else if(options.resolution.is('hour')) {
-                    coeff *= 60;
-                } else if(options.resolution.is('day')) {
-                    coeff *= 60 * 24;
-                }
-                var startTime = new Date(Math.floor(time.getTime() / coeff) * coeff)
-                var stopTime = new Date(startTime.getTime() + coeff)
-
-                var focus_column = disp.focus.svg.select('path.column_hover');
-                var old_data = focus_column.data();
-
-    //            var value_i = Math.floor(xy[0] / focus.width * d.values.length);
-                var value_i = timestamps_nested.indexOf(startTime + "");
-                var value = d.values[value_i].value;
-                var value0 = d.values[value_i].value0;
-
-                if(!old_data || old_data.series != d.id ||
-                   old_data.startTime != startTime || old_data.stopTime != stopTime) {
-
-                    focus_column.data([{
-                        series: d.id,
-                        startTime: startTime,
-                        stopTime: stopTime,
-                        value: value,
-                        value0: value0
-                    }]);
-
-                    focus_column
-                        .transition()
-                        .duration(50)
-                        .attr("d", 
-                            disp.focus.area([
-                                {timestamp: startTime, value: value, value0: value0},
-                                {timestamp: stopTime, value: value, value0: value0}
-                            ]))
-                        .style('display', 'block');
-                }
-
-                if(!old_data || old_data.series != d.id)
-                    legend.highlightSeries(d);
-            });
-
-        series.attr("class", function(d) {
-                return "series " + d.id
-            });
-
-        series.exit().remove();
-
-        series_paths.append("path")
-            .attr("class", "area");
-
-        // Define the parameters of the area
-        if (options.display_type.is('overlap') | options.display_type.is('lines')) {
-            disp.focus.area
-                .y0(disp.focus.height)
-                .y1(function (d) { return disp.focus.y(d.value); });
-        } else {
-            disp.focus.area
-                .y0(function (d) { return disp.focus.y(d.value0); })
-                .y1(function (d) { return disp.focus.y(d.value0 + d.value); });
-        }
-
-        // here we create the transition
-        var transition = disp.focus.svg.selectAll(".series")
-            .transition()
-            .duration(750)
-
-        // Transition to the new area
-        var fill_opacity = options.display_type.is("lines") ? 0.0 : 
-                        (options.display_type.is("overlap") ? 0.1 : 0.8);
-
-        disp.focus.svg.selectAll(".series")
-            .classed("lines", false);
-        transition.select("path.area")
-            .style("fill", function (d) { return disp.color(d.name); })
-            .style("fill-opacity", fill_opacity)
-            .style("stroke", function (d) { return d3.rgb(disp.color(d.name)).darker(); })
-    //        .style("stroke-opacity", 1.0)
-            .attr("d", function(d) { return disp.focus.area(d.values)});
-
-        disp.toggleLoading(false);
     },
     setContextTime: function(time_min, time_max) {
         // Establish the maximum and minimum time of the data series
@@ -560,7 +504,61 @@ Display.prototype = {
                 .style('stroke', series.stroke);
         });
     },
-    total_line: function() {    
+    seriesHover: function(d) {
+        var time = disp.getTimeHoveringOverAxis(this);
+
+        var focus_column = disp.focus.svg.select('path.column_hover');
+        var old_data = focus_column.data();
+
+//      var value_i = Math.floor(xy[0] / focus.width * d.values.length);
+        var value_i = timestamps_nested.indexOf(time.min + "");
+        var value = d.values[value_i].value;
+        var value0 = d.values[value_i].value0;
+
+        if(!old_data || old_data.series != d.id ||
+           util.compareDates(old_data.startTime, time.min) ||
+           util.compareDates(old_data.stopTime,  time.max) ) {
+
+            focus_column.data([{
+                series: d.id,
+                startTime: time.min,
+                stopTime: time.max,
+                value: value,
+                value0: value0
+            }]);
+
+            focus_column
+                .transition()
+                .duration(50)
+                .attr("d", 
+                    disp.focus.area([
+                        {timestamp: time.min, value: value, value0: value0},
+                        {timestamp: time.max, value: value, value0: value0}
+                    ]))
+                .style('display', 'block');
+        }
+
+        if(!old_data || old_data.series != d.id)
+            legend.highlightSeries(d);
+    },
+    getTimeHoveringOverAxis: function(svg_element) {
+        var time = {}
+        var xy = d3.mouse(svg_element);
+        time.hover = disp.focus.x.invert(xy[0]);
+        var coeff = 1000 * 60; // get a minute on other side
+        if(options.resolution.is('tenminute')) {
+            coeff *= 10;
+        } else if(options.resolution.is('hour')) {
+            coeff *= 60;
+        } else if(options.resolution.is('day')) {
+            coeff *= 60 * 24;
+        }
+        time.min = new Date(Math.floor(time.hover.getTime() / coeff) * coeff)
+        time.max = new Date(time.min.getTime() + coeff)
+        
+        return time;
+    },
+    showTotalLine: function() {    
         // Find or create context line
         var container = disp.focus.svg.select("g#y_context");
         if(!container[0][0]) {
