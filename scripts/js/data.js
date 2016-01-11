@@ -77,16 +77,15 @@ Data.prototype = {
 
         // Generate options, including collections
         options.collection.labels = data.collection_names;
-        options.collection.ids = data.collection_names.map(function(name) { return util.simplify(name); } );
+        options.collection.ids = data.collections.map(function(datum) { return datum['ID']; });
         options.collection.available = data.collection_names.map(function(d, i) { return i; });
         options.collection.set(util.simplify(data.collection_names[0]));
 
         options.init();
 
         // Add additional information for collections
-        data.collection_names.map(function(name, i) {
+        data.collections.map(function(collection, i) {
             var content = '<dl class="dl-horizontal collection_popover">';
-            var collection = data.collections[i];
             Object.keys(collection).map(function(key) {
                 content += "<dt>" + key + "</dt>";
 
@@ -102,7 +101,7 @@ Data.prototype = {
             });
             content += "</dl>";
 
-            d3.select('#collection_' + util.simplify(name))
+            d3.select('#collection_' + collection['ID'])
                 .attr({
                     'class': 'collection_option',
                     'data-toggle': "popover",
@@ -120,10 +119,10 @@ Data.prototype = {
         data.setCollection();
     },
     setCollection: function() {
-        var collection_name = options.collection.getLabel();
+        var collection_id = options.collection.get();
         
         data.collection = data.collections.reduce(function(collection, candidate) {
-            if(collection.Name == collection_name)
+            if(collection.ID == collection_id)
                 return collection;
             return candidate
         }, {});
