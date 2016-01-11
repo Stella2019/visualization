@@ -25,7 +25,7 @@ function Options() {
     
     var options = {};
     options.topmenu = ['collection', 'time_limit', 'add_term', '<br>',
-                    'series', 'subset', 'resolution', '<br>',
+                    'series', 'subset', 'found_in', 'resolution', '<br>',
                     'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'context_line']; 
     
 //    if (window.location.href.indexOf('index_dev.html') > -1) {
@@ -37,7 +37,7 @@ function Options() {
                       'display_type', 'y_scale', 'shape', 'series',
                       'time_save', 'time_min', 'time_max',
                       'y_max_toggle', 'y_max', 'color_scale',
-                      'context_line'];//,
+                      'context_line', 'found_in'];//,
 //                      'terms_selected'];
     
     options.collection = new Option({
@@ -68,9 +68,9 @@ function Options() {
         });
     options.subset = new Option({
             title: "Subset",
-            labels: ["All", "Distinct", "Original", "Retweet", "Reply"],//, "Quote"],
-            ids:    ["all", "distinct", "original", "retweet", "reply"],//, "quote"],
-            available: [0, 1, 2, 3, 4],
+            labels: ["All", "Distinct", "Original", "Retweet", "Reply", "Quote"],
+            ids:    ["all", "distinct", "original", "retweet", "reply", "quote"],
+            available: [0, 1, 2, 3, 4, 5],
             default: 0,
             callback: function() { changeData(); }
         });
@@ -201,6 +201,14 @@ function Options() {
             default: 1,
             type: "toggle",
             callback: function() { display(); }
+        });
+    options.found_in = new Option({
+            title: "Terms Found In",
+            labels: ["Any", "Text", "Quote", "URL"],
+            ids:    ["Any", "Text", "Quote", "URL"],
+            available: [0, 1, 2, 3],
+            default: 1,
+            callback: function() { changeData(); }
         });
     
     // push holder variables and option sets into the list

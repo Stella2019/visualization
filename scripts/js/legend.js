@@ -12,8 +12,7 @@ function Legend() {
         {term: "<svg height=10 width=10><line x1=0 y1=10 x2=10 y2=0 class='context_line' /></svg>",
             label: "Tweet Volume", id: 'context_line', has: false}
     ];
-    
-    
+     
     // Function
     self.startToggle = function(series) {
         self.mouseOverToggle = true;
@@ -49,15 +48,6 @@ function Legend() {
             .classed('focused', true);
     };
     self.hoverLegendEntry = function(series) {
-        var others_shown = self.data.reduce(function(others_shown, inner_series) {
-            if(inner_series.id != series.id)
-                others_shown |= inner_series.shown; 
-            return others_shown;
-        }, false);
-        
-        d3.selectAll('.' + series.id + ' .legend_only')
-            .text(others_shown ? 'only' : 'show all');
-        
         self.highlightSeries(series);
     };
     self.hoverLegendEntryEnd = function(series) {
@@ -68,7 +58,7 @@ function Legend() {
             .classed('focused', false)
             .classed('unfocused', false);
     };
-    self.toggleSeries = function(series) { //chooseKeyword
+    self.toggleSeries = function(series) {
         series.shown = !series.shown;
         d3.select('.' + series.id + ' .legend_icon')
             .classed('off', !series.shown);
@@ -79,30 +69,34 @@ function Legend() {
             prepareData();
         }
     };
-    self.toggleSingle = function(series) { //chooseKeyword
+    self.toggleSingle = function(series) {
         // Figure out if this is the only series being shown
-        var turnAllOff = self.data.reduce(function(others_shown, inner_series) {
-            if(inner_series.id != series.id)
-                others_shown |= inner_series.shown; 
-            return others_shown;
-        }, false);
         
         self.data.map(function(inner_series) {
-            inner_series.shown = !turnAllOff; 
+            inner_series.shown = false;//!turnAllOff; 
         }, this);
         
         series.shown = true;
         
         d3.selectAll('.legend_icon')
-            .classed('off', turnAllOff);
+            .classed('off', true);//turnAllOff);
         d3.select('.' + series.id + ' .legend_icon')
             .classed('off', false);
-        d3.select('.' + series.id + ' .legend_only')
-            .text(turnAllOff ? 'show all' : 'only');
 
         prepareData();
     };
-    self.hoverOverSeries = function(series) { //chooseKeyword
+    self.showAll = function() {
+        
+        self.data.map(function(inner_series) {
+            inner_series.shown = true;
+        }, this);
+        
+        d3.selectAll('.legend_icon')
+            .classed('off', false);
+
+        prepareData();
+    };
+    self.hoverOverSeries = function(series) {
         window.getSelection().removeAllRanges()
         if(self.mouseOverToggle && series.shown != self.mouseOverToggleState) {
             self.toggleSeries(series);
@@ -114,25 +108,20 @@ Legend.prototype = {
     init: function() {
         this.container = d3.select('#legend');
         
-        this.container.append('div')
-            .attr('class', 'legend_title text-center')
-            .style({'font-weight': 'bold', margin: '5px'})
-            .text('Terms');
+        var legend_header = this.container.append('div')
+            .attr('class', 'legend_header');
+        
+        legend_header.append('span')
+            .attr('class', 'legend_title')
+            .text('Terms')
+
+        legend_header.append('div')
+            .attr('class', 'legend_showall')
+            .text('show all')
+            .on('click', this.showAll);
         
         this.container_series = this.container.append('div')
             .attr('class', 'legend_series_list');
-        
-//        var legend_key = this.container.append('div')
-//            .attr('id', 'legend_key')
-//            .append('dl').selectAll()
-//            .data([
-//                {term: "&nbsp;", label: "Final Capture Term"},
-//                {term: "&#x271d;", label: "Old Capture Term"},
-//                {term: "*", label: "New Term"}
-//            ]);
-//        
-//        legend_key.enter().insert("dt").html(function(d) { return d.term });
-//        legend_key.enter().insert("dd").html(function(d) { return d.label });
         
         this.key = this.container.append('div')
             .attr('id', 'legend_key');
@@ -162,7 +151,7 @@ Legend.prototype = {
         }, this);
         
         this.container.select('.legend_title')
-            .html(options.series.getLabel());
+            .text(options.series.getLabel());
         
         // Hide table entries
 //        d3.select('#legend_key')
@@ -212,7 +201,6 @@ Legend.prototype = {
         new_entries.append('div')
             .attr('class', 'legend_only')
             .text('only')
-//            .style('display', 'none')
             .on('click', this.toggleSingle);
 
         // Remove entries

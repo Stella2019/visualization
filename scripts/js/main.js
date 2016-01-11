@@ -139,15 +139,13 @@ function initialize() {
 }
 
 function loadDataFile(collection, subset, callback) {
-//    var filename = "capture_stats/" + collection + '_' + subset + ".json";
-    var url = "scripts/php/getEventTweetCounts.php";
+    var url = "scripts/php/getTweetCounts.php";
     url += "?event_id=" + collection.ID;
     
     if(!options.time_limit.is('all')) {
         var time_limit = options.time_limit.get()
         var sign = time_limit.slice(0, 1) == '-' ? -1 : 1;
         
-        console.log(time_limit.slice(0, 1), sign);
         time_limit = time_limit.slice(-2);
         var hours_diff = 0;
         
@@ -187,7 +185,11 @@ function loadDataFile(collection, subset, callback) {
         if(timestamps.length == 0)
             timestamps = [formatDate(new Date())];
         keywords = Array.from(new Set(data_file.map(function(d) {return d.Keyword})));
-        keywords.pop(); // remove _total_, hopefully
+        keywords = keywords.reduce(function(arr, word) {
+            if(word != '_total_')
+                arr.push(word);
+            return arr;
+        }, [])
         
         // Fill in missing timestamps
         var first_timestamp = timestamps[0];
@@ -206,42 +208,50 @@ function loadDataFile(collection, subset, callback) {
         
         var data_raw0 = {};
         // Create matrix to hold values
-        options.subset.ids.map(function(subset) {
-            data_raw0[subset] = {};
-            data_raw[subset] = {};
-            timestamps.map(function (timestamp) {
-                var entry = {
-                    timestamp: new Date(timestamp),
-                    "_total_": 0
-                };
-                keywords.map(function(keyword) {
-                    entry[keyword] = 0;
+        options.found_in.ids.map(function(found_in) {
+            data_raw0[found_in] = {}
+            options.subset.ids.map(function(subset) {
+                data_raw0[found_in][subset] = {};
+                timestamps.map(function (timestamp) {
+                    var entry = {
+                        timestamp: new Date(timestamp),
+                        "_total_": 0
+                    };
+                    keywords.map(function(keyword) {
+                        entry[keyword] = 0;
+                    });
+
+                    data_raw0[found_in][subset][timestamp] = entry;
                 });
-                
-                data_raw0[subset][timestamp] = entry;
             });
         });
         
         // Input values from the loaded file
         for(row in data_file) {
             var timestamp = data_file[row]['Time'];
+            var found_in = data_file[row]['Found_In'];
             var keyword = data_file[row]['Keyword'];
             
             if(typeof data_file[row] !== 'object')
                 continue;
             
-            data_raw0['all'][timestamp][keyword] = parseInt(data_file[row]['Count']);
-            data_raw0['distinct'][timestamp][keyword] = parseInt(data_file[row]['Distinct']);
-            data_raw0['original'][timestamp][keyword] = parseInt(data_file[row]['Original']);
-            data_raw0['retweet'][timestamp][keyword] = parseInt(data_file[row]['Retweet']);
-            data_raw0['reply'][timestamp][keyword] = parseInt(data_file[row]['Reply']);
+            data_raw0[found_in]['all'][timestamp][keyword] = parseInt(data_file[row]['Count']);
+            data_raw0[found_in]['distinct'][timestamp][keyword] = parseInt(data_file[row]['Distinct']);
+            data_raw0[found_in]['original'][timestamp][keyword] = parseInt(data_file[row]['Original']);
+            data_raw0[found_in]['retweet'][timestamp][keyword] = parseInt(data_file[row]['Retweet']);
+            data_raw0[found_in]['reply'][timestamp][keyword] = parseInt(data_file[row]['Reply']);
+            data_raw0[found_in]['quote'][timestamp][keyword] = parseInt(data_file[row]['Quote']);
         }
         
-        options.subset.ids.map(function(subset) {
-            data_raw[subset] = [];
-            for(row in data_raw0[subset]) {
-                data_raw[subset].push(data_raw0[subset][row]);
-            }
+        options.found_in.ids.map(function(found_in) {
+            data_raw[found_in] = {}
+            
+            options.subset.ids.map(function(subset) {
+                data_raw[found_in][subset] = [];
+                for(row in data_raw0[found_in][subset]) {
+                    data_raw[found_in][subset].push(data_raw0[found_in][subset][row]);
+                }
+            });
         });
 //            
 //            for (var i = 0; i < timestamps.length; i++) {
@@ -292,8 +302,8 @@ function loadCollectionData() {
 //        });
         
         // Set Time Domain and Axis
-        var x_min = data_raw[subset_to_start][0].timestamp;
-        var x_max = data_raw[subset_to_start][data_raw[subset_to_start].length - 1].timestamp;
+        var x_min = data_raw['Any'][subset_to_start][0].timestamp;
+        var x_max = data_raw['Any'][subset_to_start][data_raw['Any'][subset_to_start].length - 1].timestamp;
         focus.x.domain([x_min, x_max]).clamp(true);
         context.x.domain([x_min, x_max]);
 
@@ -311,6 +321,7 @@ function loadCollectionData() {
 }
 
 function loadNewSeriesData(subset) {
+    var found_in = options.found_in.get();
     series_data = series_names.map(function(name, i) {
         return {
             name: name,
@@ -331,32 +342,24 @@ function loadNewSeriesData(subset) {
                 return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
             }, false);
             
-            datum.sum = data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+            datum.sum = data_raw[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                 return cur_sum + datapoint[datum.name];
             }, 0);
         });
     } else if(options.series.is('types')) {
         series_data.map(function(datum) {
-            if(datum.name == 'quote')
-                datum.sum = data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
-                    return cur_sum + datapoint['_total_'];
-                }, 0);
-            else
-                datum.sum = data_raw[datum.name].reduce(function(cur_sum, datapoint) { // Can change subset
-                    return cur_sum + datapoint['_total_'];
-                }, 0);
+            datum.sum = data_raw[found_in][datum.name].reduce(function(cur_sum, datapoint) { // Can change subset
+                return cur_sum + datapoint['_total_'];
+            }, 0);
         });
-        
-        // Subtract the first three sums from the all sum to make the quote sum, presuming repeat is in the fourth place
-        series_data[3].sum -= series_data[0].sum + series_data[1].sum + series_data[2].sum;
     } else if(options.series.is('distinct')) {
         series_data.map(function(datum) {
             if(datum.name == 'distinct')
-                datum.sum = data_raw['distinct'].reduce(function(cur_sum, datapoint) { // Can change subset
+                datum.sum = data_raw[found_in]['distinct'].reduce(function(cur_sum, datapoint) { // Can change subset
                     return cur_sum + datapoint['_total_'];
                 }, 0);
             else
-                datum.sum = data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                datum.sum = data_raw[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                     return cur_sum + datapoint['_total_'];
                 }, 0);
         });
@@ -365,7 +368,7 @@ function loadNewSeriesData(subset) {
         series_data[1].sum -= series_data[0].sum;
     } else { // implicit none
         series_data.map(function(datum) {
-            datum.sum = data_raw['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+            datum.sum = data_raw[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
                 return cur_sum + datapoint['_total_'];
             }, 0);
         });
@@ -401,11 +404,13 @@ function changeData() {
 }
 
 function prepareData() {
+    var found_in = options.found_in.get();
+    
     // If we haven't loaded the data yet, tell the user and ask them to wait
-    if(data_raw[options.subset.get()] == undefined) {
+    if(data_raw[found_in][options.subset.get()] == undefined) {
         // Wait a second, then if it still isn't ready, message user that they are waiting
         window.setTimeout(function() {
-            if(data_raw[options.subset.get()] == undefined) {
+            if(data_raw[found_in][options.subset.get()] == undefined) {
                 if (confirm(
                     getCurrentCollection().name + ": " + 
                     options.subset.get() + " _total_" +
@@ -428,31 +433,30 @@ function prepareData() {
     var data_nested_entries;
     if(options.series.is('types')) {
         data_nested_entries = []; // think about it
-        for(var i = 0; i < data_raw['all'].length; i++) {
+        for(var i = 0; i < data_raw[found_in]['all'].length; i++) {
             entry = {
-                timestamp: data_raw['all'][i]['timestamp'],
-                _total_: data_raw['all'][i]['_total_'],
-                original: data_raw['original'][i]['_total_'],
-                retweet: data_raw['retweet'][i]['_total_'],
-                reply: data_raw['reply'][i]['_total_']
+                timestamp: data_raw[found_in]['all'][i]['timestamp'],
+                _total_: data_raw[found_in]['all'][i]['_total_'],
+                original: data_raw[found_in]['original'][i]['_total_'],
+                retweet: data_raw[found_in]['retweet'][i]['_total_'],
+                reply: data_raw[found_in]['reply'][i]['_total_'],
+                quote: data_raw[found_in]['quote'][i]['_total_']
             }
-            entry.quote = entry['_total_'] - entry['original'] 
-                        - entry['retweet'] - entry['reply'];
             data_nested_entries.push(entry);
         }
     } else if(options.series.is('distinct')) {
         data_nested_entries = []; // think about it
-        for(var i = 0; i < data_raw['all'].length; i++) {
+        for(var i = 0; i < data_raw[found_in]['all'].length; i++) {
             entry = {
-                timestamp: data_raw['all'][i]['timestamp'],
-                _total_: data_raw['all'][i]['_total_'],
-                distinct: data_raw['distinct'][i]['_total_'],
-                repeat: data_raw['all'][i]['_total_'] - data_raw['distinct'][i]['_total_'],
+                timestamp: data_raw[found_in]['all'][i]['timestamp'],
+                _total_: data_raw[found_in]['all'][i]['_total_'],
+                distinct: data_raw[found_in]['distinct'][i]['_total_'],
+                repeat: data_raw[found_in]['all'][i]['_total_'] - data_raw[found_in]['distinct'][i]['_total_'],
             }
             data_nested_entries.push(entry);
         }
     } else {
-        data_nested_entries = data_raw[options.subset.get()];
+        data_nested_entries = data_raw[found_in][options.subset.get()];
     }
                 
     var data_nested = d3.nest()
@@ -582,7 +586,12 @@ function prepareData() {
 }
 
 function display() {
+    // Set the Y Scale
     setYScale();
+    
+    // Turn off the column hover if it is on
+    focus.svg.select('path.column_hover')
+                .style('display', 'none');
     
     if (options.display_type.is("wiggle")) {
         stack.offset("wiggle");
@@ -1035,11 +1044,11 @@ function buildInterface() {
     });
 }
 
-function genEventTweetCount() {
+function genTweetCount() {
     var event_id = getCurrentCollection().ID;
     var search_term = options.add_term.get().toLowerCase();
     // Generate PHP query
-    var url = "scripts/php/genEventTweetCounts.php";
+    var url = "scripts/php/genTweetCounts.php";
     url += "?event_id=" + event_id;
     url += '&time_min="' + formatDate(options.time_min.min) + '"';
     url += '&time_max="' + formatDate(options.time_max.max) + '"';

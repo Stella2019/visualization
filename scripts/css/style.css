@@ -33,12 +33,6 @@
     stroke-opacity: 1.0;
     stroke-width: 3px;
 }
-/*
-.column_hover {o
-    cursor: zoom-in;
-    z-index: 10;
-}
-*/
 
 /* Options */
 .brush .extent {
@@ -104,6 +98,7 @@ button:focus {
     margin: 5px;
     min-width: 200px;
     min-height: 50px;
+    display: table;
 }
 .legend_entry {
     display: table-row;
@@ -112,10 +107,9 @@ button:focus {
     display: table-cell;
     vertical-align: middle;
     position: relative;
+    width: 25px;
 }
 .legend_icon .glyphicon {
-/*    float: left;*/
-/*    right: -50%;*/
     line-height: 1.9;
     opacity: 0;
     pointer-events: none;
@@ -123,12 +117,6 @@ button:focus {
     width: 100%;
     text-align: center;
 }
-/*
-.legend_icon:hover .glyphicon {
-    opacity: 1;
-    cursor: pointer;
-}
-*/
 .legend_series_list:hover .glyphicon {
     opacity: 1;
     cursor: pointer;
@@ -161,10 +149,35 @@ button:focus {
     padding: 5px;
 }
 
+.legend_header {
+    position: relative;
+}
+.legend_title {
+    font-weight: bold;
+    display: block;
+    text-align: center;
+    margin: 5px;
+}
+.legend_showall {
+    position: absolute;
+    right: 0;
+    top: 0;
+    text-align: right;
+    vertical-align: middle;
+    cursor: pointer;
+    opacity: 0;
+}
+.legend_header:hover .legend_showall {
+    opacity: 0.5;
+}
+.legend_showall:hover {
+    opacity: 0.9 !important;
+    cursor: pointer;
+}
+
 .legend_only {
     display: table-cell;
     opacity: 0;
-    width: 60px;
     text-align: right;
     vertical-align: middle;
 }

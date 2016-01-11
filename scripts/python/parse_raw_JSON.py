@@ -333,10 +333,11 @@ def getKeywords(collection):
     collection["keywords_parts"] = []
     
     for keyword in all_keywords:
-        keyword = keyword.strip()
+        keyword = keyword.replace('#', '').strip()
         collection["keywords"].append(keyword)
         
-        keywords_parts = unicodedata.normalize('NFD', keyword.lower().replace('#', '')).split(' ')
+#        keywords_parts = unicodedata.normalize('NFD', keyword.lower().replace('#', '')).split(' ')
+        keywords_parts = keyword.lower().replace('#', '').split(' ')
         collection["keywords_parts"].append(keywords_parts)
     
     return collection
