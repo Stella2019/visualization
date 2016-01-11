@@ -315,7 +315,7 @@ def getKeywords(collection):
         duplicate = False
         for existing_word in all_keywords:
             duplicate |= new_word.lower() == existing_word.strip().lower()
-        if(not duplicate):
+        if(not duplicate and new_word):
             old_keywords.append(new_word)
             all_keywords.append(new_word)
     
