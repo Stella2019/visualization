@@ -179,82 +179,6 @@ Display.prototype = {
         
         data.loadCollections();
     },
-    loadCollections: function () {
-        disp.toggleLoading(true);
-
-        // Collection selection
-        d3.json("scripts/php/getCollections.php", data.parseCollectionsFile);
-    },
-    parseCollectionsFile: function(error, collections_file) {
-        if (error) throw error;
-
-        // Add collections
-        collections_file.sort(util.compareCollections);
-        collections_file.reverse();
-        data.collections = collections_file;
-
-        // Get new data
-        data.collection_names = data.collections.map(function(collection) {
-            return collection.Name;
-        });
-        data.collections.map(function(collection) {
-            collection.Keywords = collection.Keywords.trim().split(/,[ ]*/);
-            collection.OldKeywords = collection.OldKeywords.trim().split(/,[ ]*/);
-            if(collection.OldKeywords.length == 1 && collection.OldKeywords[0] == "")
-                collection.OldKeywords = [];
-            collection.StartTime = new Date(collection.StartTime);
-            collection.StartTime.setMinutes(collection.StartTime.getMinutes()
-                                           -collection.StartTime.getTimezoneOffset());
-            if(collection.StopTime)
-                collection.StopTime = new Date(collection.StopTime);
-            else
-                collection.StopTime = "Ongoing";
-        });
-
-        // Generate options, including collections
-        options.collection.labels = data.collection_names;
-        options.collection.ids = data.collection_names.map(function(name) { return util.simplify(name); } );
-        options.collection.available = data.collection_names.map(function(d, i) { return i; });
-        options.collection.set(util.simplify(data.collection_names[0]));
-
-        options.init();
-
-        // Add additional information for collections
-        data.collection_names.map(function(name, i) {
-            var content = '<dl class="dl-horizontal collection_popover">';
-            var collection = data.collections[i];
-            Object.keys(collection).map(function(key) {
-                content += "<dt>" + key + "</dt>";
-
-                if(collection[key] instanceof Date) {
-                    var date = new Date(collection[key]);
-                    content += "<dd>" + util.formatDate(date) + "</dd>";
-                } else if(collection[key] instanceof Array) {
-                    var arr = collection[key].join(", ");
-                    content += "<dd>" + arr + "</dd>";
-                } else {
-                    content += "<dd>" + collection[key] + "</dd>";
-                }
-            });
-            content += "</dl>";
-
-            d3.select('#collection_' + util.simplify(name))
-                .attr({
-                    'class': 'collection_option',
-                    'data-toggle': "popover",
-                    'data-trigger': "hover",
-                    'data-placement': "right",
-                    'data-content': content}
-                 );
-        });
-        $('.collection_option').popover({html: true});
-
-        // Initialize Legend
-        legend = new Legend();
-        legend.init();
-
-        data.loadCollectionData();
-    },
     display: function() {
         // Set the Y Scale
         disp.setYScale();
@@ -280,7 +204,7 @@ Display.prototype = {
                 new_series.values = new_series.values.map(function(datum, i) {
                     var new_datum = datum;
                     new_datum.timestamp = new Date(new_datum.timestamp);
-                    new_datum.value *= 100 / data.total_byTime[i];
+                    new_datum.value *= 100 / data.total_of_series[i];
                     return new_datum;
                 });
                 return new_series;            
@@ -335,7 +259,7 @@ Display.prototype = {
                 return d.value0 + d.value;
             }));
         var biggest_totalpoint = 
-            d3.max(data.context_byTime.map(function (d) {
+            d3.max(data.total_tweets.map(function (d) {
                 return d.value;
             }));
 
@@ -345,13 +269,13 @@ Display.prototype = {
             if (options.display_type.is('overlap') | options.display_type.is('lines')) {
                 y_max = biggest_datapoint;
 
-                if(options.context_line.is("true"))
+                if(options.total_line.is("true"))
                     y_max = Math.max(y_max, biggest_totalpoint);
             } else if (options.display_type.is('percent')) {
                 y_max = 100;
             } else {
                 y_max = highest_datapoint;
-                if(options.context_line.is("true"))
+                if(options.total_line.is("true"))
                     y_max = Math.max(y_max, biggest_totalpoint);
             }
             options.y_max.update(y_max);
@@ -382,7 +306,7 @@ Display.prototype = {
         ax.attr("class", "context_y axis")
             .call(disp.context.yAxis);
 
-        disp.display_context_line();
+        disp.total_line();
 
         // Bind new series to the graph
 
@@ -636,18 +560,18 @@ Display.prototype = {
                 .style('stroke', series.stroke);
         });
     },
-    display_context_line: function() {    
+    total_line: function() {    
         // Find or create context line
         var container = disp.focus.svg.select("g#y_context");
         if(!container[0][0]) {
             container = disp.focus.svg.append('g')
                 .attr('id', 'y_context');
             container.append('path')
-                .attr('class', 'area_context context_line')
+                .attr('class', 'area_context total_line')
         }
 
         // Update Data
-        container.data([data.context_byTime]);
+        container.data([data.total_tweets]);
 
         var transition = container
             .transition()
@@ -655,7 +579,7 @@ Display.prototype = {
 
         var multiplier = 1;
         if(options.display_type.is('percent')) {
-            var biggest_totalpoint = data.context_byTime.reduce(function (cur_max, d) {
+            var biggest_totalpoint = data.total_tweets.reduce(function (cur_max, d) {
                 return Math.max(cur_max, d.value);
             }, 0);
             multiplier = 100 / biggest_totalpoint;
@@ -666,15 +590,15 @@ Display.prototype = {
             .y0(disp.focus.height)
             .y1(function (d) { return disp.focus.y_context(d.value * multiplier); });
 
-        if(options.context_line.is("false"))
+        if(options.total_line.is("false"))
             disp.focus.area_context.y1(disp.focus.height);
 
         transition.select("path.area_context")
             .attr("d", function(d) { return disp.focus.area_context(d)});
 
         // Set visibility
-        legend.key.select('.legend_key_context_line')
-            .classed('hidden', options.context_line.is("false"));
-    //    container.style('display', options.context_line.is("true") ? 'block' : 'none');
+        legend.key.select('.legend_key_total_line')
+            .classed('hidden', options.total_line.is("false"));
+    //    container.style('display', options.total_line.is("true") ? 'block' : 'none');
     }
 }

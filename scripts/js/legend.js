@@ -2,7 +2,6 @@ function Legend() {
     var self = this;
     self.container = [];
     self.container_series = [];
-    self.data = [];
     self.mouseOverToggle = false;
     self.mouseOverToggleState = true;
     self.key_data = [
@@ -65,7 +64,7 @@ function Legend() {
     self.toggleSingle = function(series) {
         // Figure out if this is the only series being shown
         
-        self.data.map(function(inner_series) {
+        data.series.map(function(inner_series) {
             inner_series.shown = false;//!turnAllOff; 
         }, this);
         
@@ -75,12 +74,13 @@ function Legend() {
             .classed('off', true);//turnAllOff);
         d3.select('.' + series.id + ' .legend_icon')
             .classed('off', false);
+        console.log(data);
 
         data.prepareData();
     };
     self.showAll = function() {
         
-        self.data.map(function(inner_series) {
+        data.series.map(function(inner_series) {
             inner_series.shown = true;
         }, this);
         

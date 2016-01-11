@@ -26,7 +26,7 @@ function Options() {
     var options = {};
     options.topmenu = ['collection', 'time_limit', 'add_term', '<br>',
                     'series', 'subset', 'found_in', 'resolution', '<br>',
-                    'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'context_line']; 
+                    'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line']; 
     
 //    if (window.location.href.indexOf('index_dev.html') > -1) {
 //        options.dropdowns.push('series');
@@ -37,7 +37,7 @@ function Options() {
                       'display_type', 'y_scale', 'shape', 'series',
                       'time_save', 'time_min', 'time_max',
                       'y_max_toggle', 'y_max', 'color_scale',
-                      'context_line', 'found_in'];//,
+                      'total_line', 'found_in'];//,
 //                      'terms_selected'];
     
     options.collection = new Option({
@@ -163,7 +163,7 @@ function Options() {
             default: 0,
             custom_entries_allowed: true,   
             type: "textfieldconfirm",
-            callback: function() { data.genEventTweetCount(); }
+            callback: function() { data.genTweetCount(); }
         });
     options.color_scale = new Option({
             title: "Color Scale",
@@ -182,7 +182,7 @@ function Options() {
             custom_entries_allowed: true, 
             callback: function() { data.prepareData(); }
         });
-    options.context_line = new Option({
+    options.total_line = new Option({
             title: "Show total",
             styles: ["btn btn-default", "btn btn-primary"],
             labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Total Line", "<span class='glyphicon glyphicon-ok-circle'></span> Show Total Line"],
@@ -207,7 +207,6 @@ function Options() {
         this[item] = options[item];
     }, this);
 };
-
 Options.prototype = {
     init: function() {
         var options = this;
@@ -225,7 +224,7 @@ Options.prototype = {
         //
         options.y_max_toggle.styleFunc();
         options.time_save.styleFunc();
-        options.context_line.styleFunc();
+        options.total_line.styleFunc();
         $(function () {
             $('[data-toggle="popover"]').popover()
         })

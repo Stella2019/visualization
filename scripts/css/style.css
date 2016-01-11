@@ -27,7 +27,7 @@
 .series .area {
     stroke-opacity: 1.0;
 }
-.context_line {
+.total_line {
     fill: none;
     stroke: black;
     stroke-opacity: 1.0;

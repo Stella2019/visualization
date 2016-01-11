@@ -20,31 +20,27 @@ function Data() {
     // Data
     self.stacked = {}; // formerly data_stacked
     self.series = {}; // formerly series_data
+    self.series_byID = {};
     self.all = {}; // formerly data_raw
-    self.total_byTime = [];
-    self.context_byTime = [];
+    self.total_of_series = []; // formerly total_byTime
+    self.total_tweets = []; // formerly context_byTime
     
     // Series
     self.keywords = {};
     self.series_names = [];
-    self.stack = {};
-    
-    self.init();
+    self.stack =  d3.layout.stack()
+        .values(function (d) { return d.values; })
+        .x(function (d) { return d.timestamp; })
+        .y(function (d) { return d.value; })
+        .out(function (d, y0, y) { 
+            d.y0 = y0;
+            d.y = y;
+            d.value0 = y0;
+        })
+        .order("reverse");
 }
 
 Data.prototype = {
-    init: function() {
-        this.stack = d3.layout.stack()
-            .values(function (d) { return d.values; })
-            .x(function (d) { return d.timestamp; })
-            .y(function (d) { return d.value; })
-            .out(function (d, y0, y) { 
-                d.y0 = y0;
-                d.y = y;
-                d.value0 = y0;
-            })
-            .order("reverse");
-    },
     loadCollections: function () {
         disp.toggleLoading(true);
 
@@ -148,6 +144,8 @@ Data.prototype = {
         data.time.collection_min = new Date(data.collection.StartTime);
         if(data.collection.StopTime == "Ongoing") {
             data.time.collection_max = new Date();
+        } else {
+            data.time.collection_max = new Date(data.collection.StopTime);
         }
         
         // Get times to load
@@ -184,7 +182,7 @@ Data.prototype = {
                 data.time.max = new Date(data.time.collection_min);
                 data.time.max.setHours(data.time.max.getHours() + hours_diff * sign);
             }
-        } 
+        }
 
         // Load the collection's primary file
         data.loadDataFile();
@@ -194,6 +192,8 @@ Data.prototype = {
         url += "?event_id=" + data.collection.ID;
         url += '&time_min="' + util.formatDate(data.time.min) + '"';
         url += '&time_max="' + util.formatDate(data.time.max) + '"';
+        
+        console.info(url);
         
         d3.csv(url, this.parseCSVData);
     },
@@ -313,6 +313,8 @@ Data.prototype = {
     },
     loadNewSeriesData: function(subset) {
         var found_in = options.found_in.get();
+        
+        // Start the series data store
         data.series = data.series_names.map(function(name, i) {
             return {
                 name: name,
@@ -321,7 +323,14 @@ Data.prototype = {
                 shown: true
             };
         });
+        
+        // Copy it to the search_by_id
+        data.series_byID = {};
+        data.series_names.map(function(name, i) {
+            data.series_byID[name] = data.series[i];
+        });
 
+        // Fill in specifics of the series
         if(options.series.is('terms')) {
             data.series.map(function(datum) {
                 datum.isKeyword = data.collection.Keywords.reduce(function(prev, keyword) {
@@ -367,28 +376,28 @@ Data.prototype = {
         var found_in = options.found_in.get();
 
         // If we haven't loaded the data yet, tell the user and ask them to wait
-        if(data.all[found_in][options.subset.get()] == undefined) {
+        if(!('Any' in data.all) || data.all[found_in][options.subset.get()] == undefined) {
             // Wait a second, then if it still isn't ready, message user that they are waiting
-            window.setTimeout(function() {
-                if(data.all[found_in][options.subset.get()] == undefined) {
-                    if (confirm(
-                        getCurrentCollection().name + ": " + 
-                        options.subset.get() + " _total_" +
-                        " not loaded yet. \n\n" +
-                        "Press OK to try again.")
-                       ) {
-                        window.setTimeout(prepareData, 1000);
-                    } else {
-                        // Should mark that the visualization is out of date or something
-                    }
-                    return;
-                } else {
-                    data.prepareData();
-                }
-            }, 1000);
+//            window.setTimeout(function() {
+//                if(!('Any' in data.all) || data.all[found_in][options.subset.get()] == undefined) {
+//                    if (confirm(
+//                        data.collection.name + ": " + 
+//                        options.subset.get() + " _total_" +
+//                        " not loaded yet. \n\n" +
+//                        "Press OK to try again.")
+//                       ) {
+//                        window.setTimeout(data.prepareData, 1000);
+//                    } else {
+//                        // Should mark that the visualization is out of date or something
+//                    }
+//                    return;
+//                } else {
+//                    data.prepareData();
+//                }
+//            }, 1000);
             return;
         }
-
+        
         // Aggregate on time depending on the resolution
         var data_nested_entries;
         if(options.series.is('types')) {
@@ -473,12 +482,12 @@ Data.prototype = {
             data_ready.push(dup);
         }
 
-        data.total_byTime = data_ready.map(function(datum) {
+        data.total_of_series = data_ready.map(function(datum) {
             return Math.max(data.series_names.reduce(function(running_sum, word) {
                 return running_sum += datum[word];
             }, 0), 1);
         });
-        data.context_byTime = data_ready.map(function(datum) {
+        data.total_tweets = data_ready.map(function(datum) {
             return {timestamp: datum.timestamp, value: datum['_total_']};
         });
 
@@ -546,7 +555,7 @@ Data.prototype = {
         disp.display();
     },
     genTweetCount: function() {
-        var event_id = data.getCurrentCollection().ID;
+        var event_id = data.collection.ID;
         var search_term = options.add_term.get().toLowerCase();
         // Generate PHP query
         var url = "scripts/php/genTweetCounts.php";
@@ -614,7 +623,7 @@ Data.prototype = {
     },
     getTweets: function(series, startTime, stopTime) {
         var url = "scripts/php/getTweets.php";
-        url += "?event_id=" + data.getCurrentCollection().ID;
+        url += "?event_id=" + data.collection.ID;
         var title = "";
 
         if(options.subset.is("distinct")) {
