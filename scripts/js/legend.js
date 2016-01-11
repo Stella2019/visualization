@@ -1,5 +1,5 @@
 function Legend() {
-    self = this;
+    var self = this;
     self.container = [];
     self.container_series = [];
     self.data = [];
@@ -23,14 +23,7 @@ function Legend() {
     self.endToggle = function(series) {
         if(self.mouseOverToggle) {
             self.mouseOverToggle = false;
-            
-//            var arr_selected = self.data.map(function(series) {
-//                return series.id + ':' + (series.shown ? 1 : 0);
-//            });
-//            options.terms_selected.set(arr_selected.join(","));
-            
-//            options.recordState(options, 'terms_selected');
-            prepareData(); 
+            data.prepareData(); 
         }
     };
     self.highlightSeries = function(series) {
@@ -66,7 +59,7 @@ function Legend() {
         if(!self.mouseOverToggle) {
 //            self.mouseOverToggle = true; // weird hack
 //            self.endToggle();
-            prepareData();
+            data.prepareData();
         }
     };
     self.toggleSingle = function(series) {
@@ -83,7 +76,7 @@ function Legend() {
         d3.select('.' + series.id + ' .legend_icon')
             .classed('off', false);
 
-        prepareData();
+        data.prepareData();
     };
     self.showAll = function() {
         
@@ -94,7 +87,7 @@ function Legend() {
         d3.selectAll('.legend_icon')
             .classed('off', false);
 
-        prepareData();
+        data.prepareData();
     };
     self.hoverOverSeries = function(series) {
         window.getSelection().removeAllRanges()
@@ -106,7 +99,8 @@ function Legend() {
 
 Legend.prototype = {
     init: function() {
-        this.container = d3.select('#legend');
+        this.container = d3.select('#legend')
+            .on('mouseout', this.endToggle);
         
         var legend_header = this.container.append('div')
             .attr('class', 'legend_header');

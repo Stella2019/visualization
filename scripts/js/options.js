@@ -48,7 +48,7 @@ function Options() {
             default: 0,
             callback: function() {
                 options.terms_selected.set("");
-                loadCollectionData(); }
+                data.loadCollectionData(); }
         });
     options.display_type = new Option({
             title: "Plot Type",
@@ -56,7 +56,7 @@ function Options() {
             ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
             available: [0, 1, 2, 3, 4, 5],
             default: 0,
-            callback: function() { display(); }
+            callback: function() { disp.display(); }
         });
     options.resolution = new Option({
             title: "Resolution",
@@ -64,7 +64,7 @@ function Options() {
             ids:    ["day", "hour", "tenminute", "minute"],
             available: [0, 1, 2, 3],
             default: 2,
-            callback: function() { prepareData(); }
+            callback: function() { data.prepareData(); }
         });
     options.subset = new Option({
             title: "Subset",
@@ -72,7 +72,7 @@ function Options() {
             ids:    ["all", "distinct", "original", "retweet", "reply", "quote"],
             available: [0, 1, 2, 3, 4, 5],
             default: 0,
-            callback: function() { changeData(); }
+            callback: function() { data.changeData(); }
         });
     options.shape = new Option({
             title: "Shape",
@@ -80,7 +80,7 @@ function Options() {
             ids:    ["linear",  "basis-open",   "step-after"],
             available: [0, 1, 2],
             default: 2,
-            callback: function() { prepareData(); }
+            callback: function() { data.prepareData(); }
         });
     options.series = new Option({
             title: "Series",
@@ -88,7 +88,7 @@ function Options() {
             ids:    ["none", "terms", "types", "distinct"],
             available: [0, 1, 2, 3],
             default: 1,
-            callback: function() { changeSeries('all'); }
+            callback: function() { data.changeSeries('all'); }
         });
     options.y_scale = new Option({
             title: "Y Scale",
@@ -96,7 +96,7 @@ function Options() {
             ids:    ["linear",  "pow",   "log", "preserve"],
             available: [0, 1, 2],
             default: 0,
-            callback: function() { display(); }
+            callback: function() { disp.display(); }
         });
     options.y_max = new Option({
             title: "Y Max",
@@ -106,7 +106,7 @@ function Options() {
             default: 0,
             type: "textfieldautoman",
             custom_entries_allowed: true,
-            callback: function() { display(); }
+            callback: function() { disp.display(); }
         });
     options.time_save = new Option({
             title: "Save Time State",
@@ -138,7 +138,7 @@ function Options() {
             available: [0],
             default: 0,
             custom_entries_allowed: true,
-            callback: function() { setFocusTime('input_field'); }
+            callback: function() { disp.setFocusTime('input_field'); }
         });
     options.time_max = new Option({
             title: "End",
@@ -147,7 +147,7 @@ function Options() {
             available: [0],
             default: 0,
             custom_entries_allowed: true,
-            callback: function() { setFocusTime('input_field'); }
+            callback: function() { disp.setFocusTime('input_field'); }
         });
     options.time_limit = new Option({
             title: "Tweets in",
@@ -155,15 +155,7 @@ function Options() {
             ids:    ["3h", "12h", "1d", "3d", '1w', 'all', '-1w', '-3d', '-1d', '-12h', '-3h'],
             available: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             default: 2,
-            callback: function() { loadCollectionData(); }
-        });
-    options.plot_click = new Option({
-            title: "On Plot Click",
-            labels: ["Deselect", "Get Tweets"],
-            ids:    ["deselect", "gettweets"],
-            available: [0, 1],
-            default: 0,
-            callback: function() { console.log("Changed plot click"); }
+            callback: function() { data.loadCollectionData(); }
         });
     options.add_term = new Option({
             title: "Add Term",
@@ -173,7 +165,7 @@ function Options() {
             default: 0,
             custom_entries_allowed: true,   
             type: "textfieldconfirm",
-            callback: function() { genEventTweetCount(); }
+            callback: function() { data.genEventTweetCount(); }
         });
     options.color_scale = new Option({
             title: "Color Scale",
@@ -181,7 +173,7 @@ function Options() {
             ids:    ["category10", 'category20', 'category20b', 'category20c'],
             available: [0, 1, 2, 3],
             default: 1,
-            callback: function() { prepareData(); }
+            callback: function() { data.prepareData(); }
         });
     options.terms_selected = new Option({
             title: "Terms Selected",
@@ -190,7 +182,7 @@ function Options() {
             available: [0],
             default: 0,
             custom_entries_allowed: true, 
-            callback: function() { prepareData(); }
+            callback: function() { data.prepareData(); }
         });
     options.context_line = new Option({
             title: "Show total",
@@ -200,7 +192,7 @@ function Options() {
             available: [0, 1],
             default: 1,
             type: "toggle",
-            callback: function() { display(); }
+            callback: function() { disp.display(); }
         });
     options.found_in = new Option({
             title: "Terms Found In",
@@ -208,7 +200,7 @@ function Options() {
             ids:    ["Any", "Text", "Quote", "URL"],
             available: [0, 1, 2, 3],
             default: 1,
-            callback: function() { changeData(); }
+            callback: function() { data.changeData(); }
         });
     
     // push holder variables and option sets into the list
@@ -296,7 +288,7 @@ Options.prototype = {
         });
         
         // If the program has been initialized
-        if(changed.length > 0 && data_raw != undefined) {
+        if(changed.length > 0 && data.data_raw != undefined) {
             // Render changes
             // Right now this function is VERY manual, should make a more explicit data flow
 
@@ -317,10 +309,10 @@ Options.prototype = {
         }
 
 //        strstate = '#' + JSON.stringify(this.state);
-        arrstate = Object.keys(options.state).map(function(d) {
+        var arrstate = Object.keys(options.state).map(function(d) {
                 return d + '="' + options.state[d] + '"';
             });
-        strstate = '#!' + arrstate.join('&');
+        var strstate = '#!' + arrstate.join('&');
         
         if(newState == undefined || newState) {
             history.pushState(null, null, strstate);
@@ -454,7 +446,7 @@ Options.prototype = {
             default: 0,
             callback: function() {
                 options.recordState(options);
-                display();
+                disp.display();
             },
             styleFunc: function() {
                 d3.select('#input_' + option)
@@ -635,7 +627,7 @@ Options.prototype = {
             .attr({class: 'btn btn-default'})
             .html('<span class="glyphicon glyphicon-step-backward"></span>')
             .on('click', function(d) {
-                setFocusTime('button_time_to_start');
+                disp.setFocusTime('button_time_to_start');
             });
 //        right_buttons.append('button')
 //            .attr({class: 'btn btn-default'})
@@ -681,7 +673,7 @@ Options.prototype = {
             .attr({class: 'btn btn-default'})
             .html('<span class="glyphicon glyphicon-step-forward"></span>')
             .on('click', function(d) {
-                setFocusTime('button_time_to_end');
+                disp.setFocusTime('button_time_to_end');
             });
         
         options.time_save.styleFunc = function() {
@@ -723,6 +715,7 @@ Options.prototype = {
             },
             onSelect: function (selectedDateTime){
                 var date = startDateTextBox.datetimepicker('getDate');
+                endDateTextBox.datetimepicker('option', 'minDate', date);
                 endDateTextBox.datetimepicker('option', 'minDate', date);
                 options.time_min.set(date);
                 
