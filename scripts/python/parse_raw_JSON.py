@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import json, os, re, csv, sys
+import json, os, re, csv, sys, socket
 import argparse, unicodedata
 from pprint import pprint
 from datetime import datetime, timedelta
@@ -25,8 +25,8 @@ add_tweet_to_event = ("INSERT IGNORE INTO TweetInEvent "
              "(Tweet_ID, Event_ID)"
              "VALUES (%(Tweet_ID)s, %(Event_ID)s)")
 add_event = ("REPLACE INTO Event "
-             "(ID, Name, Description, Keywords, OldKeywords, StartTime, StopTime, TweetsCollected)"
-             "VALUES (%(ID)s, %(Name)s, %(Description)s, %(Keywords)s, %(OldKeywords)s, %(StartTime)s, %(StopTime)s, %(TweetsCollected)s)")
+             "(ID, Name, Description, Keywords, OldKeywords, StartTime, StopTime, TweetsCollected, Server)"
+             "VALUES (%(ID)s, %(Name)s, %(Description)s, %(Keywords)s, %(OldKeywords)s, %(StartTime)s, %(StopTime)s, %(TweetsCollected)s, %(Server)s)")
 add_tweet_count = ("REPLACE INTO TweetCount "
              "(Event_ID, Time, Timesource, Found_In, Keyword, Count, `Distinct`, Original, Retweet, Reply, Quote) "
              "VALUES (%(Event_ID)s, %(Time)s, %(Timesource)s, %(Found_In)s, %(Keyword)s, %(Count)s, %(Distinct)s, %(Original)s, %(Retweet)s, %(Reply)s, %(Quote)s)")
@@ -379,7 +379,8 @@ def loadCollection(collection_name):
             'Description': collection["description"],
             'Keywords': collection["twitter_keywords"],
             'OldKeywords': collection["old_keywords"],
-            'TweetsCollected': collection["total_count"]
+            'TweetsCollected': collection["total_count"],
+            'Server': socket.gethostname()
         }
         
         if('started' in collection and collection["started"]):
