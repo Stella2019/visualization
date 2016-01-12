@@ -287,14 +287,13 @@ Options.prototype = {
         });
         
         // If the program has been initialized
-        if(changed.length > 0 && data && data.all && data.all[0]) {
+        if(changed.length > 0 && data && data.all && data.all.Text) {
             // Render changes
-            // Right now this function is VERY manual, should make a more explicit data flow
 
             if(changed.indexOf("collection") > -1)
-                options.collection.callback();
+                data.setCollection();
             else
-                options.subset.callback();
+                data.prepareData(); // although we can do something else
         }
     },
     recordState: function(options, changedItem, newState) {

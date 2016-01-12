@@ -14,23 +14,26 @@ function Legend() {
      
     // Function
     self.startToggle = function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
         self.mouseOverToggle = true;
         self.mouseOverToggleState = !series.shown;
         self.toggleSeries(series); 
         d3.event.stopPropagation();
     };
     self.endToggle = function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
         if(self.mouseOverToggle) {
             self.mouseOverToggle = false;
             data.prepareData(); 
         }
     };
     self.highlightSeries = function(series) {
-        var id;
-        if((typeof series) != "string")
-            id = series.id;
-        else
-            id = series;
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
 
         d3.selectAll('.series, .legend_icon')
             .classed('focused', false)
@@ -40,17 +43,29 @@ function Legend() {
             .classed('focused', true);
     };
     self.hoverLegendEntry = function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
         self.highlightSeries(series);
     };
     self.hoverLegendEntryEnd = function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
         self.unHighlightSeries(series);
     };
     self.unHighlightSeries = function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
         d3.selectAll('.series, .legend_icon')
             .classed('focused', false)
             .classed('unfocused', false);
     };
     self.toggleSeries = function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
         series.shown = !series.shown;
         d3.select('.' + series.id + ' .legend_icon')
             .classed('off', !series.shown);
@@ -62,7 +77,8 @@ function Legend() {
         }
     };
     self.toggleSingle = function(series) {
-        // Figure out if this is the only series being shown
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
         
         data.series.map(function(inner_series) {
             inner_series.shown = false;//!turnAllOff; 
@@ -90,6 +106,9 @@ function Legend() {
         data.prepareData();
     };
     self.hoverOverSeries = function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
         window.getSelection().removeAllRanges()
         if(self.mouseOverToggle && series.shown != self.mouseOverToggleState) {
             self.toggleSeries(series);
@@ -124,7 +143,7 @@ Legend.prototype = {
             .data(legend.key_data)
             .enter().append('div')
             .attr('class', function(d) {
-                return 'legend_key_entry legend_key_' + d.id;
+                return 'legend_key_entry legend_key_' + d;
             });
         
         legend_key_entries.append('div')
@@ -136,10 +155,15 @@ Legend.prototype = {
             .html(function(d) { return d.label; });                    
     },
     populate: function() {        
-        // Get series data
+        // Get series ids
         data.series.map(function(series) {
             series.shown = true; 
-        }, this);
+        });
+        
+        // Show all series
+        legend.series = data.series.map(function(series) {
+            return series.id; 
+        });
         
         this.container.select('.legend_title')
             .text(options.series.getLabel());
@@ -151,14 +175,14 @@ Legend.prototype = {
         // Add new entries
         var entries = this.container_series
             .selectAll('div.legend_entry')
-            .data(data.series);
+            .data(legend.series);
 
         var new_entries = entries.enter().append('div')
             .attr('id', function(d) {
-                return 'legend_' + d.id;
+                return 'legend_' + d;
             })
             .attr('class', function(d) {
-                return 'legend_entry ' + d.id;
+                return 'legend_entry ' + d;
             })
             .on('mouseover', this.hoverLegendEntry)
             .on('mouseout', this.hoverLegendEntryEnd);
@@ -202,10 +226,10 @@ Legend.prototype = {
 
         entries
             .attr('id', function(d) {
-                return 'legend_' + d.id;
+                return 'legend_' + d;
             })
             .attr('class', function(d) {
-                return 'legend_entry ' + d.id;
+                return 'legend_entry ' + d;
             });
         
         this.container_series.on('mouseout', function(d) {
@@ -226,12 +250,15 @@ Legend.prototype = {
 
         this.container.selectAll('div.legend_label')
             .html(function (d) {
-                var name = d.name;
+                var series = data.series_byID[d];
+            console.log(series, d)
+            
+                var name = series.name;
                 if(options.series.is('terms')) {
-                    if(d.isOldKeyword) {
+                    if(series.isOldKeyword) {
                         name += ' &#x271d;';
                         legend.key_data[1].has = true; // removed
-                    }else if(!d.isKeyword) {
+                    }else if(!series.isKeyword) {
                         name += ' *';
                         legend.key_data[2].has = true; // added
                     } else {

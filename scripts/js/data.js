@@ -336,8 +336,8 @@ Data.prototype = {
         
         // Copy it to the search_by_id
         data.series_byID = {};
-        data.series_names.map(function(name, i) {
-            data.series_byID[name] = data.series[i];
+        data.series.map(function(series) {
+            data.series_byID[series.id] = series;
         });
 
         // Fill in specifics of the series
@@ -386,10 +386,10 @@ Data.prototype = {
         var found_in = options.found_in.get();
         
         // If we haven't loaded the data yet, tell the user and ask them to wait
-        if(!('Any' in data.all) || data.all[found_in][options.subset.get()] == undefined) {
+        if(!('Text' in data.all) || data.all[found_in][options.subset.get()] == undefined) {
             // Wait a second, then if it still isn't ready, message user that they are waiting
 //            window.setTimeout(function() {
-//                if(!('Any' in data.all) || data.all[found_in][options.subset.get()] == undefined) {
+//                if(!('Text' in data.all) || data.all[found_in][options.subset.get()] == undefined) {
 //                    if (confirm(
 //                        data.collection.name + ": " + 
 //                        options.subset.get() + " _total_" +

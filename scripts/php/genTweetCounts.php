@@ -8,8 +8,8 @@
 
     // Execute Query
     $query = "" .
-//        "REPLACE INTO TweetCount " .
-//        "(Event_ID, `Time`, Timesource, Found_In, Keyword, Count, `Distinct`, `Original`, Retweet, Reply) " .
+        "REPLACE INTO TweetCount " .
+        "(Event_ID, `Time`, Timesource, Found_In, Keyword, Count, `Distinct`, `Original`, Retweet, Reply, Quote) " .
         "SELECT " .
         "    " . $event_id . " as 'Event_ID', " .
         "    Tweets.Time as 'Time',  " .
