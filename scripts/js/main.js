@@ -3,6 +3,9 @@ var options, legend, disp, data;
 
 var util = {
     formatDate: d3.time.format("%Y-%m-%d %H:%M:%S"),
+    date: function(str) {
+        return util.formatDate.parse(str);
+    },
     simplify: function(str) {
         return "l" + str.replace(/[\s\.#]+/g, '_');
     },
@@ -27,9 +30,12 @@ window.onload = initialize;
 
 function initialize() {
     options = new Options();
-    disp = new Display();
-    data = new Data();
+    options.init();
     
+    disp = new Display();
     disp.init();
+    
+    data = new Data();
+    data.loadCollections();
 }
 

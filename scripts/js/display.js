@@ -68,14 +68,14 @@ Display.prototype = {
         if(options.y_scale.is("linear")) {
             focus.y = d3.scale.linear()
                 .range([focus.height, 0]);
-            focus.y_context = d3.scale.linear()
+            focus.y_total_line = d3.scale.linear()
                 .range([focus.height, 0]);
             focus.yAxis.scale(focus.y)
                 .tickFormat(null);
         } else if(options.y_scale.is("pow")) {
             focus.y = d3.scale.sqrt()
                 .range([focus.height, 0]);
-            focus.y_context = d3.scale.sqrt()
+            focus.y_total_line = d3.scale.sqrt()
                 .range([focus.height, 0]);
             focus.yAxis.scale(focus.y)
                 .tickFormat(null);
@@ -83,14 +83,14 @@ Display.prototype = {
             focus.y = d3.scale.log()
                 .clamp(true)
                 .range([focus.height, 0]);
-            focus.y_context = d3.scale.log()
+            focus.y_total_line = d3.scale.log()
                 .clamp(true)
                 .range([focus.height, 0]);
             focus.yAxis.scale(focus.y)
                 .tickFormat(focus.y.tickFormat(10, ",.0f"));
         }
     },
-    init: function() {
+    init: function() { // Initialize D3 handles
         var focus = this.focus;
         var context = this.context;
         var plot_area = this.plot_area;
@@ -102,7 +102,7 @@ Display.prototype = {
 
         focus.y = d3.scale.linear()
             .range([focus.height, 0]);
-        focus.y_context = d3.scale.linear()
+        focus.y_total_line = d3.scale.linear()
             .range([focus.height, 0]);
         context.y = d3.scale.linear()
             .range([context.height, 0]);
@@ -121,8 +121,8 @@ Display.prototype = {
         focus.yAxis = d3.svg.axis()
             .scale(focus.y)
             .orient("left");
-        focus.yAxis_context = d3.svg.axis()
-            .scale(focus.y_context)
+        focus.yAxis_total_line = d3.svg.axis()
+            .scale(focus.y_total_line)
             .orient("right");
 
         context.yAxis = d3.svg.axis()
@@ -133,7 +133,7 @@ Display.prototype = {
         focus.area = d3.svg.area()
             .interpolate(options.shape.get())
             .x(function (d) { return focus.x(d.timestamp); });
-        focus.area_context = d3.svg.area()
+        focus.area_total_line = d3.svg.area()
             .interpolate(options.shape.get())
             .x(function (d) { return focus.x(d.timestamp); });
 
@@ -146,7 +146,6 @@ Display.prototype = {
         this.brush = d3.svg.brush()
             .x(context.x)
             .on("brush", function() { disp.setFocusTime('brush'); } );
-                
         
         plot_area.svg = d3.select("svg#timeseries")
             .attr("width", plot_area.width)
@@ -177,7 +176,21 @@ Display.prototype = {
             .style('fill-opacity', '0.2')
             .style('stroke-opacity', '0.6');
         
-        data.loadCollections();
+    },
+    setFocusAxisLabels: function() {
+        // Display the xAxis
+        var ax = disp.focus.svg.select("g#xAxis");
+        if(!ax[0][0])
+            ax = disp.focus.svg.append('g').attr('id', 'xAxis');
+        ax.attr('class','x axis')
+            .attr('transform', 'translate(0,' + disp.focus.height + ')')
+            .transition().duration(1000)
+            .call(disp.focus.xAxis);
+        
+        // Set the Y-Axis label
+        disp.focus.svg.select('#y_label')
+            .text("Count of " + options.subset.getLabel() + " Tweets"
+                  + " Every " + options.resolution.getLabel() + "");
     },
     display: function() {
         // Set the Y Scale
@@ -349,7 +362,7 @@ Display.prototype = {
 
         disp.focus.y.domain([y_min, y_max])
             .range([disp.focus.height, 0]);
-        disp.focus.y_context.domain([y_min, y_max])
+        disp.focus.y_total_line.domain([y_min, y_max])
             .range([disp.focus.height, 0]);
 
         if(options.y_scale.is("log")) {
@@ -484,8 +497,8 @@ Display.prototype = {
         disp.focus.x.domain(disp.brush.empty() ? disp.context.x.domain() : disp.brush.extent());
         disp.focus.svg.selectAll("path.area")
             .attr("d", function(d) { return disp.focus.area(d.values)});
-        disp.focus.svg.selectAll("path.area_context")
-            .attr("d", function(d) { return disp.focus.area_context(d)});
+        disp.focus.svg.selectAll("path.area_total_line")
+            .attr("d", function(d) { return disp.focus.area_total_line(d)});
         disp.focus.svg.select(".x.axis")
             .call(disp.focus.xAxis);
     },
@@ -511,7 +524,7 @@ Display.prototype = {
         var old_data = focus_column.data();
 
 //      var value_i = Math.floor(xy[0] / focus.width * d.values.length);
-        var value_i = timestamps_nested.indexOf(time.min + "");
+        var value_i = data.timestamps_nested.indexOf(time.min + "");
         var value = d.values[value_i].value;
         var value0 = d.values[value_i].value0;
 
@@ -560,12 +573,12 @@ Display.prototype = {
     },
     showTotalLine: function() {    
         // Find or create context line
-        var container = disp.focus.svg.select("g#y_context");
+        var container = disp.focus.svg.select("g#y_total_line");
         if(!container[0][0]) {
             container = disp.focus.svg.append('g')
-                .attr('id', 'y_context');
+                .attr('id', 'y_total_line');
             container.append('path')
-                .attr('class', 'area_context total_line')
+                .attr('class', 'area_total_line total_line')
         }
 
         // Update Data
@@ -583,16 +596,16 @@ Display.prototype = {
             multiplier = 100 / biggest_totalpoint;
         }
 
-        disp.focus.area_context
+        disp.focus.area_total_line
             .interpolate(options.shape.get())
             .y0(disp.focus.height)
-            .y1(function (d) { return disp.focus.y_context(d.value * multiplier); });
+            .y1(function (d) { return disp.focus.y_total_line(d.value * multiplier); });
 
         if(options.total_line.is("false"))
-            disp.focus.area_context.y1(disp.focus.height);
+            disp.focus.area_total_line.y1(disp.focus.height);
 
-        transition.select("path.area_context")
-            .attr("d", function(d) { return disp.focus.area_context(d)});
+        transition.select("path.area_total_line")
+            .attr("d", function(d) { return disp.focus.area_total_line(d)});
 
         // Set visibility
         legend.key.select('.legend_key_total_line')

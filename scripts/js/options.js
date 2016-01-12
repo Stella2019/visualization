@@ -46,6 +46,7 @@ function Options() {
             ids:    ["none"],
             available: [0],
             default: 0,
+            custom_entries_allowed: true,
             callback: function() { data.setCollection(); }
         });
     options.display_type = new Option({
@@ -247,6 +248,7 @@ Options.prototype = {
                 return s;
             }, {});
         } catch(err) {
+            console.log(err);
             return;
         }
         
@@ -285,7 +287,7 @@ Options.prototype = {
         });
         
         // If the program has been initialized
-        if(changed.length > 0 && data.all != undefined) {
+        if(changed.length > 0 && data && data.all && data.all[0]) {
             // Render changes
             // Right now this function is VERY manual, should make a more explicit data flow
 
@@ -555,53 +557,69 @@ Options.prototype = {
         options.state[option] = set.ids[set.default];
     },
     buildDropdown: function(options, option) {
+        
+        // Select the option set
         var set = options[option];
-
         var superId = "choose_" + option;
-        var container = d3.select("#choices").append("div")
-            .attr("class", "choice")
-            .style("text-transform", "capitalize")
-            .append("div")
-                .attr("id", superId)
-                .attr("class", "dropdown");
+        var container = d3.select('#' + superId);
         
-        container.append("button")
-            .attr({type: "button",
-                class: 'btn btn-primary dropdown-toggle',
-                'data-toggle': "dropdown",
-                'aria-haspopup': true,
-                'aria-expanded': false})
-            .html("<strong>" + set.title + ":</strong> ");
+        // If it does not exist, create it
+        if(!container[0][0]) {
+            container = d3.select("#choices").append("div")
+                .attr("class", "choice")
+                .style("text-transform", "capitalize")
+                .append("div")
+                    .attr("id", superId)
+                    .attr("class", "dropdown");
+        }
         
-        container.select('button').append('span')
-            .attr('class', 'current')
-            .style('text-transform', 'capitalize')
-            .html('Label');
+        var button = container.select('button')
+        if(!button[0][0]) {
+            button = container.append("button")
+                .attr({type: "button",
+                    class: 'btn btn-primary dropdown-toggle',
+                    'data-toggle': "dropdown",
+                    'aria-haspopup': true,
+                    'aria-expanded': false})
+                .html("<strong>" + set.title + ":</strong> ");
+            
+            button.append('span')
+                .attr('class', 'current')
+                .style('text-transform', 'capitalize')
+                .html('Label');
 
-        container.select('button').append('text')
-            .text(' ');
-        container.select('button').append('span')
-            .attr('class', 'caret');
+            button.append('text')
+                .text(' ');
+            button.append('span')
+                .attr('class', 'caret');
+        }
+        
+        var list = container.select('ul');
+        if(!list[0][0]) {
+            list = container.append('ul')
+                .attr({class: 'dropdown-menu'});
+        }
+        
+        // Populate the list;
+        list.selectAll("li")
+            .data(set.available)
+            .enter()
+            .append("li").append("a");
+        
+        list.selectAll('a')
+            .attr("id", function(d) { return option + "_" + set.ids[d]; })
+            .html(function(d) {
+                return set.labels[d];
+            })
+            .on("click", function(d) {
+                container.select('.current')
+                    .text(set.labels[d]);
 
-        container.append('ul')
-            .attr({class: 'dropdown-menu'})
-            .selectAll("li")
-                .data(set.available)
-                .enter()
-                .append("li").append("a")
-                    .attr("id", function(d) { return option + "_" + set.ids[d]; })
-                    .html(function(d) {
-                        return set.labels[d];
-                    })
-                    .on("click", function(d) {
-                        container.select('.current')
-                            .text(set.labels[d]);
-                        
-                        set.set(set.ids[d]);
-                        options.recordState(options, option);
+                set.set(set.ids[d]);
+                options.recordState(options, option);
 
-                        set.callback();
-                    });
+                set.callback();
+            });
 
         // Save the current value to the interface and the history
         container.select('.current')

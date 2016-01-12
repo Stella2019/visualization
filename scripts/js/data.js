@@ -66,22 +66,30 @@ Data.prototype = {
             collection.OldKeywords = collection.OldKeywords.trim().split(/,[ ]*/);
             if(collection.OldKeywords.length == 1 && collection.OldKeywords[0] == "")
                 collection.OldKeywords = [];
-            collection.StartTime = new Date(collection.StartTime);
+            collection.StartTime = util.date(collection.StartTime);
             collection.StartTime.setMinutes(collection.StartTime.getMinutes()
                                            -collection.StartTime.getTimezoneOffset());
             if(collection.StopTime)
-                collection.StopTime = new Date(collection.StopTime);
+                collection.StopTime = util.date(collection.StopTime);
             else
                 collection.StopTime = "Ongoing";
         });
 
         // Generate options, including collections
         options.collection.labels = data.collection_names;
-        options.collection.ids = data.collections.map(function(datum) { return datum['ID']; });
+        options.collection.ids = data.collections.map(function(datum, i) {
+            if(options.collection.is(datum['ID']))
+               options.collection.default = i;
+            return datum['ID'];
+        });
         options.collection.available = data.collection_names.map(function(d, i) { return i; });
-        options.collection.set(util.simplify(data.collection_names[0]));
+        
+//        if(options.collection
+//        
+//        if(options.collection.is("none"))
+//            options.collection.set(data.collections[0]['ID']);
 
-        options.init();
+        options.buildDropdown(options, 'collection');
 
         // Add additional information for collections
         data.collections.map(function(collection, i) {
@@ -184,7 +192,7 @@ Data.prototype = {
                 data.time.max.setHours(data.time.max.getHours() + hours_diff * sign);
             }
         }
-
+        
         // Load the collection's primary file
         data.loadDataFile();
     },
@@ -206,6 +214,7 @@ Data.prototype = {
 
         // Get the timestamps
         data.timestamps = Array.from(new Set(data_file.map(function(d) {return d.Time}))).sort();
+
         if(data.timestamps.length == 0)
             data.timestamps = [util.formatDate(new Date())];
         data.keywords = Array.from(new Set(data_file.map(function(d) {return d.Keyword})));
@@ -216,8 +225,8 @@ Data.prototype = {
         }, [])
 
         // Fill in missing timestamps
-        data.time.min = new Date(data.timestamps[0]);
-        data.time.max = new Date(data.timestamps[data.timestamps.length - 1]);
+        data.time.min = util.date(data.timestamps[0]);
+        data.time.max = util.date(data.timestamps[data.timestamps.length - 1]);
         if(options.time_limit.get().slice(0, 1) == '-')
             last_timestamp = util.formatDate(new Date());
 
@@ -237,7 +246,7 @@ Data.prototype = {
                 data_raw0[found_in][subset] = {};
                 data.timestamps.map(function (timestamp) {
                     var entry = {
-                        timestamp: new Date(timestamp),
+                        timestamp: util.date(timestamp),
                         "_total_": 0
                     };
                     data.keywords.map(function(keyword) {
@@ -375,7 +384,7 @@ Data.prototype = {
     },
     prepareData: function() {
         var found_in = options.found_in.get();
-
+        
         // If we haven't loaded the data yet, tell the user and ask them to wait
         if(!('Any' in data.all) || data.all[found_in][options.subset.get()] == undefined) {
             // Wait a second, then if it still isn't ready, message user that they are waiting
@@ -399,74 +408,9 @@ Data.prototype = {
             return;
         }
         
-        // Aggregate on time depending on the resolution
-        var data_nested_entries;
-        if(options.series.is('types')) {
-            data_nested_entries = []; // think about it
-            for(var i = 0; i < data.all[found_in]['all'].length; i++) {
-                entry = {
-                    timestamp: data.all[found_in]['all'][i]['timestamp'],
-                    _total_: data.all[found_in]['all'][i]['_total_'],
-                    original: data.all[found_in]['original'][i]['_total_'],
-                    retweet: data.all[found_in]['retweet'][i]['_total_'],
-                    reply: data.all[found_in]['reply'][i]['_total_'],
-                    quote: data.all[found_in]['quote'][i]['_total_']
-                }
-                data_nested_entries.push(entry);
-            }
-        } else if(options.series.is('distinct')) {
-            data_nested_entries = []; // think about it
-            for(var i = 0; i < data.all[found_in]['all'].length; i++) {
-                entry = {
-                    timestamp: data.all[found_in]['all'][i]['timestamp'],
-                    _total_: data.all[found_in]['all'][i]['_total_'],
-                    distinct: data.all[found_in]['distinct'][i]['_total_'],
-                    repeat: data.all[found_in]['all'][i]['_total_'] - data.all[found_in]['distinct'][i]['_total_'],
-                }
-                data_nested_entries.push(entry);
-            }
-        } else {
-            data_nested_entries = data.all[found_in][options.subset.get()];
-        }
+        var data_nested = data.nestData();
 
-        var data_nested = d3.nest()
-            .key(function (d) {
-                var time = new Date(d.timestamp);
-                if(options.resolution.is('tenminute'))
-                    time.setMinutes(Math.floor(time.getMinutes() / 10) * 10);
-                if(options.resolution.is('hour') || options.resolution.is("day"))
-                    time.setMinutes(0);
-                if(options.resolution.is("day"))
-                    time.setHours(0);
-                return time;
-            })
-            .rollup(function (leaves) {
-                var newdata = {timestamp: leaves[0].timestamp};
-                newdata['_total_'] = leaves.reduce(function(sum, cur) {
-                    return sum + cur['_total_'];
-                }, 0);
-
-                if(options.series.is('none')) {
-                    newdata['all'] = leaves.reduce(function(sum, leaf) {
-                        return sum + leaf['_total_'];
-                    }, 0);
-                } else {
-                    data.series.map(function(series) {
-                        if(series.shown) {
-                            newdata[series.name] = leaves.reduce(function(sum, leaf) {
-                                return sum + leaf[series.name];
-                            }, 0);
-                        } else {
-                            newdata[series.name] = 0;
-                        }
-                    });
-                }
-
-                return newdata;
-            })
-            .entries(data_nested_entries);
-
-        timestamps_nested = data_nested.map(function(item) { return item.key; });
+        data.timestamps_nested = data_nested.map(function(item) { return item.key; });
 
         // Convert data to a format the charts can use
         var data_ready = [];
@@ -511,19 +455,7 @@ Data.prototype = {
         // Set Time Domain and Axis appropriate to the resolution
         disp.setContextTime(data_ready[0].timestamp, data_ready[data_ready.length - 1].timestamp);
 
-        // Display the xAxis
-        var ax = disp.focus.svg.select("g#xAxis");
-        if(!ax[0][0])
-            ax = disp.focus.svg.append('g').attr('id', 'xAxis');
-        ax.attr('class','x axis')
-            .attr('transform', 'translate(0,' + disp.focus.height + ')')
-            .transition().duration(1000)
-            .call(disp.focus.xAxis);
-
-        // Set the Y-Axis label
-        disp.focus.svg.select('#y_label')
-            .text("Count of " + options.subset.getLabel() + " Tweets"
-                  + " Every " + options.resolution.getLabel() + "");
+        disp.setFocusAxisLabels();
 
         // Display values on the context chart
         disp.context.y.domain([0, data_ready.reduce(function (cur_max, series) {
@@ -554,6 +486,79 @@ Data.prototype = {
 
         // Display the data
         disp.display();
+    },
+    nestData: function() {
+        var found_in = options.found_in.get();
+        
+        // Aggregate on time depending on the resolution
+        var data_nested_entries;
+        if(options.series.is('types')) {
+            data_nested_entries = []; // think about it
+            for(var i = 0; i < data.all[found_in]['all'].length; i++) {
+                entry = {
+                    timestamp: data.all[found_in]['all'][i]['timestamp'],
+                    _total_: data.all[found_in]['all'][i]['_total_'],
+                    original: data.all[found_in]['original'][i]['_total_'],
+                    retweet: data.all[found_in]['retweet'][i]['_total_'],
+                    reply: data.all[found_in]['reply'][i]['_total_'],
+                    quote: data.all[found_in]['quote'][i]['_total_']
+                }
+                data_nested_entries.push(entry);
+            }
+        } else if(options.series.is('distinct')) {
+            data_nested_entries = []; // think about it
+            for(var i = 0; i < data.all[found_in]['all'].length; i++) {
+                entry = {
+                    timestamp: data.all[found_in]['all'][i]['timestamp'],
+                    _total_: data.all[found_in]['all'][i]['_total_'],
+                    distinct: data.all[found_in]['distinct'][i]['_total_'],
+                    repeat: data.all[found_in]['all'][i]['_total_'] - data.all[found_in]['distinct'][i]['_total_'],
+                }
+                data_nested_entries.push(entry);
+            }
+        } else {
+            data_nested_entries = data.all[found_in][options.subset.get()];
+        }
+
+        // Perform the nest
+        var data_nested = d3.nest()
+            .key(function (d) {
+                var time = new Date(d.timestamp);
+                if(options.resolution.is('tenminute'))
+                    time.setMinutes(Math.floor(time.getMinutes() / 10) * 10);
+                if(options.resolution.is('hour') || options.resolution.is("day"))
+                    time.setMinutes(0);
+                if(options.resolution.is("day"))
+                    time.setHours(0);
+                return time;
+            })
+            .rollup(function (leaves) {
+                var newdata = {timestamp: leaves[0].timestamp};
+                newdata['_total_'] = leaves.reduce(function(sum, cur) {
+                    return sum + cur['_total_'];
+                }, 0);
+
+                if(options.series.is('none')) {
+                    newdata['all'] = leaves.reduce(function(sum, leaf) {
+                        return sum + leaf['_total_'];
+                    }, 0);
+                } else {
+                    data.series.map(function(series) {
+                        if(series.shown) {
+                            newdata[series.name] = leaves.reduce(function(sum, leaf) {
+                                return sum + leaf[series.name];
+                            }, 0);
+                        } else {
+                            newdata[series.name] = 0;
+                        }
+                    });
+                }
+
+                return newdata;
+            })
+            .entries(data_nested_entries);
+        
+        return data_nested;
     },
     genTweetCount: function() {
         var event_id = data.collection.ID;
