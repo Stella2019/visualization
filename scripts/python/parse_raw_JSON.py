@@ -368,6 +368,7 @@ def loadCollection(collection_name):
         pgno += 1
     
     collection = getKeywords(collection)
+    pprint(collection);
     
     # Push the collection to the storage database if it exists
     if(options.database):
@@ -383,15 +384,25 @@ def loadCollection(collection_name):
             'Server': socket.gethostname()
         }
         
-        if('started' in collection and collection["started"]):
-            event['StartTime'] = collection["started"].replace("Z", "").replace("T", " ")
+        if('first_started' in collection and collection["first_started"]):
+            time = collection["first_started"]
+            time = datetime.strptime(time, '%Y-%m-%dT%H:%M:%SZ')
+            time = time - timedelta(seconds=60*60*8) # UTC to PST
+            time = datetime.strftime(time, '%Y-%m-%d %H:%M:%S')
+            event['StartTime'] = time
         else:
             event['StartTime'] = None 
         
-        if('stopped' in collection and collection["stopped"]):
-            event['StopTime'] = collection["stopped"].replace("Z", "").replace("T", " ")
+        if('archived_date' in collection and collection["archived_date"]):
+            time = collection["archived_date"]
+            time = datetime.strptime(time, '%Y-%m-%dT%H:%M:%SZ')
+            time = time - timedelta(seconds=60*60*8) # UTC to PST
+            time = datetime.strftime(time, '%Y-%m-%d %H:%M:%S')
+            event['StopTime'] = time
         else:
             event['StopTime'] = None 
+            
+        pprint(event)
         
         cursor.execute("SET FOREIGN_KEY_CHECKS=0")
         cursor.execute(add_event, event)
