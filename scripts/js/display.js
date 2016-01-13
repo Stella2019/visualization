@@ -491,8 +491,8 @@ Display.prototype = {
             d3.selectAll(".brush").call(disp.brush.clear());//brush.clear();
         }
 
-        options.recordState(options, 'time_min');
-        options.recordState(options, 'time_max');
+        options.recordState('time_min');
+        options.recordState('time_max');
 
         disp.focus.x.domain(disp.brush.empty() ? disp.context.x.domain() : disp.brush.extent());
         disp.focus.svg.selectAll("path.area")
