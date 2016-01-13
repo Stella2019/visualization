@@ -23,6 +23,16 @@ var util = {
         if(a > b)
             return 1;
         return 0;
+    },
+    lunique: function(list) {
+        return Array.from(new Set(list)).sort();
+    },
+    range: function(length) {
+        var arr = [];
+        for(var i = 0; i < length; i++) {
+            arr.push(i);
+        }
+        return arr;
     }
 }
 

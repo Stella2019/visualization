@@ -75,50 +75,7 @@ Data.prototype = {
                 collection.StopTime = "Ongoing";
         });
 
-        // Generate options, including collections
-        options.collection.labels = data.collection_names;
-        options.collection.ids = data.collections.map(function(datum, i) {
-            if(options.collection.is(datum['ID']))
-               options.collection.default = i;
-            return datum['ID'];
-        });
-        options.collection.available = data.collection_names.map(function(d, i) { return i; });
-        
-//        if(options.collection
-//        
-//        if(options.collection.is("none"))
-//            options.collection.set(data.collections[0]['ID']);
-
-        options.buildDropdown(options, 'collection');
-
-        // Add additional information for collections
-        data.collections.map(function(collection, i) {
-            var content = '<dl class="dl-horizontal collection_popover">';
-            Object.keys(collection).map(function(key) {
-                content += "<dt>" + key + "</dt>";
-
-                if(collection[key] instanceof Date) {
-                    var date = new Date(collection[key]);
-                    content += "<dd>" + util.formatDate(date) + "</dd>";
-                } else if(collection[key] instanceof Array) {
-                    var arr = collection[key].join(", ");
-                    content += "<dd>" + arr + "</dd>";
-                } else {
-                    content += "<dd>" + collection[key] + "</dd>";
-                }
-            });
-            content += "</dl>";
-
-            d3.select('#collection_' + collection['ID'])
-                .attr({
-                    'class': 'collection_option',
-                    'data-toggle': "popover",
-                    'data-trigger': "hover",
-                    'data-placement': "right",
-                    'data-content': content}
-                 );
-        });
-        $('.collection_option').popover({html: true});
+        options.buildCollections();
 
         // Initialize Legend
         legend = new Legend();
@@ -213,7 +170,7 @@ Data.prototype = {
         }
 
         // Get the timestamps
-        data.timestamps = Array.from(new Set(data_file.map(function(d) {return d.Time}))).sort();
+        data.timestamps = util.lunique(data_file.map(function(d) { return d.Time; }));
 
         if(data.timestamps.length == 0)
             data.timestamps = [util.formatDate(new Date())];
@@ -306,23 +263,6 @@ Data.prototype = {
         } else {
             data.series_names = ['all'];
         }
-
-        // Load the main series
-        data.loadNewSeriesData(subset);
-
-        // Populate Legend    
-        legend.populate();
-
-        // Finish preparing the data for loading
-        data.prepareData();   
-    },
-    changeData: function() {
-        this.loadNewSeriesData(options.subset.get());
-
-        this.prepareData();
-    },
-    loadNewSeriesData: function(subset) {
-        var found_in = options.found_in.get();
         
         // Start the series data store
         data.series = data.series_names.map(function(name, i) {
@@ -339,6 +279,23 @@ Data.prototype = {
         data.series.map(function(series) {
             data.series_byID[series.id] = series;
         });
+
+        // Load the main series
+        data.loadNewSeriesData();
+
+        // Populate Legend    
+        legend.populate();
+
+        // Finish preparing the data for loading
+        data.prepareData();   
+    },
+    changeData: function() {
+        this.loadNewSeriesData();
+
+        this.prepareData();
+    },
+    loadNewSeriesData: function() {
+        var found_in = options.found_in.get();
 
         // Fill in specifics of the series
         if(options.series.is('terms')) {
@@ -437,8 +394,8 @@ Data.prototype = {
         });
 
         // Reorder by total size
-        data.series.sort(util.compareSeries);
-        legend.container_series.selectAll('div.legend_entry').sort(util.compareSeries);
+        data.series.sort(legend.cmp);
+        legend.container_series.selectAll('div.legend_entry').sort(legend.cmp_byID);
         disp.setColors();
 
         // Add the nested data to the series

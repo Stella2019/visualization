@@ -23,25 +23,21 @@ Option.prototype = {
 function Options() {
     var self = this;
     
-    var options = {};
-    options.topmenu = ['collection', 'time_limit', 'add_term', '<br>',
+//    var options = {};
+    self.topmenu = ['collection_type', 'collection', 'time_limit', 'add_term', '<br>',
                     'series', 'subset', 'found_in', 'resolution', '<br>',
-                    'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line']; 
-    
-//    if (window.location.href.indexOf('index_dev.html') > -1) {
-//        options.dropdowns.push('series');
-//    }
-    options.timefields = ['time_min', 'time_max']; 
-    
-    options.record = ['collection', 'subset', 'resolution', 'time_limit',
+                    'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line', '<br>',
+                    'series_order', 'legend_showhidden'];
+    self.timefields = ['time_min', 'time_max']; 
+    self.record = ['collection', 'subset', 'resolution', 'time_limit',
                       'display_type', 'y_scale', 'shape', 'series',
                       'time_save', 'time_min', 'time_max',
                       'y_max_toggle', 'y_max', 'color_scale',
-                      'total_line', 'found_in'];//,
-//                      'terms_selected'];
+                      'total_line', 'found_in', 'collection_type',
+                      'series_order', 'legend_showhidden'];
     
-    options.collection = new Option({
-            title: "Collection",
+    self.collection = new Option({
+            title: "Event",
             labels: ["none"],
             ids:    ["none"],
             available: [0],
@@ -49,7 +45,7 @@ function Options() {
             custom_entries_allowed: true,
             callback: function() { data.setCollection(); }
         });
-    options.display_type = new Option({
+    self.display_type = new Option({
             title: "Plot Type",
             labels: ["Stacked", "Overlap", "Lines", "Stream", "Separate", "100%"],
             ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
@@ -57,7 +53,7 @@ function Options() {
             default: 0,
             callback: function() { disp.display(); }
         });
-    options.resolution = new Option({
+    self.resolution = new Option({
             title: "Resolution",
             labels: ["Day", "Hour", "10 Minutes", "Minute"],
             ids:    ["day", "hour", "tenminute", "minute"],
@@ -65,7 +61,7 @@ function Options() {
             default: 2,
             callback: function() { data.prepareData(); }
         });
-    options.subset = new Option({
+    self.subset = new Option({
             title: "Subset",
             labels: ["All", "Distinct", "Original", "Retweet", "Reply", "Quote"],
             ids:    ["all", "distinct", "original", "retweet", "reply", "quote"],
@@ -73,7 +69,7 @@ function Options() {
             default: 0,
             callback: function() { data.changeData(); }
         });
-    options.shape = new Option({
+    self.shape = new Option({
             title: "Shape",
             labels: ["Linear",  "Basis",        "Step"],
             ids:    ["linear",  "basis-open",   "step-after"],
@@ -81,7 +77,7 @@ function Options() {
             default: 2,
             callback: function() { data.prepareData(); }
         });
-    options.series = new Option({
+    self.series = new Option({
             title: "Series",
             labels: ["None", "Terms", "Tweet Types", "Distinct/Not"],
             ids:    ["none", "terms", "types", "distinct"],
@@ -89,7 +85,7 @@ function Options() {
             default: 1,
             callback: function() { data.changeSeries('all'); }
         });
-    options.y_scale = new Option({
+    self.y_scale = new Option({
             title: "Y Scale",
             labels: ["Linear",  "Power", "Log", "Preserve"],
             ids:    ["linear",  "pow",   "log", "preserve"],
@@ -97,7 +93,7 @@ function Options() {
             default: 0,
             callback: function() { disp.display(); }
         });
-    options.y_max = new Option({
+    self.y_max = new Option({
             title: "Y Max",
             labels: [0],
             ids:    [0],
@@ -107,7 +103,7 @@ function Options() {
             custom_entries_allowed: true,
             callback: function() { disp.display(); }
         });
-    options.time_save = new Option({
+    self.time_save = new Option({
             title: "Save Time State",
             styles: ["btn btn-default", "btn btn-primary"],
             labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Saving", "<span class='glyphicon glyphicon-ok-circle'></span> Saving"],
@@ -130,7 +126,7 @@ function Options() {
                 }
             }
         });
-    options.time_min = new Option({
+    self.time_min = new Option({
             title: "Begin",
             labels: ["2000-01-01 00:00"],
             ids:    [new Date("2000-01-01 00:00")],
@@ -139,7 +135,7 @@ function Options() {
             custom_entries_allowed: true,
             callback: function() { disp.setFocusTime('input_field'); }
         });
-    options.time_max = new Option({
+    self.time_max = new Option({
             title: "End",
             labels: ["2000-01-01 00:00"],
             ids:    [new Date("2000-01-01 00:00")],
@@ -148,7 +144,7 @@ function Options() {
             custom_entries_allowed: true,
             callback: function() { disp.setFocusTime('input_field'); }
         });
-    options.time_limit = new Option({
+    self.time_limit = new Option({
             title: "Tweets in",
             labels: ["First 3 Hours", "First 12 Hours", "First 24 Hours", "First 3 Days", "First Week", "All time", "Last Week", "Last 3 Days", "Last 24 Hours", "Last 12 Hours", "Last 3 Hours"],
             ids:    ["3h", "12h", "1d", "3d", '1w', 'all', '-1w', '-3d', '-1d', '-12h', '-3h'],
@@ -156,7 +152,7 @@ function Options() {
             default: 2,
             callback: function() { data.loadCollectionData(); }
         });
-    options.add_term = new Option({
+    self.add_term = new Option({
             title: "Add Term",
             labels: ["New Term"],
             ids:    ["new"],
@@ -166,7 +162,7 @@ function Options() {
             type: "textfieldconfirm",
             callback: function() { data.genTweetCount(); }
         });
-    options.color_scale = new Option({
+    self.color_scale = new Option({
             title: "Color Scale",
             labels: ["10", "20", "20b", "20c"],
             ids:    ["category10", 'category20', 'category20b', 'category20c'],
@@ -174,7 +170,7 @@ function Options() {
             default: 1,
             callback: function() { data.prepareData(); }
         });
-    options.terms_selected = new Option({
+    self.terms_selected = new Option({
             title: "Terms Selected",
             labels: [""],
             ids:    [''],
@@ -183,17 +179,17 @@ function Options() {
             custom_entries_allowed: true, 
             callback: function() { data.prepareData(); }
         });
-    options.total_line = new Option({
-            title: "Show total",
+    self.total_line = new Option({
+            title: "Show Total",
             styles: ["btn btn-default", "btn btn-primary"],
             labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Total Line", "<span class='glyphicon glyphicon-ok-circle'></span> Show Total Line"],
             ids:    ["false", "true"],
             available: [0, 1],
-            default: 1,
+            default: 0,
             type: "toggle",
             callback: function() { disp.display(); }
         });
-    options.found_in = new Option({
+    self.found_in = new Option({
             title: "Terms Found In",
             labels: ["Any", "Text", "Quote", "URL"],
             ids:    ["Any", "Text", "Quote", "URL"],
@@ -201,39 +197,67 @@ function Options() {
             default: 1,
             callback: function() { data.changeData(); }
         });
+    self.collection_type = new Option({
+            title: "Type",
+            labels: ["All", "Other Type"],
+            ids:    ["All", "Other Type"],
+            available: [0, 1],
+            default: 0,
+            custom_entries_allowed: true,
+            callback: function() { options.chooseCollectionType(); }
+        });
+    self.series_order = new Option({
+            title: "Order Series by",
+            labels: ["Original", "Alphabet", "Type", "Volume"],
+            ids:    ["orig", "alpha", "type", "volume"],
+            available: [0, 1, 2, 3],
+            default: 3,
+            callback: function() { data.prepareData(); }
+        });
+    self.legend_showhidden = new Option({
+            title: "Show Hidden",
+            styles: ["btn btn-default", "btn btn-primary"],
+            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Hidden Series in Legend", "<span class='glyphicon glyphicon-ok-circle'></span> Show Hidden Series in Legend"],
+            ids:    ["false", "true"],
+            available: [0, 1],
+            default: 1,
+            type: "toggle",
+            callback: function() { legend.showOrHideAll(); }
+        });
     
     // push holder variables and option sets into the list
     this.state = {};
-    Object.keys(options).map(function(item) {
-        this[item] = options[item];
-    }, this);
+//    Object.keys(options).map(function(item) {
+//        this[item] = options[item];
+//    }, this);
 };
 Options.prototype = {
     init: function() {
-        var options = this;
+//        var options = this;
         
         // Build options
-        options.buildTopMenu(options);
-        options.buildTimeWindow(options);
+        options.buildTopMenu();
+        options.buildTimeWindow();
         
         // Import the current state
-        options.importState(options);
+        options.importState();
         window.onpopstate = function() {
-            options.importState(options)
+            options.importState()
         };
         
-        //
+        // Style elements
         options.y_max_toggle.styleFunc();
         options.time_save.styleFunc();
         options.total_line.styleFunc();
+        options.legend_showhidden.styleFunc();
         $(function () {
             $('[data-toggle="popover"]').popover()
         })
         
         // Record the state
-        options.recordState(options, null, false);
+        options.recordState(null, true);
     },
-    importState: function(options) {
+    importState: function() {
         var state;
         try {
 //            state = JSON.parse(window.location.hash.slice(1));
@@ -290,13 +314,22 @@ Options.prototype = {
         if(changed.length > 0 && data && data.all && data.all.Text) {
             // Render changes
 
-            if(changed.indexOf("collection") > -1)
+            if(changed.indexOf("collection") > -1) {
                 data.setCollection();
-            else
+                
+                options.collection_type.set(data.collection['Type']);
+
+                d3.select('#choose_collection_type').select('.current')
+                    .text(options.collection_type.getLabel());
+
+                options.recordState('collection_type', true);
+
+                options.chooseCollectionType();
+            } else
                 data.prepareData(); // although we can do something else
         }
     },
-    recordState: function(options, changedItem, newState) {
+    recordState: function(changedItem, override) {
         if(changedItem == undefined) {
             options.state = options.record.reduce(function(state, dropdown) {
                 state[dropdown] = options[dropdown].get();
@@ -312,10 +345,10 @@ Options.prototype = {
             });
         var strstate = '#!' + arrstate.join('&');
         
-        if(newState == undefined || newState) {
-            history.pushState(null, null, strstate);
-        } else {
+        if(override) {
             history.replaceState(null, null, strstate);
+        } else {
+            history.pushState(null, null, strstate);
         }
     },
     buildButtonSet: function(option) {
@@ -324,7 +357,7 @@ Options.prototype = {
             return
         }
         
-        var set = this[option];
+        var set = options[option];
         
         var container = d3.select("#choices").append("div")
             .attr("class", "choice")
@@ -359,22 +392,22 @@ Options.prototype = {
 
         container.select('#' + set.ids[set.default]).classed('active', true);
     },
-    buildTopMenu: function(options) {
+    buildTopMenu: function() {
         options.topmenu.map(function(option) {
             if (option == '<br>') {
                 d3.select("#choices").append("br")
             } else if(options[option].type == 'textfieldautoman') {
-                options.buildTextToggle(options, option);
+                options.buildTextToggle(option);
             } else if(options[option].type == 'textfieldconfirm') {
-                options.buildTextConfirm(options, option);
+                options.buildTextConfirm(option);
             } else if(options[option].type == 'toggle') {
-                options.buildToggle(options, option);
+                options.buildToggle(option);
             } else { // Dropdown
-                options.buildDropdown(options, option);
+                options.buildDropdown(option);
             }
         });
     },
-    buildToggle: function(options, option) {
+    buildToggle: function(option) {
         var set = options[option];
         
         var superId = "choose_" + option;
@@ -404,12 +437,12 @@ Options.prototype = {
                 var toggle = !(set.get() == "true");
                 set.set(toggle ? "true" : "false");
                 set.styleFunc();
-                options.recordState(options, option);
+                options.recordState(option);
             
                 set.callback();
             });
     },
-    buildTextToggle: function(options, option) {
+    buildTextToggle: function(option) {
         var set = options[option];
         
         // Make container
@@ -443,7 +476,7 @@ Options.prototype = {
             available: [0, 1],
             default: 0,
             callback: function() {
-                options.recordState(options);
+                options.recordState();
                 disp.display();
             },
             styleFunc: function() {
@@ -468,7 +501,7 @@ Options.prototype = {
             .attr("class", "text-center form-control")
             .on('keyup', function(d) {
                 set.set(this.value);
-                options.recordState(options, option);
+                options.recordState(option);
             
                 options[option].callback();
             });
@@ -508,7 +541,7 @@ Options.prototype = {
         options.state[toggleOption] = options[toggleOption].get();
         options.state[option] = set.ids[set.default];
     },
-    buildTextConfirm: function(options, option) {
+    buildTextConfirm: function(option) {
         var set = options[option];
         
         // Make container
@@ -555,7 +588,7 @@ Options.prototype = {
         
         options.state[option] = set.ids[set.default];
     },
-    buildDropdown: function(options, option) {
+    buildDropdown: function(option) {
         
         // Select the option set
         var set = options[option];
@@ -615,7 +648,7 @@ Options.prototype = {
                     .text(set.labels[d]);
 
                 set.set(set.ids[d]);
-                options.recordState(options, option);
+                options.recordState(option);
 
                 set.callback();
             });
@@ -626,7 +659,7 @@ Options.prototype = {
         
         options.state[option] = set.ids[set.default];
     },
-    buildTimeWindow: function(options) {
+    buildTimeWindow: function() {
  
         var container = d3.select("#chart-bottom").append("div")
             .style({width: '500px', display: 'inline-table'})
@@ -706,7 +739,7 @@ Options.prototype = {
                 var saving = !(options.time_save.is("true"));
                 options.time_save.set(saving ? "true" : "false");
                 options.time_save.styleFunc();
-                options.recordState(options);
+                options.recordState();
             
                 options.time_save.callback();
             });
@@ -759,5 +792,109 @@ Options.prototype = {
         });
         
 //        d3.selectAll('#ui-datepicker-div button').classed('btn btn-default', true);
+    },
+    buildCollections: function() {
+        // Generate Collections List
+        options.collection['labels'] = data.collection_names;
+        options.collection['ids'] = data.collections.map(function(collection) { return collection['ID']; });
+        options.collection['available'] = util.range(data.collections.length);
+        
+        // Find the current collection
+        var cur = options.collection.get();
+        options.collection.default = data.collections.reduce(function(candidate, collection, i) {
+            if(collection['ID'] == cur)
+                return i;
+            return candidate;
+        }, 0);
+        options.collection.set(options.collection['ids'][options.collection.default]);
+        
+        // Make the dropdown
+        options.buildDropdown('collection');
+        options.recordState('collection', true);
+        
+        // Generate Types of Collections
+        var types = util.lunique(data.collections.map(function(collection) { return collection['Type']; }));
+        types.unshift('All'); // Add 'All' to begining
+        
+        options.collection_type['labels'] = types;
+        options.collection_type['ids'] = types;
+        options.collection_type['available'] = util.range(types.length);
+        
+        // Set the type to match the current collection
+        options.collection_type.default = options.collection_type['ids'].indexOf(
+            data.collections[options.collection.default]['Type'] );
+        options.collection_type.set(types[options.collection_type.default]);
+        
+        // Make the dropdown for collection types
+
+        options.buildDropdown('collection_type');
+        options.recordState('collection_type', true);
+
+        // Add additional information for collections
+        data.collections.map(options.addCollectionPopup);
+        $('.collection_option').popover({html: true});
+        
+        // Limit the collection selections to the particular type
+        options.chooseCollectionType();
+    },
+    addCollectionPopup: function(collection) {
+        var content = '<dl class="dl-horizontal collection_popover">';
+        Object.keys(collection).map(function(key) {
+            content += "<dt>" + key + "</dt>";
+
+            if(collection[key] instanceof Date) {
+                var date = new Date(collection[key]);
+                content += "<dd>" + util.formatDate(date) + "</dd>";
+            } else if(collection[key] instanceof Array) {
+                var arr = collection[key].join(", ");
+                content += "<dd>" + arr + "</dd>";
+            } else {
+                content += "<dd>" + collection[key] + "</dd>";
+            }
+        });
+        content += "</dl>";
+
+        d3.select('#collection_' + collection['ID'])
+            .attr({
+                'class': 'collection_option',
+                'data-toggle': "popover",
+                'data-trigger': "hover",
+                'data-placement': "right",
+                'data-content': content}
+             );
+    },
+    chooseCollectionType: function() {
+        var curType = options.collection_type.get();
+        var curCollection = options.collection.get();
+        var firstValid = -1; 
+        
+        data.collections.map(function(collection, i) {
+            if(collection['Type'] == curType || 'All' == curType) {
+                d3.select('#collection_' + collection['ID'])
+                    .style('display', 'block');
+                
+                if(firstValid == -1)
+                    firstValid = i;
+            } else {
+                d3.select('#collection_' + collection['ID'])
+                    .style('display', 'none');
+                
+                if(collection['ID'] == curCollection)
+                    curCollection = 'invalid';
+            }
+        });
+        
+        // If the current collection does not match this type, then make a new one
+        if(curCollection == 'invalid') {
+            options.collection.set(options.collection.ids[firstValid]);
+                        
+            d3.select('#choose_collection').select('.current')
+                .text(options.collection.getLabel());
+
+            options.recordState('collection', true);
+
+            data.setCollection();
+        }
+            
     }
 }

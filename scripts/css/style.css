@@ -91,7 +91,9 @@ dl.collection_popover {
     margin-left: 85px;
     text-align: left;
     min-width: 200px !important;
-/*    width: auto !important;*/
+    max-height: 120px;
+    overflow: hidden;
+/*    text-overflow: ellipsis; */ /* Won't work with wrapped content */
 }
 
 button:focus {

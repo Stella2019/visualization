@@ -8,8 +8,8 @@ function Legend() {
         {term: "&nbsp;", label: "Capture Term", id: 'capture', has: false},
         {term: "&#x271d;", label: "Removed Capture Term", id: 'removed', has: false},
         {term: "*", label: "Term Added Later", id: 'added', has: false},
-        {term: "<svg height=10 width=10><line x1=0 y1=10 x2=10 y2=0 class='context_line' /></svg>",
-            label: "Tweet Volume", id: 'context_line', has: false}
+        {term: "<svg height=10 width=10><line x1=0 y1=10 x2=10 y2=0 class='total_line' /></svg>",
+            label: "Tweet Volume", id: 'total_line', has: false}
     ];
      
     // Function
@@ -67,14 +67,26 @@ function Legend() {
             series = data.series_byID[series];
         
         series.shown = !series.shown;
-        d3.select('.' + series.id + ' .legend_icon')
-            .classed('off', !series.shown);
-
+        self.showOrHideSeries(series);
+        
         if(!self.mouseOverToggle) {
 //            self.mouseOverToggle = true; // weird hack
 //            self.endToggle();
             data.prepareData();
         }
+    };
+    self.showOrHideSeries = function(series) {
+        d3.select('.' + series.id + ' .legend_icon')
+            .classed('off', !series.shown);
+        
+        if(options.legend_showhidden.is("false") && !series.shown) {
+            $('.legend_entry.' + series.id).fadeOut();
+        } else {
+            $('.legend_entry.' + series.id).fadeIn().css('display', 'table-row');
+        }
+    };
+    self.showOrHideAll = function() {
+        data.series.map(self.showOrHideSeries);
     };
     self.toggleSingle = function(series) {
         if(typeof(series) == "string")
@@ -86,11 +98,11 @@ function Legend() {
         
         series.shown = true;
         
-        d3.selectAll('.legend_icon')
-            .classed('off', true);//turnAllOff);
-        d3.select('.' + series.id + ' .legend_icon')
-            .classed('off', false);
-        console.log(data);
+//        d3.selectAll('.legend_icon')
+//            .classed('off', true);//turnAllOff);
+//        d3.select('.' + series.id + ' .legend_icon')
+//            .classed('off', false);
+        legend.showOrHideAll();
 
         data.prepareData();
     };
@@ -100,8 +112,9 @@ function Legend() {
             inner_series.shown = true;
         }, this);
         
-        d3.selectAll('.legend_icon')
-            .classed('off', false);
+        legend.showOrHideAll();
+//        d3.selectAll('.legend_icon')
+//            .classed('off', false);
 
         data.prepareData();
     };
@@ -143,7 +156,7 @@ Legend.prototype = {
             .data(legend.key_data)
             .enter().append('div')
             .attr('class', function(d) {
-                return 'legend_key_entry legend_key_' + d;
+                return 'legend_key_entry legend_key_' + d.id;
             });
         
         legend_key_entries.append('div')
@@ -154,18 +167,18 @@ Legend.prototype = {
             .attr('class', 'legend_key_label')
             .html(function(d) { return d.label; });                    
     },
-    populate: function() {        
-        // Get series ids
-        data.series.map(function(series) {
-            series.shown = true; 
-        });
+    populate: function() {     
+        // Show all series   
+//        data.series.map(function(series) {
+//            series.shown = true; 
+//        });
         
-        // Show all series
+        // Get series ids
         legend.series = data.series.map(function(series) {
             return series.id; 
         });
         
-        this.container.select('.legend_title')
+        legend.container.select('.legend_title')
             .text(options.series.getLabel());
         
         // Hide table entries
@@ -173,7 +186,7 @@ Legend.prototype = {
 //            .style('display', (options.series.is('terms') ? 'table' : 'none'));
         
         // Add new entries
-        var entries = this.container_series
+        var entries = legend.container_series
             .selectAll('div.legend_entry')
             .data(legend.series);
 
@@ -216,13 +229,19 @@ Legend.prototype = {
         new_entries.append('div')
             .attr('class', 'legend_only')
             .text('only')
-            .on('click', this.toggleSingle);
+            .on('click', legend.toggleSingle);
 
         // Remove entries
         entries.exit().remove();
-        entries.select('svg');
-        entries.select('div.legend_label');
-        entries.select('div.legend_only');
+        
+        // Propagate data to children
+        entries.each(function(d) {
+            var entry = d3.select(this);
+            entry.select('div.legend_icon').data([d])
+                .select('svg').select('rect');
+            entry.select('div.legend_label').data([d]);
+            entry.select('div.legend_only').data([d]);
+        });
 
         entries
             .attr('id', function(d) {
@@ -232,26 +251,23 @@ Legend.prototype = {
                 return 'legend_entry ' + d;
             });
         
-        this.container_series.on('mouseout', function(d) {
+        legend.container_series.on('mouseout', function(d) {
             d3.event.stopPropagation();
         });
-        this.container.on('mouseout', self.endToggle);
+        legend.container.on('mouseout', legend.endToggle);
 
-//        this.container.selectAll('rect.legend_icon')
+//        legend.container.selectAll('div.legend_icon')
 //            .classed('off', function(d) {
-//                return !d.shown;
+//                return !data.series_byID[d].shown;
 //            });
-        this.container.selectAll('rect.legend_icon')
-            .classed('off', false);
         
-        this.key_data.map(function(item) {
+        legend.key_data.map(function(item) {
             item.has = false;
         });
 
-        this.container.selectAll('div.legend_label')
+        legend.container.selectAll('div.legend_label')
             .html(function (d) {
                 var series = data.series_byID[d];
-            console.log(series, d)
             
                 var name = series.name;
                 if(options.series.is('terms')) {
@@ -268,9 +284,55 @@ Legend.prototype = {
                 return name;
             });
         
-        this.key_data.map(function(item) {
+        legend.key_data.map(function(item) {
+            console.log(item)
             this.key.select('.legend_key_' + item.id)
                 .classed('hidden', !item.has);
-        }, this);
+        }, legend);
+        
+        legend.showOrHideAll();
+    },
+    cmp: function(a, b) {
+        if(options.series_order.is('alpha')) {
+            a = a.name.toLowerCase();
+            b = b.name.toLowerCase();
+            
+            if(a < b)
+                return -1;
+            else if(a > b)
+                return 1;
+            return 0
+            
+        } else if(options.series_order.is('volume')) {
+            a = a.sum;
+            b = b.sum;
+
+            if(a < b)
+                return 1;
+            else if(a > b)
+                return -1;
+            return 0
+        } else if(options.series_order.is('type')) {
+            if((a.isKeyword && !b.isKeyword) || (a.isOldKeyword && !b.isKeyword && !b.isOldKeyword))
+                return -1;
+            else if((!a.isKeyword && b.isKeyword) || (!a.isOldKeyword && !a.isKeyword && b.isOldKeyword))
+                return 1;
+            return b.sum - a.sum;
+        } else {
+            a = a.order;
+            b = b.order;
+            
+            if(a < b)
+                return -1;
+            else if(a > b)
+                return 1;
+            return 0
+        }
+        
+    },
+    cmp_byID: function(a, b) {
+        a = data.series_byID[a];
+        b = data.series_byID[b];
+        return legend.cmp(a, b);
     }
 }
