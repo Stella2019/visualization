@@ -7,7 +7,7 @@ var util = {
         return util.formatDate.parse(str);
     },
     simplify: function(str) {
-        return "l" + str.replace(/[\s\.#]+/g, '_');
+        return "l" + str.replace(/\W/g, '_');
     },
     compareCollections: function(a, b) {
         return util.compareDates(new Date(a.StartTime), new Date(b.StartTime));
