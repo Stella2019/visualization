@@ -611,5 +611,8 @@ Display.prototype = {
         legend.key.select('.legend_key_total_line')
             .classed('hidden', options.total_line.is("false"));
     //    container.style('display', options.total_line.is("true") ? 'block' : 'none');
+    },
+    alert: function(text, style) {
+        alert(text);
     }
 }

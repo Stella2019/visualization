@@ -255,11 +255,6 @@ Legend.prototype = {
             d3.event.stopPropagation();
         });
         legend.container.on('mouseout', legend.endToggle);
-
-//        legend.container.selectAll('div.legend_icon')
-//            .classed('off', function(d) {
-//                return !data.series_byID[d].shown;
-//            });
         
         legend.key_data.map(function(item) {
             item.has = false;
@@ -285,7 +280,6 @@ Legend.prototype = {
             });
         
         legend.key_data.map(function(item) {
-            console.log(item)
             this.key.select('.legend_key_' + item.id)
                 .classed('hidden', !item.has);
         }, legend);

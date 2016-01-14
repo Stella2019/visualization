@@ -35,7 +35,7 @@
         "        ON TinE.Tweet_ID = Tweet.ID " .
         "    WHERE TinE.Event_ID = " . $event_id . " " .
         "        AND Tweet.Timestamp >= " . $time_min . " " .
-        "        AND Tweet.Timestamp <= " . $time_max . " ";
+        "        AND Tweet.Timestamp < " . $time_max . " ";
 
     foreach(explode(' ', $_GET["text_search"]) as $term) {
         $query = $query . "   AND LOWER(Tweet.Text) REGEXP '[[:<:]]" . $term . "[[:>:]]' ";

@@ -42,7 +42,7 @@ function Data() {
 
 Data.prototype = {
     loadCollections: function () {
-        disp.toggleLoading(true);
+//        disp.toggleLoading(true);
 
         // Collection selection
         d3.json("scripts/php/getCollections.php", data.parseCollectionsFile);
@@ -95,11 +95,11 @@ Data.prototype = {
         data.loadCollectionData();
     },
     loadCollectionData: function() {
-        disp.toggleLoading(true);
+//        disp.toggleLoading(true);
 
         // If there is no collection information, end, we cannot do this yet
         if($.isEmptyObject(data.collection)) {
-            disp.toggleLoading(false);
+//            disp.toggleLoading(false);
             return;
         }
 
@@ -150,31 +150,116 @@ Data.prototype = {
             }
         }
         
-        // Load the collection's primary file
-        data.loadDataFile();
+        // Send a signal to start loading the collection
+        data.startLoadingCollection();
     },
-    loadDataFile: function() {
+    startLoadingCollection: function() {
+        // Determine the base URL
         var url = "scripts/php/getTweetCounts.php";
         url += "?event_id=" + data.collection.ID;
-        url += '&time_min="' + util.formatDate(data.time.min) + '"';
-        url += '&time_max="' + util.formatDate(data.time.max) + '"';
         
-        console.info(url);
+        // Generate a list of times every 3 hours
+        var time_chunks = [];
+        for(var timestamp = new Date(data.time.min);
+            timestamp < data.time.max;
+            timestamp.setMinutes(timestamp.getMinutes() + 60 * 3)) {
+            time_chunks.push(util.formatDate(timestamp));
+        }
+        time_chunks.push(util.formatDate(data.time.max));
         
-        d3.csv(url, this.parseCSVData);
+        // Disable the collection button
+        d3.select('#choose_collection button')
+            .attr('disabled', true);
+        
+        // Start progress bar
+        d3.select("#timeseries_div").append('div')
+            .attr('id', 'load_collection_progress_div')
+            .attr('class', 'progress')
+            .style({
+                position: 'absolute',
+                top: '36%',
+                left: '10%',
+                width: '80%',
+                height: '40px',
+                'z-index': 3
+            })
+            .append('div')
+            .attr({
+                id: "load_collection_progress",
+                class: "progress-bar progress-bar-striped active",
+                role: "progressbar",
+                'aria-valuenow': "0",
+                'aria-valuemin': "0",
+                'aria-valuemax': "100",
+                'transition': "width .1s ease"
+            })
+            .style({'width': '0%',
+                   'font-weight': 'bold',
+                   'padding': '10px',
+                   'font-size': '1em'})
+            .text('Loading');
+        
+        // Make base file container
+        data.file = [];
+        
+        // Send off the first chunk of time to generate tweet counts
+        data.loadDataFile(url, time_chunks, 0);
     },
-    parseCSVData: function(error, data_file) {
-        if (error) {
-            alert("Sorry! File not found");
+    loadDataFile: function(url_base, time_chunks, index) {
+        // If we are at the max, end
+        if(index >= time_chunks.length - 1) {
+            // Set the text to rendering
+            d3.select('#load_collection_progress')
+                .text('Rendering Chart');
+            
+            // Load the new data
+            data.parseCSVData();
+            
+            // End the progress bar and stop function
+            d3.select('#load_collection_progress_div').remove();
+            d3.select('#choose_collection button')
+                .attr('disabled', null);
             return;
         }
+    
+        var url = url_base;
+        url += '&time_min="' + time_chunks[index] + '"';
+        url += '&time_max="' + time_chunks[index + 1] + '"';
+        console.info(url);
+    
+        d3.csv(url, function(error, file_data) {
+            if(error || !file_data) {
+                console.debug(error);
+                console.debug(file_data);
+                
+                // Abort
+                disp.alert("Problem loading data file");
+                d3.select('#load_collection_progress_div').remove();
+                d3.select('#choose_collection button')
+                    .attr('disabled', null);
+                return;
+            }
+            
+            // Update the progress bar
+            var progress = Math.floor(index / (time_chunks.length - 1) * 100);
+            d3.select('#load_collection_progress')
+                .attr('aria-valuenow', progress + "")
+                .style('width', progress + "%");
+            
+            // Append the data to the data loaded so far
+            data.file = data.file.concat(file_data);
 
+            // Start loading the next batch
+            data.loadDataFile(url_base, time_chunks, index + 1);
+        });
+    },
+    parseCSVData: function() {
         // Get the timestamps
-        data.timestamps = util.lunique(data_file.map(function(d) { return d.Time; }));
+        data.timestamps = util.lunique(data.file.map(function(d) { return d.Time; }));
 
         if(data.timestamps.length == 0)
             data.timestamps = [util.formatDate(new Date())];
-        data.keywords = Array.from(new Set(data_file.map(function(d) {return d.Keyword})));
+        data.keywords = Array.from(new Set(data.file.map(function(d) {return d.Keyword})));
         data.keywords = data.keywords.reduce(function(arr, word) {
             if(word != '_total_')
                 arr.push(word);
@@ -216,17 +301,17 @@ Data.prototype = {
         });
 
         // Input values from the loaded file
-        for(row in data_file) {
-            var timestamp = data_file[row]['Time'];
-            var found_in = data_file[row]['Found_In'];
-            var keyword = data_file[row]['Keyword'];
+        for(row in data.file) {
+            var timestamp = data.file[row]['Time'];
+            var found_in = data.file[row]['Found_In'];
+            var keyword = data.file[row]['Keyword'];
 
-            if(typeof data_file[row] !== 'object')
+            if(typeof data.file[row] !== 'object')
                 continue;
 
             options.subset.ids.map(function(subset) {
                 data_raw0[found_in][subset][timestamp][keyword] =
-                    parseInt(data_file[row][subset]);
+                    parseInt(data.file[row][subset]);
             });
         }
 
@@ -241,6 +326,8 @@ Data.prototype = {
             });
         });
 
+        // Clear the data file object (since it takes up a lot of space)
+        data.file = {};
         
         // Set Time Domain and Axis
         disp.focus.x.domain(  [data.time.min, data.time.max]).clamp(true);
@@ -520,14 +607,25 @@ Data.prototype = {
     genTweetCount: function() {
         var event_id = data.collection.ID;
         var search_term = options.add_term.get().toLowerCase();
+        
         // Generate PHP query
         var url = "scripts/php/genTweetCounts.php";
         url += "?event_id=" + event_id;
-        url += '&time_min="' + util.formatDate(options.time_min.min) + '"';
-        url += '&time_max="' + util.formatDate(options.time_max.max) + '"';
         url += '&text_search=' + search_term;
-        console.info(url);
-
+        
+        // Calculate time periods to add to the event
+        var time_min = options.time_min.min;
+        var time_max = options.time_max.max;
+        
+        // Generate a list of times every 6 hours
+        var time_chunks = [];
+        for(var timestamp = new Date(time_min);
+            timestamp < time_max;
+            timestamp.setMinutes(timestamp.getMinutes() + 60 * 6)) {
+            time_chunks.push(util.formatDate(timestamp));
+        }
+        time_chunks.push(util.formatDate(time_max));
+        
         // Start progress bar
         options.add_term.reset();
         $("#input_add_term").blur();
@@ -548,40 +646,54 @@ Data.prototype = {
                 id: "new_keyword_progress",
                 class: "progress-bar progress-bar-striped active",
                 role: "progressbar",
-                'aria-valuenow': "100",
+                'aria-valuenow': "0",
                 'aria-valuemin': "0",
                 'aria-valuemax': "100",
+                'transition': "width .1s ease"
             })
-            .style('width', '100%');
-
-        var timescale = d3.time.scale()
-            .range([0, 100])
-            .domain(disp.context.x.domain());
-
-    //    var check = setInterval(function() {
-    //        var url = "scripts/php/getEventTweetCount_Keyword_Stats.php";
-    //        url += "?event_id=" + event_id;
-    //        url += '&keyword=' + search_term;
-    //        
-    //        d3.json(url, function(error, data) {
-    //            if(error) return;
-    //            var progress = Math.floor(timescale(new Date(data[0].time)));
-    //            d3.select('#new_keyword_progress')
-    //                .attr('aria-valuenow', progress + "")
-    //                .style('width', progress + "%");
-    //        });
-    //    }, 2000);
-
-        d3.text(url, function(error, file_data) {
-            console.debug(error);
-            console.info(file_data);
-            if(error || file_data.substring(0, 7) != "REPLACE") {
-                alert("Problem generating new series");
-            }
-
+            .style('width', '0%');
+        
+        // Send off the first chunk of time to generate tweet counts
+        data.getTweetCountChunk(url, time_chunks, 0);
+    },
+    getTweetCountChunk: function(url_base, time_chunks, index) {
+        // If we are at the max, end
+        if(index >= time_chunks.length - 1) {
+            // Load the new data
+            data.startLoadingCollection();
+            
+            // End the progress bar and stop function
             d3.select('#new_keyword_progress_div').remove();
-    //        clearInterval(check);
-            data.loadCollectionData();
+            return;
+        }
+    
+        var url = url_base;
+        url += '&time_min="' + time_chunks[index] + '"';
+        url += '&time_max="' + time_chunks[index + 1] + '"';
+        console.info(url);
+    
+        d3.text(url, function(error, file_data) {
+            if(error || file_data.substring(0, 7) != "REPLACE") {
+                console.debug(error);
+                console.debug(file_data);
+                
+                // Abort
+                disp.alert("Problem generating new series from terms");
+                d3.select('#new_keyword_progress_div').remove();
+                return;
+            }
+            
+            // Update the progress bar
+            var progress = Math.floor(index / (time_chunks.length - 1) * 100);
+            d3.select('#new_keyword_progress')
+                .attr('aria-valuenow', progress + "")
+                .style('width', progress + "%");
+            
+            // If success, load the new data
+//            data.loadDataFile();
+
+            // Start loading the next batch
+            data.getTweetCountChunk(url_base, time_chunks, index + 1);
         });
     },
     getTweets: function(series, startTime, stopTime) {
