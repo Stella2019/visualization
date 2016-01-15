@@ -614,5 +614,69 @@ Display.prototype = {
     },
     alert: function(text, style) {
         alert(text);
+    },
+    startProgressBar: function(name) {
+        var parent_div = '#timeseries_div'; // load_collection
+        var parent_style = {
+            position: 'absolute',
+            top: '36%',
+            left: '10%',
+            width: '80%',
+            height: '40px',
+            'z-index': 3
+        }
+        var style = {
+            'width': '0%',
+            'font-weight': 'bold',
+            'padding': '10px',
+            'font-size': '1em'
+        };
+        var text = "Loading";
+        if(name == 'new_keyword') {
+            parent_div = '#input_add_term';
+            parent_style = {
+                position: 'absolute',
+                top: '0px',
+                left: '0px',
+                width: '100%',
+                height: '100%',
+                opacity: 0.5,
+                'z-index': 3
+            }
+            style = {
+                'width': '0%',
+                'font-weight': 'bold',
+                'padding': '10px',
+                'font-size': '1em'
+            };
+            text = "Working";
+        }
+        
+        // Start progress bar
+        d3.select(parent_div).append('div')
+            .attr('id', name + '_progress_div')
+            .attr('class', 'progress')
+            .style(parent_style)
+            .append('div')
+            .attr({
+                id: name + "_progress",
+                class: "progress-bar progress-bar-striped active",
+                role: "progressbar",
+                'aria-valuenow': "0",
+                'aria-valuemin': "0",
+                'aria-valuemax': "100",
+                'transition': "width .1s ease"
+            })
+            .style(style)
+            .text(text);
+    },
+    updateProgressBar: function(name, percentDone) {
+        console.log(percentDone)
+        d3.select('#' + name + '_progress')
+            .attr('aria-valuenow', percentDone + "")
+            .style('width', percentDone + "%");
+    },
+    endProgressBar: function(name) {
+        d3.select('#' + name + '_progress_div').remove();
     }
 }

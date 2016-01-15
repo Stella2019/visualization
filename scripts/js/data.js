@@ -172,32 +172,7 @@ Data.prototype = {
             .attr('disabled', true);
         
         // Start progress bar
-        d3.select("#timeseries_div").append('div')
-            .attr('id', 'load_collection_progress_div')
-            .attr('class', 'progress')
-            .style({
-                position: 'absolute',
-                top: '36%',
-                left: '10%',
-                width: '80%',
-                height: '40px',
-                'z-index': 3
-            })
-            .append('div')
-            .attr({
-                id: "load_collection_progress",
-                class: "progress-bar progress-bar-striped active",
-                role: "progressbar",
-                'aria-valuenow': "0",
-                'aria-valuemin': "0",
-                'aria-valuemax': "100",
-                'transition': "width .1s ease"
-            })
-            .style({'width': '0%',
-                   'font-weight': 'bold',
-                   'padding': '10px',
-                   'font-size': '1em'})
-            .text('Loading');
+        disp.startProgressBar('load_collection');
         
         // Make base file container
         data.file = [];
@@ -213,12 +188,15 @@ Data.prototype = {
                 .text('Rendering Chart');
             
             // Load the new data
+            setTimeout(function() {
             data.parseCSVData();
             
             // End the progress bar and stop function
-            d3.select('#load_collection_progress_div').remove();
+            disp.endProgressBar('load_collection');
             d3.select('#choose_collection button')
                 .attr('disabled', null);
+            }, 1000);
+                
             return;
         }
     
@@ -234,17 +212,16 @@ Data.prototype = {
                 
                 // Abort
                 disp.alert("Problem loading data file");
-                d3.select('#load_collection_progress_div').remove();
+                disp.endProgressBar('load_collection');
                 d3.select('#choose_collection button')
                     .attr('disabled', null);
                 return;
             }
             
             // Update the progress bar
-            var progress = Math.floor(index / (time_chunks.length - 1) * 100);
-            d3.select('#load_collection_progress')
-                .attr('aria-valuenow', progress + "")
-                .style('width', progress + "%");
+            console.log(index, time_chunks.length);
+            disp.updateProgressBar('load_collection',
+                                   Math.floor((index + 1) / (time_chunks.length - 1) * 100));
             
             // Append the data to the data loaded so far
             data.file = data.file.concat(file_data);
@@ -629,41 +606,20 @@ Data.prototype = {
         // Start progress bar
         options.add_term.reset();
         $("#input_add_term").blur();
-        d3.select("#choose_add_term").append('div')
-            .attr('id', 'new_keyword_progress_div')
-            .attr('class', 'progress')
-            .style({
-                position: 'absolute',
-                top: '0px',
-                left: '0px',
-                width: '100%',
-                height: '100%',
-                opacity: 0.5,
-                'z-index': 3
-            })
-            .append('div')
-            .attr({
-                id: "new_keyword_progress",
-                class: "progress-bar progress-bar-striped active",
-                role: "progressbar",
-                'aria-valuenow': "0",
-                'aria-valuemin': "0",
-                'aria-valuemax': "100",
-                'transition': "width .1s ease"
-            })
-            .style('width', '0%');
+        
+        disp.startProgressBar('new_keyword');
         
         // Send off the first chunk of time to generate tweet counts
-        data.getTweetCountChunk(url, time_chunks, 0);
+        data.genTweetCountChunk(url, time_chunks, 0);
     },
-    getTweetCountChunk: function(url_base, time_chunks, index) {
+    genTweetCountChunk: function(url_base, time_chunks, index) {
         // If we are at the max, end
         if(index >= time_chunks.length - 1) {
             // Load the new data
             data.startLoadingCollection();
             
             // End the progress bar and stop function
-            d3.select('#new_keyword_progress_div').remove();
+                disp.endProgressBar('new_keyword');
             return;
         }
     
@@ -679,21 +635,19 @@ Data.prototype = {
                 
                 // Abort
                 disp.alert("Problem generating new series from terms");
-                d3.select('#new_keyword_progress_div').remove();
+                disp.endProgressBar('new_keyword');
                 return;
             }
             
             // Update the progress bar
-            var progress = Math.floor(index / (time_chunks.length - 1) * 100);
-            d3.select('#new_keyword_progress')
-                .attr('aria-valuenow', progress + "")
-                .style('width', progress + "%");
+            disp.updateProgressBar('new_keyword',
+                                   Math.floor((index + 1) / (time_chunks.length - 1) * 100));
             
             // If success, load the new data
 //            data.loadDataFile();
 
             // Start loading the next batch
-            data.getTweetCountChunk(url_base, time_chunks, index + 1);
+            data.genTweetCountChunk(url_base, time_chunks, index + 1);
         });
     },
     getTweets: function(series, startTime, stopTime) {
