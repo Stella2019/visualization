@@ -15,6 +15,7 @@ found_in_types = ['any', 'text', 'quote', 'url']
 collection = {'name': None}
 collection_tweets = {}
 minutes = {}
+n_minutes = 15 # :00 to :09 after, then additionally :10 to :14
 
 distinct_mask = 1e6
 
@@ -96,7 +97,7 @@ def parseFile(filename):
     # Initialize different types of counts
     for count_type in types:
         minutes[count_type] = {}
-        for minute in range(0, 11):
+        for minute in range(0, n_minutes):
             minutes[count_type][minute] = {}
             for found_in in found_in_types:
                 minutes[count_type][minute][found_in] = {'_total_': 0}
@@ -171,7 +172,7 @@ def parseFile(filename):
                 # Figure out which minte we are at in the file
                 minute = 0
                 if(timestamp_minute[-2] != timestamp_str[-2]):
-                    minute = 10
+                    minute = 10 + int(timestamp_minute[-1])
                 else:
                     minute = int(timestamp_minute[-1])
                 
@@ -208,9 +209,9 @@ def parseFile(filename):
         if(options.statistics):
             # Push the numbers for each minute
             for found_in in found_in_types:
-                for minute in range(11):
+                for minute in range(n_minutes):
                     version_this = version;
-                    if(minute == 10):
+                    if(minute >= 10):
                         version_this = -1 - version_this;
                     timestamp_minute = timestamp + timedelta(seconds=60*minute)
                     time_key = datetime.strftime(timestamp_minute, '%Y%m%d_%H%M')
@@ -368,7 +369,6 @@ def loadCollection(collection_name):
         pgno += 1
     
     collection = getKeywords(collection)
-    pprint(collection);
     
     # Push the collection to the storage database if it exists
     if(options.database):
@@ -401,8 +401,6 @@ def loadCollection(collection_name):
             event['StopTime'] = time
         else:
             event['StopTime'] = None 
-            
-        pprint(event)
         
         cursor.execute("SET FOREIGN_KEY_CHECKS=0")
         cursor.execute(add_event, event)
