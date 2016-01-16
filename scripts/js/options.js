@@ -23,19 +23,23 @@ Option.prototype = {
 function Options() {
     var self = this;
     
-//    var options = {};
-    self.topmenu = ['collection_type', 'collection', 'time_limit', 'add_term', '<br>',
-                    'series', 'subset', 'found_in', 'resolution', '<br>',
-                    'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line', '<br>',
-                    'series_order', 'legend_showhidden'];
+    self.choice_groups = ['data', 'subset', 'style', 'legend'];
+    self.initial_buttons = ['show_options',
+                       'collection_type', 'collection', 'time_limit', 'add_term',
+                       'series', 'subset', 'found_in', 'resolution',
+                       'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line',
+                       'series_order', 'legend_showhidden'];
+    
     self.timefields = ['time_min', 'time_max']; 
     self.record = ['collection', 'subset', 'resolution', 'time_limit',
                       'display_type', 'y_scale', 'shape', 'series',
                       'time_save', 'time_min', 'time_max',
                       'y_max_toggle', 'y_max', 'color_scale',
                       'total_line', 'found_in', 'collection_type',
-                      'series_order', 'legend_showhidden'];
+                      'series_order', 'legend_showhidden', 'show_options'];
+    self.state = {};
     
+    // All options
     self.collection = new Option({
             title: "Event",
             labels: ["none"],
@@ -43,6 +47,7 @@ function Options() {
             available: [0],
             default: 0,
             custom_entries_allowed: true,
+            parent: '#choices_data',
             callback: function() { data.setCollection(); }
         });
     self.display_type = new Option({
@@ -51,6 +56,7 @@ function Options() {
             ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
             available: [0, 1, 2, 3, 4, 5],
             default: 0,
+            parent: '#choices_style',
             callback: function() { disp.display(); }
         });
     self.resolution = new Option({
@@ -59,6 +65,7 @@ function Options() {
             ids:    ["day", "hour", "tenminute", "minute"],
             available: [0, 1, 2, 3],
             default: 2,
+            parent: '#choices_subset',
             callback: function() { data.prepareData(); }
         });
     self.subset = new Option({
@@ -67,6 +74,7 @@ function Options() {
             ids:    ["all", "distinct", "original", "retweet", "reply", "quote"],
             available: [0, 1, 2, 3, 4, 5],
             default: 0,
+            parent: '#choices_subset',
             callback: function() { data.changeData(); }
         });
     self.shape = new Option({
@@ -75,6 +83,7 @@ function Options() {
             ids:    ["linear",  "basis-open",   "step-after"],
             available: [0, 1, 2],
             default: 2,
+            parent: '#choices_style',
             callback: function() { data.prepareData(); }
         });
     self.series = new Option({
@@ -83,6 +92,7 @@ function Options() {
             ids:    ["none", "terms", "types", "distinct"],
             available: [0, 1, 2, 3],
             default: 1,
+            parent: '#choices_subset',
             callback: function() { data.changeSeries('all'); }
         });
     self.y_scale = new Option({
@@ -91,6 +101,7 @@ function Options() {
             ids:    ["linear",  "pow",   "log", "preserve"],
             available: [0, 1, 2],
             default: 0,
+            parent: '#choices_style',
             callback: function() { disp.display(); }
         });
     self.y_max = new Option({
@@ -101,6 +112,7 @@ function Options() {
             default: 0,
             type: "textfieldautoman",
             custom_entries_allowed: true,
+            parent: '#choices_style',
             callback: function() { disp.display(); }
         });
     self.time_save = new Option({
@@ -111,6 +123,7 @@ function Options() {
             available: [0, 1],
             default: 0,
             type: "toggle",
+            parent: '#choices_time_right_buttons',
             callback: function() { 
                 var saving = !(options.time_save.is("true"));
                 if(saving) {
@@ -133,6 +146,7 @@ function Options() {
             available: [0],
             default: 0,
             custom_entries_allowed: true,
+            parent: '#chart-bottom',
             callback: function() { disp.setFocusTime('input_field'); }
         });
     self.time_max = new Option({
@@ -142,6 +156,7 @@ function Options() {
             available: [0],
             default: 0,
             custom_entries_allowed: true,
+            parent: '#chart-bottom',
             callback: function() { disp.setFocusTime('input_field'); }
         });
     self.time_limit = new Option({
@@ -150,6 +165,7 @@ function Options() {
             ids:    ["3h", "12h", "1d", "3d", '1w', 'all', '-1w', '-3d', '-1d', '-12h', '-3h'],
             available: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             default: 2,
+            parent: '#choices_data',
             callback: function() { data.loadCollectionData(); }
         });
     self.add_term = new Option({
@@ -160,6 +176,7 @@ function Options() {
             default: 0,
             custom_entries_allowed: true,   
             type: "textfieldconfirm",
+            parent: '#choices_data',
             callback: function() { data.genTweetCount(); }
         });
     self.color_scale = new Option({
@@ -168,6 +185,7 @@ function Options() {
             ids:    ["category10", 'category20', 'category20b', 'category20c'],
             available: [0, 1, 2, 3],
             default: 1,
+            parent: '#choices_style',
             callback: function() { data.prepareData(); }
         });
     self.terms_selected = new Option({
@@ -177,16 +195,18 @@ function Options() {
             available: [0],
             default: 0,
             custom_entries_allowed: true, 
+            parent: '#choices_legend',
             callback: function() { data.prepareData(); }
         });
     self.total_line = new Option({
             title: "Show Total",
-            styles: ["btn btn-default", "btn btn-primary"],
+            styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
             labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Total Line", "<span class='glyphicon glyphicon-ok-circle'></span> Show Total Line"],
             ids:    ["false", "true"],
             available: [0, 1],
             default: 0,
             type: "toggle",
+            parent: '#choices_style',
             callback: function() { disp.display(); }
         });
     self.found_in = new Option({
@@ -195,6 +215,7 @@ function Options() {
             ids:    ["Any", "Text", "Quote", "URL"],
             available: [0, 1, 2, 3],
             default: 1,
+            parent: '#choices_subset',
             callback: function() { data.changeData(); }
         });
     self.collection_type = new Option({
@@ -204,6 +225,7 @@ function Options() {
             available: [0, 1],
             default: 0,
             custom_entries_allowed: true,
+            parent: '#choices_data',
             callback: function() { options.chooseCollectionType(); }
         });
     self.series_order = new Option({
@@ -212,28 +234,36 @@ function Options() {
             ids:    ["orig", "alpha", "type", "volume"],
             available: [0, 1, 2, 3],
             default: 3,
+            parent: '#choices_legend',
             callback: function() { data.prepareData(); }
         });
     self.legend_showhidden = new Option({
             title: "Show Hidden",
-            styles: ["btn btn-default", "btn btn-primary"],
-            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Hidden Series in Legend", "<span class='glyphicon glyphicon-ok-circle'></span> Show Hidden Series in Legend"],
+            styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
+            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Hidden Series in Legend",
+                     "<span class='glyphicon glyphicon-ok-circle'></span> Show All Series in Legend"],
             ids:    ["false", "true"],
             available: [0, 1],
             default: 1,
             type: "toggle",
+            parent: '#choices_legend',
             callback: function() { legend.showOrHideAll(); }
         });
-    
-    // push holder variables and option sets into the list
-    this.state = {};
-//    Object.keys(options).map(function(item) {
-//        this[item] = options[item];
-//    }, this);
+    self.show_options = new Option({
+            title: 'Show Options',
+            styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
+            labels: ["<span class='glyphicon glyphicon-menu-up'></span> Options",
+                     "<span class='glyphicon glyphicon-menu-down'></span> Options"],
+            ids:    ["false", "true"],
+            available: [0, 1],
+            default: 1,
+            type: "toggle",
+            parent: '#header',
+            callback: function() { options.togglePane(); }
+        });
 };
 Options.prototype = {
     init: function() {
-//        var options = this;
         
         // Build options
         options.buildTopMenu();
@@ -249,6 +279,7 @@ Options.prototype = {
         options.y_max_toggle.styleFunc();
         options.time_save.styleFunc();
         options.total_line.styleFunc();
+        options.show_options.styleFunc();
         options.legend_showhidden.styleFunc();
         $(function () {
             $('[data-toggle="popover"]').popover()
@@ -299,7 +330,7 @@ Options.prototype = {
                 options.state[option] = value;
                 
                 // Change the interface
-                if(options.topmenu.indexOf(option) > -1) {
+                if(options.initial_buttons.indexOf(option) > -1) {
                     if(options[option].textfield) {
                         options[option].update(value);
                     } else {
@@ -351,15 +382,18 @@ Options.prototype = {
             history.pushState(null, null, strstate);
         }
     },
-    buildButtonSet: function(option) {
-        if(option == '<br>') {
-            d3.select("#choices").append("br")
-            return
-        }
+    togglePane: function() {
+        var show = options.show_options.is("true");
         
+        d3.select('#choices')
+            .transition(1000)
+            .style({'max-height': show ? '150px' : '0px',
+                    'opacity': show ? 1 : 0});
+    },
+    buildButtonSet: function(option) {
         var set = options[option];
         
-        var container = d3.select("#choices").append("div")
+        var container = d3.select(set.parent).append("div")
             .attr("class", "choice")
             .style("text-transform", "capitalize")
             .html(" " + set.title + ": ")
@@ -369,7 +403,7 @@ Options.prototype = {
         
 //        container.append("button")
 //            .attr({type: "button",
-//                class: 'btn btn-default'})
+//                class: 'btn btn-sm btn-default'})
 //            .style({'font-weight': 'bold'})
 //            .text(set.title);
         
@@ -378,7 +412,7 @@ Options.prototype = {
             .enter()
             .append("button")
                 .attr("type", "button")
-                .attr("class", "btn btn-default")
+                .attr("class", "btn btn-sm btn-default")
                 .attr("id", function(d) { return set.ids[d]; })
                 .text(function(d) { return set.labels[d]; })
                 .on("click", function(d) {
@@ -393,10 +427,15 @@ Options.prototype = {
         container.select('#' + set.ids[set.default]).classed('active', true);
     },
     buildTopMenu: function() {
-        options.topmenu.map(function(option) {
-            if (option == '<br>') {
-                d3.select("#choices").append("br")
-            } else if(options[option].type == 'textfieldautoman') {
+        d3.select('#choices')
+            .selectAll('div')
+            .data(options.choice_groups)
+            .enter()
+            .append('div')
+            .attr('id', function(d) { return 'choices_' + d; });
+        
+        options.initial_buttons.map(function(option) {
+            if(options[option].type == 'textfieldautoman') {
                 options.buildTextToggle(option);
             } else if(options[option].type == 'textfieldconfirm') {
                 options.buildTextConfirm(option);
@@ -422,14 +461,14 @@ Options.prototype = {
         }
         
         // Make container
-        var container = d3.select("#choices").append("div")
+        var container = d3.select(set.parent).append("div")
             .attr("class", "choice")
             .style("display", "inline-table")
             .style("vertical-align", "top")
             .style("text-transform", "capitalize")
             .append("div")
                 .attr("id", superId)
-                .attr("class", "input-group");
+                .attr("class", "input-group input-group-sm");
         
         container.append('button')
             .attr('id', superId + "_button")
@@ -447,14 +486,14 @@ Options.prototype = {
         
         // Make container
         var superId = "choose_" + option;
-        var container = d3.select("#choices").append("div")
+        var container = d3.select(set.parent).append("div")
             .attr("class", "choice")
             .style("display", "inline-table")
             .style("vertical-align", "top")
             .style("text-transform", "capitalize")
             .append("div")
                 .attr("id", superId)
-                .attr("class", "input-group");
+                .attr("class", "input-group input-group-sm");
         
         // Add title
         container.append('span')
@@ -546,14 +585,14 @@ Options.prototype = {
         
         // Make container
         var superId = "choose_" + option;
-        var container = d3.select("#choices").append("div")
+        var container = d3.select(set.parent).append("div")
             .attr("class", "choice")
             .style("display", "inline-table")
             .style("vertical-align", "top")
             .style("text-transform", "capitalize")
             .append("div")
                 .attr("id", superId)
-                .attr("class", "input-group");
+                .attr("class", "input-group input-group-sm");
         
         // Add title
         container.append('span')
@@ -597,7 +636,7 @@ Options.prototype = {
         
         // If it does not exist, create it
         if(!container[0][0]) {
-            container = d3.select("#choices").append("div")
+            container = d3.select(set.parent).append("div")
                 .attr("class", "choice")
                 .style("text-transform", "capitalize")
                 .append("div")
@@ -609,7 +648,7 @@ Options.prototype = {
         if(!button[0][0]) {
             button = container.append("button")
                 .attr({type: "button",
-                    class: 'btn btn-primary dropdown-toggle',
+                    class: 'btn btn-sm btn-primary dropdown-toggle',
                     'data-toggle': "dropdown",
                     'aria-haspopup': true,
                     'aria-expanded': false})
@@ -663,11 +702,12 @@ Options.prototype = {
  
         var container = d3.select("#chart-bottom").append("div")
             .style({width: '500px', display: 'inline-table'})
-            .attr("class", "text-center input-group");
+            .attr("class", "text-center input-group input-group-sm");
 //            .html("<strong>Time Window:</strong> ");
         
         
         var right_buttons = container.append('div')
+            .attr('id', 'choices_time_right_buttons')
             .attr('class', 'input-group-btn');
         
         right_buttons.append('button')
@@ -702,6 +742,7 @@ Options.prototype = {
             .attr("class", "text-center form-control");
         
         var left_buttons = container.append('div')
+            .attr('id', 'choices_time_left_buttons')
             .attr('class', 'input-group-btn');
         
 //        left_buttons.append('button')

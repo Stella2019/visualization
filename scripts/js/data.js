@@ -55,26 +55,41 @@ Data.prototype = {
         collections_file.reverse();
         data.collections = collections_file;
 
-        // Get new data
-        data.collection_names = data.collections.map(function(collection) {
-            if('DisplayName' in collection && collection['DisplayName'] && collection['DisplayName'] != "null")
-                return collection['DisplayName'];
-            return collection.Name;
-        });
+        
+        // Format collection data
         data.collections.map(function(collection) {
+            // Keywords
             collection.Keywords = collection.Keywords.trim().split(/,[ ]*/);
             collection.OldKeywords = collection.OldKeywords.trim().split(/,[ ]*/);
             if(collection.OldKeywords.length == 1 && collection.OldKeywords[0] == "")
                 collection.OldKeywords = [];
+            
+            // Name
+            if(!('DisplayName' in collection) || !collection['DisplayName'] || collection['DisplayName'] == "null")
+                collection.DisplayName = collection.Name;
+               
+            // Time
             collection.StartTime = util.date(collection.StartTime);
             collection.StartTime.setMinutes(collection.StartTime.getMinutes()
                                            -collection.StartTime.getTimezoneOffset());
-            if(collection.StopTime)
+            collection.Month = util.date2monthstr(collection.StartTime);
+            if(collection.StopTime) {
                 collection.StopTime = util.date(collection.StopTime);
-            else
+                if(collection.StartTime.getMonth() != collection.StopTime.getMonth()) 
+                    collection.Month += ' to ' + util.date2monthstr(collection.StopTime);
+            } else {
                 collection.StopTime = "Ongoing";
+                collection.Month += '+';
+            }
+            collection.DisplayName += ' ' + collection.Month;
         });
 
+        
+        // Make nicer collection names
+        data.collection_names = data.collections.map(function(collection) {
+            return collection.DisplayName;
+        });
+        
         options.buildCollections();
 
         // Initialize Legend
@@ -91,6 +106,8 @@ Data.prototype = {
                 return collection;
             return candidate
         }, {});
+        
+        disp.setTitle();
         
         data.loadCollectionData();
     },
@@ -203,7 +220,7 @@ Data.prototype = {
         var url = url_base;
         url += '&time_min="' + time_chunks[index] + '"';
         url += '&time_max="' + time_chunks[index + 1] + '"';
-        console.info(url);
+//        console.info(url);
     
         d3.csv(url, function(error, file_data) {
             if(error || !file_data) {
@@ -219,7 +236,6 @@ Data.prototype = {
             }
             
             // Update the progress bar
-            console.log(index, time_chunks.length);
             disp.updateProgressBar('load_collection',
                                    Math.floor((index + 1) / (time_chunks.length - 1) * 100));
             
@@ -598,7 +614,7 @@ Data.prototype = {
         var time_chunks = [];
         for(var timestamp = new Date(time_min);
             timestamp < time_max;
-            timestamp.setMinutes(timestamp.getMinutes() + 60 * 6)) {
+            timestamp.setMinutes(timestamp.getMinutes() + 60 * 1)) {
             time_chunks.push(util.formatDate(timestamp));
         }
         time_chunks.push(util.formatDate(time_max));
@@ -626,7 +642,7 @@ Data.prototype = {
         var url = url_base;
         url += '&time_min="' + time_chunks[index] + '"';
         url += '&time_max="' + time_chunks[index + 1] + '"';
-        console.info(url);
+//        console.info(url);
     
         d3.text(url, function(error, file_data) {
             if(error || file_data.substring(0, 7) != "REPLACE") {
@@ -645,6 +661,7 @@ Data.prototype = {
             
             // If success, load the new data
 //            data.loadDataFile();
+            console.debug(file_data);
 
             // Start loading the next batch
             data.genTweetCountChunk(url_base, time_chunks, index + 1);

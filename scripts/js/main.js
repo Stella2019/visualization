@@ -3,6 +3,7 @@ var options, legend, disp, data;
 
 var util = {
     formatDate: d3.time.format("%Y-%m-%d %H:%M:%S"),
+    date2monthstr: d3.time.format("%Y-%m"),
     date: function(str) {
         return util.formatDate.parse(str);
     },

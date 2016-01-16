@@ -633,7 +633,7 @@ Display.prototype = {
         };
         var text = "Loading";
         if(name == 'new_keyword') {
-            parent_div = '#input_add_term';
+            parent_div = '#choose_add_term';
             parent_style = {
                 position: 'absolute',
                 top: '0px',
@@ -671,12 +671,16 @@ Display.prototype = {
             .text(text);
     },
     updateProgressBar: function(name, percentDone) {
-        console.log(percentDone)
         d3.select('#' + name + '_progress')
             .attr('aria-valuenow', percentDone + "")
             .style('width', percentDone + "%");
     },
     endProgressBar: function(name) {
         d3.select('#' + name + '_progress_div').remove();
+    },
+    setTitle: function() {
+        d3.select('#chart-title')
+            .html('<small>' + data.collection.Type + ':</small> ' + 
+                  data.collection.DisplayName);
     }
 }

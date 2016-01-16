@@ -1,62 +1,23 @@
-/* Chart Display */
-#timeseries_div, #legend {
-    display: inline-block;
-    position: relative;
-}
-.axis path,
-.axis line {
-    fill: none;
-    stroke: #000;
-    shape-rendering: crispEdges;
-}
-.series {
-    transition: 1s;
-    cursor: pointer; /*zoom-in;*/
-    text-anchor: end;
-}
-.series.lines {
-    stroke-width: 2.0;
-}
-.series.unfocused {
-    opacity: 0.5;
-}
-.series.lines.unfocused {
-    opacity: 0.2;
-}
-.series .area {
-    stroke-opacity: 1.0;
-}
-.total_line {
-    fill: none;
-    stroke: black;
-    stroke-opacity: 1.0;
-    stroke-width: 3px;
-}
+/* Header */
 
-.brush .extent {
-  stroke: #fff;
-  fill-opacity: .125;
-  shape-rendering: crispEdges;
+#header {
+    padding: 5px;
+}
+#chart-title {
+    font-size: x-large;
+}
+#header .choice {
+    float: right;
 }
 
 /* Options */
-#optionsToggle:after {
-    content:"\e252"; /* Empty down arrow */
-    font-family: 'Glyphicons Halflings';
-    position: relative;
-    font-style: normal;
-    font-weight: 400;
-    line-height: 1;
-    top: 2px;
-    padding-left: 6px;
-}
-#optionsToggle.collapsed:after {
-    content:"\e253"; /* Filled down arrow */
+#choices {
+    max-height: 150px;
 }
 
 .choice {
-    display:inline-block;
-    padding: 5px;
+    display: inline-block;
+    padding: 2px;
 }
 
 .choice .dropdown-toggle {
@@ -98,6 +59,47 @@ dl.collection_popover {
 
 button:focus {
     outline: none !important;
+}
+
+/* Chart Display */
+#timeseries_div, #legend {
+    display: inline-block;
+    position: relative;
+}
+.axis path,
+.axis line {
+    fill: none;
+    stroke: #000;
+    shape-rendering: crispEdges;
+}
+.series {
+    transition: 1s;
+    cursor: pointer; /*zoom-in;*/
+    text-anchor: end;
+}
+.series.lines {
+    stroke-width: 2.0;
+}
+.series.unfocused {
+    opacity: 0.5;
+}
+.series.lines.unfocused {
+    opacity: 0.2;
+}
+.series .area {
+    stroke-opacity: 1.0;
+}
+.total_line {
+    fill: none;
+    stroke: black;
+    stroke-opacity: 1.0;
+    stroke-width: 3px;
+}
+
+.brush .extent {
+  stroke: #fff;
+  fill-opacity: .125;
+  shape-rendering: crispEdges;
 }
 
 /* Legend */
