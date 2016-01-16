@@ -14,21 +14,30 @@ types = ['all', 'distinct', 'original', 'retweet', 'reply', 'quote']
 found_in_types = ['any', 'text', 'quote', 'url']
 collection = {'name': None}
 collection_tweets = {}
+
 minutes = {}
-n_minutes = 15 # :00 to :09 after, then additionally :10 to :14
+n_minutes = 30
+# :-10 to :-1 (before the file, happens rarely but sometimes) 
+# :00 to :09 (within file),
+# then :10 to :19 (should be in next file, happens more often than I'd like)
 
 distinct_set = set()
 
+# Queries
 add_tweet = ("INSERT INTO Tweet "
              "(ID, Text, `Distinct`, Type, Username, Timestamp, Origin) "
              "VALUES (%(ID)s, %(Text)s, %(Distinct)s, %(Type)s, %(Username)s, %(Timestamp)s, %(Origin)s) "
-            "ON DUPLICATE KEY UPDATE `Distinct`=%(Distinct)s, `Text`=%(Text)s")
+            "ON DUPLICATE KEY UPDATE `Distinct`=%(Distinct)s, `Text`=%(Text)s ")
+
 add_tweet_to_event = ("INSERT IGNORE INTO TweetInEvent "
              "(Tweet_ID, Event_ID)"
              "VALUES (%(Tweet_ID)s, %(Event_ID)s)")
-add_event = ("REPLACE INTO Event "
+
+add_event = ("INSERT INTO Event "
              "(ID, Name, Description, Keywords, OldKeywords, StartTime, StopTime, TweetsCollected, Server)"
-             "VALUES (%(ID)s, %(Name)s, %(Description)s, %(Keywords)s, %(OldKeywords)s, %(StartTime)s, %(StopTime)s, %(TweetsCollected)s, %(Server)s)")
+             "VALUES (%(ID)s, %(Name)s, %(Description)s, %(Keywords)s, %(OldKeywords)s, %(StartTime)s, %(StopTime)s, %(TweetsCollected)s, %(Server)s)"
+            "ON DUPLICATE KEY UPDATE `StartTime`=%(StartTime)s, `StopTime`=%(StopTime)s, `TweetsCollected`=%(TweetsCollected)s, `Keywords`=%(Keywords)s, `OldKeywords`=%(OldKeywords)s ")
+
 add_tweet_count = ("REPLACE INTO TweetCount "
              "(Event_ID, Time, Timesource, Found_In, Keyword, Count, `Distinct`, Original, Retweet, Reply, Quote) "
              "VALUES (%(Event_ID)s, %(Time)s, %(Timesource)s, %(Found_In)s, %(Keyword)s, %(Count)s, %(Distinct)s, %(Original)s, %(Retweet)s, %(Reply)s, %(Quote)s)")
@@ -81,9 +90,14 @@ def parseFile(filename):
     
     collection_name = filename_with_content[0:-18].rsplit('/',1)[-1]
     timestamp_str = filename_with_content[-18:-5]
+    file_minute = int(timestamp_str[-2:])
     timestamp = datetime.strptime(timestamp_str, '%Y%m%d_%H%M')
     
-    if(options.verbose): print ("Parsing File: " + collection_name + " @ " + timestamp_str)
+    if(options.verbose): 
+        if(version is not 0):
+            print ("Parsing File: " + collection_name + " @ " + timestamp_str + '(' + version + ')')
+        else:
+            print ("Parsing File: " + collection_name + " @ " + timestamp_str)
     
     # Load intermediate collection
     verifyCollection(collection_name)
@@ -97,7 +111,7 @@ def parseFile(filename):
     # Initialize different types of counts
     for count_type in types:
         minutes[count_type] = {}
-        for minute in range(0, n_minutes):
+        for minute in range(n_minutes):
             minutes[count_type][minute] = {}
             for found_in in found_in_types:
                 minutes[count_type][minute][found_in] = {'_total_': 0}
@@ -170,11 +184,13 @@ def parseFile(filename):
                     cursor.execute(add_tweet_to_event, tweetInEvent)
                     
                 # Figure out which minte we are at in the file
-                minute = 0
-                if(timestamp_minute[-2] != timestamp_str[-2]):
-                    minute = 10 + int(timestamp_minute[-1])
-                else:
-                    minute = int(timestamp_minute[-1])
+                minute = int(timestamp_minute[-2:])
+                minute -= file_minute # Minutes since the start of the file
+                minute += 10 # 0 represents 10 minutes before the file, 29 represents 29 minutes after
+                minute %= 60 # Make sure it looks around the hour okay
+                
+                if(minute > 29):
+                    minute = 29 # Correct outrageous minutes
                 
                 # Count the tweet by its type
                 keyword = '_total_'
@@ -196,13 +212,6 @@ def parseFile(filename):
                             minutes["distinct"][minute][found_in][keyword] += 1
                         if(tweet["Type"] in types):
                             minutes[tweet["Type"]][minute][found_in][keyword] += 1
-                            
-                # Search for them in other parts
-#                if not keywords_found_in['any']:
-#                    print()
-#                    print(text)
-#                    print(data['id_str'])
-#                    printNestedWithKeywords(data)
                         
     if(options.database):
         
@@ -211,7 +220,9 @@ def parseFile(filename):
             for found_in in found_in_types:
                 for minute in range(n_minutes):
                     version_this = version;
-                    if(minute >= 10):
+                    if(minute < 10): # Before the file
+                        version_this = -51 - version_this;
+                    elif(minute >= 20): # After the file
                         version_this = -1 - version_this;
                     timestamp_minute = timestamp + timedelta(seconds=60*minute)
                     time_key = datetime.strftime(timestamp_minute, '%Y%m%d_%H%M')
