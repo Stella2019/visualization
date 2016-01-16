@@ -17,7 +17,7 @@ collection_tweets = {}
 minutes = {}
 n_minutes = 15 # :00 to :09 after, then additionally :10 to :14
 
-distinct_mask = 1e6
+distinct_set = set()
 
 add_tweet = ("INSERT IGNORE INTO Tweet "
              "(ID, Text, `Distinct`, Type, Username, Timestamp, Origin)"
@@ -89,7 +89,6 @@ def parseFile(filename):
     
     # Collect the counts of the keyword for the collection
     global collection_counts
-    distinct_set = set()
     cursor = {}
     if(options.database):
         cursor = serverStorage.cursor()
@@ -109,9 +108,10 @@ def parseFile(filename):
         for line in data_file:
             if len(line) > 5:
                 data = json.loads(line)
-                text = unicodedata.normalize('NFD', data['text']).encode('ascii', 'replace').decode('ascii', 'replace');
+                text = unicodedata.normalize('NFD', data['text']).encode('ascii', 'replace').decode('ascii', 'replace')
                 
-                # at some point remove urls from text (recognized by http)
+                # Remove URL, presuming they all start with http and contain no spaces
+                text_no_url = re.sub(r'http\S+',' ', text)
                 
                 push_this_tweet = True
                 if(options.words):
@@ -120,10 +120,9 @@ def parseFile(filename):
                         push_this_tweet |= word.lower() in text.lower().decode()
                 
                 # Figure out if the tweet is distinct
-                hash_value = hash(text) % distinct_mask
                 distinct = False
-                if(hash_value not in distinct_set):
-                    distinct_set.add(hash_value)
+                if(text_no_url not in distinct_set):
+                    distinct_set.add(text_no_url)
                     distinct = True
                 
                 # Get attributes of tweet
