@@ -19,9 +19,10 @@ n_minutes = 15 # :00 to :09 after, then additionally :10 to :14
 
 distinct_set = set()
 
-add_tweet = ("INSERT IGNORE INTO Tweet "
-             "(ID, Text, `Distinct`, Type, Username, Timestamp, Origin)"
-             "VALUES (%(ID)s, %(Text)s, %(Distinct)s, %(Type)s, %(Username)s, %(Timestamp)s, %(Origin)s)")
+add_tweet = ("INSERT INTO Tweet "
+             "(ID, Text, `Distinct`, Type, Username, Timestamp, Origin) "
+             "VALUES (%(ID)s, %(Text)s, %(Distinct)s, %(Type)s, %(Username)s, %(Timestamp)s, %(Origin)s) "
+            "ON DUPLICATE KEY UPDATE `Distinct`=%(Distinct)s, `Text`=%(Text)s")
 add_tweet_to_event = ("INSERT IGNORE INTO TweetInEvent "
              "(Tweet_ID, Event_ID)"
              "VALUES (%(Tweet_ID)s, %(Event_ID)s)")
