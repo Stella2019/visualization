@@ -1,6 +1,8 @@
 <?php
     include 'connect.php';
 
+    ini_set('max_execution_time', 300);
+
     // Get input from user
     $event_id = $_GET["event_id"];
     $time_min = $_GET["time_min"];
@@ -37,8 +39,9 @@
         "        AND Tweet.Timestamp >= " . $time_min . " " .
         "        AND Tweet.Timestamp < " . $time_max . " ";
 
-    foreach(explode(' ', $_GET["text_search"]) as $term) {
-        $query = $query . "   AND LOWER(Tweet.Text) REGEXP '[[:<:]]" . $term . "[[:>:]]' ";
+    foreach(explode(',', $_GET["text_search"]) as $term) {
+        $query = $query . "   AND LOWER(Tweet.Text) REGEXP '" . $term . "' ";
+//        $query = $query . "   AND LOWER(Tweet.Text) REGEXP '[[:<:]]" . $term . "[[:>:]]' ";
     }
 
     $query = $query . ") Tweets " .

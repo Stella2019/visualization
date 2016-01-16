@@ -24,8 +24,9 @@
         $query = $query . "   AND Tweet.Distinct = '" . $_GET["distinct"] . "'  ";
     }
     if(isset($_GET["text_search"])) {
-        foreach(explode(' ', $_GET["text_search"]) as $term) {
-            $query = $query . "   AND LOWER(Tweet.Text) REGEXP '[[:<:]]" . $term . "[[:>:]]' ";
+        foreach(explode(',', $_GET["text_search"]) as $term) {
+            $query = $query . "   AND LOWER(Tweet.Text) REGEXP '" . $term . "' ";
+//            $query = $query . "   AND LOWER(Tweet.Text) REGEXP '[[:<:]]" . $term . "[[:>:]]' ";
         }
     }
 
