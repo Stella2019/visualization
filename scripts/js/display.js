@@ -231,7 +231,9 @@ Display.prototype = {
         var n_series = data.stacked.length;
         if(n_series == 0) {
             disp.toggleLoading(false);
-            alert('No data');
+            disp.alert('Failure to display data');
+            
+            d3.selectAll('.series').remove();
             return;
         }
         n_datapoints = data.stacked[0].values.length;
@@ -266,7 +268,6 @@ Display.prototype = {
             .data(data.stacked);
 
         var series_paths = series.enter().append("g")
-    //        .on("mouseover", legend.highlightSeries)
             .on("mouseout", legend.unHighlightSeries)
             .on("click", function(d) {
                 var time = disp.getTimeHoveringOverAxis(this);
@@ -613,7 +614,47 @@ Display.prototype = {
     //    container.style('display', options.total_line.is("true") ? 'block' : 'none');
     },
     alert: function(text, style) {
-        alert(text);
+//        alert(text);
+        
+        var style = {
+            position: 'absolute',
+            top: '45%',
+            left: '20%',
+            width: '60%',
+            'z-index': 4
+        }
+        
+        var alert_shadow = d3.select('#body').append('div')
+            .attr('class', 'alert_outer')
+            .style({
+                'width': '100%',
+                'height': '100%',
+                'position': 'absolute',
+                'top': 0,
+                'left': 0
+            })
+            .on('click', function() {
+                d3.select('.alert_outer').remove();
+            });
+        
+        var alert_div = alert_shadow.append('div')
+            .attr({
+                'class': 'alert alert-warning alert-dismissible',
+                'role': 'alert'
+            })
+            .style(style);
+        
+        alert_div.append('button')
+            .attr({'type': 'button',
+                   'class': 'close', 
+                   'data-dismiss': 'alert',
+                   'aria-label': 'Close'})
+            .append('span')
+            .attr('aria-hidden', 'true')
+            .html('&times;');
+        
+        alert_div.append('span')
+            .html(text);
     },
     startProgressBar: function(name) {
         var parent_div = '#timeseries_div'; // load_collection
@@ -682,5 +723,62 @@ Display.prototype = {
         d3.select('#chart-title')
             .html('<small>' + data.collection.Type + ':</small> ' + 
                   data.collection.DisplayName);
+    },
+    tweetsModal: function(error, filedata, url, title) {
+
+        d3.select('#selectedTweetsModal .modal-title')
+            .html(title);
+
+        var modal_body = d3.select('#selectedTweetsModal .modal-body');
+        modal_body.selectAll('*').remove();
+
+        if(filedata.indexOf('Maximum execution time') >= 0) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br /> Query took too long");
+        } else if (filedata.indexOf('Fatal error') >= 0 || filedata.indexOf('Errormessage') >= 0) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br /> " + filedata);
+        } else if (error) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br /> " + error);
+        } else {
+            filedata = JSON.parse(filedata);
+
+            if(data.length == 0) {
+                modal_body.append('div')
+                    .attr('class', 'text-center')
+                    .text("No tweets found in this selection.");
+            } else {
+                modal_body.append('ul')
+                    .attr('class', 'list-group')
+                    .selectAll('li').data(filedata).enter()
+                    .append('li')
+                    .attr('class', 'list-group-item')
+                    .html(function(d) {
+                        var content = '<span class="badge"><a href="https://twitter.com/emcomp/status/' + d['ID'] + '">' + d['ID'] + '</a></span>';
+                        content += d['Timestamp'] + ' ';
+                        content += d['Username'] + ' said: ';
+                        content += "<br />";
+                        content += d['Text'];
+                        content += "<br />";
+                        if(d['Distinct'] == '1')
+                            content += 'distinct ';
+                        content += d['Type'];
+                        if(d['Origin'])
+                            content += ' of <a href="https://twitter.com/emcomp/status/' + d['Origin'] + '">#' + d['Origin'] + '</a>'
+                        return content;
+                    });
+
+                d3.json(url.replace('getTweets.php', 'getTweets_Count.php'), function(count) {
+                    d3.select('#selectedTweetsModal .modal-title')
+                        .html(count[0]['count'] + " " + title);
+                });
+            }
+        }
+
+        $('#selectedTweetsModal').modal();
     }
 }

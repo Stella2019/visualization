@@ -102,6 +102,12 @@ button:focus {
   shape-rendering: crispEdges;
 }
 
+/* Tweet Fetcher */
+.badge a {
+    color: white;
+}
+
+
 /* Legend */
 #legend {
     min-width: 200px;

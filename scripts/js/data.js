@@ -705,61 +705,7 @@ Data.prototype = {
 
         console.info(url);
         d3.text(url, function(error, filedata) {
-
-            d3.select('#selectedTweetsModal .modal-title')
-                .html(title);
-
-            var modal_body = d3.select('#selectedTweetsModal .modal-body');
-            modal_body.selectAll('*').remove();
-
-            if(filedata.indexOf('Maximum execution time') >= 0) {
-                modal_body.append('div')
-                    .attr('class', 'text-center')
-                    .html("Error retrieving tweets. <br /><br /> Query took too long");
-            } else if (filedata.indexOf('Fatal error') >= 0 || filedata.indexOf('Errormessage') >= 0) {
-                modal_body.append('div')
-                    .attr('class', 'text-center')
-                    .html("Error retrieving tweets. <br /><br /> " + filedata);
-            } else if (error) {
-                modal_body.append('div')
-                    .attr('class', 'text-center')
-                    .html("Error retrieving tweets. <br /><br /> " + error);
-            } else {
-                filedata = JSON.parse(filedata);
-
-                if(data.length == 0) {
-                    modal_body.append('div')
-                        .attr('class', 'text-center')
-                        .text("No tweets found in this selection.");
-                } else {
-                    modal_body.append('ul')
-                        .attr('class', 'list-group')
-                        .selectAll('li').data(filedata).enter()
-                        .append('li')
-                        .attr('class', 'list-group-item')
-                        .html(function(d) {
-                            var content = "<span class='badge'># " + d['ID'] + " </span>";
-                            content += d['Timestamp'] + ' ';
-                            content += d['Username'] + " said: ";
-                            content += "<br />";
-                            content += d['Text'];
-                            content += "<br />";
-                            if(d['Distinct'] == '1')
-                                content += 'distinct ';
-                            content += d['Type'];
-                            if(d['Origin'])
-                                content += ' of # ' + d['Origin']
-                            return content;
-                        });
-
-                    d3.json(url.replace('getTweets.php', 'getTweets_Count.php'), function(count) {
-                        d3.select('#selectedTweetsModal .modal-title')
-                            .html(count[0]['count'] + " " + title);
-                    });
-                }
-            }
-
-            $('#selectedTweetsModal').modal();
+            disp.tweetsModal(error, filedata, url, title);
         });
     }
 }
