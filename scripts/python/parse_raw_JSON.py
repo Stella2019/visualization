@@ -123,7 +123,7 @@ def parseFile(filename):
         for line in data_file:
             if len(line) > 5:
                 data = json.loads(line)
-                text = unicodedata.normalize('NFD', data['text']).encode('ascii', 'replace').decode('ascii', 'replace')
+                text = norm_unicode(data['text'])
                 
                 # Remove URL, presuming they all start with http and contain no spaces
                 text_no_url = re.sub(r'http\S+',' ', text)
@@ -147,9 +147,12 @@ def parseFile(filename):
                 timestamp_exact = datetime.strftime(created_at, '%Y-%m-%d %H:%M:%S')
                 timestamp_minute = datetime.strftime(created_at, '%Y%m%d_%H%M')
                 
+                database_text = text;
+                if(len(database_text) > 200):
+                    database_text = 200
                 tweet = {
                     'ID': data['id'],
-                    'Text': text,
+                    'Text': database_text,
                     'Distinct': distinct,
                     'Type': 'original',
                     'Username': None,
@@ -471,7 +474,7 @@ def printNested(obj, level=0):
     if(type(obj) is dict):
         for key in obj:
             if(type(obj[key]) is str):
-                text = obj[key].encode('ascii', 'replace').decode('ascii', 'replace');
+                text = rm_unicode(obj[key]);
                 print("  " * level + key + ": " + text)
             elif(type(obj[key]) is int or type(obj[key]) is bool or not obj[key]):
                 text = str(obj[key]);
@@ -482,7 +485,7 @@ def printNested(obj, level=0):
     elif(type(obj) is list):
         for i, item in enumerate(obj):
             if(type(item) is str):
-                text = item.encode('ascii', 'replace').decode('ascii', 'replace');
+                text = rm_unicode(item);
                 print("  " * level + str(i) + ": " + text)
             elif(type(item) is int or type(item) is bool or not item):
                 text = str(item);
@@ -491,17 +494,17 @@ def printNested(obj, level=0):
                 print("  " * level + str(i) + ":")
                 printNested(item, level + 1)
     elif(type(obj) is str):
-        text = obj.encode('ascii', 'replace').decode('ascii', 'replace');
+        text = rm_unicode(obj);
         print('  ' * level + text)
     else:
-        text = str(obj).encode('ascii', 'replace').decode('ascii', 'replace');
+        text = rm_unicode(str(obj));
         print('  ' * level + text)
         
 def printNestedWithKeywords(obj, pre="  "):
     if(type(obj) is dict):
         for key in obj:
             if(type(obj[key]) is str):
-                text = obj[key].encode('ascii', 'replace').decode('ascii', 'replace');
+                text = rm_unicode(obj[key]);
                 if(hasKeywords(text)):
                     print(pre + "." + key + ": " + text)
             elif(type(obj[key]) is int or type(obj[key]) is bool or not obj[key]):
@@ -513,7 +516,7 @@ def printNestedWithKeywords(obj, pre="  "):
     elif(type(obj) is list):
         for i, item in enumerate(obj):
             if(type(item) is str):
-                text = item.encode('ascii', 'replace').decode('ascii', 'replace');
+                text = rm_unicode(item);
                 if(hasKeywords(text)):
                     print(pre + '[' + str(i) + "]: " + text)
             elif(type(item) is int or type(item) is bool or not item):
@@ -523,16 +526,16 @@ def printNestedWithKeywords(obj, pre="  "):
             else:
                 printNestedWithKeywords(item, pre + '[' + str(i) + ']')
     elif(type(obj) is str):
-        text = obj.encode('ascii', 'replace').decode('ascii', 'replace');
+        text = rm_unicode(obj);
         if(hasKeywords(text)):
             print(pre + ": " + text)
     else:
-        text = str(obj).encode('ascii', 'replace').decode('ascii', 'replace');
+        text = rm_unicode(str(obj));
         if(hasKeywords(text)):
             print(pre + ": " + text)
         
 def hasKeywords(text):
-    text = text.encode('ascii', 'replace').decode('ascii', 'replace').lower()
+    text = rm_unicode(text).lower()
     found = []
     
     for keyword, keyword_parts in zip(collection['keywords'], collection['keywords_parts']):
@@ -595,6 +598,13 @@ def checkMetaData(data):
     found_in['any'] = l_union(found_in['any'],  found_in['url'])
        
     return found_in
+
+def rm_unicode(str):
+    return str.encode('ascii', 'ignore').decode('ascii', 'ignore')
+#    return str.encode('ascii', 'replace').decode('ascii', 'replace')
+
+def norm_unicode(str):
+    return rm_unicode(unicodedata.normalize('NFD', str))
 
 if __name__ == "__main__":
     main()
