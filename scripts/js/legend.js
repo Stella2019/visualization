@@ -13,120 +13,6 @@ function Legend() {
     ];
      
     // Function
-    self.startToggle = function(series) {
-        if(typeof(series) == "string")
-            series = data.series_byID[series];
-        
-        self.mouseOverToggle = true;
-        self.mouseOverToggleState = !series.shown;
-        self.toggleSeries(series); 
-        d3.event.stopPropagation();
-    };
-    self.endToggle = function(series) {
-        if(typeof(series) == "string")
-            series = data.series_byID[series];
-        
-        if(self.mouseOverToggle) {
-            self.mouseOverToggle = false;
-            data.prepareData(); 
-        }
-    };
-    self.highlightSeries = function(series) {
-        if(typeof(series) == "string")
-            series = data.series_byID[series];
-
-        d3.selectAll('.series, .legend_icon')
-            .classed('focused', false)
-            .classed('unfocused', true);
-        d3.selectAll('.series.' + series.id + ', .' + series.id + ' .legend_icon')
-            .classed('unfocused', false)
-            .classed('focused', true);
-    };
-    self.hoverLegendEntry = function(series) {
-        if(typeof(series) == "string")
-            series = data.series_byID[series];
-        
-        self.highlightSeries(series);
-    };
-    self.hoverLegendEntryEnd = function(series) {
-        if(typeof(series) == "string")
-            series = data.series_byID[series];
-        
-        self.unHighlightSeries(series);
-    };
-    self.unHighlightSeries = function(series) {
-        if(typeof(series) == "string")
-            series = data.series_byID[series];
-        
-        d3.selectAll('.series, .legend_icon')
-            .classed('focused', false)
-            .classed('unfocused', false);
-    };
-    self.toggleSeries = function(series) {
-        if(typeof(series) == "string")
-            series = data.series_byID[series];
-        
-        series.shown = !series.shown;
-        self.showOrHideSeries(series);
-        
-        if(!self.mouseOverToggle) {
-//            self.mouseOverToggle = true; // weird hack
-//            self.endToggle();
-            data.prepareData();
-        }
-    };
-    self.showOrHideSeries = function(series) {
-        d3.select('.' + series.id + ' .legend_icon')
-            .classed('off', !series.shown);
-        
-        if(options.legend_showhidden.is("false") && !series.shown) {
-            $('.legend_entry.' + series.id).fadeOut();
-        } else {
-            $('.legend_entry.' + series.id).fadeIn().css('display', 'table-row');
-        }
-    };
-    self.showOrHideAll = function() {
-        data.series.map(self.showOrHideSeries);
-    };
-    self.toggleSingle = function(series) {
-        if(typeof(series) == "string")
-            series = data.series_byID[series];
-        
-        data.series.map(function(inner_series) {
-            inner_series.shown = false;//!turnAllOff; 
-        }, this);
-        
-        series.shown = true;
-        
-//        d3.selectAll('.legend_icon')
-//            .classed('off', true);//turnAllOff);
-//        d3.select('.' + series.id + ' .legend_icon')
-//            .classed('off', false);
-        legend.showOrHideAll();
-
-        data.prepareData();
-    };
-    self.showAll = function() {
-        
-        data.series.map(function(inner_series) {
-            inner_series.shown = true;
-        }, this);
-        
-        legend.showOrHideAll();
-//        d3.selectAll('.legend_icon')
-//            .classed('off', false);
-
-        data.prepareData();
-    };
-    self.hoverOverSeries = function(series) {
-        if(typeof(series) == "string")
-            series = data.series_byID[series];
-        
-        window.getSelection().removeAllRanges()
-        if(self.mouseOverToggle && series.shown != self.mouseOverToggleState) {
-            self.toggleSeries(series);
-        }
-    };
 }
 
 Legend.prototype = {
@@ -328,5 +214,111 @@ Legend.prototype = {
         a = data.series_byID[a];
         b = data.series_byID[b];
         return legend.cmp(a, b);
+    },
+    startToggle: function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
+        legend.mouseOverToggle = true;
+        legend.mouseOverToggleState = !series.shown;
+        legend.toggleSeries(series); 
+        d3.event.stopPropagation();
+    },
+    endToggle: function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
+        if(legend.mouseOverToggle) {
+            legend.mouseOverToggle = false;
+            data.prepareData(); 
+        }
+    },
+    highlightSeries: function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+
+        d3.selectAll('.series, .legend_icon')
+            .classed('focused', false)
+            .classed('unfocused', true);
+        d3.selectAll('.series.' + series.id + ', .' + series.id + ' .legend_icon')
+            .classed('unfocused', false)
+            .classed('focused', true);
+    },
+    hoverLegendEntry: function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
+        legend.highlightSeries(series);
+    },
+    hoverLegendEntryEnd: function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
+        legend.unHighlightSeries(series);
+    },
+    unHighlightSeries: function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
+        d3.selectAll('.series, .legend_icon')
+            .classed('focused', false)
+            .classed('unfocused', false);
+    },
+    toggleSeries: function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
+        series.shown = !series.shown;
+        legend.showOrHideSeries(series);
+        
+        if(!legend.mouseOverToggle) {
+            data.prepareData();
+        }
+    },
+    showOrHideSeries: function(series) {
+        d3.select('.' + series.id + ' .legend_icon')
+            .classed('off', !series.shown);
+        
+        if(options.legend_showhidden.is("false") && !series.shown) {
+            $('.legend_entry.' + series.id).fadeOut();
+        } else {
+            $('.legend_entry.' + series.id).fadeIn().css('display', 'table-row');
+        }
+    },
+    showOrHideAll: function() {
+        data.series.map(legend.showOrHideSeries);
+    },
+    toggleSingle: function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
+        data.series.map(function(inner_series) {
+            inner_series.shown = false;//!turnAllOff; 
+        }, this);
+        
+        series.shown = true;
+        
+        legend.showOrHideAll();
+
+        data.prepareData();
+    },
+    showAll: function() {
+        
+        data.series.map(function(inner_series) {
+            inner_series.shown = true;
+        }, this);
+        
+        legend.showOrHideAll();
+
+        data.prepareData();
+    },
+    hoverOverSeries: function(series) {
+        if(typeof(series) == "string")
+            series = data.series_byID[series];
+        
+        window.getSelection().removeAllRanges()
+        if(legend.mouseOverToggle && series.shown != legend.mouseOverToggleState) {
+            legend.toggleSeries(series);
+        }
     }
 }

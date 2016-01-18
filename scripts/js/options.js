@@ -261,16 +261,6 @@ function Options() {
             parent: '#header',
             callback: function() { options.togglePane(); }
         });
-    self.getTweets = new Option({
-            title: '<span class="glyphicon glyphicon-download"></span>',
-            labels: ["All Visible", "100 Random of Visible"],
-            ids:    ["visible", "100random"],
-            available: [0, 1],
-            default: 1,
-            type: "dropdown",
-            parent: '#choices_legend',
-            callback: function() { console.log("New Tweets") }
-        });
 };
 Options.prototype = {
     init: function() {
