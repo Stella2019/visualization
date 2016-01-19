@@ -106,7 +106,9 @@ button:focus {
 .badge a {
     color: white;
 }
-
+.modal-options {
+    display: inline-block;
+}
 
 /* Legend */
 #legend {

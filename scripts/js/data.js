@@ -70,8 +70,8 @@ Data.prototype = {
                
             // Time
             collection.StartTime = util.date(collection.StartTime);
-            collection.StartTime.setMinutes(collection.StartTime.getMinutes()
-                                           -collection.StartTime.getTimezoneOffset());
+//            collection.StartTime.setMinutes(collection.StartTime.getMinutes()
+//                                           -collection.StartTime.getTimezoneOffset());
             collection.Month = util.date2monthstr(collection.StartTime);
             if(collection.StopTime) {
                 collection.StopTime = util.date(collection.StopTime);
@@ -672,6 +672,11 @@ Data.prototype = {
         url += "?event_id=" + data.collection.ID;
         var title = "";
 
+        if(options.fetched_tweet_order.is("rand")) {
+            url += '&rand'
+            title += 'Random ';
+        }
+        
         if(options.subset.is("distinct")) {
             url += '&distinct=1';
             title += 'Distinct ';
@@ -682,10 +687,7 @@ Data.prototype = {
         title += 'Tweets';
 
         if(options.series.is("terms")) {
-    //        if(series.name.split(" ").length > 1)
-    //            url += '&text_search="' + series.name.split(" ").join("|") + '"';
-    //        else
-                url += '&text_search=' + series.name;
+            url += '&text_search=' + series.name;
             title += ' with text "' + series.name + '"';
         } else if(options.series.is("types")) {
             url += '&type=' + series.name;
@@ -695,17 +697,19 @@ Data.prototype = {
             title += ' that are ' + (series.name == "distinct" ? 'distinct' : 'not distinct')
         }
 
-    //    startTime.setHours(startTime.getHours() - 8); // temporary UTC/PST fix
         url += '&time_min="' + util.formatDate(startTime) + '"';
         title += " between <br />" + util.formatDate(startTime);
 
-    //    stopTime.setHours(stopTime.getHours() - 8); // temporary UTC/PST fix
         url += '&time_max="' + util.formatDate(stopTime) + '"';
         title += " and " + util.formatDate(stopTime);
-
+        
         console.info(url);
         d3.text(url, function(error, filedata) {
             disp.tweetsModal(error, filedata, url, title);
         });
+    },
+    getRumor: function() {
+        
+        
     }
 }

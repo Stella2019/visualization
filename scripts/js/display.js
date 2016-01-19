@@ -729,9 +729,13 @@ Display.prototype = {
         d3.select('#selectedTweetsModal .modal-title')
             .html(title);
 
+        // Clear any data still in the modal
+        d3.select('#selectedTweetsModal .modal-options')
+            .selectAll('*').remove();
         var modal_body = d3.select('#selectedTweetsModal .modal-body');
         modal_body.selectAll('*').remove();
 
+        // Report errors if they happened
         if(filedata.indexOf('Maximum execution time') >= 0) {
             modal_body.append('div')
                 .attr('class', 'text-center')
@@ -745,6 +749,8 @@ Display.prototype = {
                 .attr('class', 'text-center')
                 .html("Error retrieving tweets. <br /><br /> " + error);
         } else {
+            
+            // Otherwise, parse the data
             filedata = JSON.parse(filedata);
 
             if(data.length == 0) {
@@ -771,6 +777,30 @@ Display.prototype = {
                             content += ' of <a href="https://twitter.com/emcomp/status/' + d['Origin'] + '">#' + d['Origin'] + '</a>'
                         return content;
                     });
+                
+                d3.select('.modal-options').selectAll('button')
+                    .data(options.fetched_tweet_order.available)
+                    .enter()
+                    .append('button')
+                    .attr('class', 'btn btn-primary')
+                    .text(function(d) {
+                        return options.fetched_tweet_order.labels[d];
+                    })
+                    .on('click', function(d) {
+                        options.fetched_tweet_order.click(d);
+                    
+                        url = url.replace('&rand', '');
+                        if(options.fetched_tweet_order.is('rand')) {
+                            url += '&rand';
+                        }
+                    console.log(url);
+                        
+                        // Fetch new data
+                        d3.text(url, function(error, filedata) {
+                            disp.tweetsModal(error, filedata, url, title);
+                        });
+                    });
+                
 
                 d3.json(url.replace('getTweets.php', 'getTweets_Count.php'), function(count) {
                     d3.select('#selectedTweetsModal .modal-title')

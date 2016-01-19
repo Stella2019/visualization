@@ -28,7 +28,7 @@ function Options() {
                        'collection_type', 'collection', 'time_limit', 'add_term',
                        'series', 'subset', 'found_in', 'resolution',
                        'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line',
-                       'series_order', 'legend_showhidden'];
+                       'series_order', 'legend_showhidden', 'fetched_tweet_order', 'get_rumor'];
     
     self.timefields = ['time_min', 'time_max']; 
     self.record = ['collection', 'subset', 'resolution', 'time_limit',
@@ -260,6 +260,26 @@ function Options() {
             type: "toggle",
             parent: '#header',
             callback: function() { options.togglePane(); }
+        });
+    self.get_rumor = new Option({
+            title: 'Rumor',
+            labels: ["New"],
+            ids:    ["_new_"],
+            available: [0],
+            default: 0,
+            type: "dropdown",
+            parent: '#choices_legend',
+            callback: function() { options.editRumorWindow(); }
+        });
+    self.fetched_tweet_order = new Option({
+            title: 'Fetched Tweets',
+            labels: ["Most Repeated", "First in Time", "Random"],
+            ids:    ["popular", "time", "rand"],
+            available: [1, 2],
+            default: 1,
+            type: "dropdown",
+            parent: '#choices_legend',
+            callback: function() { /* nothing */ }
         });
 };
 Options.prototype = {
@@ -677,20 +697,22 @@ Options.prototype = {
             .enter()
             .append("li").append("a");
         
+        set.click = function(d) {
+            container.select('.current')
+                .text(set.labels[d]);
+
+            set.set(set.ids[d]);
+            options.recordState(option);
+
+            set.callback();
+        }
+        
         list.selectAll('a')
             .attr("id", function(d) { return option + "_" + set.ids[d]; })
             .html(function(d) {
                 return set.labels[d];
             })
-            .on("click", function(d) {
-                container.select('.current')
-                    .text(set.labels[d]);
-
-                set.set(set.ids[d]);
-                options.recordState(option);
-
-                set.callback();
-            });
+            .on("click", set.click);
 
         // Save the current value to the interface and the history
         container.select('.current')
@@ -937,5 +959,26 @@ Options.prototype = {
             data.setCollection();
         }
             
+    },
+    editRumorWindow: function() {
+        var rumor_id = options.get_rumor.get();
+        
+        // Get up to date rumor information from the database
+        if(rumor_id == '_new_') {
+        } else { 
+            data.getRumor();
+        }
+        
+        d3.select('#selectedTweetsModal .modal-title')
+            .html(rumor_id);
+
+        // Clear any data still in the modal
+        d3.select('#selectedTweetsModal .modal-options')
+            .selectAll('*').remove();
+        var modal_body = d3.select('#selectedTweetsModal .modal-body');
+        modal_body.selectAll('*').remove();
+        
+        
+        $('#selectedTweetsModal').modal();
     }
 }
