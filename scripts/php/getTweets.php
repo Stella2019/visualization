@@ -31,9 +31,12 @@
     }
     if(isset($_GET["text_search"])) {
         foreach(explode(',', $_GET["text_search"]) as $term) {
-//            $query = $query . "   AND LOWER(Tweet.Text) REGEXP '[[:<:]]" . $term . "[[:>:]]' ";
             $query = $query . "   AND LOWER(Tweet.Text) REGEXP '" . $term . "' ";
         }
+    }
+
+    if(isset($_GET["rand"])) {
+        $query = $query . " ORDER BY RAND()";
     }
 
     if(isset($_GET["limit"])) {
@@ -42,5 +45,10 @@
         $query = $query . " LIMIT 5;";
     }
 
-    include 'printJSON.php';
+
+    if(isset($_GET["csv"])) {
+        include 'exportToCSV.php';
+    } else {
+        include 'printJSON.php';
+    }
 ?>
