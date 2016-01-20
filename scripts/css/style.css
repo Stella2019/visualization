@@ -239,8 +239,9 @@ button:focus {
 }
 .modal-options {
     display: inline-block;
+    margin: 0px 5px;
 }
-.edit-box-editable input, .edit-box-date-editable input {
+#edit_form input {
     width: 95%;
 }
     

@@ -1033,7 +1033,13 @@ Options.prototype = {
         
         // Append form
         var form = modal_body.append('form')
-            .attr('class', 'form-horizontal');
+            .attr({
+                id: 'edit_form',
+                method: 'post',
+                class: 'form-horizontal',
+                action: 'scripts/php/updateEvent.php',
+                target: 'internal_php_frame'
+            });
         
         var divs = form.selectAll('div.form-group')
             .data(Object.keys(info))
@@ -1042,7 +1048,7 @@ Options.prototype = {
             .attr('class', 'form-group');
         
         divs.append('label')
-            .attr('for', function(d) { return d; })
+            .attr('for', function(d) { return 'edit_input_' + d; })
             .attr('class', 'col-sm-3 control-label')
             .text(function(d) {
                 // Convert CamelCase to Camel Case
@@ -1052,17 +1058,30 @@ Options.prototype = {
                     return d;
             });
         
-        var nonEditable = ['ID', 'Name', 'Keywords', 'OldKeywords'];
+        var nonEditable = ['ID', 'Name', 'Keywords', 'OldKeywords', 'Server', 'Month'];
         var dateFields = ['StartTime', 'StopTime'];
         
         divs.append('div')
             .attr('class', function(d) { 
-                if(nonEditable.includes(d))
+                if(d.toLowerCase() == 'id')
+                    return 'col-sm-9 edit-box-id-non-editable';
+                else if(nonEditable.includes(d))
                     return 'col-sm-9 edit-box-non-editable';
                 else if(dateFields.includes(d))
                     return 'col-sm-9 edit-box-date-editable';
                 else
                     return 'col-sm-9 edit-box-editable';
+            });
+        
+        form.selectAll('.edit-box-id-non-editable')
+            .append('input')
+            .attr({
+                class: 'form-control',
+                type: 'text',
+                id: function(d) { return 'edit_input_' + d; },
+                name: function(d) { return d.toLowerCase(); },
+                value: function(d) { return info[d]; },
+                readonly: true
             });
         
         form.selectAll('.edit-box-editable')
@@ -1071,6 +1090,8 @@ Options.prototype = {
                 class: 'form-control',
                 type: 'text',
                 id: function(d) { return 'edit_input_' + d; },
+                name: function(d) { return d; },
+//                rows: function(d) { return textarea.includes(d) ? 3 : 1 },
                 placeholder: function(d) { return info[d]; }
             });
         
@@ -1080,6 +1101,7 @@ Options.prototype = {
                 class: 'form-control',
                 type: 'datetime-local',
                 id: function(d) { return 'edit_input_' + d; },
+                name: function(d) { return d; },
                 value: function(d) {
                     if(info[d] instanceof Date)
                         return util.formatDate(info[d]).replace(' ', 'T');
@@ -1090,6 +1112,23 @@ Options.prototype = {
             .append('p')
             .attr('class', 'form-control-static')
             .text(function(d) { return info[d]; });
+        
+        form.append('input')
+            .attr({
+                name: 'type',
+                value: option,
+                class: 'hidden'
+            });
+        
+        // Add submit button        
+        d3.select('#selectedTweetsModal .modal-options').append('button')
+            .attr({
+                class: 'btn btn-primary',
+                type: 'submit',
+                form: 'edit_form'
+            })
+            .text('Update');
+        
         
         $('#selectedTweetsModal').modal();
     }
