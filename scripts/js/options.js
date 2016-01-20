@@ -995,26 +995,25 @@ Options.prototype = {
             
             return
         } else {
-            console.log(info);
-            var content = '<dl class="dl-horizontal collection_popover">';
-            Object.keys(info).map(function(key) {
-                content += "<dt>" + key + "</dt>";
-
-                if(info[key] instanceof Date) {
-                    var date = new Date(info[key]);
-                    content += "<dd>" + util.formatDate(date) + "&nbsp;</dd>";
-                } else if(info[key] instanceof Array) {
-                    var arr = info[key].join(", ");
-                    content += "<dd>" + arr + "&nbsp;</dd>";
-                } else {
-                    content += "<dd>" + info[key] + "&nbsp;</dd>";
-                }
-            });
-            content += "</dl>";
-            
-            disp.alert(content, 'success');
+//            console.log(info);
+//            var content = '<dl class="dl-horizontal collection_popover">';
+//            Object.keys(info).map(function(key) {
+//                content += "<dt>" + key + "</dt>";
+//
+//                if(info[key] instanceof Date) {
+//                    var date = new Date(info[key]);
+//                    content += "<dd>" + util.formatDate(date) + "&nbsp;</dd>";
+//                } else if(info[key] instanceof Array) {
+//                    var arr = info[key].join(", ");
+//                    content += "<dd>" + arr + "&nbsp;</dd>";
+//                } else {
+//                    content += "<dd>" + info[key] + "&nbsp;</dd>";
+//                }
+//            });
+//            content += "</dl>";
+//            
+//            disp.alert(content, 'success');
         }
-        return
         
 //        // Get up to date rumor information from the database
 //        if(rumor_id == '_new_') {
@@ -1033,11 +1032,64 @@ Options.prototype = {
         modal_body.selectAll('*').remove();
         
         // Append form
-        modal_body.append('form')
-            .attr('class', 'form-horizontal')
-            .data(Object.keys(info));
+        var form = modal_body.append('form')
+            .attr('class', 'form-horizontal');
         
+        var divs = form.selectAll('div.form-group')
+            .data(Object.keys(info))
+            .enter()
+            .append('div')
+            .attr('class', 'form-group');
         
+        divs.append('label')
+            .attr('for', function(d) { return d; })
+            .attr('class', 'col-sm-3 control-label')
+            .text(function(d) {
+                // Convert CamelCase to Camel Case
+                if(d.toUpperCase() != d)
+                    return d.replace(/([A-Z])/g, " $1");
+                else
+                    return d;
+            });
+        
+        var nonEditable = ['ID', 'Name', 'Keywords', 'OldKeywords'];
+        var dateFields = ['StartTime', 'StopTime'];
+        
+        divs.append('div')
+            .attr('class', function(d) { 
+                if(nonEditable.includes(d))
+                    return 'col-sm-9 edit-box-non-editable';
+                else if(dateFields.includes(d))
+                    return 'col-sm-9 edit-box-date-editable';
+                else
+                    return 'col-sm-9 edit-box-editable';
+            });
+        
+        form.selectAll('.edit-box-editable')
+            .append('input')
+            .attr({
+                class: 'form-control',
+                type: 'text',
+                id: function(d) { return 'edit_input_' + d; },
+                placeholder: function(d) { return info[d]; }
+            });
+        
+        form.selectAll('.edit-box-date-editable')
+            .append('input')
+            .attr({
+                class: 'form-control',
+                type: 'datetime-local',
+                id: function(d) { return 'edit_input_' + d; },
+                value: function(d) {
+                    if(info[d] instanceof Date)
+                        return util.formatDate(info[d]).replace(' ', 'T');
+                }
+            })
+        
+        form.selectAll('.edit-box-non-editable')
+            .append('p')
+            .attr('class', 'form-control-static')
+            .text(function(d) { return info[d]; });
         
         $('#selectedTweetsModal').modal();
     }

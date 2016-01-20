@@ -93,14 +93,6 @@ button:focus {
   shape-rendering: crispEdges;
 }
 
-/* Tweet Fetcher */
-.badge a {
-    color: white;
-}
-.modal-options {
-    display: inline-block;
-}
-
 /* Legend */
 #legend {
     min-width: 200px;
@@ -240,17 +232,16 @@ button:focus {
     padding: 5px 5px 0px 5px;
 }
 
-/*
-.legend_tooltip dl {
-    margin-bottom: 0px;
+
+/* Modals */
+.badge a {
+    color: white;
 }
-.legend_tooltip dt {
-    width: 60px;
+.modal-options {
+    display: inline-block;
 }
-.legend_tooltip dd {
-    margin-left: 65px;
-    text-align: left;
-    min-width: 100px !important;
-    max-height: 120px;
-    overflow: hidden;
-}*/
+.edit-box-editable input, .edit-box-date-editable input {
+    width: 95%;
+}
+    
+    
