@@ -20,15 +20,6 @@
     padding: 2px;
 }
 
-.choice .dropdown-toggle {
-    width: 100%;
-    min-width: auto;
-}
-/*
-.choice .dropdown-menu {
-    width: 100%
-}
-*/
 .input-group-addon.primary {
     color: rgb(255, 255, 255);
     background-color: rgb(50, 118, 177);
@@ -234,3 +225,32 @@ button:focus {
     padding-top: 5px;
 }
 
+.legend_tooltip {
+    position: fixed;
+    background: white;
+    border: 0px;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 20;
+    text-transform: capitalize;
+}
+
+.legend_tooltip td, .legend_tooltip th {
+    padding: 5px 5px 0px 5px;
+}
+
+/*
+.legend_tooltip dl {
+    margin-bottom: 0px;
+}
+.legend_tooltip dt {
+    width: 60px;
+}
+.legend_tooltip dd {
+    margin-left: 65px;
+    text-align: left;
+    min-width: 100px !important;
+    max-height: 120px;
+    overflow: hidden;
+}*/

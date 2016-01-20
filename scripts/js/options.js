@@ -28,7 +28,7 @@ function Options() {
                        'collection_type', 'collection', 'time_limit', 'add_term',
                        'series', 'subset', 'found_in', 'resolution',
                        'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line',
-                       'series_order', 'legend_showhidden', 'fetched_tweet_order', 'get_rumor'];
+                       'series_order', 'legend_showhidden', 'fetched_tweet_order', 'rumor'];
     
     self.timefields = ['time_min', 'time_max']; 
     self.record = ['collection', 'subset', 'resolution', 'time_limit',
@@ -48,7 +48,8 @@ function Options() {
             default: 0,
             custom_entries_allowed: true,
             parent: '#choices_data',
-            callback: function() { data.setCollection(); }
+            callback: function() { data.setCollection(); },
+            edit: function() { options.editPopup('collection');  }
         });
     self.display_type = new Option({
             title: "Plot Type",
@@ -261,7 +262,7 @@ function Options() {
             parent: '#header',
             callback: function() { options.togglePane(); }
         });
-    self.get_rumor = new Option({
+    self.rumor = new Option({
             title: 'Rumor',
             labels: ["New"],
             ids:    ["_new_"],
@@ -269,7 +270,10 @@ function Options() {
             default: 0,
             type: "dropdown",
             parent: '#choices_legend',
-            callback: function() { options.editRumorWindow(); }
+            callback: function() { 
+                disp.alert("You clicked on the rumor option, I haven't implemented it yet though", 'info');
+            },
+            edit: function() { options.editPopup('rumor'); }
         });
     self.fetched_tweet_order = new Option({
             title: 'Fetched Tweets',
@@ -664,9 +668,9 @@ Options.prototype = {
                     .attr("class", "dropdown");
         }
         
-        var button = container.select('button')
-        if(!button[0][0]) {
-            button = container.append("button")
+        var list_open = container.select('button.dropdown-toggle')
+        if(!list_open[0][0]) {
+            list_open = container.append("button")
                 .attr({type: "button",
                     class: 'btn btn-sm btn-primary dropdown-toggle',
                     'data-toggle': "dropdown",
@@ -674,14 +678,14 @@ Options.prototype = {
                     'aria-expanded': false})
                 .html("<strong>" + set.title + ":</strong> ");
             
-            button.append('span')
+            list_open.append('span')
                 .attr('class', 'current')
                 .style('text-transform', 'capitalize')
                 .html('Label');
 
-            button.append('text')
+            list_open.append('text')
                 .text(' ');
-            button.append('span')
+            list_open.append('span')
                 .attr('class', 'caret');
         }
         
@@ -717,6 +721,26 @@ Options.prototype = {
         // Save the current value to the interface and the history
         container.select('.current')
             .text(set.labels[set.default]);
+        
+        // Add an edit button if there is an edit function
+        if('edit' in set) {
+            var edit_button = container.select('button.edit-button')
+            if(!edit_button[0][0]) {
+                container.classed('btn-group', true);
+
+                list_open.style({
+                    'border-top-right-radius': '0px',
+                    'border-bottom-right-radius': '0px',
+                    'border-right': 'none'
+                });
+
+                edit_button = container.append('button')
+                    .attr('class', 'btn btn-sm btn-primary edit-button')
+                    .on('click', set.edit)
+                    .append('span')
+                    .attr('class', 'glyphicon glyphicon-pencil');
+            }
+        }
         
         options.state[option] = set.ids[set.default];
     },
@@ -907,12 +931,12 @@ Options.prototype = {
 
             if(collection[key] instanceof Date) {
                 var date = new Date(collection[key]);
-                content += "<dd>" + util.formatDate(date) + "</dd>";
+                content += "<dd>" + util.formatDate(date) + "&nbsp;</dd>";
             } else if(collection[key] instanceof Array) {
                 var arr = collection[key].join(", ");
-                content += "<dd>" + arr + "</dd>";
+                content += "<dd>" + arr + "&nbsp;</dd>";
             } else {
-                content += "<dd>" + collection[key] + "</dd>";
+                content += "<dd>" + collection[key] + "&nbsp;</dd>";
             }
         });
         content += "</dl>";
@@ -960,23 +984,59 @@ Options.prototype = {
         }
             
     },
-    editRumorWindow: function() {
-        var rumor_id = options.get_rumor.get();
+    editPopup: function(option) {
+        var set = options[option];
+        var id = set.get();
         
-        // Get up to date rumor information from the database
-        if(rumor_id == '_new_') {
-        } else { 
-            data.getRumor();
+        var info = data[option];
+        
+        if(!info) {
+            disp.alert('no info!', 'success');
+            
+            return
+        } else {
+            console.log(info);
+            var content = '<dl class="dl-horizontal collection_popover">';
+            Object.keys(info).map(function(key) {
+                content += "<dt>" + key + "</dt>";
+
+                if(info[key] instanceof Date) {
+                    var date = new Date(info[key]);
+                    content += "<dd>" + util.formatDate(date) + "&nbsp;</dd>";
+                } else if(info[key] instanceof Array) {
+                    var arr = info[key].join(", ");
+                    content += "<dd>" + arr + "&nbsp;</dd>";
+                } else {
+                    content += "<dd>" + info[key] + "&nbsp;</dd>";
+                }
+            });
+            content += "</dl>";
+            
+            disp.alert(content, 'success');
         }
+        return
         
+//        // Get up to date rumor information from the database
+//        if(rumor_id == '_new_') {
+//        } else { 
+//            data.getRumor();
+//        }
+        
+        // Set Modal Title
         d3.select('#selectedTweetsModal .modal-title')
-            .html(rumor_id);
+            .html(info.DisplayName ? info.DisplayName : info.Name);
 
         // Clear any data still in the modal
         d3.select('#selectedTweetsModal .modal-options')
             .selectAll('*').remove();
         var modal_body = d3.select('#selectedTweetsModal .modal-body');
         modal_body.selectAll('*').remove();
+        
+        // Append form
+        modal_body.append('form')
+            .attr('class', 'form-horizontal')
+            .data(Object.keys(info));
+        
         
         
         $('#selectedTweetsModal').modal();

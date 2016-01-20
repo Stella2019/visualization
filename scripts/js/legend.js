@@ -8,9 +8,18 @@ function Legend() {
         {term: "&nbsp;", label: "Capture Term", id: 'capture', has: false},
         {term: "&#x271d;", label: "Removed Capture Term", id: 'removed', has: false},
         {term: "*", label: "Term Added Later", id: 'added', has: false},
+        {term: "R", label: "Rumor", id: 'rumor', has: false},
         {term: "<svg height=10 width=10><line x1=0 y1=10 x2=10 y2=0 class='total_line' /></svg>",
             label: "Tweet Volume", id: 'total_line', has: false}
     ];
+    self.key_data_byID = self.key_data.reduce(function(all, cur) {
+        all[cur.id] = cur;
+        return all;
+    }, {});
+    self.key_data_byLabel = self.key_data.reduce(function(all, cur) {
+        all[cur.label] = cur;
+        return all;
+    }, {});
      
     // Function
 }
@@ -20,6 +29,7 @@ Legend.prototype = {
         this.container = d3.select('#legend')
             .on('mouseout', this.endToggle);
         
+        // Header
         var legend_header = this.container.append('div')
             .attr('class', 'legend_header');
         
@@ -32,9 +42,11 @@ Legend.prototype = {
             .text('show all')
             .on('click', this.showAll);
         
+        // Series
         this.container_series = this.container.append('div')
             .attr('class', 'legend_series_list');
         
+        // Key
         this.key = this.container.append('div')
             .attr('id', 'legend_key');
         
@@ -51,7 +63,12 @@ Legend.prototype = {
         
         legend_key_entries.append('div')
             .attr('class', 'legend_key_label')
-            .html(function(d) { return d.label; });                    
+            .html(function(d) { return d.label; });
+        
+        // Tooltip
+        this.tooltip = this.container.append('div')
+            .attr('class', 'legend_tooltip')
+
     },
     populate: function() {     
         // Show all series   
@@ -84,6 +101,7 @@ Legend.prototype = {
                 return 'legend_entry ' + d;
             })
             .on('mouseover', this.hoverLegendEntry)
+            .on('mousemove', this.hoverLegendEntryMove)
             .on('mouseout', this.hoverLegendEntryEnd);
 
         var legend_icon_divs = new_entries.append('div')
@@ -152,15 +170,10 @@ Legend.prototype = {
             
                 var name = series.name;
                 if(options.series.is('terms')) {
-                    if(series.isOldKeyword) {
-                        name += ' &#x271d;';
-                        legend.key_data[1].has = true; // removed
-                    }else if(!series.isKeyword) {
-                        name += ' *';
-                        legend.key_data[2].has = true; // added
-                    } else {
-                        legend.key_data[0].has = true; // capture
-                    }
+                    var key_data = legend.key_data_byLabel[series.type];
+                    
+                    name += ' ' + key_data.term;
+                    key_data.has = true;
                 }
                 return name;
             });
@@ -248,11 +261,45 @@ Legend.prototype = {
         if(typeof(series) == "string")
             series = data.series_byID[series];
         
+        // Set data
+        var curData = legend.tooltip.data();
+        if(!curData || curData != series.id) {
+            legend.tooltip.data(series.id);
+            
+            legend.tooltip.selectAll('*').remove();
+            var rows = legend.tooltip.append('table')
+                .selectAll('tr')
+                .data(['total', 'max', 'type'])
+                .enter()
+                .append('tr');
+            
+            rows.append('th')
+                .html(function(d) { return d + ":"; });
+            
+            rows.append('td')
+                .html(function(d) { return series[d]; });
+        }
+        
+        legend.tooltip.transition(200)
+            .style('opacity', 1);
+        
+        
         legend.highlightSeries(series);
+    },
+    hoverLegendEntryMove: function(series) {
+        legend.tooltip
+            .style({
+                left: d3.event.x + 20 + "px",
+                top: d3.event.y + "px"
+//                opacity: 1
+            });
     },
     hoverLegendEntryEnd: function(series) {
         if(typeof(series) == "string")
             series = data.series_byID[series];
+        
+        legend.tooltip.transition(200)
+            .style('opacity', 0);
         
         legend.unHighlightSeries(series);
     },

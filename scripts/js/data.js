@@ -376,47 +376,70 @@ Data.prototype = {
     },
     loadNewSeriesData: function() {
         var found_in = options.found_in.get();
+        var subset = options.subset.get();
 
         // Fill in specifics of the series
         if(options.series.is('terms')) {
             data.series.map(function(datum) {
-                datum.isKeyword = data.collection.Keywords.reduce(function(prev, keyword) {
+                var isKeyword = data.collection.Keywords.reduce(function(prev, keyword) {
                     return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
                 }, false);
-                datum.isOldKeyword = data.collection.OldKeywords.reduce(function(prev, keyword) {
+                var isOldKeyword = data.collection.OldKeywords.reduce(function(prev, keyword) {
                     return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
                 }, false);
+                var isRumor = false;
+                
+                datum.type = legend.key_data_byID['added'].label;
+                if(isKeyword) {
+                    datum.type = legend.key_data_byID['capture'].label;
+                } else if(isOldKeyword) {
+                    datum.type = legend.key_data_byID['removed'].label;
+                } else if(isRumor) {
+                    datum.type = legend.key_data_byID['rumor'].label;
+                }
 
-                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) {
+                    return cur_sum + datapoint[datum.name];
+                }, 0);
+                datum.total = data.all[found_in][subset].reduce(function(cur_sum, datapoint) {
                     return cur_sum + datapoint[datum.name];
                 }, 0);
             });
         } else if(options.series.is('types')) {
             data.series.map(function(datum) {
-                datum.sum = data.all[found_in][datum.name].reduce(function(cur_sum, datapoint) { // Can change subset
+                datum.sum = data.all[found_in][datum.name].reduce(function(cur_sum, datapoint) {
                     return cur_sum + datapoint['_total_'];
                 }, 0);
+                datum.total = datum.sum;
             });
+            datum.type = 'Tweet Type';
         } else if(options.series.is('distinct')) {
             data.series.map(function(datum) {
-                if(datum.name == 'distinct')
-                    datum.sum = data.all[found_in]['distinct'].reduce(function(cur_sum, datapoint) { // Can change subset
+                if(datum.name == 'distinct') {
+                    datum.sum = data.all[found_in]['distinct'].reduce(function(cur_sum, datapoint) {
                         return cur_sum + datapoint['_total_'];
                     }, 0);
-                else
-                    datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                } else {
+                    datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) {
                         return cur_sum + datapoint['_total_'];
                     }, 0);
+                }
             });
 
             // Subtract the distinct sum from the all sum to make the repeat sum, presuming repeat is in the second place
             data.series[1].sum -= data.series[0].sum;
+            
+            data.series[0].total = data.series[0].sum;
+            data.series[1].total = data.series[1].sum;
+            datum.type = 'Distinctiveness';
         } else { // implicit none
             data.series.map(function(datum) {
-                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) { // Can change subset
+                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) {
                     return cur_sum + datapoint['_total_'];
                 }, 0);
+                datum.total = datum.sum;
             });
+            datum.type = 'All Tweets';
         }
     },
     prepareData: function() {
@@ -709,7 +732,18 @@ Data.prototype = {
         });
     },
     getRumor: function() {
+        url = "scripts/php/getRumor.php";
+        url += "?rumor_id=" + options.rumor.get();
+        url += "&event_id=" + data.collection.ID;
+        url += '&time_min="' + util.formatDate(startTime) + '"';
+        url += '&time_max="' + util.formatDate(stopTime) + '"';
+        url += '&definition="' + "hello" + '"';
+        url += '&query="' + "pzbooks|[[:<:]]bot[[:>:]],know|knew|predict|before|[[:<:]]11[[:>:]]|early" + '"';
         
-        
+        d3.json(url, function(error, filedata) {
+            if (error) throw error;
+
+            return filedata;
+        });
     }
 }

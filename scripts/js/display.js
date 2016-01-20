@@ -613,12 +613,15 @@ Display.prototype = {
             .classed('hidden', options.total_line.is("false"));
     //    container.style('display', options.total_line.is("true") ? 'block' : 'none');
     },
-    alert: function(text, style) {
+    alert: function(text, style_class) {
+        if(!style_class)
+            style_class = 'warning';
 //        alert(text);
         
         var style = {
             position: 'absolute',
-            top: '45%',
+            top: '50%',
+            transform: 'translate(0%, -50%)',
             left: '20%',
             width: '60%',
             'z-index': 4
@@ -639,7 +642,7 @@ Display.prototype = {
         
         var alert_div = alert_shadow.append('div')
             .attr({
-                'class': 'alert alert-warning alert-dismissible',
+                'class': 'alert alert-' + style_class + ' alert-dismissible',
                 'role': 'alert'
             })
             .style(style);
@@ -783,6 +786,11 @@ Display.prototype = {
                     .enter()
                     .append('button')
                     .attr('class', 'btn btn-primary')
+                    .style('font-weight', function(d) {
+                        if(d == options.fetched_tweet_order.indexCur())
+                            return 'bold';
+                        return 'normal';
+                    })
                     .text(function(d) {
                         return options.fetched_tweet_order.labels[d];
                     })
@@ -790,8 +798,10 @@ Display.prototype = {
                         options.fetched_tweet_order.click(d);
                     
                         url = url.replace('&rand', '');
+//                        title = title.replace('Random', '');
                         if(options.fetched_tweet_order.is('rand')) {
                             url += '&rand';
+//                            title = 'Random ' + title;
                         }
                     console.log(url);
                         
