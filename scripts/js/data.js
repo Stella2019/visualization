@@ -648,6 +648,26 @@ Data.prototype = {
         
         return data_nested;
     },
+    updateCollection: function() {
+        var fields = {};
+        $("#edit_form").serializeArray().forEach(function(x) { fields[x.name] = x.value; });
+        
+        data.callPHP('updateEvent', fields, options.editWindowUpdated); // add a callback
+    },
+    callPHP: function(url, fields, callback) {
+        if(!fields)
+            fields = {};
+        if(!callback)
+            callback = function() {};
+        
+        $.ajax({
+            url: 'scripts/php/' + url + '.php',
+            type: "POST",
+            data: fields,
+            cache: false,
+            success: callback
+        });
+    },
     genTweetCount: function() {
         var event_id = data.collection.ID;
         var search_term = options.add_term.get().toLowerCase();
@@ -775,6 +795,80 @@ Data.prototype = {
             if (error) throw error;
 
             data.rumor = filedata[0];
+            delete data.rumor['StartTime'];
+            delete data.rumor['StopTime']; 
+        });
+    },
+    genTweetInCollection: function(type) {
+        // Right now just for a rumor
+        var event_id = data.collection.ID;
+        var rumor_id = data.rumor.ID;
+        var search_term = data.rumor.Query;
+        
+        // Generate PHP query
+        var url = "scripts/php/genTweetCounts.php";
+        url += "?event_id=" + event_id;
+        url += '&text_search=' + search_term;
+        
+        // Calculate time periods to add to the event
+        var time_min = options.time_min.min;
+        var time_max = options.time_max.max;
+        
+        // Generate a list of times every 6 hours
+        var time_chunks = [];
+        for(var timestamp = new Date(time_min);
+            timestamp < time_max;
+            timestamp.setMinutes(timestamp.getMinutes() + 60 * 1)) {
+            time_chunks.push(util.formatDate(timestamp));
+        }
+        time_chunks.push(util.formatDate(time_max));
+        
+        // Start progress bar
+        options.add_term.reset();
+        $("#input_add_term").blur();
+        
+        disp.startProgressBar('in_collection', '#choose_add_term', true);
+        
+        // Send off the first chunk of time to generate tweet counts
+        data.genTweetInCollectionChunk(url, time_chunks, 0);
+    },
+    genTweetInCollectionChunk: function(url_base, time_chunks, index) {
+        // If we are at the max, end
+        if(index >= time_chunks.length - 1) {
+            // Load the new data
+            data.startLoadingCollection();
+            
+            // End the progress bar and stop function
+                disp.endProgressBar('in_collection');
+            return;
+        }
+    
+        var url = url_base;
+        url += '&time_min="' + time_chunks[index] + '"';
+        url += '&time_max="' + time_chunks[index + 1] + '"';
+//        console.info(url);
+    
+        d3.text(url, function(error, file_data) {
+            if(error || file_data.substring(0, 7) != "REPLACE") {
+                console.debug(error);
+                console.debug(file_data);
+                
+                // Abort
+                disp.alert("Problem searching tweets");
+                disp.endProgressBar('in_collection');
+                return;
+            }
+            
+            // Update the progress bar
+            disp.updateProgressBar('in_collection',
+                                   Math.floor((index + 1) / (time_chunks.length - 1) * 100));
+            
+            // If success, load the new data
+//            data.loadDataFile();
+            console.debug(file_data);
+
+            // Start loading the next batch
+            data.genTweetInCollectionChunk(url_base, time_chunks, index + 1);
         });
     }
 }

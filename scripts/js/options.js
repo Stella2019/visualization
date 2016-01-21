@@ -49,7 +49,7 @@ function Options() {
             custom_entries_allowed: true,
             parent: '#choices_data',
             callback: function() { data.setCollection(); },
-            edit: function() { options.editPopup('collection');  }
+            edit: function() { options.editWindow('collection');  }
         });
     self.display_type = new Option({
             title: "Plot Type",
@@ -271,9 +271,9 @@ function Options() {
             type: "dropdown",
             parent: '#choices_legend',
             callback: function() { data.getRumor(); },
-            edit: function() { options.editPopup('rumor'); },
-            button: "<span class='glyphicon glyphicon-search'></span>",
-            button_callback: function() {}
+            edit: function() { options.editWindow('rumor'); }//,
+//            button: "<span class='glyphicon glyphicon-search'></span>",
+//            button_callback: function() { data.genTweetInRumor(); }
         });
     self.fetched_tweet_order = new Option({
             title: 'Fetched Tweets',
@@ -937,7 +937,7 @@ Options.prototype = {
 
         // Add additional information for collections
         data.collections.map(options.addCollectionPopup);
-        $('.collection_option').popover({html: true});
+//        $('.collection_option').popover({html: true});
         
         // Limit the collection selections to the particular type
         options.chooseCollectionType();
@@ -986,14 +986,19 @@ Options.prototype = {
         });
         content += "</dl>";
 
-        d3.select('#collection_' + collection['ID'])
-            .attr({
-                'class': 'collection_option',
-                'data-toggle': "popover",
-                'data-trigger': "hover",
-                'data-placement': "right",
-                'data-content': content}
-             );
+//        d3.select('#collection_' + collection['ID'])
+//            .attr({
+//                'class': 'collection_option',
+//                'data-toggle': "popover",
+//                'data-trigger': "hover",
+//                'data-placement': "right",
+//                'data-content': content}
+//             );
+//        $('#collection_' + collection['ID']).popover({html: true});
+        
+        disp.newPopup('#collection_' + collection['ID'])
+            .set('content', content)
+            .set('placement', 'right');
     },
     chooseCollectionType: function() {
         var curType = options.collection_type.get();
@@ -1029,14 +1034,14 @@ Options.prototype = {
         }
             
     },
-    editPopup: function(option) {
+    editWindow: function(option) {
         var set = options[option];
         var id = set.get();
         
         var info = data[option];
         
         if(!info) {
-            disp.alert('Nothing to edit, no way to make a new one!', 'warning');
+            disp.alert('No information.', 'warning');
             
             return
         }
@@ -1056,9 +1061,11 @@ Options.prototype = {
             .attr({
                 id: 'edit_form',
                 method: 'post',
-                class: 'form-horizontal',
-                action: 'scripts/php/updateEvent.php',
-                target: 'internal_php_frame'
+                class: 'form-horizontal'
+            })
+            .on('submit', function() {
+                event.preventDefault();
+                return false; 
             });
         
         var keys = Object.keys(info);
@@ -1149,81 +1156,8 @@ Options.prototype = {
                 }
             });
         
-        var querybox = form.select('.edit-box-query')
-            .append('table');
-        
-        if(querybox[0][0]) {
-            var rows = querybox.selectAll('tr.edit-box-query-and')
-                .data(function(d) { return info[d].split(','); })
-                .enter()
-                .append('tr')
-                .attr('class', 'edit-box-query-and');
-
-            // Add all current AND statements
-            rows.append('td')
-                .style('vertical-align', 'top')
-                .append('select')
-                .attr('class', 'form-control input-sm selectType')
-                .on('change', function() {}) // nothing for now
-                .selectAll('option')
-                .data(['In Text'])
-                .enter()
-                .append('option')
-                .text(function(d) { return d; });
-
-            // Add place to make new row
-            querybox.append('tr')
-                .attr('id', 'query-edit-add')
-                .append('td')
-                .append('button')
-                .attr('class', 'btn btn-sm btn-primary')
-                .append('span')
-                .attr('class', 'glyphicon glyphicon-plus')
-                .on('click', options.queryEditAddRow);
-
-            // Add terms for each row
-            var terms = rows.append('td');
-
-            terms.selectAll('input.edit-box-query-or')
-                .data(function(d) { 
-                    var arr = d.split('|');
-                        arr.push(""); // append empty one
-                    return arr; })
-                .enter()
-                .append('input')
-                .attr({
-                    class: 'edit-box-query-or form-control input-sm',
-                    type: 'text',
-                    size: '10',
-                    value: function(d) {
-                        var str =   d.replace('[[:<:]]', '\\W');
-                        var str = str.replace('[[:>:]]', '\\W');
-                        return str;
-                    },
-                    placeholder: 'new'
-                })
-                .on('focus', options.queryEditFocus)
-                .on('blur', options.queryEditBlur);
-
-
-            querybox.selectAll('td')
-                .style({
-                    padding: '3px'
-                });
-            querybox.selectAll('input')
-                .style({
-                    width: 'auto',
-                    display: 'inline-block'
-                });
-            
-            form.append('input')
-                .attr({
-                    id: 'edit-box-query-input',
-                    name: 'Query',
-                    class: 'hidden'
-                });
-
-        }
+        if(keys.includes('Query'))
+            options.queryEditCreate(form, info);
         
         form.selectAll('.edit-box-static')
             .append('p')
@@ -1237,17 +1171,155 @@ Options.prototype = {
                 class: 'hidden'
             });
         
-        // Add submit button        
-        d3.select('#selectedTweetsModal .modal-options').append('button')
-            .attr({
-                class: 'btn btn-primary',
-                type: 'submit',
-                form: 'edit_form'
-            })
-            .text('Update');
+        // Add Lower Buttons        
+        var bottom_row = d3.select('#selectedTweetsModal .modal-options')
         
+        bottom_row.append('button')
+            .attr({
+                id: 'edit-window-save',
+                class: 'btn btn-default'
+            })
+            .text('Update')
+            .on('click', data.updateCollection);
+        
+        disp.newPopup('#edit-window-save')
+            .set('content', 'Otherwise won\'t save changes');
+        
+        if(option == 'rumor') {
+            bottom_row.append('div')
+                .attr('id', 'edit-window-tweetin-div')
+                .append('button')
+                .data([option])
+                .attr({
+                    id: 'edit-window-tweetin',
+                    class: 'btn btn-primary edit-window-routine'
+                })
+                .on('click', data.tweetInCollection)
+                .text('Match Tweets');
+
+            bottom_row.append('div')
+                .attr('id', 'edit-window-tweetin-div')
+                .append('button')
+                .data([option + " 100"])
+                .attr({
+                    id: 'edit-window-fetch100',
+                    class: 'btn btn-primary edit-window-routine'
+                })
+                .on('click', data.fetchTweets)
+                .text('Fetch 100 Random');
+
+            bottom_row.append('div')
+                .attr('id', 'edit-window-tweetin-div')
+                .append('button')
+                .data([option + " all"])
+                .attr({
+                    id: 'edit-window-fetchall',
+                    class: 'btn btn-primary edit-window-routine'
+                })
+                .on('click', data.fetchTweets)
+                .text('Fetch All');
+        }
+        
+        form.selectAll('input')
+            .on('input', options.editWindowChanged);
         
         $('#selectedTweetsModal').modal();
+    },
+    editWindowChanged: function() {
+        // Indicate that the collection is to be updated
+        d3.select('#edit-window-save')
+            .attr('class', 'btn btn-primary');
+        
+        // Disable Match/Fetch buttons
+        d3.selectAll('.edit-window-routine')
+            .attr('disabled', '');
+    },
+    editWindowUpdated: function() {
+        // Reload the rumor list
+        data.loadRumors();
+        
+        // Turn update to normal
+        d3.select('#edit-window-save')
+            .attr('class', 'btn btn-default');
+
+        // Unlock Match/Fetch buttons
+        d3.selectAll('.edit-window-routine')
+            .attr('disabled', null);
+    },
+    queryEditCreate: function(form, info) {
+        var queryarea = form.select('.edit-box-query');
+        var querybox = queryarea.append('table');
+        
+        var rows = querybox.selectAll('tr.edit-box-query-and')
+            .data(function(d) { return info[d].split(','); })
+            .enter()
+            .append('tr')
+            .attr('class', 'edit-box-query-and');
+
+        // Add all current AND statements
+        rows.append('td')
+            .style('vertical-align', 'top')
+            .append('select')
+            .attr('class', 'form-control input-sm selectType')
+            .on('change', function() {}) // nothing for now
+            .selectAll('option')
+            .data(['In Text'])
+            .enter()
+            .append('option')
+            .text(function(d) { return d; });
+
+        // Add place to make new row
+//        querybox.append('tr')
+//            .attr('id', 'query-edit-add')
+//            .append('td')
+        queryarea.append('button')
+            .attr('class', 'btn btn-sm btn-primary')
+            .style('margin', '3px')
+            .append('span')
+            .attr('class', 'glyphicon glyphicon-plus')
+            .on('click', options.queryEditAddRow);
+
+        // Add terms for each row
+        var terms = rows.append('td');
+
+        terms.selectAll('input.edit-box-query-or')
+            .data(function(d) { 
+                var arr = d.split('|');
+                    arr.push(""); // append empty one
+                return arr; })
+            .enter()
+            .append('input')
+            .attr({
+                class: 'edit-box-query-or form-control input-sm',
+                type: 'text',
+                size: '10',
+                value: function(d) {
+                    var str =   d.replace('[[:<:]]', '\\W');
+                    var str = str.replace('[[:>:]]', '\\W');
+                    return str;
+                },
+                placeholder: 'new'
+            })
+            .on('focus', options.queryEditFocus)
+            .on('blur', options.queryEditBlur);
+
+
+        querybox.selectAll('td')
+            .style({
+                padding: '3px'
+            });
+        querybox.selectAll('input')
+            .style({
+                width: 'auto',
+                display: 'inline-block'
+            });
+
+        form.append('input')
+            .attr({
+                id: 'edit-box-query-input',
+                name: 'Query',
+                class: 'hidden'
+            });
     },
     queryEditFocus: function() {
         options.queryEditCheckEmpties(d3.select(this.parentElement));
@@ -1287,7 +1359,8 @@ Options.prototype = {
                     display: 'inline-block'
                 })
                 .on('focus', options.queryEditFocus)
-                .on('blur', options.queryEditBlur);
+                .on('blur', options.queryEditBlur)
+                .on('input', options.editWindowChanged);
             
         } else if(empties.length > 1) {
             // Remove all but the last
@@ -1299,7 +1372,7 @@ Options.prototype = {
     queryEditAddRow: function() {
         var querybox = d3.select('.edit-box-query table')
         
-        var row = querybox.insert('tr', 'tr#query-edit-add')
+        var row = querybox.append('tr')
             .attr('class', 'edit-box-query-and');
 
         // Add all current AND statements

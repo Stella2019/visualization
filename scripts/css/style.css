@@ -250,3 +250,7 @@ button:focus {
 .edit-box-query .selectType {
     width: 80px;
 }
+.modal-options div {
+    display: inline-block;
+    margin-left: 5px;
+}

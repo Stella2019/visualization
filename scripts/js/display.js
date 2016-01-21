@@ -659,8 +659,9 @@ Display.prototype = {
         alert_div.append('span')
             .html(text);
     },
-    startProgressBar: function(name) {
-        var parent_div = '#timeseries_div'; // load_collection
+    startProgressBar: function(name, parent_id, over_button) {
+        if(!parent_id)
+            parent_id = '#timeseries_div'; // load_collection
         var parent_style = {
             position: 'absolute',
             top: '36%',
@@ -676,8 +677,7 @@ Display.prototype = {
             'font-size': '1em'
         };
         var text = "Loading";
-        if(name == 'new_keyword') {
-            parent_div = '#choose_add_term';
+        if(over_button) {
             parent_style = {
                 position: 'absolute',
                 top: '0px',
@@ -697,7 +697,7 @@ Display.prototype = {
         }
         
         // Start progress bar
-        d3.select(parent_div).append('div')
+        d3.select(parent_id).append('div')
             .attr('id', name + '_progress_div')
             .attr('class', 'progress')
             .style(parent_style)
@@ -820,5 +820,37 @@ Display.prototype = {
         }
 
         $('#selectedTweetsModal').modal();
+    },
+    newPopup: function(id) {        
+        // Make factory for options
+        var factory = {
+            id: id,
+            placement: 'bottom',
+            trigger: 'hover',
+            html: true,
+            content: '',
+            title: '',
+            create: function() {
+                $(this.id).popover({
+                    html: this.html,
+                    placement: this.placement,
+                    content: this.content,
+                    trigger: this.trigger,
+                    title: this.title
+                });
+            },
+            destroy: function() {
+                $(this.id).popover('destroy');
+            },
+            set: function(key, value) {
+                this.destroy();
+                this[key] = value;
+                this.create();
+                return this;
+            }
+        };
+        factory.create();
+        
+        return factory;
     }
 }
