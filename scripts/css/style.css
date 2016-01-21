@@ -241,8 +241,12 @@ button:focus {
     display: inline-block;
     margin: 0px 5px;
 }
-#edit_form input {
-    width: 95%;
+.edit-box {
+    padding-right: 30px;
 }
-    
-    
+.edit-box-query td {
+    padding: 3px;
+}
+.edit-box-query .selectType {
+    width: 80px;
+}

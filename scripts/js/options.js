@@ -273,7 +273,9 @@ function Options() {
             callback: function() { 
                 disp.alert("You clicked on the rumor option, I haven't implemented it yet though", 'info');
             },
-            edit: function() { options.editPopup('rumor'); }
+            edit: function() { options.editPopup('rumor'); },
+            button: "<span class='glyphicon glyphicon-search'></span>",
+            button_callback: function() {}
         });
     self.fetched_tweet_order = new Option({
             title: 'Fetched Tweets',
@@ -741,6 +743,24 @@ Options.prototype = {
                     .attr('class', 'glyphicon glyphicon-pencil');
             }
         }
+        // Add another button if there is one
+        if('button' in set) {
+            var new_button = container.select('button.new-button')
+            if(!new_button[0][0]) {
+                container.classed('btn-group', true);
+
+                list_open.style({
+                    'border-top-right-radius': '0px',
+                    'border-bottom-right-radius': '0px',
+                    'border-right': 'none'
+                });
+
+                new_button = container.append('button')
+                    .attr('class', 'btn btn-sm btn-primary new-button')
+                    .on('click', set.button_callback)
+                    .html(set['button']);
+            }
+        }
         
         options.state[option] = set.ids[set.default];
     },
@@ -924,6 +944,33 @@ Options.prototype = {
         // Limit the collection selections to the particular type
         options.chooseCollectionType();
     },
+    buildRumors: function() {
+        var rumor_names = data.rumors.map(function(collection) {
+            return collection.Name;
+        });
+        
+        // Generate Collections List
+        options.rumor['labels'] = rumor_names;
+        options.rumor['labels'].push('- New -');
+        options.rumor['ids'] = data.rumors.map(function(rumor) { return rumor['ID']; });
+        options.rumor['ids'].push('_new_');
+        options.rumor['available'] = util.range(rumor_names.length + 1);
+        
+        // Find the current collection
+        var cur = options.rumor.get();
+        options.rumor.default = data.rumors.reduce(function(candidate, rumor, i) {
+            if(rumor['ID'] == cur)
+                return i;
+            return candidate;
+        }, 0);
+        options.rumor.set(options.rumor['ids'][options.rumor.default]);
+        
+        // Make the dropdown
+        options.buildDropdown('rumor');
+        options.recordState('rumor', true);
+        
+        data.setRumor();
+    },
     addCollectionPopup: function(collection) {
         var content = '<dl class="dl-horizontal collection_popover">';
         Object.keys(collection).map(function(key) {
@@ -991,35 +1038,10 @@ Options.prototype = {
         var info = data[option];
         
         if(!info) {
-            disp.alert('no info!', 'success');
+            disp.alert('Nothing to edit, no way to make a new one!', 'warning');
             
             return
-        } else {
-//            console.log(info);
-//            var content = '<dl class="dl-horizontal collection_popover">';
-//            Object.keys(info).map(function(key) {
-//                content += "<dt>" + key + "</dt>";
-//
-//                if(info[key] instanceof Date) {
-//                    var date = new Date(info[key]);
-//                    content += "<dd>" + util.formatDate(date) + "&nbsp;</dd>";
-//                } else if(info[key] instanceof Array) {
-//                    var arr = info[key].join(", ");
-//                    content += "<dd>" + arr + "&nbsp;</dd>";
-//                } else {
-//                    content += "<dd>" + info[key] + "&nbsp;</dd>";
-//                }
-//            });
-//            content += "</dl>";
-//            
-//            disp.alert(content, 'success');
         }
-        
-//        // Get up to date rumor information from the database
-//        if(rumor_id == '_new_') {
-//        } else { 
-//            data.getRumor();
-//        }
         
         // Set Modal Title
         d3.select('#selectedTweetsModal .modal-title')
@@ -1041,8 +1063,9 @@ Options.prototype = {
                 target: 'internal_php_frame'
             });
         
+        var keys = Object.keys(info);
         var divs = form.selectAll('div.form-group')
-            .data(Object.keys(info))
+            .data(keys)
             .enter()
             .append('div')
             .attr('class', 'form-group');
@@ -1052,28 +1075,35 @@ Options.prototype = {
             .attr('class', 'col-sm-3 control-label')
             .text(function(d) {
                 // Convert CamelCase to Camel Case
-                if(d.toUpperCase() != d)
-                    return d.replace(/([A-Z])/g, " $1");
+                if(d.includes('ID'))
+                    return d.replace('_', ' ');
                 else
-                    return d;
+                    return d.replace(/([A-Z])/g, " $1");
             });
         
-        var nonEditable = ['ID', 'Name', 'Keywords', 'OldKeywords', 'Server', 'Month'];
+        var nonEditable = ['Keywords', 'OldKeywords', 'Server', 'Month'];
+        var identifier = ['ID', 'Event_ID', 'Name'];
         var dateFields = ['StartTime', 'StopTime'];
+        var textareaFields = ['Description', 'Definition'];
+        var queryFields = ['Query'];
         
         divs.append('div')
             .attr('class', function(d) { 
-                if(d.toLowerCase() == 'id')
-                    return 'col-sm-9 edit-box-id-non-editable';
+                if(identifier.includes(d))
+                    return 'col-sm-9 edit-box edit-box-id';
                 else if(nonEditable.includes(d))
-                    return 'col-sm-9 edit-box-non-editable';
+                    return 'col-sm-9 edit-box edit-box-static';
                 else if(dateFields.includes(d))
-                    return 'col-sm-9 edit-box-date-editable';
+                    return 'col-sm-9 edit-box edit-box-date';
+                else if(textareaFields.includes(d))
+                    return 'col-sm-9 edit-box edit-box-textarea';
+                else if(queryFields.includes(d))
+                    return 'col-sm-9 edit-box edit-box-query';
                 else
-                    return 'col-sm-9 edit-box-editable';
+                    return 'col-sm-9 edit-box edit-box-textfield';
             });
         
-        form.selectAll('.edit-box-id-non-editable')
+        form.selectAll('.edit-box-id')
             .append('input')
             .attr({
                 class: 'form-control',
@@ -1081,21 +1111,31 @@ Options.prototype = {
                 id: function(d) { return 'edit_input_' + d; },
                 name: function(d) { return d.toLowerCase(); },
                 value: function(d) { return info[d]; },
-                readonly: true
+                readonly: function(d) { return info[d] ? false : true; }
             });
         
-        form.selectAll('.edit-box-editable')
+        form.selectAll('.edit-box-textfield')
             .append('input')
             .attr({
                 class: 'form-control',
                 type: 'text',
                 id: function(d) { return 'edit_input_' + d; },
                 name: function(d) { return d; },
-//                rows: function(d) { return textarea.includes(d) ? 3 : 1 },
                 placeholder: function(d) { return info[d]; }
             });
         
-        form.selectAll('.edit-box-date-editable')
+        form.selectAll('.edit-box-textarea')
+            .append('textarea')
+            .attr({
+                class: 'form-control',
+                type: 'text',
+                id: function(d) { return 'edit_input_' + d; },
+                name: function(d) { return d; },
+                rows: 3,
+                placeholder: function(d) { return info[d]; }
+            });
+        
+        form.selectAll('.edit-box-date')
             .append('input')
             .attr({
                 class: 'form-control',
@@ -1106,9 +1146,85 @@ Options.prototype = {
                     if(info[d] instanceof Date)
                         return util.formatDate(info[d]).replace(' ', 'T');
                 }
-            })
+            });
         
-        form.selectAll('.edit-box-non-editable')
+        var querybox = form.select('.edit-box-query')
+            .append('table');
+        
+        if(querybox[0][0]) {
+            var rows = querybox.selectAll('tr.edit-box-query-and')
+                .data(function(d) { return info[d].split(','); })
+                .enter()
+                .append('tr')
+                .attr('class', 'edit-box-query-and');
+
+            // Add all current AND statements
+            rows.append('td')
+                .style('vertical-align', 'top')
+                .append('select')
+                .attr('class', 'form-control input-sm selectType')
+                .on('change', function() {}) // nothing for now
+                .selectAll('option')
+                .data(['In Text'])
+                .enter()
+                .append('option')
+                .text(function(d) { return d; });
+
+            // Add place to make new row
+            querybox.append('tr')
+                .attr('id', 'query-edit-add')
+                .append('td')
+                .append('button')
+                .attr('class', 'btn btn-sm btn-primary')
+                .append('span')
+                .attr('class', 'glyphicon glyphicon-plus')
+                .on('click', options.queryEditAddRow);
+
+            // Add terms for each row
+            var terms = rows.append('td');
+
+            terms.selectAll('input.edit-box-query-or')
+                .data(function(d) { 
+                    var arr = d.split('|');
+                        arr.push(""); // append empty one
+                    return arr; })
+                .enter()
+                .append('input')
+                .attr({
+                    class: 'edit-box-query-or form-control input-sm',
+                    type: 'text',
+                    size: '10',
+                    value: function(d) {
+                        var str =   d.replace('[[:<:]]', '\\W');
+                        var str = str.replace('[[:>:]]', '\\W');
+                        return str;
+                    },
+                    placeholder: 'new'
+                })
+                .on('focus', options.queryEditFocus)
+                .on('blur', options.queryEditBlur);
+
+
+            querybox.selectAll('td')
+                .style({
+                    padding: '3px'
+                });
+            querybox.selectAll('input')
+                .style({
+                    width: 'auto',
+                    display: 'inline-block'
+                });
+            
+            form.append('input')
+                .attr({
+                    id: 'edit-box-query-input',
+                    name: 'Query',
+                    class: 'hidden'
+                });
+
+        }
+        
+        form.selectAll('.edit-box-static')
             .append('p')
             .attr('class', 'form-control-static')
             .text(function(d) { return info[d]; });
@@ -1131,5 +1247,97 @@ Options.prototype = {
         
         
         $('#selectedTweetsModal').modal();
+    },
+    queryEditFocus: function() {
+        options.queryEditCheckEmpties(d3.select(this.parentElement));
+    },
+    queryEditBlur: function() {
+        options.queryEditCheckEmpties(d3.select(this.parentElement), true);
+        
+        options.queryEditForm();
+    },
+    queryEditCheckEmpties: function(parent, blurring) {
+        var empties = [];
+        var inputs = parent.selectAll("input");
+        
+        inputs[0].forEach(function(element) {
+            if(!element.value)  {
+                empties.push(element);
+            }
+        });
+        
+        // If the container only has empties, delete it's parent
+        if(blurring && empties.length == inputs[0].length) {
+            d3.select(parent[0][0].parentNode).remove();
+            return;
+        }
+
+        // Otherwise, appropriately trim/add empty elements
+        if(empties.length == 0) {
+            parent.append('input')
+                .attr({
+                    class: 'edit-box-query-or form-control input-sm',
+                    type: 'text',
+                    size: '10',
+                    placeholder: 'new'
+                })
+                .style({
+                    width: 'auto',
+                    display: 'inline-block'
+                })
+                .on('focus', options.queryEditFocus)
+                .on('blur', options.queryEditBlur);
+            
+        } else if(empties.length > 1) {
+            // Remove all but the last
+            for (var i = 0; i < empties.length - 1; i++) {
+                d3.select(empties[i]).remove();
+            }
+        }
+    },
+    queryEditAddRow: function() {
+        var querybox = d3.select('.edit-box-query table')
+        
+        var row = querybox.insert('tr', 'tr#query-edit-add')
+            .attr('class', 'edit-box-query-and');
+
+        // Add all current AND statements
+        row.append('td')
+            .style('vertical-align', 'top')
+            .append('select')
+            .attr('class', 'form-control input-sm selectType')
+            .on('change', function() {}) // nothing for now
+            .selectAll('option')
+            .data(['In Text'])
+            .enter()
+            .append('option')
+            .text(function(d) { return d; });
+        
+        options.queryEditCheckEmpties(row.append('td'));
+    },
+    queryEditForm: function() {
+        var rows = d3.selectAll('.edit-box-query .edit-box-query-and');
+        
+        var and_terms = rows[0].reduce(function(and_terms, row) {
+            var inputs = d3.select(row).selectAll('input');
+            
+            var or_terms = inputs[0].reduce(function(or_terms, element) {
+                if(element.value) {
+                    var val = element.value;
+                    val = val.replace(/\\W(.*)\\W/g, "[[:<:]]$1[[:>:]]");
+                    
+                    or_terms.push(val);
+                }
+                return or_terms;
+            }, []);
+            
+            if(or_terms)
+                and_terms.push(or_terms.join('|'));
+            return and_terms;
+        }, []);
+        
+        console.log(and_terms.join(','));
+        document.getElementById('edit-box-query-input')
+            .value = and_terms.join(',');
     }
 }

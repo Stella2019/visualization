@@ -167,8 +167,36 @@ Data.prototype = {
             }
         }
         
+        // Load information about the rumors related to the collection
+        data.loadRumors();
+        
         // Send a signal to start loading the collection
         data.startLoadingCollection();
+    },
+    loadRumors: function() {
+        var url = "scripts/php/getRumors.php";
+        url += '?event_id=' + data.collection.ID;
+        
+        d3.json(url, data.parseRumorsFile);
+    },
+    parseRumorsFile: function(error, filedata) {
+        if (error) throw error;
+        
+        data.rumors = filedata;
+        
+        // Populate the list of options
+        options.buildRumors();
+    },
+    setRumor: function() {
+        var rumor_id = options.rumor.get();
+        
+        data.rumor = data.rumors.reduce(function(rumor, candidate) {
+            if(rumor.ID == rumor_id)
+                return rumor;
+            return candidate
+        }, {});
+        
+        // No future callbacks from this
     },
     startLoadingCollection: function() {
         // Determine the base URL
