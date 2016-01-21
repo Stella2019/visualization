@@ -15,9 +15,9 @@
             "(Event_ID, `Name`, Definition, `Query`, StartTime, StopTime) " .
             " VALUES (" . 
             $_GET["event_id"] . ", " . 
-            $_GET["name"] . ", " . 
-            $_GET["definition"] . ", " . 
-            $_GET["query"] . ", " . 
+            "'New Rumor'" . ", " . 
+            "''" . ", " . 
+            "''" . ", " . 
             $_GET["time_min"] . ", " . 
             $_GET["time_max"] . ") ";
 
@@ -33,23 +33,6 @@
 
         include 'printJSON.php';
         
-    } elseif(isset($_GET["update"])) {
-        // Update the entire rumor, right now presuming you have given every field
-        $query = "" .
-            "UPDATE Rumor " .
-            " SET Event_ID = " . $_GET["event_id"] .
-            ", Name = " . $_GET["name"] .
-            ", Definition = " . $_GET["definition"] .
-            ", Query = " . $_GET["query"] .
-            ", StartTime = " . $_GET["time_min"] .
-            ", StopTime = " . $_GET["time_max"] .
-            " WHERE ID = " . $_GET["rumor_id"];
-
-        $result = $mysqli->query($query);
-        if (!$result) {
-            printf("Error: %s <br>", $mysqli->error);
-        } else {
-            print("Success!");
     } else {
             
         // Get the last inserted rumor, so we get the rumor ID

@@ -270,9 +270,7 @@ function Options() {
             default: 0,
             type: "dropdown",
             parent: '#choices_legend',
-            callback: function() { 
-                disp.alert("You clicked on the rumor option, I haven't implemented it yet though", 'info');
-            },
+            callback: function() { data.getRumor(); },
             edit: function() { options.editPopup('rumor'); },
             button: "<span class='glyphicon glyphicon-search'></span>",
             button_callback: function() {}
@@ -1082,7 +1080,10 @@ Options.prototype = {
             });
         
         var nonEditable = ['Keywords', 'OldKeywords', 'Server', 'Month'];
-        var identifier = ['ID', 'Event_ID', 'Name'];
+        var identifier = ['ID', 'Event_ID'];
+        if(option == 'collection')
+            identifier.push('Name');
+        
         var dateFields = ['StartTime', 'StopTime'];
         var textareaFields = ['Description', 'Definition'];
         var queryFields = ['Query'];

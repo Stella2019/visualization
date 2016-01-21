@@ -763,15 +763,18 @@ Data.prototype = {
         url = "scripts/php/getRumor.php";
         url += "?rumor_id=" + options.rumor.get();
         url += "&event_id=" + data.collection.ID;
-        url += '&time_min="' + util.formatDate(startTime) + '"';
-        url += '&time_max="' + util.formatDate(stopTime) + '"';
+        url += '&time_min="' + util.formatDate(data.collection.StartTime) + '"';
+        url += '&time_max="' + util.formatDate(data.collection.StopTime) + '"';
         url += '&definition="' + "hello" + '"';
         url += '&query="' + "pzbooks|[[:<:]]bot[[:>:]],know|knew|predict|before|[[:<:]]11[[:>:]]|early" + '"';
+        
+        if(options.rumor.get() == '_new_')
+            url += "&new";
         
         d3.json(url, function(error, filedata) {
             if (error) throw error;
 
-            return filedata;
+            data.rumor = filedata[0];
         });
     }
 }
