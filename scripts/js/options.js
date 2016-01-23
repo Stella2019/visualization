@@ -178,7 +178,11 @@ function Options() {
             custom_entries_allowed: true,   
             type: "textfieldconfirm",
             parent: '#choices_data',
-            callback: function() { data.genTweetCount(); }
+            callback: function() {
+                data.genTweetCount(
+                    options.add_term.get().toLowerCase()
+                ); 
+            }
         });
     self.color_scale = new Option({
             title: "Color Scale",
@@ -271,9 +275,7 @@ function Options() {
             type: "dropdown",
             parent: '#choices_legend',
             callback: function() { data.getRumor(); },
-            edit: function() { options.editWindow('rumor'); }//,
-//            button: "<span class='glyphicon glyphicon-search'></span>",
-//            button_callback: function() { data.genTweetInRumor(); }
+            edit: function() { options.editWindow('rumor'); }
         });
     self.fetched_tweet_order = new Option({
             title: 'Fetched Tweets',
@@ -1174,7 +1176,8 @@ Options.prototype = {
         // Add Lower Buttons        
         var bottom_row = d3.select('#selectedTweetsModal .modal-options')
         
-        bottom_row.append('button')
+        bottom_row.append('div')
+            .append('button')
             .attr({
                 id: 'edit-window-save',
                 class: 'btn btn-default'
@@ -1182,48 +1185,72 @@ Options.prototype = {
             .text('Update')
             .on('click', data.updateCollection);
         
-        disp.newPopup('#edit-window-save')
-            .set('content', 'Otherwise won\'t save changes');
+//        disp.newPopup('#edit-window-save')
+//            .set('content', 'Otherwise won\'t save changes');
         
         if(option == 'rumor') {
-            bottom_row.append('div')
-                .attr('id', 'edit-window-tweetin-div')
-                .append('button')
-                .data([option])
-                .attr({
-                    id: 'edit-window-tweetin',
-                    class: 'btn btn-primary edit-window-routine'
-                })
-                .on('click', data.tweetInCollection)
-                .text('Match Tweets');
-
-            bottom_row.append('div')
-                .attr('id', 'edit-window-tweetin-div')
-                .append('button')
-                .data([option + " 100"])
-                .attr({
-                    id: 'edit-window-fetch100',
-                    class: 'btn btn-primary edit-window-routine'
-                })
-                .on('click', data.fetchTweets)
-                .text('Fetch 100 Random');
-
-            bottom_row.append('div')
-                .attr('id', 'edit-window-tweetin-div')
-                .append('button')
-                .data([option + " all"])
-                .attr({
-                    id: 'edit-window-fetchall',
-                    class: 'btn btn-primary edit-window-routine'
-                })
-                .on('click', data.fetchTweets)
-                .text('Fetch All');
+            options.editWindowRumorOptions();
         }
         
         form.selectAll('input')
             .on('input', options.editWindowChanged);
         
         $('#selectedTweetsModal').modal();
+    },
+    editWindowRumorOptions: function() {
+        var tweet_count = bottom_row.append('div')
+            .attr('id', 'edit-window-tweetin-div')
+            .attr('class', 'input-group')
+            .style('display', 'inline-table');
+            
+        tweet_count.append('span')
+            .attr('class', 'input-group-addon')
+            .text('Count:')
+            .style('width', 'auto');
+
+        tweet_count.append('input')
+            .attr('id', 'edit-window-tweetin-count')
+            .attr('class', 'text-center form-control')
+            .attr('readonly', '')
+            .style('width', '80px')
+            .attr('value', 0);
+
+        tweet_count.append('div')
+            .attr('class', 'input-group-btn')
+            .style('margin', '0px')
+            .append('button')
+            .data([option])
+            .attr({
+                id: 'edit-window-tweetin',
+                class: 'btn btn-primary edit-window-routine'
+            })
+            .on('click', data.genTweetInCollection)
+            .append('span')
+            .attr('class', 'glyphicon glyphicon-refresh');
+        
+        
+
+        bottom_row.append('div')
+            .attr('id', 'edit-window-fetch100-div')
+            .append('button')
+            .data([option + " 100"])
+            .attr({
+                id: 'edit-window-fetch100',
+                class: 'btn btn-primary edit-window-routine'
+            })
+            .on('click', data.fetchTweets)
+            .html('<span class="glyphicon glyphicon-download-alt"></span> 100 Random');
+
+        bottom_row.append('div')
+            .attr('id', 'edit-window-fetchall-div')
+            .append('button')
+            .data([option + " all"])
+            .attr({
+                id: 'edit-window-fetchall',
+                class: 'btn btn-primary edit-window-routine'
+            })
+            .on('click', data.fetchTweets)
+            .html('<span class="glyphicon glyphicon-download-alt"></span> All');
     },
     editWindowChanged: function() {
         // Indicate that the collection is to be updated

@@ -1,3 +1,88 @@
+function Stream(args) {
+    var self = this;
+
+    // Defaults
+    self.name = 'r' + Math.floor(Math.random() * 1000000 + 1);
+    self.url = "";
+    self.post = {};
+    self.time_res = 1; // 1 Hour
+    self.progress_div = '#timeseries_div';
+    self.progress_button = false;
+    self.chunk_index = 0;
+    self.time_min = options.time_min.min;
+    self.time_max = options.time_max.max;
+    self.failure_msg = 'Problem with data stream';
+    self.on_chunk_finish = function() {};
+    self.on_finish = function() {};
+    
+    // Save args  
+    Object.keys(args).map(function(item) {
+        this[item] = args[item];
+    }, this);
+}
+Stream.prototype = {
+    start: function() {
+        this.time_chunks = [];
+        for(var timestamp = new Date(this.time_min);
+            timestamp < this.time_max;
+            timestamp.setMinutes(timestamp.getMinutes() + 60 * 1)) {
+            this.time_chunks.push(util.formatDate(timestamp));
+        }
+        this.time_chunks.push(util.formatDate(this.time_max));
+
+        // Start progress bar
+        disp.startProgressBar(this.name,
+                              this.progress_div,
+                              this.progress_button);
+
+        this.chunk();
+    },
+    chunk: function() {
+        // If we are at the max, end
+        if(this.chunk_index >= this.time_chunks.length - 1) {
+            // Load the new data
+            this.on_finish();
+
+            // End the progress bar and stop function
+            disp.endProgressBar(this.name);
+            return;
+        }
+
+        this.post.time_min = this.time_chunks[this.chunk_index];
+        this.post.time_max = this.time_chunks[this.chunk_index + 1];
+
+        data.callPHP(this.url, this.post,
+                     this.chunk_success.bind(this),
+                     this.chunk_failure.bind(this));
+    },
+    chunk_success: function(file_data, b, c) {
+        if(file_data.includes('<b>Notice</b>')) {
+            console.debug(file_data);
+
+            // Abort
+            this.chunk_failure();
+            return;
+        }
+        console.debug(file_data, b, c);
+
+        // Update the progress bar
+        var completed = this.chunk_index + 1;
+        var total = this.time_chunks.length - 1;
+        disp.updateProgressBar(this.name, Math.floor(completed / total * 100));
+
+        this.on_chunk_finish();
+
+        // Start loading the next batch
+        this.chunk_index = this.chunk_index + 1;
+        this.chunk();
+    },
+    chunk_failure: function(a, b, c) {
+        console.log(a, b, c);
+        disp.alert(this.failure_msg);
+        disp.endProgressBar(this.name);
+    }
+};
+
 function Data() {
     var self = this;
     
@@ -39,7 +124,6 @@ function Data() {
         })
         .order("reverse");
 }
-
 Data.prototype = {
     loadCollections: function () {
 //        disp.toggleLoading(true);
@@ -654,89 +738,58 @@ Data.prototype = {
         
         data.callPHP('updateEvent', fields, options.editWindowUpdated); // add a callback
     },
-    callPHP: function(url, fields, callback) {
+    callPHP: function(url, fields, callback, error_callback) {
         if(!fields)
             fields = {};
         if(!callback)
             callback = function() {};
+        if(!error_callback)
+            error_callback = function() {};
         
         $.ajax({
             url: 'scripts/php/' + url + '.php',
             type: "POST",
             data: fields,
             cache: false,
-            success: callback
+            success: callback,
+            error: callback
         });
     },
-    genTweetCount: function() {
-        var event_id = data.collection.ID;
-        var search_term = options.add_term.get().toLowerCase();
+    genTweetCount: function(search_text, search_name) {
+        var post = {
+            event_id: data.collection.ID,
+            search_name: search_name,
+            search_text: search_text
+        };
         
-        // Generate PHP query
-        var url = "scripts/php/genTweetCounts.php";
-        url += "?event_id=" + event_id;
-        url += '&text_search=' + search_term;
+        // Generate fields
+        if(!post.search_name)
+            post.search_name = post.search_text;
         
-        // Calculate time periods to add to the event
-        var time_min = options.time_min.min;
-        var time_max = options.time_max.max;
+        post.search_text = post.search_text
+            .replace(/\\W(.*)\\W/g, "[[:<:]]$1[[:>:]]");
         
-        // Generate a list of times every 6 hours
-        var time_chunks = [];
-        for(var timestamp = new Date(time_min);
-            timestamp < time_max;
-            timestamp.setMinutes(timestamp.getMinutes() + 60 * 1)) {
-            time_chunks.push(util.formatDate(timestamp));
+        var progress_div = '#choose_add_term';
+        if(search_name == 'rumor')
+            post.rumor_id = data.rumor.ID;
+        else {
+            options.add_term.reset();
+            $("#input_add_term").blur();
         }
-        time_chunks.push(util.formatDate(time_max));
         
-        // Start progress bar
-        options.add_term.reset();
-        $("#input_add_term").blur();
+        // Initialize and start a stream
+        var args = {
+            name: 'add_term',
+            url: 'genTweetCounts',
+            post: post,
+            failure_msg: "Problem generating new series from query",
+            progress_div: progress_div,
+            progress_button: true,
+            on_finish: data.startLoadingCollection
+        };
         
-        disp.startProgressBar('new_keyword');
-        
-        // Send off the first chunk of time to generate tweet counts
-        data.genTweetCountChunk(url, time_chunks, 0);
-    },
-    genTweetCountChunk: function(url_base, time_chunks, index) {
-        // If we are at the max, end
-        if(index >= time_chunks.length - 1) {
-            // Load the new data
-            data.startLoadingCollection();
-            
-            // End the progress bar and stop function
-                disp.endProgressBar('new_keyword');
-            return;
-        }
-    
-        var url = url_base;
-        url += '&time_min="' + time_chunks[index] + '"';
-        url += '&time_max="' + time_chunks[index + 1] + '"';
-//        console.info(url);
-    
-        d3.text(url, function(error, file_data) {
-            if(error || file_data.substring(0, 7) != "REPLACE") {
-                console.debug(error);
-                console.debug(file_data);
-                
-                // Abort
-                disp.alert("Problem generating new series from terms");
-                disp.endProgressBar('new_keyword');
-                return;
-            }
-            
-            // Update the progress bar
-            disp.updateProgressBar('new_keyword',
-                                   Math.floor((index + 1) / (time_chunks.length - 1) * 100));
-            
-            // If success, load the new data
-//            data.loadDataFile();
-            console.debug(file_data);
-
-            // Start loading the next batch
-            data.genTweetCountChunk(url_base, time_chunks, index + 1);
-        });
+        var stream = new Stream(args);
+        stream.start();
     },
     getTweets: function(series, startTime, stopTime) {
         var url = "scripts/php/getTweets.php";
@@ -800,75 +853,25 @@ Data.prototype = {
         });
     },
     genTweetInCollection: function(type) {
-        // Right now just for a rumor
-        var event_id = data.collection.ID;
-        var rumor_id = data.rumor.ID;
-        var search_term = data.rumor.Query;
+        console.log(type);
+        // Set fields
+        var args = {
+            name: 'genTweetInCollection',
+            url: 'genTweetInCollection',
+            post: {
+                event_id: data.collection.ID,
+                rumor_id: data.rumor.ID,
+                search_text: data.rumor.Query
+            },
+            failure_msg: "Problem finding tweets that were in the rumor",
+            progress_div: '#edit-window-tweetin-div',
+            progress_button: true,
+            on_finish: data.startLoadingCollection
+        };
+        console.log(args);
         
-        // Generate PHP query
-        var url = "scripts/php/genTweetCounts.php";
-        url += "?event_id=" + event_id;
-        url += '&text_search=' + search_term;
-        
-        // Calculate time periods to add to the event
-        var time_min = options.time_min.min;
-        var time_max = options.time_max.max;
-        
-        // Generate a list of times every 6 hours
-        var time_chunks = [];
-        for(var timestamp = new Date(time_min);
-            timestamp < time_max;
-            timestamp.setMinutes(timestamp.getMinutes() + 60 * 1)) {
-            time_chunks.push(util.formatDate(timestamp));
-        }
-        time_chunks.push(util.formatDate(time_max));
-        
-        // Start progress bar
-        options.add_term.reset();
-        $("#input_add_term").blur();
-        
-        disp.startProgressBar('in_collection', '#choose_add_term', true);
-        
-        // Send off the first chunk of time to generate tweet counts
-        data.genTweetInCollectionChunk(url, time_chunks, 0);
-    },
-    genTweetInCollectionChunk: function(url_base, time_chunks, index) {
-        // If we are at the max, end
-        if(index >= time_chunks.length - 1) {
-            // Load the new data
-            data.startLoadingCollection();
-            
-            // End the progress bar and stop function
-                disp.endProgressBar('in_collection');
-            return;
-        }
-    
-        var url = url_base;
-        url += '&time_min="' + time_chunks[index] + '"';
-        url += '&time_max="' + time_chunks[index + 1] + '"';
-//        console.info(url);
-    
-        d3.text(url, function(error, file_data) {
-            if(error || file_data.substring(0, 7) != "REPLACE") {
-                console.debug(error);
-                console.debug(file_data);
-                
-                // Abort
-                disp.alert("Problem searching tweets");
-                disp.endProgressBar('in_collection');
-                return;
-            }
-            
-            // Update the progress bar
-            disp.updateProgressBar('in_collection',
-                                   Math.floor((index + 1) / (time_chunks.length - 1) * 100));
-            
-            // If success, load the new data
-//            data.loadDataFile();
-            console.debug(file_data);
-
-            // Start loading the next batch
-            data.genTweetInCollectionChunk(url_base, time_chunks, index + 1);
-        });
+        // Initialize and start Stream
+        var stream = new Stream(args);
+        stream.start();
     }
 }

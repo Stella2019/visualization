@@ -251,6 +251,11 @@ button:focus {
     width: 80px;
 }
 .modal-options div {
+    display: inline-table;
+    text-align: left;
+}
+.modal-options div {
     display: inline-block;
-    margin-left: 5px;
+    margin-right: 5px;
+    position: relative;
 }

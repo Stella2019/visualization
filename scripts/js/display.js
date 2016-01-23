@@ -320,7 +320,7 @@ Display.prototype = {
             .style("stroke", function (d) { return d3.rgb(disp.color(d.name)).darker(); })
             .attr("d", function(d) { return disp.focus.area(d.values)});
 
-        disp.toggleLoading(false);
+//        disp.toggleLoading(false);
     },
     setYAxes: function() {
         // Set the Y Domain
@@ -673,7 +673,7 @@ Display.prototype = {
         var style = {
             'width': '0%',
             'font-weight': 'bold',
-            'padding': '10px',
+            'padding': '10px 0px',
             'font-size': '1em'
         };
         var text = "Loading";
@@ -684,13 +684,14 @@ Display.prototype = {
                 left: '0px',
                 width: '100%',
                 height: '100%',
-                opacity: 0.5,
+                opacity: 0.9,
+                background: 'grey',
                 'z-index': 3
             }
             style = {
                 'width': '0%',
                 'font-weight': 'bold',
-                'padding': '10px',
+                'padding': '5px 0px',
                 'font-size': '1em'
             };
             text = "Working";
@@ -803,7 +804,6 @@ Display.prototype = {
                             url += '&rand';
 //                            title = 'Random ' + title;
                         }
-                    console.log(url);
                         
                         // Fetch new data
                         d3.text(url, function(error, filedata) {
