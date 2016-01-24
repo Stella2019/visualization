@@ -5,7 +5,9 @@
 
     // Get input from user
     $event_id = $_POST["event_id"];
-    if(isset($_POST["rumor_id")) {
+    $time_min = $_POST["time_min"];
+    $time_max = $_POST["time_max"];
+    if(isset($_POST["rumor_id"])) {
         $collection_id = $_POST["rumor_id"];
         $collection_type = 'Rumor';                    
         $search_name = '_rumor_' . $collection_id;
@@ -15,8 +17,6 @@
         $search_name = $_POST["search_name"];
         $search_text = $_POST["search_text"];
     }
-    $time_min = $_POST["time_min"];
-    $time_max = $_POST["time_max"];
 
     // Execute Query
     $query = "" .
@@ -45,8 +45,8 @@
         "    FROM Tweet " .
         "    JOIN TweetIn" . $collection_type . " TinC " .
         "        ON TinC.Tweet_ID = Tweet.ID " .
-        "    WHERE TinC." . $collection_type . "_ID = " . $collection_id . " " .
-        "        AND Tweet.Timestamp >= '" . $time_min . "' " .
+        "        AND TinC." . $collection_type . "_ID = " . $collection_id . " " .
+        "    WHERE Tweet.Timestamp >= '" . $time_min . "' " .
         "        AND Tweet.Timestamp < '" . $time_max . "' ";
 
     if($collection_type != 'Rumor') {

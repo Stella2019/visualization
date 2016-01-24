@@ -257,5 +257,6 @@ button:focus {
 .modal-options div {
     display: inline-block;
     margin-right: 5px;
+    margin-bottom: 5px;
     position: relative;
 }

@@ -63,7 +63,6 @@ Stream.prototype = {
             this.chunk_failure();
             return;
         }
-        console.debug(file_data, b, c);
 
         // Update the progress bar
         var completed = this.chunk_index + 1;
@@ -752,7 +751,20 @@ Data.prototype = {
             data: fields,
             cache: false,
             success: callback,
-            error: callback
+            error: error_callback
+        });
+    },
+    rmTweetCount: function(search_text, search_name) {
+        var post = {
+            event_id: data.collection.ID,
+            keyword: search_name,
+        };
+        if(search_text == 'rumor') {
+            post.keyword = data.rumor.ID;
+        }
+        
+        data.callPHP('genTweetCounts_remove', post, function() {
+            data.genTweetCount(search_text, search_name);
         });
     },
     genTweetCount: function(search_text, search_name) {
@@ -770,9 +782,11 @@ Data.prototype = {
             .replace(/\\W(.*)\\W/g, "[[:<:]]$1[[:>:]]");
         
         var progress_div = '#choose_add_term';
-        if(search_name == 'rumor')
+        if(search_text == 'rumor') {
             post.rumor_id = data.rumor.ID;
-        else {
+            post.search_name = data.rumor.ID;
+            progress_div = '#edit-window-gencount-div';
+        } else {
             options.add_term.reset();
             $("#input_add_term").blur();
         }
@@ -791,45 +805,65 @@ Data.prototype = {
         var stream = new Stream(args);
         stream.start();
     },
-    getTweets: function(series, startTime, stopTime) {
-        var url = "scripts/php/getTweets.php";
-        url += "?event_id=" + data.collection.ID;
+    getTweets: function(args) {
+        var post = {
+            event_id: data.collection.ID
+        };
         var title = "";
 
         if(options.fetched_tweet_order.is("rand")) {
-            url += '&rand'
-            title += 'Random ';
+            post.rand = '';
+//            title += 'Random ';
         }
         
         if(options.subset.is("distinct")) {
-            url += '&distinct=1';
+            post.distinct = 1;
             title += 'Distinct ';
         } else if(!options.subset.is('all')) {
-            url += '&type=' + options.subset.get();
+            post.type = options.subset.get();
             title += options.subset.getLabel() + ' ';
         }
         title += 'Tweets';
 
-        if(options.series.is("terms")) {
-            url += '&text_search=' + series.name;
-            title += ' with text "' + series.name + '"';
-        } else if(options.series.is("types")) {
-            url += '&type=' + series.name;
-            title += ' of type ' + series.name;
-        } else if(options.series.is("distinct")) {
-            url += '&distinct=' + (series.name == "distinct" ? 1 : 0);
-            title += ' that are ' + (series.name == "distinct" ? 'distinct' : 'not distinct')
+        if('series' in args) {
+            if(options.series.is("terms")) {
+                post.search_text = args.series.name;
+                title += ' with text "' + args.series.name + '"';
+            } else if(options.series.is("types")) {
+                post.type = args.series.name;
+                title += ' of type ' + args.series.name;
+            } else if(options.series.is("distinct")) {
+                post.distinct = args.series.name == "distinct" ? 1 : 0;
+                title += ' that are ' + (args.series.name == "distinct" ? 'distinct' : 'not distinct')
+            }
         }
-
-        url += '&time_min="' + util.formatDate(startTime) + '"';
-        title += " between <br />" + util.formatDate(startTime);
-
-        url += '&time_max="' + util.formatDate(stopTime) + '"';
-        title += " and " + util.formatDate(stopTime);
         
-        console.info(url);
-        d3.text(url, function(error, filedata) {
-            disp.tweetsModal(error, filedata, url, title);
+        if('rand' in args)
+            post.rand = args.rand;
+        if('rumor_id' in args)
+            post.rumor_id = args.rumor_id;
+        if('limit' in args)
+            post.limit = args.limit;
+        if('csv' in args)
+            post.csv = args.csv;
+        
+        if(!('time_min' in args))
+            args.time_min = options.time_min.min;
+        if(!('time_max' in args))
+            args.time_max = options.time_max.max;
+
+        post.time_min = util.formatDate(args.time_min);
+        title += " between <br />" + util.formatDate(args.time_min);
+        post.time_max = util.formatDate(args.time_max);
+        title += " and " + util.formatDate(args.time_max);
+        
+        data.callPHP('getTweets', post, function(filedata) {
+            if('csv' in post)
+                data.handleTweets(filedata);
+            else
+                disp.tweetsModal(filedata, post, title);
+        }, function() { 
+            disp.alert('Unable to retreive tweets', 'danger');
         });
     },
     getRumor: function() {
@@ -852,8 +886,24 @@ Data.prototype = {
             delete data.rumor['StopTime']; 
         });
     },
+    getRumorCount: function() {
+        var post = {
+            event_id: data.collection.ID,
+            rumor_id: data.rumor.ID,
+            time_min: util.formatDate(options.time_min.min),
+            time_max: util.formatDate(options.time_max.max),
+            total: ''
+        };
+        
+        data.callPHP('getCount', post, function(file_data) {
+            var count = JSON.parse(file_data);
+            document.getElementById("edit-window-tweetin-count")
+                .value = count[0]['count'];
+        }, function() { 
+            disp.alert('Unable to retreive count of tweets in rumor', 'danger', '#selectedTweetsModal');
+        });
+    },
     genTweetInCollection: function(type) {
-        console.log(type);
         // Set fields
         var args = {
             name: 'genTweetInCollection',
@@ -868,10 +918,74 @@ Data.prototype = {
             progress_button: true,
             on_finish: data.startLoadingCollection
         };
-        console.log(args);
         
-        // Initialize and start Stream
-        var stream = new Stream(args);
-        stream.start();
+        if(type == 'rumor') {
+            args.on_finish = function() {
+                data.getRumorCount();
+            }
+        }
+        
+        // Delete the TweetInCollection
+        data.callPHP('genTweetInCollection_Remove', args.post, function() {
+            // Initialize and start Stream
+            var stream = new Stream(args);
+            stream.start();
+        }, function() {
+            disp.alert('Problem deleting the last TweetInCollection records');
+        })
+        
+    },
+    handleTweets: function(tweets_str) {
+        tweets_str = 'Tweet_' + tweets_str;
+        var tweets = d3.csv.parse(tweets_str);
+        
+        var tweet_text_unique = new Set();
+        var tweets_unique = [];
+        
+        // Strip out newlines
+        tweets.forEach(function(tweet) {
+            tweet.Text = tweet.Text.replace(/(?:\r\n|\r|\n)/g, ' ');
+            var text_no_url = tweet.Text.replace(/(?:http\S+)/g, ' ');
+            
+            if(tweet_text_unique.has(text_no_url)) {
+                tweet.Distinct = 0;
+            } else {
+                tweet_text_unique.add(text_no_url);
+                if(tweets_unique.length < 100) {
+                    tweets_unique.push(tweet);
+                }
+            }
+        });
+        
+        // Turn it back into a CSV and download
+        tweets_str = d3.csv.format(tweets_unique);
+        data.download(tweets_str);
+    },
+    download: function(content, fileName, mimeType) {
+        var a = document.createElement('a');
+        fileName = fileName || 'data.csv';
+        mimeType = mimeType || 'text/csv'; // 'application/octet-stream';
+
+        if (navigator.msSaveBlob) { // IE10
+            return navigator.msSaveBlob(new Blob([content], { type: mimeType }),     fileName);
+        } else if ('download' in a) { //html5 A[download]
+            a.href = 'data:' + mimeType + ',' + encodeURIComponent(content);
+            a.setAttribute('download', fileName);
+            document.body.appendChild(a);
+            setTimeout(function() {
+                a.click();
+                document.body.removeChild(a);
+            }, 66);
+            return true;
+        } else { //do iframe dataURL download (old ch+FF):
+            var f = document.createElement('iframe');
+            document.body.appendChild(f);
+            f.src = 'data:' + mimeType + ',' + encodeURIComponent(content);
+
+            setTimeout(function() {
+                document.body.removeChild(f);
+            }, 333);
+            return true;
+        }
     }
 }

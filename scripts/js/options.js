@@ -1198,6 +1198,9 @@ Options.prototype = {
         $('#selectedTweetsModal').modal();
     },
     editWindowRumorOptions: function() {
+        var bottom_row = d3.select('#selectedTweetsModal .modal-options')
+        var option = 'rumor';
+        
         var tweet_count = bottom_row.append('div')
             .attr('id', 'edit-window-tweetin-div')
             .attr('class', 'input-group')
@@ -1214,6 +1217,8 @@ Options.prototype = {
             .attr('readonly', '')
             .style('width', '80px')
             .attr('value', 0);
+        
+        data.getRumorCount();
 
         tweet_count.append('div')
             .attr('class', 'input-group-btn')
@@ -1228,7 +1233,17 @@ Options.prototype = {
             .append('span')
             .attr('class', 'glyphicon glyphicon-refresh');
         
-        
+        bottom_row.append('div')
+            .attr('id', 'edit-window-gencount-div')
+            .append('button')
+            .data([option])
+            .attr({
+                id: 'edit-window-gencount',
+                class: 'btn btn-primary edit-window-routine'
+            })
+            .on('click', data.rmTweetCount)
+            .append('span')
+            .attr('class', 'glyphicon glyphicon-signal');
 
         bottom_row.append('div')
             .attr('id', 'edit-window-fetch100-div')
@@ -1238,8 +1253,16 @@ Options.prototype = {
                 id: 'edit-window-fetch100',
                 class: 'btn btn-primary edit-window-routine'
             })
-            .on('click', data.fetchTweets)
-            .html('<span class="glyphicon glyphicon-download-alt"></span> 100 Random');
+            .on('click', function() {
+                data.getTweets({
+                    limit: 300,
+                    distinct: 1,
+                    rand: '',
+                    rumor_id: data.rumor.ID,
+                    csv: ''
+                });
+            })
+            .html('<span class="glyphicon glyphicon-download-alt"></span> 100 Rand');
 
         bottom_row.append('div')
             .attr('id', 'edit-window-fetchall-div')
@@ -1249,7 +1272,14 @@ Options.prototype = {
                 id: 'edit-window-fetchall',
                 class: 'btn btn-primary edit-window-routine'
             })
-            .on('click', data.fetchTweets)
+            .on('click', function() {
+                data.getTweets({
+                    limit: 10000,
+                    distinct: 1,
+                    rumor_id: data.rumor.ID,
+                    csv: ''
+                });
+            })
             .html('<span class="glyphicon glyphicon-download-alt"></span> All');
     },
     editWindowChanged: function() {

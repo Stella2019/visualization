@@ -272,7 +272,11 @@ Display.prototype = {
             .on("click", function(d) {
                 var time = disp.getTimeHoveringOverAxis(this);
 
-                data.getTweets(d, time.min, time.max);
+                data.getTweets({
+                    series: d,
+                    time_min: time.min,
+                    time_max: time.max
+                });
             })
             .on("mouseover", legend.highlightSeries)
             .on("mouseout", function(d) {
@@ -613,10 +617,11 @@ Display.prototype = {
             .classed('hidden', options.total_line.is("false"));
     //    container.style('display', options.total_line.is("true") ? 'block' : 'none');
     },
-    alert: function(text, style_class) {
+    alert: function(text, style_class, parent) {
         if(!style_class)
             style_class = 'warning';
-//        alert(text);
+        if(!parent)
+            parent = '#body';
         
         var style = {
             position: 'absolute',
@@ -627,7 +632,7 @@ Display.prototype = {
             'z-index': 4
         }
         
-        var alert_shadow = d3.select('#body').append('div')
+        var alert_shadow = d3.select(parent).append('div')
             .attr('class', 'alert_outer')
             .style({
                 'width': '100%',
@@ -692,6 +697,7 @@ Display.prototype = {
                 'width': '0%',
                 'font-weight': 'bold',
                 'padding': '5px 0px',
+                'text-align': 'center',
                 'font-size': '1em'
             };
             text = "Working";
@@ -728,7 +734,7 @@ Display.prototype = {
             .html('<small>' + data.collection.Type + ':</small> ' + 
                   data.collection.DisplayName);
     },
-    tweetsModal: function(error, filedata, url, title) {
+    tweetsModal: function(filedata, post, title) {
 
         d3.select('#selectedTweetsModal .modal-title')
             .html(title);
@@ -748,12 +754,7 @@ Display.prototype = {
             modal_body.append('div')
                 .attr('class', 'text-center')
                 .html("Error retrieving tweets. <br /><br /> " + filedata);
-        } else if (error) {
-            modal_body.append('div')
-                .attr('class', 'text-center')
-                .html("Error retrieving tweets. <br /><br /> " + error);
         } else {
-            
             // Otherwise, parse the data
             filedata = JSON.parse(filedata);
 
@@ -797,22 +798,26 @@ Display.prototype = {
                     })
                     .on('click', function(d) {
                         options.fetched_tweet_order.click(d);
-                    
-                        url = url.replace('&rand', '');
+                        
 //                        title = title.replace('Random', '');
                         if(options.fetched_tweet_order.is('rand')) {
-                            url += '&rand';
+                            post.rand = '';
 //                            title = 'Random ' + title;
+                        } else {
+                            delete post.rand;
                         }
                         
                         // Fetch new data
-                        d3.text(url, function(error, filedata) {
-                            disp.tweetsModal(error, filedata, url, title);
+                        data.callPHP('getTweets', post, function(filedata) {
+                            disp.tweetsModal(filedata, post, title);
+                        }, function() { 
+                            disp.alert('Unable to fetch new data', 'danger');
                         });
                     });
                 
-
-                d3.json(url.replace('getTweets.php', 'getTweets_Count.php'), function(count) {
+                data.callPHP('getCount', post, function(file_data) {
+                    var count = JSON.parse(file_data);
+                    
                     d3.select('#selectedTweetsModal .modal-title')
                         .html(count[0]['count'] + " " + title);
                 });
