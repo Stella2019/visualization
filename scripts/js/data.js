@@ -1,3 +1,5 @@
+/*global data, disp, legend, util, options, d3, console */
+
 function Stream(args) {
     var self = this;
 
@@ -12,20 +14,21 @@ function Stream(args) {
     self.time_min = options.time_min.min;
     self.time_max = options.time_max.max;
     self.failure_msg = 'Problem with data stream';
-    self.on_chunk_finish = function() {};
-    self.on_finish = function() {};
+    self.on_chunk_finish = function () {};
+    self.on_finish = function () {};
     
     // Save args  
-    Object.keys(args).map(function(item) {
+    Object.keys(args).map(function (item) {
         this[item] = args[item];
     }, this);
 }
 Stream.prototype = {
-    start: function() {
+    start: function () {
         this.time_chunks = [];
-        for(var timestamp = new Date(this.time_min);
-            timestamp < this.time_max;
-            timestamp.setMinutes(timestamp.getMinutes() + 60 * 1)) {
+        var timestamp;
+        for (timestamp = new Date(this.time_min);
+                timestamp < this.time_max;
+                timestamp.setMinutes(timestamp.getMinutes() + 60 * this.time_res)) {
             this.time_chunks.push(util.formatDate(timestamp));
         }
         this.time_chunks.push(util.formatDate(this.time_max));
@@ -37,9 +40,9 @@ Stream.prototype = {
 
         this.chunk();
     },
-    chunk: function() {
+    chunk: function () {
         // If we are at the max, end
-        if(this.chunk_index >= this.time_chunks.length - 1) {
+        if (this.chunk_index >= this.time_chunks.length - 1) {
             // Load the new data
             this.on_finish();
 
@@ -55,8 +58,8 @@ Stream.prototype = {
                      this.chunk_success.bind(this),
                      this.chunk_failure.bind(this));
     },
-    chunk_success: function(file_data, b, c) {
-        if(file_data.includes('<b>Notice</b>')) {
+    chunk_success: function (file_data, b, c) {
+        if (file_data.includes('<b>Notice</b>')) {
             console.debug(file_data);
 
             // Abort
@@ -75,7 +78,7 @@ Stream.prototype = {
         this.chunk_index = this.chunk_index + 1;
         this.chunk();
     },
-    chunk_failure: function(a, b, c) {
+    chunk_failure: function (a, b, c) {
         console.log(a, b, c);
         disp.alert(this.failure_msg);
         disp.endProgressBar(this.name);
@@ -130,7 +133,7 @@ Data.prototype = {
         // Collection selection
         d3.json("scripts/php/getCollections.php", data.parseCollectionsFile);
     },
-    parseCollectionsFile: function(error, collections_file) {
+    parseCollectionsFile: function (error, collections_file) {
         if (error) throw error;
 
         // Add collections
@@ -140,15 +143,15 @@ Data.prototype = {
 
         
         // Format collection data
-        data.collections.map(function(collection) {
+        data.collections.map(function (collection) {
             // Keywords
             collection.Keywords = collection.Keywords.trim().split(/,[ ]*/);
             collection.OldKeywords = collection.OldKeywords.trim().split(/,[ ]*/);
-            if(collection.OldKeywords.length == 1 && collection.OldKeywords[0] == "")
+            if (collection.OldKeywords.length == 1 && collection.OldKeywords[0] == "")
                 collection.OldKeywords = [];
             
             // Name
-            if(!('DisplayName' in collection) || !collection['DisplayName'] || collection['DisplayName'] == "null")
+            if (!('DisplayName' in collection) || !collection['DisplayName'] || collection['DisplayName'] == "null")
                 collection.DisplayName = collection.Name;
                
             // Time
@@ -156,9 +159,9 @@ Data.prototype = {
 //            collection.StartTime.setMinutes(collection.StartTime.getMinutes()
 //                                           -collection.StartTime.getTimezoneOffset());
             collection.Month = util.date2monthstr(collection.StartTime);
-            if(collection.StopTime) {
+            if (collection.StopTime) {
                 collection.StopTime = util.date(collection.StopTime);
-                if(collection.StartTime.getMonth() != collection.StopTime.getMonth()) 
+                if (collection.StartTime.getMonth() != collection.StopTime.getMonth() ) 
                     collection.Month += ' to ' + util.date2monthstr(collection.StopTime);
             } else {
                 collection.StopTime = "Ongoing";
@@ -169,7 +172,7 @@ Data.prototype = {
 
         
         // Make nicer collection names
-        data.collection_names = data.collections.map(function(collection) {
+        data.collection_names = data.collections.map(function (collection) {
             return collection.DisplayName;
         });
         
@@ -181,24 +184,24 @@ Data.prototype = {
 
         data.setCollection();
     },
-    setCollection: function() {
+    setCollection: function () {
         var collection_id = options.collection.get();
         
-        data.collection = data.collections.reduce(function(collection, candidate) {
-            if(collection.ID == collection_id)
+        data.collection = data.collections.reduce(function (collection, candidate) {
+            if (collection.ID == collection_id)
                 return collection;
-            return candidate
+            return candidate;
         }, {});
         
         disp.setTitle();
         
         data.loadCollectionData();
     },
-    loadCollectionData: function() {
+    loadCollectionData: function () {
 //        disp.toggleLoading(true);
 
         // If there is no collection information, end, we cannot do this yet
-        if($.isEmptyObject(data.collection)) {
+        if ($.isEmptyObject(data.collection)) {
 //            disp.toggleLoading(false);
             return;
         }
@@ -219,15 +222,15 @@ Data.prototype = {
             data.time.min = new Date(data.time.collection_min);
             data.time.max = new Date(data.time.collection_max);
         } else {
-            var time_limit = options.time_limit.get()
+            var time_limit = options.time_limit.get();
             var sign = time_limit.slice(0, 1) == '-' ? -1 : 1;
 
             time_limit = time_limit.slice(-2);
             var hours_diff = 0;
 
-            if(time_limit == '3h') {
+            if (time_limit == '3h') {
                 hours_diff = 3;
-            } else if(time_limit == '2h') { // 12h, but we sliced it
+            } else if (time_limit == '2h') { // 12h, but we sliced it
                 hours_diff = 12;
             } else if(time_limit == '1d') {
                 hours_diff = 24;
@@ -457,12 +460,28 @@ Data.prototype = {
         
         // Start the series data store
         data.series = data.series_names.map(function(name, i) {
-            return {
+            var entry = {
+                display_name: name,
                 name: name,
                 id: util.simplify(name),
                 order: (i + 1) * 100,
                 shown: true
             };
+            if(name.includes('_rumor_')) {
+                var rumor = name.substring(7);
+                rumor = data.rumors.reduce(function(cur, cand) {
+                    if(cand.ID == rumor)
+                        return cand;
+                    return cur;
+                }, {});
+                if(rumor) {
+                    entry.display_name = rumor.Name;
+                    entry.rumor = rumor;
+                    entry.isRumor = true;
+                }
+            }
+            
+            return entry;
         });
         
         // Copy it to the search_by_id
@@ -498,14 +517,13 @@ Data.prototype = {
                 var isOldKeyword = data.collection.OldKeywords.reduce(function(prev, keyword) {
                     return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
                 }, false);
-                var isRumor = false;
                 
                 datum.type = legend.key_data_byID['added'].label;
                 if(isKeyword) {
                     datum.type = legend.key_data_byID['capture'].label;
                 } else if(isOldKeyword) {
                     datum.type = legend.key_data_byID['removed'].label;
-                } else if(isRumor) {
+                } else if(datum.isRumor) {
                     datum.type = legend.key_data_byID['rumor'].label;
                 }
 
@@ -827,8 +845,13 @@ Data.prototype = {
 
         if('series' in args) {
             if(options.series.is("terms")) {
-                post.search_text = args.series.name;
-                title += ' with text "' + args.series.name + '"';
+                if(args.series.isRumor) {
+                    post.search_text = args.series.rumor.Query;
+                    title += ' with text "' + post.search_text + '"';
+                } else {
+                    post.search_text = args.series.name;
+                    title += ' with text "' + args.series.name + '"';
+                }
             } else if(options.series.is("types")) {
                 post.type = args.series.name;
                 title += ' of type ' + args.series.name;

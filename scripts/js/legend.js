@@ -168,7 +168,7 @@ Legend.prototype = {
             .html(function (d) {
                 var series = data.series_byID[d];
             
-                var name = series.name;
+                var name = series.display_name;
                 if(options.series.is('terms')) {
                     var key_data = legend.key_data_byLabel[series.type];
                     
