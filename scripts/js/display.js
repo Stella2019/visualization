@@ -12,17 +12,6 @@ function Display() {
     context.width  = focus.width;
     context.height = plot_area.height - context.margin.top - context.margin.bottom;
     
-    // Loading Spinner
-    self.spin = new Spinner({
-        lines: 11,
-        color: '#000',
-        length: 50,
-        width: 10,
-        radius: 25,
-        top: focus.margin.top + focus.height / 2 + "px",
-        left: focus.margin.left + focus.width / 2 + "px"
-    });
-    
     // Link to self
     self.focus = focus;
     self.context = context;
@@ -32,17 +21,6 @@ function Display() {
 }
 
 Display.prototype = {
-    toggleLoading: function(toggle) {
-        if(toggle) {
-            $('#timeseries_div').append(this.spin.spin().el);
-            d3.select('#charts')
-                .style("opacity", 0.5);
-        } else {
-            this.spin.stop();
-            d3.select('#charts')
-                .style("opacity", 1);
-        }
-    },
     setColorScale: function() {
         switch(options.color_scale.get()) {
             case "category10":
@@ -230,7 +208,6 @@ Display.prototype = {
         // Change data for display
         var n_series = data.stacked.length;
         if(n_series == 0) {
-            disp.toggleLoading(false);
             disp.alert('Failure to display data');
             
             d3.selectAll('.series').remove();
@@ -324,7 +301,6 @@ Display.prototype = {
             .style("stroke", function (d) { return d3.rgb(disp.color(d.name)).darker(); })
             .attr("d", function(d) { return disp.focus.area(d.values)});
 
-//        disp.toggleLoading(false);
     },
     setYAxes: function() {
         // Set the Y Domain
@@ -808,14 +784,14 @@ Display.prototype = {
                         }
                         
                         // Fetch new data
-                        data.callPHP('getTweets', post, function(filedata) {
+                        data.callPHP('tweets/fetch', post, function(filedata) {
                             disp.tweetsModal(filedata, post, title);
                         }, function() { 
                             disp.alert('Unable to fetch new data', 'danger');
                         });
                     });
                 
-                data.callPHP('getCount', post, function(file_data) {
+                data.callPHP('tweets/count', post, function(file_data) {
                     var count = JSON.parse(file_data);
                     
                     d3.select('#selectedTweetsModal .modal-title')

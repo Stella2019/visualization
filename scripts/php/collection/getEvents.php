@@ -1,8 +1,8 @@
 <?php
-    include 'connect.php';
+    include '../connect.php';
 
     // Execute Query
     $query = "SELECT * FROM Event;";
 
-    include 'printJSON.php';
+    include '../printJSON.php';
 ?>

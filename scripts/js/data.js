@@ -58,7 +58,7 @@ Stream.prototype = {
                      this.chunk_success.bind(this),
                      this.chunk_failure.bind(this));
     },
-    chunk_success: function (file_data, b, c) {
+    chunk_success: function (file_data) {
         if (file_data.includes('<b>Notice</b>')) {
             console.debug(file_data);
 
@@ -114,6 +114,8 @@ function Data() {
     
     // Series
     self.keywords = {};
+    self.tweet_types = ['original', 'retweet', 'reply', 'quote'];
+    self.distinct_types = ['distinct', 'repeat'];
     self.series_names = [];
     self.stack =  d3.layout.stack()
         .values(function (d) { return d.values; })
@@ -128,15 +130,13 @@ function Data() {
 }
 Data.prototype = {
     loadCollections: function () {
-//        disp.toggleLoading(true);
-
         // Collection selection
-        d3.json("scripts/php/getCollections.php", data.parseCollectionsFile);
+        data.callPHP('collection/getEvents', {},
+                     data.parseCollectionsFile);
     },
-    parseCollectionsFile: function (error, collections_file) {
-        if (error) throw error;
-
+    parseCollectionsFile: function (collections_file) {
         // Add collections
+        collections_file = JSON.parse(collections_file);
         collections_file.sort(util.compareCollections);
         collections_file.reverse();
         data.collections = collections_file;
@@ -198,11 +198,8 @@ Data.prototype = {
         data.loadCollectionData();
     },
     loadCollectionData: function () {
-//        disp.toggleLoading(true);
-
         // If there is no collection information, end, we cannot do this yet
         if ($.isEmptyObject(data.collection)) {
-//            disp.toggleLoading(false);
             return;
         }
 
@@ -260,13 +257,12 @@ Data.prototype = {
         data.startLoadingCollection();
     },
     loadRumors: function() {
-        var url = "scripts/php/getRumors.php";
-        url += '?event_id=' + data.collection.ID;
-        
-        d3.json(url, data.parseRumorsFile);
+        data.callPHP('collection/getRumors',
+                     {event_id: data.collection.ID},
+                     data.parseRumorsFile);
     },
-    parseRumorsFile: function(error, filedata) {
-        if (error) throw error;
+    parseRumorsFile: function(filedata) {
+        filedata = JSON.parse(filedata);
         
         data.rumors = filedata;
         
@@ -286,7 +282,7 @@ Data.prototype = {
     },
     startLoadingCollection: function() {
         // Determine the base URL
-        var url = "scripts/php/getTweetCounts.php";
+        var url = "scripts/php/timeseries/get.php";
         url += "?event_id=" + data.collection.ID;
         
         // Generate a list of times every 3 hours
@@ -444,22 +440,11 @@ Data.prototype = {
         disp.brush.clear();
         disp.plot_area.svg.selectAll('.brush').call(disp.brush);
 
-        data.changeSeries('all');
+        data.initializeSeries();
     },
-    changeSeries: function(subset) {
-        // Determine the series on the chart
-        if(options.series.is('terms')) {
-            data.series_names = data.keywords;
-        } else if(options.series.is('types')) {
-            data.series_names = ['original', 'retweet', 'reply', 'quote'];
-        } else if(options.series.is('distinct')) {
-            data.series_names = ['distinct', 'repeat'];
-        } else {
-            data.series_names = ['all'];
-        }
-        
-        // Start the series data store
-        data.series = data.series_names.map(function(name, i) {
+    initializeSeries: function() {
+        data.series = data.keywords
+            .map(function(name, i) {
             var entry = {
                 display_name: name,
                 name: name,
@@ -467,6 +452,8 @@ Data.prototype = {
                 order: (i + 1) * 100,
                 shown: true
             };
+            
+            // Get rumor information
             if(name.includes('_rumor_')) {
                 var rumor = name.substring(7);
                 rumor = data.rumors.reduce(function(cur, cand) {
@@ -481,15 +468,75 @@ Data.prototype = {
                 }
             }
             
+            // Find if the entry is in either keyword list
+            entry.isKeyword = data.collection
+                .Keywords.reduce(function(prev, keyword) {
+                return prev |= keyword.toLowerCase() == entry.name.toLowerCase();
+            }, false);
+            entry.isOldKeyword = data.collection
+                .OldKeywords.reduce(function(prev, keyword) {
+                return prev |= keyword.toLowerCase() == entry.name.toLowerCase();
+            }, false);
+            
+            // Get Legend Type
+            entry.type = legend.key_data_byID['added'].label;
+            if(entry.isKeyword) {
+                entry.type = legend.key_data_byID['capture'].label;
+            } else if(entry.isOldKeyword) {
+                entry.type = legend.key_data_byID['removed'].label;
+            } else if(entry.isRumor) {
+                entry.type = legend.key_data_byID['rumor'].label;
+            }
+            
             return entry;
         });
         
-        // Copy it to the search_by_id
-        data.series_byID = {};
-        data.series.map(function(series) {
-            data.series_byID[series.id] = series;
+        // Types of tweets
+        data.tweet_types
+            .forEach(function(name, i) {
+            var entry = {
+                display_name: name,
+                name: name,
+                id: util.simplify(name),
+                order: (i + 1) * 100,
+                shown: true,
+                type: legend.section_names[1] // Tweet Type
+            };
+            
+            data.series.push(entry);
         });
+        
+        // Distinct/Repeat Tweets
+        data.distinct_types
+            .forEach(function(name, i) {
+            var entry = {
+                display_name: name,
+                name: name,
+                id: util.simplify(name),
+                order: (i + 1) * 100,
+                shown: true,
+                type: legend.section_names[2] // Distinctiveness
+            };
+            
+            data.series.push(entry);
+        });
+        
+        // Make alternative indices
+        data.series_names = data.series.map(function(series) {
+            data.series_byID[series.id] = series;
+            return series.name;
+        });
+        
+        // Start data series
+        data.loadNewSeriesData();
 
+        // Populate Legend    
+        legend.section_names.forEach(legend.populate);
+
+        // Finish preparing the data for loading
+        data.prepareData();  
+    },
+    changeSeries: function(subset) {
         // Load the main series
         data.loadNewSeriesData();
 
@@ -508,96 +555,53 @@ Data.prototype = {
         var found_in = options.found_in.get();
         var subset = options.subset.get();
 
-        // Fill in specifics of the series
-        if(options.series.is('terms')) {
-            data.series.map(function(datum) {
-                var isKeyword = data.collection.Keywords.reduce(function(prev, keyword) {
-                    return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
-                }, false);
-                var isOldKeyword = data.collection.OldKeywords.reduce(function(prev, keyword) {
-                    return prev |= keyword.toLowerCase() == datum.name.toLowerCase();
-                }, false);
-                
-                datum.type = legend.key_data_byID['added'].label;
-                if(isKeyword) {
-                    datum.type = legend.key_data_byID['capture'].label;
-                } else if(isOldKeyword) {
-                    datum.type = legend.key_data_byID['removed'].label;
-                } else if(datum.isRumor) {
-                    datum.type = legend.key_data_byID['rumor'].label;
-                }
-
-                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) {
-                    return cur_sum + datapoint[datum.name];
-                }, 0);
-                datum.total = data.all[found_in][subset].reduce(function(cur_sum, datapoint) {
-                    return cur_sum + datapoint[datum.name];
-                }, 0);
-            });
-        } else if(options.series.is('types')) {
-            data.series.map(function(datum) {
-                datum.sum = data.all[found_in][datum.name].reduce(function(cur_sum, datapoint) {
+        
+        data.series.map(function(datum) {
+            if(datum.type == 'Tweet Type') {
+                datum.sum = data.all[found_in][datum.name]
+                    .reduce(function(cur_sum, datapoint) {
                     return cur_sum + datapoint['_total_'];
                 }, 0);
                 datum.total = datum.sum;
-            });
-            datum.type = 'Tweet Type';
-        } else if(options.series.is('distinct')) {
-            data.series.map(function(datum) {
-                if(datum.name == 'distinct') {
-                    datum.sum = data.all[found_in]['distinct'].reduce(function(cur_sum, datapoint) {
+            } else if(datum.type == 'Distinctiveness') {
+                if(datum.name == 'Distinct') {
+                    datum.sum = data.all[found_in]['distinct']
+                        .reduce(function(cur_sum, datapoint) {
                         return cur_sum + datapoint['_total_'];
                     }, 0);
                 } else {
-                    datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) {
+                    datum.sum = data.all[found_in]['all']
+                        .reduce(function(cur_sum, datapoint) {
                         return cur_sum + datapoint['_total_'];
                     }, 0);
+                    datum.sum -= data.series_byID['ldistinct'].sum;
                 }
-            });
-
-            // Subtract the distinct sum from the all sum to make the repeat sum, presuming repeat is in the second place
-            data.series[1].sum -= data.series[0].sum;
-            
-            data.series[0].total = data.series[0].sum;
-            data.series[1].total = data.series[1].sum;
-            datum.type = 'Distinctiveness';
-        } else { // implicit none
-            data.series.map(function(datum) {
-                datum.sum = data.all[found_in]['all'].reduce(function(cur_sum, datapoint) {
-                    return cur_sum + datapoint['_total_'];
-                }, 0);
                 datum.total = datum.sum;
-            });
-            datum.type = 'All Tweets';
-        }
+            } else {
+                datum.sum = data.all[found_in]['all']
+                    .reduce(function(cur_sum, datapoint) {
+                    return cur_sum + datapoint[datum.name];
+                }, 0);
+                datum.total = data.all[found_in][subset]
+                    .reduce(function(cur_sum, datapoint) {
+                    return cur_sum + datapoint[datum.name];
+                }, 0);
+            }
+        });
     },
     prepareData: function() {
         var found_in = options.found_in.get();
         
         // If we haven't loaded the data yet, tell the user and ask them to wait
         if(!('Text' in data.all) || data.all[found_in][options.subset.get()] == undefined) {
-            // Wait a second, then if it still isn't ready, message user that they are waiting
-//            window.setTimeout(function() {
-//                if(!('Text' in data.all) || data.all[found_in][options.subset.get()] == undefined) {
-//                    if (confirm(
-//                        data.collection.name + ": " + 
-//                        options.subset.get() + " _total_" +
-//                        " not loaded yet. \n\n" +
-//                        "Press OK to try again.")
-//                       ) {
-//                        window.setTimeout(data.prepareData, 1000);
-//                    } else {
-//                        // Should mark that the visualization is out of date or something
-//                    }
-//                    return;
-//                } else {
-//                    data.prepareData();
-//                }
-//            }, 1000);
             return;
         }
         
         var data_nested = data.nestData();
+        if(!data_nested) {
+            disp.alert('Problem adding up time series', 'danger')
+            return;
+        }
 
         data.timestamps_nested = data_nested.map(function(item) { return item.key; });
 
@@ -676,84 +680,107 @@ Data.prototype = {
         // Display the data
         disp.display();
     },
+    get: function(found_in, tweet_type, keyword) {
+        return 'a';
+    },
     nestData: function() {
+        
+        return;
+        // Get the patterns that we want
         var found_in = options.found_in.get();
         
+        var addToShownList = function(list, name) {
+            if(data.series_byID[util.simplify(name)].shown) {
+                list.push(name);
+            }
+            return list;
+        }
+        
+        var shown = {
+            keywords: data.keywords.reduce(addToShownList, []),
+            tweet_types: data.tweet_types.reduce(addToShownList, []),
+            distinct_types: data.distinct_types.reduce(addToShownList, [])
+        }
+        
+        if(shown.keywords.length == data.keywords.length)
+            shown.keywords = ['_total_'];
+        if(shown.tweet_types.length == data.tweet_types.length)
+            shown.tweet_types = ['all'];
+//        if(shown.distinct_types.length == data.distinct_types.length)
+//            shown.distinct_types = ['_total_'];
+        
+        
+//        console.log(legend.shown());
+        
+        return;
         // Aggregate on time depending on the resolution
-        var data_nested_entries;
-        if(options.series.is('types')) {
-            data_nested_entries = []; // think about it
-            for(var i = 0; i < data.all[found_in]['all'].length; i++) {
-                entry = {
-                    timestamp: data.all[found_in]['all'][i]['timestamp'],
-                    _total_: data.all[found_in]['all'][i]['_total_'],
-                    original: data.all[found_in]['original'][i]['_total_'],
-                    retweet: data.all[found_in]['retweet'][i]['_total_'],
-                    reply: data.all[found_in]['reply'][i]['_total_'],
-                    quote: data.all[found_in]['quote'][i]['_total_']
-                }
-                data_nested_entries.push(entry);
-            }
-        } else if(options.series.is('distinct')) {
-            data_nested_entries = []; // think about it
-            for(var i = 0; i < data.all[found_in]['all'].length; i++) {
-                entry = {
-                    timestamp: data.all[found_in]['all'][i]['timestamp'],
-                    _total_: data.all[found_in]['all'][i]['_total_'],
-                    distinct: data.all[found_in]['distinct'][i]['_total_'],
-                    repeat: data.all[found_in]['all'][i]['_total_'] - data.all[found_in]['distinct'][i]['_total_'],
-                }
-                data_nested_entries.push(entry);
-            }
-        } else {
-            data_nested_entries = data.all[found_in][options.subset.get()];
+        
+        var data_nested_entries = data.all[found_in][options.subset.get()];
+
+        for(var i = 0; i < data.all[found_in]['all'].length; i++) {
+                data_nested_entries[i].original = 
+                    data.all[found_in]['original'][i]['_total_'];
+                data_nested_entries[i].retweet = 
+                    data.all[found_in]['retweet'][i]['_total_'];
+                data_nested_entries[i].reply = 
+                    data.all[found_in]['reply'][i]['_total_'];
+                data_nested_entries[i].quote = 
+                    data.all[found_in]['quote'][i]['_total_'];
+
+                data_nested_entries[i].distinct = 
+                    data.all[found_in]['distinct'][i]['_total_'];
+                data_nested_entries[i].repeat =  
+                    data.all[found_in]['all'][i]['_total_'] -
+                    data.all[found_in]['distinct'][i]['_total_'];
+            
+            data_nested_entries.push(entry);
         }
 
-        // Perform the nest
-        var data_nested = d3.nest()
-            .key(function (d) {
-                var time = new Date(d.timestamp);
-                if(options.resolution.is('tenminute'))
-                    time.setMinutes(Math.floor(time.getMinutes() / 10) * 10);
-                if(options.resolution.is('hour') || options.resolution.is("day"))
-                    time.setMinutes(0);
-                if(options.resolution.is("day"))
-                    time.setHours(0);
-                return time;
-            })
-            .rollup(function (leaves) {
-                var newdata = {timestamp: leaves[0].timestamp};
-                newdata['_total_'] = leaves.reduce(function(sum, cur) {
-                    return sum + cur['_total_'];
-                }, 0);
-
-                if(options.series.is('none')) {
-                    newdata['all'] = leaves.reduce(function(sum, leaf) {
-                        return sum + leaf['_total_'];
-                    }, 0);
-                } else {
-                    data.series.map(function(series) {
-                        if(series.shown) {
-                            newdata[series.name] = leaves.reduce(function(sum, leaf) {
-                                return sum + leaf[series.name];
-                            }, 0);
-                        } else {
-                            newdata[series.name] = 0;
-                        }
-                    });
-                }
-
-                return newdata;
-            })
-            .entries(data_nested_entries);
-        
-        return data_nested;
+//        // Perform the nest
+//        var data_nested = d3.nest()
+//            .key(function (d) {
+//                var time = new Date(d.timestamp);
+//                if(options.resolution.is('tenminute'))
+//                    time.setMinutes(Math.floor(time.getMinutes() / 10) * 10);
+//                if(options.resolution.is('hour') || options.resolution.is("day"))
+//                    time.setMinutes(0);
+//                if(options.resolution.is("day"))
+//                    time.setHours(0);
+//                return time;
+//            })
+//            .rollup(function (leaves) {
+//                var newdata = {timestamp: leaves[0].timestamp};
+//                newdata['_total_'] = leaves.reduce(function(sum, cur) {
+//                    return sum + cur['_total_'];
+//                }, 0);
+//
+//                if(options.series.is('none')) {
+//                    newdata['all'] = leaves.reduce(function(sum, leaf) {
+//                        return sum + leaf['_total_'];
+//                    }, 0);
+//                } else {
+//                    data.series.map(function(series) {
+//                        if(series.shown) {
+//                            newdata[series.name] = leaves.reduce(function(sum, leaf) {
+//                                return sum + leaf[series.name];
+//                            }, 0);
+//                        } else {
+//                            newdata[series.name] = 0;
+//                        }
+//                    });
+//                }
+//
+//                return newdata;
+//            })
+//            .entries(data_nested_entries);
+//        
+//        return data_nested;
     },
     updateCollection: function() {
         var fields = {};
         $("#edit_form").serializeArray().forEach(function(x) { fields[x.name] = x.value; });
         
-        data.callPHP('updateEvent', fields, options.editWindowUpdated); // add a callback
+        data.callPHP('collection/update', fields, options.editWindowUpdated); // add a callback
     },
     callPHP: function(url, fields, callback, error_callback) {
         if(!fields)
@@ -781,7 +808,7 @@ Data.prototype = {
             post.keyword = data.rumor.ID;
         }
         
-        data.callPHP('genTweetCounts_remove', post, function() {
+        data.callPHP('timeseries/rm', post, function() {
             data.genTweetCount(search_text, search_name);
         });
     },
@@ -812,7 +839,7 @@ Data.prototype = {
         // Initialize and start a stream
         var args = {
             name: 'add_term',
-            url: 'genTweetCounts',
+            url: 'timeseries/gen',
             post: post,
             failure_msg: "Problem generating new series from query",
             progress_div: progress_div,
@@ -880,7 +907,7 @@ Data.prototype = {
         post.time_max = util.formatDate(args.time_max);
         title += " and " + util.formatDate(args.time_max);
         
-        data.callPHP('getTweets', post, function(filedata) {
+        data.callPHP('tweets/fetch', post, function(filedata) {
             if('csv' in post)
                 data.handleTweets(filedata);
             else
@@ -890,7 +917,7 @@ Data.prototype = {
         });
     },
     getRumor: function() {
-        url = "scripts/php/getRumor.php";
+        url = "scripts/php/collection/getRumor.php";
         url += "?rumor_id=" + options.rumor.get();
         url += "&event_id=" + data.collection.ID;
         url += '&time_min="' + util.formatDate(data.collection.StartTime) + '"';
@@ -918,7 +945,7 @@ Data.prototype = {
             total: ''
         };
         
-        data.callPHP('getCount', post, function(file_data) {
+        data.callPHP('collection/countTweetIn', post, function(file_data) {
             var count = JSON.parse(file_data);
             document.getElementById("edit-window-tweetin-count")
                 .value = count[0]['count'];
@@ -930,7 +957,7 @@ Data.prototype = {
         // Set fields
         var args = {
             name: 'genTweetInCollection',
-            url: 'genTweetInCollection',
+            url: 'collection/genTweetIn',
             post: {
                 event_id: data.collection.ID,
                 rumor_id: data.rumor.ID,
@@ -949,7 +976,7 @@ Data.prototype = {
         }
         
         // Delete the TweetInCollection
-        data.callPHP('genTweetInCollection_Remove', args.post, function() {
+        data.callPHP('collection/rmTweetIn', args.post, function() {
             // Initialize and start Stream
             var stream = new Stream(args);
             stream.start();

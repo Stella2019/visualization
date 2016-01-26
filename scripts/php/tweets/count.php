@@ -1,5 +1,5 @@
 <?php
-    include 'connect.php';
+    include '../connect.php';
 
     ini_set('max_execution_time', 300);
 
@@ -18,13 +18,7 @@
     // Execute Query
     $query = "" .
         "SELECT " .
-        "   Tweet.ID, " .
-        "   Tweet.Text, " .
-        "   Tweet.Distinct, " .
-        "   Tweet.Type, " .
-        "   Tweet.Username, " .
-        "   Tweet.Timestamp, " .
-        "   Tweet.Origin " .
+        "   COUNT(*) " .
         "FROM Tweet " .
         "JOIN TweetIn" . $collection_type . " TinC " .
         "    ON TinC.Tweet_ID = Tweet.ID " .
@@ -55,8 +49,8 @@
     }
 
     if(isset($_POST["csv"])) {
-        include 'exportToCSV.php';
+        include '../exportToCSV.php';
     } else {
-        include 'printJSON.php';
+        include '../printJSON.php';
     }
 ?>

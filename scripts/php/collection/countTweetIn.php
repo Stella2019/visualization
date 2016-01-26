@@ -1,5 +1,5 @@
 <?php
-    include 'connect.php';
+    include '../connect.php';
 
     // Get input from user
     $event_id = $_POST["event_id"];
@@ -45,5 +45,5 @@
     }
 
     // Execute Query and print as JSON
-    include 'printJSON.php';
+    include '../printJSON.php';
 ?>

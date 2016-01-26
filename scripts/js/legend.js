@@ -4,6 +4,7 @@ function Legend() {
     self.container_series = [];
     self.mouseOverToggle = false;
     self.mouseOverToggleState = true;
+    
     self.key_data = [
         {term: "&nbsp;", label: "Capture Term", id: 'capture', has: false},
         {term: "&#x271d;", label: "Removed Capture Term", id: 'removed', has: false},
@@ -21,7 +22,7 @@ function Legend() {
         return all;
     }, {});
      
-    // Function
+    self.section_names = ['Terms in Text', 'Tweet Type', 'Distinctiveness'];
 }
 
 Legend.prototype = {
@@ -29,13 +30,25 @@ Legend.prototype = {
         this.container = d3.select('#legend')
             .on('mouseout', this.endToggle);
         
+        this.section_names
+            .forEach(this.buildLegendSection, this);
+        
+        // Tooltip
+        this.tooltip = this.container.append('div')
+            .attr('class', 'legend_tooltip')
+
+    },
+    buildLegendSection: function(section) {
+        var container = this.container.append('div')
+            .attr('class', 'legend_section ' + util.simplify(section));
+        
         // Header
-        var legend_header = this.container.append('div')
+        var legend_header = container.append('div')
             .attr('class', 'legend_header');
         
         legend_header.append('span')
             .attr('class', 'legend_title')
-            .text('Terms')
+            .text(section)
 
         legend_header.append('div')
             .attr('class', 'legend_showall')
@@ -43,46 +56,40 @@ Legend.prototype = {
             .on('click', this.showAll);
         
         // Series
-        this.container_series = this.container.append('div')
+        var list = container.append('div')
             .attr('class', 'legend_series_list');
         
-        // Key
-        this.key = this.container.append('div')
-            .attr('id', 'legend_key');
-        
-        var legend_key_entries = this.key.selectAll('div')
-            .data(legend.key_data)
-            .enter().append('div')
-            .attr('class', function(d) {
-                return 'legend_key_entry legend_key_' + d.id;
-            });
-        
-        legend_key_entries.append('div')
-            .attr('class', 'legend_key_term')
-            .html(function(d) { return d.term; });
-        
-        legend_key_entries.append('div')
-            .attr('class', 'legend_key_label')
-            .html(function(d) { return d.label; });
-        
-        // Tooltip
-        this.tooltip = this.container.append('div')
-            .attr('class', 'legend_tooltip')
+        if(section == 'Terms in Text') {
+            this.container_series = list;
+            
+            // Key
+            this.key = container.append('div')
+                .attr('id', 'legend_key');
 
+            var legend_key_entries = this.key.selectAll('div')
+                .data(legend.key_data)
+                .enter().append('div')
+                .attr('class', function(d) {
+                    return 'legend_key_entry legend_key_' + d.id;
+                });
+
+            legend_key_entries.append('div')
+                .attr('class', 'legend_key_term')
+                .html(function(d) { return d.term; });
+
+            legend_key_entries.append('div')
+                .attr('class', 'legend_key_label')
+                .html(function(d) { return d.label; });
+        }
     },
-    populate: function() {     
-        // Show all series   
-//        data.series.map(function(series) {
-//            series.shown = true; 
-//        });
+    populate: function(section) {
+//        legend.container.select('')
         
         // Get series ids
         legend.series = data.series.map(function(series) {
             return series.id; 
         });
-        
-        legend.container.select('.legend_title')
-            .text(options.series.getLabel());
+    
         
         // Hide table entries
 //        d3.select('#legend_key')
@@ -172,8 +179,10 @@ Legend.prototype = {
                 if(options.series.is('terms')) {
                     var key_data = legend.key_data_byLabel[series.type];
                     
-                    name += ' ' + key_data.term;
-                    key_data.has = true;
+                    if(key_data) {
+                        name += ' ' + key_data.term;
+                        key_data.has = true;
+                    }
                 }
                 return name;
             });

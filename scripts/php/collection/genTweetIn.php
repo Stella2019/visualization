@@ -1,5 +1,5 @@
 <?php
-    include 'connect.php';
+    include '../connect.php';
 
     ini_set('max_execution_time', 300);
 

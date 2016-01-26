@@ -1,5 +1,5 @@
 <?php
-    include 'connect.php';
+    include '../connect.php';
 
     ini_set('max_execution_time', 300);
 
@@ -21,27 +21,25 @@
     // Execute Query
     $query = "" .
         "REPLACE INTO TweetCount " .
-        "(Event_ID, `Time`, Timesource, Found_In, Keyword, Count, `Distinct`, `Original`, Retweet, Reply, Quote) " .
+        "(Event_ID, `Time`, Timesource, Found_In, Keyword, `Distinct`, `Original`, Retweet, Reply, Quote) " .
         "SELECT " .
         "    " . $event_id . " as 'Event_ID', " .
         "    Tweets.Time as 'Time',  " .
         "    100 as 'Timesource',  " .
         "    'Text' as 'Found_In',  " .
         "    '" . $search_name . "'  as 'Keyword', " .
-        "    SUM(Tweets.`all`) as 'Count',  " .
-        "    SUM(Tweets.`distinct`) as 'Distinct',  " .
-        "    SUM(Tweets.original) as 'Original',  " .
-        "    SUM(Tweets.retweet) as 'Retweet', " . 
-        "    SUM(Tweets.reply) as 'Reply', " .
-        "    SUM(Tweets.quote) as 'Quote' " .
+        "    Tweets.`Distinct` as 'Distinct',  " .
+        "    SUM(Tweets.Original) as 'Original',  " .
+        "    SUM(Tweets.Retweet) as 'Retweet', " . 
+        "    SUM(Tweets.Reply) as 'Reply', " .
+        "    SUM(Tweets.Quote) as 'Quote' " .
         "FROM (SELECT  " .
-        "        Date_Format(Tweet.Timestamp, '%Y-%m-%d %H:%i') AS time, " .
-        "        1 AS 'all', " .
-        "        Tweet.`Distinct` AS 'distinct', " .
-        "        Tweet.Type LIKE 'original' AS 'original', " .
-        "        Tweet.Type LIKE 'retweet' AS 'retweet', " .
-        "        Tweet.Type LIKE 'reply' AS 'reply', " .
-        "        Tweet.Type LIKE 'quote' AS 'quote' " .
+        "        Date_Format(Tweet.Timestamp, '%Y-%m-%d %H:%i') AS Time, " .
+        "        Tweet.`Distinct` AS 'Distinct', " .
+        "        Tweet.Type LIKE 'original' AS 'Original', " .
+        "        Tweet.Type LIKE 'retweet' AS 'Retweet', " .
+        "        Tweet.Type LIKE 'reply' AS 'Reply', " .
+        "        Tweet.Type LIKE 'quote' AS 'Quote' " .
         "    FROM Tweet " .
         "    JOIN TweetIn" . $collection_type . " TinC " .
         "        ON TinC.Tweet_ID = Tweet.ID " .
@@ -56,8 +54,8 @@
     }
 
     $query = $query . ") Tweets " .
-        "GROUP BY Tweets.time " .
-        "ORDER BY Tweets.time ";
+        "GROUP BY Tweets.Time, Tweets.`Distinct` " .
+        "ORDER BY Tweets.Time, Tweets.`Distinct` ";
 
     $result = $mysqli->query($query);
      

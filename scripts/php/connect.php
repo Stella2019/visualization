@@ -1,6 +1,6 @@
 <?php
     // Get Configuration Data
-    $file = '../../local.conf';
+    $file = '../../../local.conf';
     $conf = json_decode(file_get_contents($file), true);
 
     if (!isset($_SERVER['PHP_AUTH_USER'])) {

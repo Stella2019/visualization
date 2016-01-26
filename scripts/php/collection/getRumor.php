@@ -1,5 +1,5 @@
 <?php
-    include 'connect.php';
+    include '../connect.php';
 
     // Get input from user
 //    $event_id = $_GET["event_id"];
@@ -31,7 +31,7 @@
             "SELECT * FROM Rumor" .
             " WHERE ID = LAST_INSERT_ID()";
 
-        include 'printJSON.php';
+        include '../printJSON.php';
         
     } else {
             
@@ -40,7 +40,7 @@
             "SELECT * FROM Rumor" .
             " WHERE ID = " . $_GET["rumor_id"];
  
-        include 'printJSON.php';
+        include '../printJSON.php';
     }
 
 ?>
