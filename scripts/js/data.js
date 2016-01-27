@@ -114,7 +114,6 @@ function Data() {
     self.total_tweets = []; // formerly context_byTime
     
     // Series
-    self.series_names = [];
     self.stack =  d3.layout.stack()
         .values(function (d) { return d.values; })
         .x(function (d) { return d.timestamp; })
@@ -325,9 +324,11 @@ Data.prototype = {
         if(data.timestamps.length == 0)
             data.timestamps = [util.formatDate(new Date())];
         var keywords = Array.from(new Set(data.file.map(function(d) {return d.Keyword})));
+        legend.series_ids.Keyword = keywords.map(function(d) {
+            return util.simplify(d) });
         legend.series_names.Keyword = keywords;
-        legend.series_names_nt.Keyword = keywords.filter(
-            function(name){ return name != '_total_'; });
+//        legend.series_names_nt.Keyword = keywords.filter(
+//            function(name){ return name != '_total_'; });
 
         // Fill in missing timestamps
         data.time.min = util.date(data.timestamps[0]);
@@ -342,45 +343,6 @@ Data.prototype = {
             new_timestamps.push(util.formatDate(timestamp));
         }
         data.timestamps = new_timestamps;
-
-//        // Create matrix to hold values // Is this awful or awesome?
-//        data.all = legend.series_names['Found In']
-//          .reduce(function(level0, found_in) {
-//            level0[found_in] = legend.series_names['Distinctiveness']
-//              .reduce(function(level1, distinct) {
-//                level1[distinct] = legend.series_names['Tweet Type']
-//                  .reduce(function(level2, tweet_type) {
-//                    level2[tweet_type] = keywords
-//                      .reduce(function (level3, keyword) {
-//                        level3[keyword] = data.timestamps
-//                          .reduce(function (level4, timestamp) {
-//                            level4[timestamp] = 0;
-//                            return level4;
-//                        }, {});
-//                        return level3;
-//                    }, {});
-//                    return level2;
-//                }, {});
-//                return level1;
-//            }, {});
-//            return level0;
-//        }, {});
-//
-//        // Input values from the loaded file
-//        for(row in data.file) {
-//            var timestamp = data.file[row]['Time'];
-//            var found_in = data.file[row]['Found_In'];
-//            var keyword = data.file[row]['Keyword'];
-//            var distinct = legend.series_names['Distinctiveness']               [data.file[row]['Distinct'] ?  0 : 1];
-//            
-//            if(typeof data.file[row] !== 'object')
-//                continue;
-//
-//            legend.series_names['Tweet Type'].forEach(function(tweet_type) {
-//                data.all[found_in][distinct][tweet_type][keyword][timestamp] =
-//                    parseInt(data.file[row][tweet_type]);
-//            });
-//        }
         
         data.all = [];
         var types = legend.series_names['Tweet Type'];
@@ -395,7 +357,7 @@ Data.prototype = {
             if(typeof data.file[row] !== 'object')
                 continue;
 
-            legend.series_names['Tweet Type'].forEach(function(tweet_type) {
+            types.forEach(function(tweet_type) {
                 var i_y = types.indexOf(tweet_type);
                 data.all.push([i_y, i_d, i_f, i_k, i_t,
                     parseInt(data.file[row][tweet_type])]);
@@ -422,7 +384,7 @@ Data.prototype = {
                 display_name: name,
                 name: name,
                 id: util.simplify(name),
-                order: (i + 1) * 100,
+                order: (i + 1) * 100 + 30000, // since it is the last main series type
                 shown: true
             };
             
@@ -471,11 +433,12 @@ Data.prototype = {
                 return; // Already done
             
             var series_names = legend.series_names[category];
+            var series_ids = legend.series_ids[category];
             series_names.forEach(function(name, i) {
                 var entry = {
                     display_name: name,
                     name: name,
-                    id: util.simplify(name),
+                    id: series_ids[i],
                     order: (i + 1) * 100 + j * 10000,
                     shown: true,
                     type: category,
@@ -487,15 +450,21 @@ Data.prototype = {
         });
         
         // Make alternative indices
+        data.series_byID = {};
+        data.series_byCat = {};
+        legend.series_cats.forEach(function(category) {
+            data.series_byCat[category] = [];
+        });
         data.series_names = data.series.map(function(series) {
             data.series_byID[series.id] = series;
+            data.series_byCat[series.category].push(series);
             return series.name;
         });
         
         // Start data series
         data.loadNewSeriesData();
 
-        // Populate Legend    
+        // Populate Legend
         legend.series_cats.forEach(legend.populate);
 
         // Finish preparing the data for loading
@@ -593,129 +562,18 @@ Data.prototype = {
 //        });
 
         // Set Time Domain and Axis appropriate to the resolution
-        disp.setContextTime(data.timestamps_nested[0], data.timestamps_nested[data.timestamps_nested.length - 1]);
+        disp.setContextTime(data.timestamps_nested[0],
+            data.timestamps_nested[data.timestamps_nested.length - 1]);
 
         disp.setFocusAxisLabels();
 
         // Display values on the context chart
-        disp.context.y.domain([0, d3.max(data.time_totals)])
-                .range([disp.context.height, 0]);
-
-        disp.context.area
-            .interpolate(options.shape.get());
-
-//        disp.context.svg.selectAll(".x, .area").remove();
-//        disp.context.svg.append("path")
-//            .datum(data.time_totals)
-//            .attr("class", "area")
-//            .attr("d", disp.context.area);
-//
-//        disp.context.svg.append("g")
-//            .attr("class", "x axis")
-//            .attr("transform", "translate(0," + disp.context.height + ")")
-//            .call(disp.context.xAxis);
-//
-//        disp.context.svg.append("g")
-//            .attr("class", "x brush")
-//            .call(disp.brush)
-//            .selectAll("rect")
-//            .attr("y", -6)
-//            .attr("height", disp.context.height + 7);
-
+        disp.contextChart();
+        
+        data.stackTimeseries();
+        
         // Display the data
         disp.display();
-    },
-    get: function(found_in, tweet_type, keyword) {
-        return 'a';
-    },
-    nestData: function() {
-        
-        // Get the patterns that we want
-        var found_in = options.found_in.get();
-        
-        var addToShownList = function(list, name) {
-            if(data.series_byID[util.simplify(name)].shown) {
-                list.push(name);
-            }
-            return list;
-        }
-        
-        var shown = {
-            keywords: data.keywords.reduce(addToShownList, []),
-            tweet_types: data.tweet_types.reduce(addToShownList, []),
-            distinct_types: data.distinct_types.reduce(addToShownList, [])
-        }
-        
-        if(shown.keywords.length == data.keywords.length)
-            shown.keywords = ['_total_'];
-        
-        
-        
-        console.log(shown);
-        
-        return;
-        // Aggregate on time depending on the resolution
-        
-        var data_nested_entries = data.all[found_in][options.subset.get()];
-        
-        for(var i = 0; i < data.all[found_in]['all'].length; i++) {
-                data_nested_entries[i].original = 
-                    data.all[found_in]['original'][i]['_total_'];
-                data_nested_entries[i].retweet = 
-                    data.all[found_in]['retweet'][i]['_total_'];
-                data_nested_entries[i].reply = 
-                    data.all[found_in]['reply'][i]['_total_'];
-                data_nested_entries[i].quote = 
-                    data.all[found_in]['quote'][i]['_total_'];
-
-                data_nested_entries[i].distinct = 
-                    data.all[found_in]['distinct'][i]['_total_'];
-                data_nested_entries[i].repeat =  
-                    data.all[found_in]['all'][i]['_total_'] -
-                    data.all[found_in]['distinct'][i]['_total_'];
-            
-            data_nested_entries.push(entry);
-        }
-
-        // Perform the nest
-        var data_nested = d3.nest()
-            .key(function (d) {
-                var time = new Date(d.timestamp);
-                if(options.resolution.is('tenminute'))
-                    time.setMinutes(Math.floor(time.getMinutes() / 10) * 10);
-                if(options.resolution.is('hour') || options.resolution.is("day"))
-                    time.setMinutes(0);
-                if(options.resolution.is("day"))
-                    time.setHours(0);
-                return time;
-            })
-            .rollup(function (leaves) {
-                var newdata = {timestamp: leaves[0].timestamp};
-                newdata['_total_'] = leaves.reduce(function(sum, cur) {
-                    return sum + cur['_total_'];
-                }, 0);
-
-                if(options.series.is('none')) {
-                    newdata['all'] = leaves.reduce(function(sum, leaf) {
-                        return sum + leaf['_total_'];
-                    }, 0);
-                } else {
-                    data.series.map(function(series) {
-                        if(series.shown) {
-                            newdata[series.name] = leaves.reduce(function(sum, leaf) {
-                                return sum + leaf[series.name];
-                            }, 0);
-                        } else {
-                            newdata[series.name] = 0;
-                        }
-                    });
-                }
-
-                return newdata;
-            })
-            .entries(data_nested_entries);
-        
-        return data_nested;
     },
     getCategorySubtotals: function() {
 //        if(series_cat == 'Keyword')
@@ -723,21 +581,21 @@ Data.prototype = {
         // Get the patterns that we want
         var found_in = options.found_in.get();
         
-        var addToShownList = function(list, name, i) {
-            if(data.series_byID[util.simplify(name)].shown) {
+        var addToShownList = function(list, id, i) {
+            if(data.series_byID[id].shown) {
                 list.push(i);
             }
             return list;
         }
         
         var shown = {
-            y: legend.series_names['Tweet Type']
+            y: legend.series_ids['Tweet Type']
                         .reduce(addToShownList, []),
-            d: legend.series_names['Distinctiveness']
+            d: legend.series_ids['Distinctiveness']
                         .reduce(addToShownList, []),
-            f: legend.series_names['Found In']
+            f: legend.series_ids['Found In']
                         .reduce(addToShownList, []),
-            k: legend.series_names['Keyword']
+            k: legend.series_ids['Keyword']
                         .reduce(addToShownList, [])
         }
         
@@ -748,66 +606,6 @@ Data.prototype = {
 //        if(shown.k.length == 
 //           legend.series_names_nt['Keyword'].length)
 //            shown.k = ['_total_'];
-        
-        
-        
-        // Filter dataset to just the visible data
-//        var dataset = [];
-        
-//        shown.foundins.forEach(function(found_in) {
-//            shown.distincts.forEach(function(distinct) {
-//                shown.types.forEach(function(tweet_type) {
-//                    shown.keywords.forEach(function (keyword) {
-//                        data.timestamps.forEach(function (timestamp) {
-//                            dataset.push({
-//                                'Found In':        found_in,
-//                                'Tweet Type':      tweet_type,
-//                                'Distinctiveness': distinct,
-//                                'Keyword':         keyword,
-//                                timestamp:       util.date(timestamp),
-//                                value: data.all[found_in][distinct][tweet_type][keyword][timestamp]
-//                            });
-//                        });
-//                    });
-//                });
-//            });
-//        });
-//        legend.series_names['Found In'].forEach(function(found_in) {
-//            legend.series_names['Distinctiveness'].forEach(function(distinct) {
-//                legend.series_names['Tweet Type'].forEach(function(tweet_type) {
-//                    legend.series_names['Keyword'].forEach(function (keyword) {
-//                        data.timestamps.forEach(function (timestamp) {
-//                            dataset.push({
-//                                'Found In':        found_in,
-//                                'Tweet Type':      tweet_type,
-//                                'Distinctiveness': distinct,
-//                                'Keyword':         keyword,
-//                                timestamp:       util.date(timestamp),
-//                                value: data.all[found_in][distinct][tweet_type][keyword][timestamp]
-//                            });
-//                        });
-//                    });
-//                });
-//            });
-//        });
-//        data.dataset = dataset;
-//        dataset2 = [];
-//        legend.series_names['Found In'].forEach(function(found_in, i_f) {
-//            var level1 = data.all[found_in];
-//            legend.series_names['Distinctiveness'].forEach(function(distinct, i_d) {
-//                var level2 = level1[distinct];
-//                legend.series_names['Tweet Type'].forEach(function(tweet_type, i_y) {
-//                    var level3 = level2[tweet_type];
-//                    legend.series_names['Keyword'].forEach(function (keyword, i_k) {
-//                        var level4 = level3[keyword];
-//                        data.timestamps.forEach(function (timestamp, i_t) {
-//                            dataset2.push([i_f, i_d, i_y, i_k, i_t, level4[timestamp]]);
-//                        });
-//                    });
-//                });
-//            });
-//        });
-//        data.dataset2 = dataset2;
         
         // Get nested timestamps
         data.timestamps_nested = d3.nest().key(function (d) {
@@ -821,7 +619,10 @@ Data.prototype = {
             return time;
         }).entries(data.timestamps);
         data.timestamps_nested = data.timestamps_nested.map(function(d) {
-            return d.key;
+            return new Date(d.key);
+        });
+        data.timestamps_nested_int = data.timestamps_nested.map(function(d) {
+            return d.getTime();
         });
 
         // Get nested data
@@ -849,14 +650,17 @@ Data.prototype = {
         
         if(cat_i < 4) { // Type/Distinct/Found In/Keyword
             return nested_data.forEach(function(nested_entry) {
-                var id = util.simplify(legend.series_names[category][nested_entry.key]);
+                var id = legend.series_ids[category][nested_entry.key];
                 var series_entry = data.series_byID[id];
                 
                 series_entry.sum = nested_entry.values;
             });
         } else { // Timestamps
             data.time_totals = nested_data.map(function(nested_entry) {
-                return nested_entry.values;
+                return {
+                    timestamp: util.date(data.timestamps[nested_entry.key]),
+                    value: nested_entry.values
+                };
             });
         }
     },
@@ -899,7 +703,7 @@ Data.prototype = {
         
         var nested_data = nest.entries(data.all);
         nested_data.forEach(function(nested_entry) {
-            var id = util.simplify(legend.series_names[category][nested_entry.key]);
+            var id = legend.series_ids[category][nested_entry.key];
             var series_entry = data.series_byID[id];
             
             // Fill in values, including filling any empty space
@@ -911,7 +715,7 @@ Data.prototype = {
                 var value = series_data_indexed[d];
                 return {
                     timestamp: d,
-                    value: value ? value : 0
+                    value: value || 0
                 }
             });
             
@@ -925,6 +729,34 @@ Data.prototype = {
                 return d.value;
             });
         });
+    },
+    stackTimeseries: function() {
+        if (options.display_type.is("wiggle")) {
+            data.stack.offset("wiggle");
+        } else if (options.display_type.is("stream_expand")) {
+            data.stack.offset("expand");
+        } else if (options.display_type.is("stream")) {
+            data.stack.offset("silhouette");
+        } else {
+            data.stack.offset("zero");
+        }
+
+        // Set stack representation of data
+        if(options.display_type.is("percent")) {
+            data_100 = data.series.map(function(series) {
+                var new_series = JSON.parse(JSON.stringify(series)); // Cheap cloning
+                new_series.values = new_series.values.map(function(datum, i) {
+                    var new_datum = datum;
+                    new_datum.timestamp = new Date(new_datum.timestamp);
+                    new_datum.value *= 100 / data.total_of_series[i];
+                    return new_datum;
+                });
+                return new_series;            
+            });
+            data.stacked = data.stack(data_100);
+        } else {
+            data.stacked = data.stack(data.series);
+        }
     },
     updateCollection: function() {
         var fields = {};

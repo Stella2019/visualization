@@ -1,7 +1,6 @@
 function Legend() {
     var self = this;
     self.container = [];
-    self.container_series = [];
     self.mouseOverToggle = false;
     self.mouseOverToggleState = true;
     
@@ -26,6 +25,12 @@ function Legend() {
         'Tweet Type': ['original', 'retweet', 'reply', 'quote'],
         'Distinctiveness': ['distinct', 'repeat'],
         'Found In': ["Any", "Text", "Quote", "URL"],
+        'Keyword': ["_total_"]
+    };
+    self.series_ids = {
+        'Tweet Type': ['_tt_original', '_tt_retweet', '_tt_reply', '_tt_quote'],
+        'Distinctiveness': ['_di_distinct', '_di_repeat'],
+        'Found In': ["_fi_Any", "_fi_Text", "_fi_Quote", "_fi_URL"],
         'Keyword': ["_total_"]
     };
     self.series_names_nt = { // no total series
@@ -71,9 +76,7 @@ Legend.prototype = {
         var list = container.append('div')
             .attr('class', 'legend_series_list');
         
-        if(section == 'Keyword') {
-            this.container_series = list;
-            
+        if(section == 'Keyword') {            
             // Key
             this.key = container.append('div')
                 .attr('id', 'legend_key');
@@ -95,23 +98,20 @@ Legend.prototype = {
         }
     },
     populate: function(section) {
-//        legend.container.select('')
+        var section_div = legend.container.select('.' + util.simplify(section));
+        var list_div = section_div.select('.legend_series_list');
         
         // Get series ids
-        var ids = data.series.reduce(function(ids, series) {
-//            if(section == 'Keywords' series.type)
-            
-            ids.push(series.id);
-            return ids; 
-        }, []);
-    
+        var ids = data.series_byCat[section].map(function(d) {
+            return d.id;
+        });    
         
         // Hide table entries
 //        d3.select('#legend_key')
 //            .style('display', (options.series.is('terms') ? 'table' : 'none'));
         
         // Add new entries
-        var entries = legend.container_series
+        var entries = list_div
             .selectAll('div.legend_entry')
             .data(ids);
 
@@ -177,34 +177,37 @@ Legend.prototype = {
                 return 'legend_entry ' + d;
             });
         
-        legend.container_series.on('mouseout', function(d) {
+        list_div.on('mouseout', function(d) {
             d3.event.stopPropagation();
         });
-        legend.container.on('mouseout', legend.endToggle);
+//        legend.container.on('mouseout', legend.endToggle);
+        list_div.on('mouseout', legend.endToggle);
         
-        legend.key_data.map(function(item) {
-            item.has = false;
-        });
-
-        legend.container.selectAll('div.legend_label')
-            .html(function (d) {
-                var series = data.series_byID[d];
-                var name = series.display_name;
-                if(options.series.is('terms')) {
-                    var key_data = legend.key_data_byLabel[series.type];
-                    
-                    if(key_data) {
-                        name += ' ' + key_data.term;
-                        key_data.has = true;
-                    }
-                }
-                return name;
+        if(section == 'Keyword') {
+            legend.key_data.map(function(item) {
+                item.has = false;
             });
-        
-        legend.key_data.map(function(item) {
-            this.key.select('.legend_key_' + item.id)
-                .classed('hidden', !item.has);
-        }, legend);
+
+            list_div.selectAll('div.legend_label')
+                .html(function (d) {
+                    var series = data.series_byID[d];
+                    var name = series.display_name;
+                    if(options.series.is('terms')) {
+                        var key_data = legend.key_data_byLabel[series.type];
+
+                        if(key_data) {
+                            name += ' ' + key_data.term;
+                            key_data.has = true;
+                        }
+                    }
+                    return name;
+                });
+
+            legend.key_data.map(function(item) {
+                this.key.select('.legend_key_' + item.id)
+                    .classed('hidden', !item.has);
+            }, legend);
+        }
         
         legend.showOrHideAll();
     },
@@ -252,6 +255,7 @@ Legend.prototype = {
         return legend.cmp(a, b);
     },
     startToggle: function(series) {
+        console.log(series);
         if(typeof(series) == "string")
             series = data.series_byID[series];
         

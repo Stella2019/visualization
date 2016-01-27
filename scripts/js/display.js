@@ -119,7 +119,7 @@ Display.prototype = {
             .interpolate(options.shape.get())
             .x(function(d) { return context.x(d.timestamp); })
             .y0(context.height)
-            .y1(function(d) { return context.y(d._total_); });
+            .y1(function(d) { return context.y(d.value); });
         
         this.brush = d3.svg.brush()
             .x(context.x)
@@ -170,6 +170,32 @@ Display.prototype = {
             .text("Count of " + options.subset.getLabel() + " Tweets"
                   + " Every " + options.resolution.getLabel() + "");
     },
+    contextChart: function() {
+        disp.context.y.domain([0, d3.max(data.time_totals, 
+                function(d) { return d.value; })])
+                .range([disp.context.height, 0]);
+
+        disp.context.area
+            .interpolate(options.shape.get());
+
+        disp.context.svg.selectAll(".x, .area").remove();
+        disp.context.svg.append("path")
+            .datum(data.time_totals)
+            .attr("class", "area")
+            .attr("d", disp.context.area);
+
+        disp.context.svg.append("g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + disp.context.height + ")")
+            .call(disp.context.xAxis);
+
+        disp.context.svg.append("g")
+            .attr("class", "x brush")
+            .call(disp.brush)
+            .selectAll("rect")
+            .attr("y", -6)
+            .attr("height", disp.context.height + 7);
+    },
     display: function() {
         // Set the Y Scale
         disp.setYScale();
@@ -178,41 +204,16 @@ Display.prototype = {
         disp.focus.svg.select('path.column_hover')
                     .style('display', 'none');
 
-        if (options.display_type.is("wiggle")) {
-            data.stack.offset("wiggle");
-        } else if (options.display_type.is("stream_expand")) {
-            data.stack.offset("expand");
-        } else if (options.display_type.is("stream")) {
-            data.stack.offset("silhouette");
-        } else {
-            data.stack.offset("zero");
-        }
-
-        // Set stack representation of data
-        if(options.display_type.is("percent")) {
-            data_100 = data.series.map(function(series) {
-                var new_series = JSON.parse(JSON.stringify(series));
-                new_series.values = new_series.values.map(function(datum, i) {
-                    var new_datum = datum;
-                    new_datum.timestamp = new Date(new_datum.timestamp);
-                    new_datum.value *= 100 / data.total_of_series[i];
-                    return new_datum;
-                });
-                return new_series;            
-            });
-            data.stacked = data.stack(data_100);
-        } else {
-            data.stacked = data.stack(data.series);
-        }
-
         // Change data for display
         var n_series = data.stacked.length;
-        if(n_series == 0) {
+        if(data.stacked.length == 0) {
             disp.alert('Failure to display data');
             
             d3.selectAll('.series').remove();
             return;
         }
+        
+        // Convert to separate area plot if that's asked for
         n_datapoints = data.stacked[0].values.length;
         if(options.display_type.is("separate")) {
             for (var i = n_series - 1; i >= 0; i--) {
@@ -223,7 +224,7 @@ Display.prototype = {
                         data.stacked[i].offset += data.stacked[i + 1].max;
                 }
 
-                data.stacked[i].values.map(function(datum) {
+                data.stacked[i].values.forEach(function(datum) {
                     datum.value0 = data.stacked[i].offset;
                 });
             }
@@ -505,7 +506,7 @@ Display.prototype = {
         var old_data = focus_column.data();
 
 //      var value_i = Math.floor(xy[0] / focus.width * d.values.length);
-        var value_i = data.timestamps_nested.indexOf(time.min + "");
+        var value_i = data.timestamps_nested_int.indexOf(time.min.getTime());
         var value = d.values[value_i].value;
         var value0 = d.values[value_i].value0;
 
