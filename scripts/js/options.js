@@ -26,16 +26,16 @@ function Options() {
     self.choice_groups = ['data', 'subset', 'style', 'legend'];
     self.initial_buttons = ['show_options',
                        'collection_type', 'collection', 'time_limit', 'add_term',
-                       'series', 'subset', 'found_in', 'resolution',
+                       /*'series', 'subset', 'found_in', */'resolution',
                        'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line',
                        'series_order', 'legend_showhidden', 'fetched_tweet_order', 'rumor'];
     
     self.timefields = ['time_min', 'time_max'];
-    self.record = ['collection', 'subset', 'resolution', 'time_limit',
-                      'display_type', 'y_scale', 'shape', 'series',
+    self.record = ['collection', /*'subset',*/ 'resolution', 'time_limit',
+                      'display_type', 'y_scale', 'shape', /*'series',*/
                       'time_save', 'time_min', 'time_max',
                       'y_max_toggle', 'y_max', 'color_scale',
-                      'total_line', 'found_in', 'collection_type',
+                      'total_line', /*'found_in',*/ 'collection_type',
                       'series_order', 'legend_showhidden', 'show_options'];
     self.state = {};
     

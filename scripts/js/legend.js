@@ -21,8 +21,20 @@ function Legend() {
         all[cur.label] = cur;
         return all;
     }, {});
-     
-    self.section_names = ['Terms in Text', 'Tweet Type', 'Distinctiveness'];
+    
+    self.series_names = {
+        'Tweet Type': ['original', 'retweet', 'reply', 'quote'],
+        'Distinctiveness': ['distinct', 'repeat'],
+        'Found In': ["Any", "Text", "Quote", "URL"],
+        'Keyword': ["_total_"]
+    };
+    self.series_names_nt = { // no total series
+        'Tweet Type': ['original', 'retweet', 'reply', 'quote'],
+        'Distinctiveness': ['distinct', 'repeat'],
+        'Found In': ["Text", "Quote", "URL"],
+        'Keyword': [],
+    };
+    self.series_cats = Object.keys(self.series_names);
 }
 
 Legend.prototype = {
@@ -30,7 +42,7 @@ Legend.prototype = {
         this.container = d3.select('#legend')
             .on('mouseout', this.endToggle);
         
-        this.section_names
+        this.series_cats
             .forEach(this.buildLegendSection, this);
         
         // Tooltip
@@ -59,7 +71,7 @@ Legend.prototype = {
         var list = container.append('div')
             .attr('class', 'legend_series_list');
         
-        if(section == 'Terms in Text') {
+        if(section == 'Keyword') {
             this.container_series = list;
             
             // Key
@@ -86,9 +98,12 @@ Legend.prototype = {
 //        legend.container.select('')
         
         // Get series ids
-        legend.series = data.series.map(function(series) {
-            return series.id; 
-        });
+        var ids = data.series.reduce(function(ids, series) {
+//            if(section == 'Keywords' series.type)
+            
+            ids.push(series.id);
+            return ids; 
+        }, []);
     
         
         // Hide table entries
@@ -98,7 +113,7 @@ Legend.prototype = {
         // Add new entries
         var entries = legend.container_series
             .selectAll('div.legend_entry')
-            .data(legend.series);
+            .data(ids);
 
         var new_entries = entries.enter().append('div')
             .attr('id', function(d) {
@@ -174,7 +189,6 @@ Legend.prototype = {
         legend.container.selectAll('div.legend_label')
             .html(function (d) {
                 var series = data.series_byID[d];
-            
                 var name = series.display_name;
                 if(options.series.is('terms')) {
                     var key_data = legend.key_data_byLabel[series.type];
