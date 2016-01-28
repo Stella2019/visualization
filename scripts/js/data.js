@@ -116,6 +116,7 @@ function Data() {
     self.stacked = {}; // formerly data_stacked
     self.series = {}; // formerly series_data
     self.series_byID = {};
+    self.series_byCat = {};
     self.all = {}; // formerly data_raw
     self.total_of_series = []; // formerly total_byTime
     self.total_tweets = []; // formerly context_byTime
@@ -330,8 +331,12 @@ Data.prototype = {
         }
     },
     parseCSVData: function() {
+        // Format selections
         d3.select('#choose_collection button')
             .attr('disabled', null);
+//        disp.startProgressBar('render', '#timeseries_div')
+//        d3.select('#render_progress')
+//            .text('Parsing Collection Data');
         
         // Get the timestamps
         data.timestamps = util.lunique(data.file.map(function(d) { return d.Time; }));
@@ -486,12 +491,12 @@ Data.prototype = {
         data.prepareData();  
     },
     prepareData: function() {
-        
-        // If we haven't loaded the data yet, tell the user and ask them to wait
         if(!data.all) {
             disp.alert('No data loaded', 'danger');
             return;
         }
+        
+        // Calculate totals and timeseries
         legend.series_cats.forEach(data.nestDataTotals);
         data.nestDataTotals('timestamps', 4);
         data.recalculateShown();
@@ -505,22 +510,17 @@ Data.prototype = {
 //        data.total_tweets = data_ready.map(function(datum) {
 //            return {timestamp: datum.timestamp, value: datum['_total_']};
 //        });
-
-        // Reorder by total size
-        data.series.sort(legend.cmp);
-        legend.container_keywords.selectAll('div.legend_entry').sort(legend.cmp_byID);
-        disp.setColors();
+        
+        data.orderAndColorSeries();
 
         // Set Time Domain and Axis appropriate to the resolution
         disp.setContextTime(data.timestamps_nested[0],
             data.timestamps_nested[data.timestamps_nested.length - 1]);
-
         disp.setFocusAxisLabels();
 
-        // Display values on the context chart
+        // Make specific timeseries to be displayed
         disp.contextChart();
-        
-        data.stackTimeseries();
+        data.makeChartTimeseries();
         
         // Display the data
         disp.display();
@@ -692,7 +692,14 @@ Data.prototype = {
             });
         });
     },
-    stackTimeseries: function() {
+    orderAndColorSeries: function() {
+        data.series_byCat['Keyword'].sort(legend.cmp);
+        legend.container_keywords.selectAll('div.legend_entry')
+            .sort(legend.cmp_byID);
+        disp.setColors();
+    },
+    makeChartTimeseries: function() {        
+        // Configure stream types
         if (options.display_type.is("wiggle")) {
             data.stack.offset("wiggle");
         } else if (options.display_type.is("stream_expand")) {
@@ -703,23 +710,52 @@ Data.prototype = {
             data.stack.offset("zero");
         }
 
+        // Find out what we are plotting
+        var category = options.chart_category.get();
+        var data_to_plot = data.series_byCat[category];
+        
         // Set stack representation of data
         if(options.display_type.is("percent")) {
-            data_100 = data.series.map(function(series) {
+            data_100 = data_to_plot.map(function(series) {
                 var new_series = JSON.parse(JSON.stringify(series)); // Cheap cloning
-                console.log(new_series);
                 new_series.values = new_series.values.map(function(datum, i) {
                     var new_datum = datum;
                     new_datum.timestamp = new Date(new_datum.timestamp);
-                    new_datum.value *= 100 / data.total_of_series[i];
+                    new_datum.value *= 100 / data.time_totals[i];
                     return new_datum;
                 });
                 return new_series;            
             });
             data.stacked = data.stack(data_100);
         } else {
-            data.stacked = data.stack(data.series);
+            data.stacked = data.stack(data_to_plot);
         }
+        
+        // Change data for display
+        var n_series = data.stacked.length;
+        if(data.stacked.length == 0) {
+            disp.alert('Failure to display data');
+            
+            d3.selectAll('.series').remove();
+            return;
+        }
+
+        // Convert to separate area plot if that's asked for
+        n_datapoints = data.stacked[0].values.length;
+        if(options.display_type.is("separate")) {
+            for (var i = n_series - 1; i >= 0; i--) {
+                data.stacked[i].offset = 0;
+                if(i < n_series - 1) {
+                    data.stacked[i].offset = data.stacked[i + 1].offset;
+                    if(data.series[i + 1].shown)
+                        data.stacked[i].offset += data.stacked[i + 1].max;
+                }
+
+                data.stacked[i].values.forEach(function(datum) {
+                    datum.value0 = data.stacked[i].offset;
+                });
+            }
+        } 
     },
     updateCollection: function() {
         var fields = {};

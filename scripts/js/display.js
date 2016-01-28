@@ -45,7 +45,7 @@ Tooltip.prototype = {
             .transition(200)
             .style('opacity', 0);
     }
-}
+};
 
 function Display() {
     var self = this;
@@ -66,30 +66,11 @@ function Display() {
     self.context = context;
     self.plot_area = plot_area;
     self.color = {};
+    self.typeColor = {};
     self.brush = {};
     self.tooltip = {};
 }
-
 Display.prototype = {
-    setColorScale: function() {
-        switch(options.color_scale.get()) {
-            case "category10":
-                this.color = d3.scale.category10();
-                break;
-            case "category20":
-                this.color = d3.scale.category20();
-                break;
-            case "category20b":
-                this.color = d3.scale.category20b();
-                break;
-            case "category20c":
-                this.color = d3.scale.category20c();
-                break;
-            default:
-                this.color = d3.scale.category10();
-                break;
-        }
-    },
     setYScale: function() {
         var focus = this.focus;
         
@@ -249,38 +230,17 @@ Display.prototype = {
             .attr("height", disp.context.height + 7);
     },
     display: function() {
+        disp.configurePlotArea();
+        disp.buildTimeseries();
+        disp.drawTimeseries();
+    },
+    configurePlotArea: function() {
         // Set the Y Scale
         disp.setYScale();
 
         // Turn off the column hover if it is on
         disp.focus.svg.select('path.column_hover')
                     .style('display', 'none');
-
-        // Change data for display
-        var n_series = data.stacked.length;
-        if(data.stacked.length == 0) {
-            disp.alert('Failure to display data');
-            
-            d3.selectAll('.series').remove();
-            return;
-        }
-        
-        // Convert to separate area plot if that's asked for
-        n_datapoints = data.stacked[0].values.length;
-        if(options.display_type.is("separate")) {
-            for (var i = n_series - 1; i >= 0; i--) {
-                data.stacked[i].offset = 0;
-                if(i < n_series - 1) {
-                    data.stacked[i].offset = data.stacked[i + 1].offset;
-                    if(data.series[i + 1].shown)
-                        data.stacked[i].offset += data.stacked[i + 1].max;
-                }
-
-                data.stacked[i].values.forEach(function(datum) {
-                    datum.value0 = data.stacked[i].offset;
-                });
-            }
-        } 
 
         // I want the starting chart to emanate from the
         // middle of the display.
@@ -291,9 +251,9 @@ Display.prototype = {
 
         disp.setYAxes();
         disp.showTotalLine();
-
+    },
+    buildTimeseries: function() {
         // Bind new series to the graph
-
         var series = disp.focus.svg.selectAll(".series")
             .data(data.stacked);
 
@@ -311,10 +271,8 @@ Display.prototype = {
 
         series_paths.append("path")
             .attr("class", "area");
-      
-        disp.draw();
     },
-    draw: function() {
+    drawTimeseries: function() {
         // Define the parameters of the area
         if (options.display_type.is('overlap') | options.display_type.is('lines')) {
             disp.focus.area
@@ -338,9 +296,9 @@ Display.prototype = {
         disp.focus.svg.selectAll(".series")
             .classed("lines", false);
         transition.select("path.area")
-            .style("fill", function (d) { return disp.color(d.name); })
+            .style("fill", function (d) { return d.fill; })
             .style("fill-opacity", fill_opacity)
-            .style("stroke", function (d) { return d3.rgb(disp.color(d.name)).darker(); })
+            .style("stroke", function (d) { return d.stroke; })
             .attr("d", function(d) { return disp.focus.area(d.values)});
 
     },
@@ -528,17 +486,64 @@ Display.prototype = {
     setColors: function() {
         disp.setColorScale();
 
-        // Set color values
-        disp.color.domain(data.series.map(function(series) {return series.name;}));
+        // Get parameters
+        var display_category = options.chart_category.get();
+        var keyword_names_ordered = data.series_byCat['Keyword']
+            .map(function(series) { return series.name; });
+        var type_order_numbers = [100, 200, 300, 400, 10100, 10200, 10300, 10400, 20100, 20200, 20300, 20400];
+        
+        // Set color domain
+        if(display_category == 'Keyword') {
+            disp.color.domain(keyword_names_ordered);    
+            disp.typeColor.domain(type_order_numbers);
+        } else {
+            var display_names_ordered = data.series_byCat[display_category]
+                .map(function(series) { return series.order; });
+            disp.color.domain(display_names_ordered);    
+            disp.typeColor.domain(type_order_numbers
+                                  .concat(keyword_names_ordered));
+        }
 
+        // Set each series color
         data.series.map(function(series) {
-            series.fill = disp.color(series.name);
-            series.stroke = d3.rgb(disp.color(series.name)).darker();
+            var key = series.category == 'Keyword' ? 'name' : 'order';
+            
+            if(series.category == display_category) {
+                series.fill = disp.color(series[key]);
+            } else {
+                series.fill = disp.typeColor(series[key]);
+            }
+            series.stroke = d3.rgb(series.fill).darker();
 
             d3.select("." + series.id + " .legend_icon")
                 .style('fill', series.fill)
                 .style('stroke', series.stroke);
         });
+    },
+    setColorScale: function() {
+//        this.typeColor = d3.scale.category20c();
+        this.typeColor = d3.scale.ordinal()
+//            .range(["#AAA", "#CCC", "#999", "#BBB"]);
+            .range(["#CCC"]);
+        
+        
+        switch(options.color_scale.get()) {
+            case "category10":
+                this.color = d3.scale.category10();
+                break;
+            case "category20":
+                this.color = d3.scale.category20();
+                break;
+            case "category20b":
+                this.color = d3.scale.category20b();
+                break;
+            case "category20c":
+                this.color = d3.scale.category20c();
+                break;
+            default:
+                this.color = d3.scale.category10();
+                break;
+        }
     },
     getTimeHoveringOverAxis: function(svg_element) {
         var time = {}

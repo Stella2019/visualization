@@ -28,7 +28,7 @@ function Options() {
                        'collection_type', 'collection', 'time_limit', 'add_term',
                        /*'series', 'subset', 'found_in', */'resolution',
                        'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line',
-                       'series_order', 'legend_showhidden', 'fetched_tweet_order', 'rumor'];
+                       'series_order', 'legend_showhidden', 'fetched_tweet_order', 'rumor', 'chart_category'];
     
     self.timefields = ['time_min', 'time_max'];
     self.record = ['collection', /*'subset',*/ 'resolution', 'time_limit',
@@ -36,7 +36,7 @@ function Options() {
                       'time_save', 'time_min', 'time_max',
                       'y_max_toggle', 'y_max', 'color_scale',
                       'total_line', /*'found_in',*/ 'collection_type',
-                      'series_order', 'legend_showhidden', 'show_options'];
+                      'series_order', 'legend_showhidden', 'show_options', 'chart_category'];
     self.state = {};
     
     // All options
@@ -58,7 +58,10 @@ function Options() {
         available: [0, 1, 2, 3, 4, 5],
         default: 0,
         parent: '#choices_style',
-        callback: function () { disp.display(); }
+        callback: function () { 
+            data.makeChartTimeseries();
+            disp.display();
+        }
     });
     self.resolution = new Option({
         title: "Resolution",
@@ -76,7 +79,7 @@ function Options() {
         available: [0, 1, 2],
         default: 2,
         parent: '#choices_style',
-        callback: function () { data.prepareData(); }
+        callback: function () { data.display(); }
     });
     self.y_scale = new Option({
         title: "Y Scale",
@@ -173,7 +176,10 @@ function Options() {
         available: [0, 1, 2, 3],
         default: 1,
         parent: '#choices_style',
-        callback: function() { data.prepareData(); }
+        callback: function() {
+            disp.setColors();
+            disp.display();
+        }
     });
     self.terms_selected = new Option({
         title: "Terms Selected",
@@ -213,7 +219,11 @@ function Options() {
         available: [0, 1, 2, 3],
         default: 3,
         parent: '#choices_legend',
-        callback: function() { data.prepareData(); }
+        callback: function() { 
+            data.orderAndColorSeries();
+            data.makeChartTimeseries();
+            disp.display();
+        }
     });
     self.legend_showhidden = new Option({
         title: "Show Hidden",
@@ -259,6 +269,20 @@ function Options() {
         type: "dropdown",
         parent: '#choices_legend',
         callback: function() { /* nothing */ }
+    });
+    self.chart_category = new Option({
+        title: 'Show in Chart',
+        labels: ["Tweet Types", "Distinctiveness", "Found Ins", "Keywords"],
+        ids:    ["Tweet Type", "Distinctiveness", "Found In", "Keyword"],
+        available: [0, 1, 2, 3],
+        default: 3,
+        type: "dropdown",
+        parent: '#choices_subset',
+        callback: function() { 
+            data.makeChartTimeseries();
+            disp.setColors();
+            disp.display();
+        }
     });
 };
 Options.prototype = {
