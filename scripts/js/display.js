@@ -65,8 +65,17 @@ function Progress(args) {
     // Make holding containers
     this.container_div = '';
     this.bar_div       = '';
+    this.active        = false;
     
     // Set styles
+    this.bar_style = {
+        'width': '0%',
+        'font-weight': 'bold',
+        'padding': '10px 0px',
+        'font-size': '1em',
+        'text-align': 'center',
+        'white-space': 'nowrap',
+    };
     if(this.full) {
         this.container_style = {
             position: 'absolute',
@@ -78,13 +87,7 @@ function Progress(args) {
             background: 'grey',
             'z-index': 3
         }
-        this.bar_style = {
-            'width': '0%',
-            'font-weight': 'bold',
-            'padding': '5px 0px',
-            'text-align': 'center',
-            'font-size': '1em'
-        };
+        this.bar_style.padding = '5px 0px';
     } else {
         this.container_style = {
             position: 'absolute',
@@ -92,13 +95,8 @@ function Progress(args) {
             left: '10%',
             width: '80%',
             height: '40px',
+            background: '#ccc',
             'z-index': 3
-        };
-        this.bar_style = {
-            'width': '0%',
-            'font-weight': 'bold',
-            'padding': '10px 0px',
-            'font-size': '1em'
         };
     }
 }
@@ -124,6 +122,8 @@ Progress.prototype = {
             })
             .style(this.bar_style)
             .text(this.text);
+        
+        this.active = true;
     },
     update: function(step, text) {
         var percentDone =  Math.floor(step * 100 / this.steps);
@@ -135,7 +135,12 @@ Progress.prototype = {
             .text(this.text);
     },
     end: function() {
-        this.container_div.remove();
+        if(this.active) {
+            this.container_div.remove();
+            this.active = false;
+        } else {
+            // Nothing, it's already gone
+        }
     },
 };
 
@@ -161,7 +166,6 @@ function Display() {
     self.typeColor = {};
     self.brush = {};
     self.tooltip = {};
-    self.progress = {};
 }
 Display.prototype = {
     setYScale: function() {
@@ -280,7 +284,6 @@ Display.prototype = {
         
         this.tooltip = new Tooltip();
         this.tooltip.init();
-        this.progress = new Progress({});
     },
     setFocusAxisLabels: function() {
         // Display the xAxis
@@ -298,6 +301,9 @@ Display.prototype = {
                   + " Every " + options.resolution.getLabel() + "");
     },
     contextChart: function() {
+        disp.setContextTime(data.timestamps_nested[0],
+            data.timestamps_nested[data.timestamps_nested.length - 1]);
+        
         disp.context.y.domain([0, d3.max(data.time_totals, 
                 function(d) { return d.value; })])
                 .range([disp.context.height, 0]);
@@ -323,10 +329,14 @@ Display.prototype = {
             .attr("y", -6)
             .attr("height", disp.context.height + 7);
     },
-    display: function() {
-        disp.configurePlotArea();
-        disp.buildTimeseries();
-        disp.drawTimeseries();
+    resetPlotArea: function() {
+        // Set Time Domain and Axis
+        disp.focus.x.domain(  [data.time.min, data.time.max]).clamp(true);
+        disp.context.x.domain([data.time.min, data.time.max]);
+
+        // Clear brush
+        disp.brush.clear();
+        disp.plot_area.svg.selectAll('.brush').call(disp.brush);
     },
     configurePlotArea: function() {
         // Set the Y Scale

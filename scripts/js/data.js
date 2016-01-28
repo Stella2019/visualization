@@ -280,7 +280,9 @@ Data.prototype = {
             time_max: new Date(data.time.max),
             time_res: 3,
             failure_msg: 'Error loading data',
-            on_finish: data.parseCSVData,
+            on_finish: function() {
+                pipeline.start();
+            },
             on_chunk_finish: function(file_data) {
                 file_data = d3.csv.parse(file_data);
                 data.file = data.file.concat(file_data);
@@ -335,13 +337,10 @@ Data.prototype = {
             return;
         }
     },
-    parseCSVData: function() {
+    parseLoadedCollectionData: function() {
         // Format selections
         d3.select('#choose_collection button')
             .attr('disabled', null);
-//        disp.startProgressBar('render', '#timeseries_div')
-//        d3.select('#render_progress')
-//            .text('Parsing Collection Data');
         
         // Get the timestamps
         data.timestamps = util.lunique(data.file.map(function(d) { return d.Time; }));
@@ -391,16 +390,6 @@ Data.prototype = {
 
         // Clear the data file object (since it takes up a lot of space)
         data.file = [];
-        
-        // Set Time Domain and Axis
-        disp.focus.x.domain(  [data.time.min, data.time.max]).clamp(true);
-        disp.context.x.domain([data.time.min, data.time.max]);
-
-        // Clear brush
-        disp.brush.clear();
-        disp.plot_area.svg.selectAll('.brush').call(disp.brush);
-
-        data.initializeSeries();
     },
     initializeSeries: function() {
         data.series = legend.series_names['Keyword']
@@ -492,21 +481,20 @@ Data.prototype = {
         // Populate Legend
         legend.series_cats.forEach(legend.populate);
 
-        // Finish preparing the data for loading
-        data.prepareData();  
-    },
-    prepareData: function() {
+        // Make sure we have data before going forward
         if(!data.all) {
             disp.alert('No data loaded', 'danger');
+            pipeline.abort();
             return;
         }
-        
-        // Calculate totals and timeseries
+    },
+    calculateCategoryTotals: function() {
         legend.series_cats.forEach(data.nestDataTotals);
+    },
+    calculateTimeTotals: function() {
         data.nestDataTotals('timestamps', 4);
-        data.recalculateShown();
-        data.getCategorySubtotals();
-        
+    },
+    prepareData: function() {        
 //        data.total_of_series = data_ready.map(function(datum) {
 //            return Math.max(data.series_names.reduce(function(running_sum, word) {
 //                return running_sum += datum[word];
@@ -515,20 +503,6 @@ Data.prototype = {
 //        data.total_tweets = data_ready.map(function(datum) {
 //            return {timestamp: datum.timestamp, value: datum['_total_']};
 //        });
-        
-        data.orderAndColorSeries();
-
-        // Set Time Domain and Axis appropriate to the resolution
-        disp.setContextTime(data.timestamps_nested[0],
-            data.timestamps_nested[data.timestamps_nested.length - 1]);
-        disp.setFocusAxisLabels();
-
-        // Make specific timeseries to be displayed
-        disp.contextChart();
-        data.makeChartTimeseries();
-        
-        // Display the data
-        disp.display();
     },
     recalculateShown: function() {
         var addToShownList = function(list, id, i) {
@@ -548,7 +522,6 @@ Data.prototype = {
             k: legend.series_ids['Keyword']
                         .reduce(addToShownList, [])
         }
-        
         
         // Handle this later
 //        if(shown.f.length == 
@@ -697,11 +670,10 @@ Data.prototype = {
             });
         });
     },
-    orderAndColorSeries: function() {
+    orderSeries: function() {
         data.series_byCat['Keyword'].sort(legend.cmp);
         legend.container_keywords.selectAll('div.legend_entry')
             .sort(legend.cmp_byID);
-        disp.setColors();
     },
     makeChartTimeseries: function() {        
         // Configure stream types

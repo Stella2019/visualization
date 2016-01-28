@@ -58,9 +58,8 @@ function Options() {
         available: [0, 1, 2, 3, 4, 5],
         default: 0,
         parent: '#choices_style',
-        callback: function () { 
-            data.makeChartTimeseries();
-            disp.display();
+        callback: function () {
+            pipeline.start('Prepare Timeseries Data for Chart');
         }
     });
     self.resolution = new Option({
@@ -70,7 +69,9 @@ function Options() {
         available: [0, 1, 2, 3],
         default: 2,
         parent: '#choices_subset',
-        callback: function () { data.prepareData(); }
+        callback: function () {
+            pipeline.start('Calculate Category Totals');
+        }
     });
     self.shape = new Option({
         title: "Shape",
@@ -79,7 +80,9 @@ function Options() {
         available: [0, 1, 2],
         default: 2,
         parent: '#choices_style',
-        callback: function () { data.display(); }
+        callback: function () { 
+            pipeline.start('Ready Context Chart');
+        }
     });
     self.y_scale = new Option({
         title: "Y Scale",
@@ -88,7 +91,9 @@ function Options() {
         available: [0, 1, 2],
         default: 0,
         parent: '#choices_style',
-        callback: function () { disp.display(); }
+        callback: function () {
+            pipeline.start('Configure Plot Area')
+        }
     });
     self.y_max = new Option({
         title: "Y Max",
@@ -99,7 +104,9 @@ function Options() {
         type: "textfieldautoman",
         custom_entries_allowed: true,
         parent: '#choices_style',
-        callback: function() { disp.display(); }
+        callback: function() {
+            pipeline.start('Configure Plot Area')
+        }
     });
     self.time_save = new Option({
         title: "Save Time State",
@@ -177,8 +184,7 @@ function Options() {
         default: 1,
         parent: '#choices_style',
         callback: function() {
-            disp.setColors();
-            disp.display();
+            pipeline.start('Set Colors');
         }
     });
     self.terms_selected = new Option({
@@ -200,7 +206,10 @@ function Options() {
         default: 0,
         type: "toggle",
         parent: '#choices_style',
-        callback: function() { disp.display(); }
+        callback: function() { 
+            disp.alert('Sorry this is broken right now');
+            pipeline.start('Configure Plot Area');
+        }
     });
     self.collection_type = new Option({
         title: "Type",
@@ -220,9 +229,7 @@ function Options() {
         default: 3,
         parent: '#choices_legend',
         callback: function() { 
-            data.orderAndColorSeries();
-            data.makeChartTimeseries();
-            disp.display();
+            pipeline.start('Order Timeseries');
         }
     });
     self.legend_showhidden = new Option({
@@ -279,9 +286,7 @@ function Options() {
         type: "dropdown",
         parent: '#choices_subset',
         callback: function() { 
-            data.makeChartTimeseries();
-            disp.setColors();
-            disp.display();
+            pipeline.start('Prepare Timeseries Data for Chart');
         }
     });
 };
@@ -539,7 +544,7 @@ Options.prototype = {
             default: 0,
             callback: function() {
                 options.recordState();
-                disp.display();
+                pipeline.start('Configure Plot Area');
             },
             styleFunc: function() {
                 d3.select('#input_' + option)
