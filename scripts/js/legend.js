@@ -28,9 +28,9 @@ function Legend() {
         'Keyword': ["_total_"]
     };
     self.series_ids = {
-        'Tweet Type': ['_tt_original', '_tt_retweet', '_tt_reply', '_tt_quote'],
-        'Distinctiveness': ['_di_distinct', '_di_repeat'],
-        'Found In': ["_fi_Any", "_fi_Text", "_fi_Quote", "_fi_URL"],
+        'Tweet Type': ['tt__original', 'tt__retweet', 'tt__reply', 'tt__quote'],
+        'Distinctiveness': ['di__distinct', 'di__repeat'],
+        'Found In': ["fi__Any", "fi__Text", "fi__Quote", "fi__URL"],
         'Keyword': ["_total_"]
     };
     self.series_names_nt = { // no total series
@@ -41,7 +41,6 @@ function Legend() {
     };
     self.series_cats = Object.keys(self.series_names);
 }
-
 Legend.prototype = {
     init: function() {
         this.container = d3.select('#legend')
@@ -49,11 +48,6 @@ Legend.prototype = {
         
         this.series_cats
             .forEach(this.buildLegendSection, this);
-        
-        // Tooltip
-        this.tooltip = this.container.append('div')
-            .attr('class', 'legend_tooltip')
-
     },
     buildLegendSection: function(section) {
         var container = this.container.append('div')
@@ -61,6 +55,7 @@ Legend.prototype = {
         
         // Header
         var legend_header = container.append('div')
+            .data([section])
             .attr('class', 'legend_header');
         
         legend_header.append('span')
@@ -76,7 +71,9 @@ Legend.prototype = {
         var list = container.append('div')
             .attr('class', 'legend_series_list');
         
-        if(section == 'Keyword') {            
+        if(section == 'Keyword') {
+            legend.container_keywords = list;
+            
             // Key
             this.key = container.append('div')
                 .attr('id', 'legend_key');
@@ -97,12 +94,12 @@ Legend.prototype = {
                 .html(function(d) { return d.label; });
         }
     },
-    populate: function(section) {
-        var section_div = legend.container.select('.' + util.simplify(section));
+    populate: function(category) {
+        var section_div = legend.container.select('.' + util.simplify(category));
         var list_div = section_div.select('.legend_series_list');
         
         // Get series ids
-        var ids = data.series_byCat[section].map(function(d) {
+        var ids = data.series_byCat[category].map(function(d) {
             return d.id;
         });    
         
@@ -122,9 +119,9 @@ Legend.prototype = {
             .attr('class', function(d) {
                 return 'legend_entry ' + d;
             })
-            .on('mouseover', this.hoverLegendEntry)
-            .on('mousemove', this.hoverLegendEntryMove)
-            .on('mouseout', this.hoverLegendEntryEnd);
+            .on('mouseover', legend.hoverLegendEntry)
+            .on('mousemove', legend.hoverLegendEntryMove)
+            .on('mouseout', legend.hoverLegendEntryEnd);
 
         var legend_icon_divs = new_entries.append('div')
             .attr('class', 'legend_icon');
@@ -138,9 +135,9 @@ Legend.prototype = {
                 class: "legend_icon_svg",
                 width: 25, height: 25
             })
-            .on('mousedown', this.startToggle)
-            .on('mouseover', this.hoverOverSeries)
-            .on('mouseup', this.endToggle)
+            .on('mousedown', legend.startToggle)
+            .on('mouseover', legend.hoverOverSeries)
+            .on('mouseup', legend.endToggle)
             .append('rect')
             .attr({
                 class: "legend_icon_rect",
@@ -177,13 +174,13 @@ Legend.prototype = {
                 return 'legend_entry ' + d;
             });
         
-        list_div.on('mouseout', function(d) {
-            d3.event.stopPropagation();
-        });
+//        list_div.on('mouseout', function(d) {
+//            d3.event.stopPropagation();
+//        });
 //        legend.container.on('mouseout', legend.endToggle);
         list_div.on('mouseout', legend.endToggle);
         
-        if(section == 'Keyword') {
+        if(category == 'Keyword') {
             legend.key_data.map(function(item) {
                 item.has = false;
             });
@@ -192,13 +189,11 @@ Legend.prototype = {
                 .html(function (d) {
                     var series = data.series_byID[d];
                     var name = series.display_name;
-                    if(options.series.is('terms')) {
-                        var key_data = legend.key_data_byLabel[series.type];
+                    var key_data = legend.key_data_byLabel[series.type];
 
-                        if(key_data) {
-                            name += ' ' + key_data.term;
-                            key_data.has = true;
-                        }
+                    if(key_data) {
+                        name += ' ' + key_data.term;
+                        key_data.has = true;
                     }
                     return name;
                 });
@@ -207,9 +202,16 @@ Legend.prototype = {
                 this.key.select('.legend_key_' + item.id)
                     .classed('hidden', !item.has);
             }, legend);
+        } else {
+            list_div.selectAll('div.legend_label')
+                .html(function (d) {
+                    var series = data.series_byID[d];
+                    var name = series.display_name;
+                    return name;
+                });
         }
         
-        legend.showOrHideAll();
+        legend.showOrHideAll(category);
     },
     cmp: function(a, b) {
         if(options.series_order.is('alpha')) {
@@ -255,7 +257,6 @@ Legend.prototype = {
         return legend.cmp(a, b);
     },
     startToggle: function(series) {
-        console.log(series);
         if(typeof(series) == "string")
             series = data.series_byID[series];
         
@@ -288,47 +289,95 @@ Legend.prototype = {
         if(typeof(series) == "string")
             series = data.series_byID[series];
         
-        // Set data
-        var curData = legend.tooltip.data();
-        if(!curData || curData != series.id) {
-            legend.tooltip.data(series.id);
-            
-            legend.tooltip.selectAll('*').remove();
-            var rows = legend.tooltip.append('table')
-                .selectAll('tr')
-                .data(['total', 'max', 'type'])
-                .enter()
-                .append('tr');
-            
-            rows.append('th')
-                .html(function(d) { return d + ":"; });
-            
-            rows.append('td')
-                .html(function(d) { return series[d]; });
-        }
-        
-        legend.tooltip.transition(200)
-            .style('opacity', 1);
-        
+        // Generate tooltip
+        disp.tooltip.setData({
+            total: series.total,
+            max: series.max,
+            type: series.type
+        });
+        disp.tooltip.on();
         
         legend.highlightSeries(series);
     },
     hoverLegendEntryMove: function(series) {
-        legend.tooltip
-            .style({
-                left: d3.event.x + 20 + "px",
-                top: d3.event.y + "px"
-//                opacity: 1
-            });
+        disp.tooltip.move(d3.event.x, d3.event.y);
     },
     hoverLegendEntryEnd: function(series) {
         if(typeof(series) == "string")
             series = data.series_byID[series];
         
-        legend.tooltip.transition(200)
-            .style('opacity', 0);
+        disp.tooltip.off();
         
         legend.unHighlightSeries(series);
+    },
+    chartClickGetTweets: function(series) {
+        var time = disp.getTimeHoveringOverAxis(this);
+
+        data.getTweets({
+            series: series,
+            time_min: time.min,
+            time_max: time.max
+        });
+    },
+    chartHoverEnter: function(series) {
+        disp.tooltip.on();
+        
+        legend.highlightSeries(series);
+    },
+    chartHoverMove: function(series) {
+        disp.tooltip.move(d3.event.x, d3.event.y);
+        
+        var time = disp.getTimeHoveringOverAxis(this);
+
+        var focus_column = disp.focus.svg.select('path.column_hover');
+        var old_data = focus_column.data();
+
+//      var value_i = Math.floor(xy[0] / focus.width * d.values.length);
+        var value_i = data.timestamps_nested_int.indexOf(time.min.getTime());
+        var value = series.values[value_i].value;
+        var value0 = series.values[value_i].value0;
+        
+        disp.tooltip.setData({
+            series: series.display_name,
+            from: util.formatDate(time.min),
+            to: util.formatDate(time.max),
+            tweets: value,
+            ' ': '<i>Click to get tweets</i>'
+        });
+
+        if(!old_data || old_data.series != series.id ||
+           util.compareDates(old_data.startTime, time.min) ||
+           util.compareDates(old_data.stopTime,  time.max) ) {
+
+            focus_column.data([{
+                series: series.id,
+                startTime: time.min,
+                stopTime: time.max,
+                value: value,
+                value0: value0
+            }]);
+
+            focus_column
+                .transition()
+                .duration(50)
+                .attr("d", 
+                    disp.focus.area([
+                        {timestamp: time.min, value: value, value0: value0},
+                        {timestamp: time.max, value: value, value0: value0}
+                    ]))
+                .style('display', 'block');
+        }
+
+        if(!old_data || old_data.series != series.id)
+            legend.highlightSeries(series);
+    },
+    chartHoverEnd: function(series) {
+        disp.focus.svg.select('path.column_hover')
+            .style('display', 'none');
+        
+        disp.tooltip.off();
+
+        legend.unHighlightSeries(series)
     },
     unHighlightSeries: function(series) {
         if(typeof(series) == "string")
@@ -359,30 +408,30 @@ Legend.prototype = {
             $('.legend_entry.' + series.id).fadeIn().css('display', 'table-row');
         }
     },
-    showOrHideAll: function() {
-        data.series.map(legend.showOrHideSeries);
+    showOrHideAll: function(category) {
+        data.series_byCat[category].map(legend.showOrHideSeries);
     },
     toggleSingle: function(series) {
         if(typeof(series) == "string")
             series = data.series_byID[series];
         
-        data.series.map(function(inner_series) {
+        data.series_byCat[series.category].map(function(inner_series) {
             inner_series.shown = false;//!turnAllOff; 
         }, this);
         
         series.shown = true;
         
-        legend.showOrHideAll();
+        legend.showOrHideAll(series.category);
 
         data.prepareData();
     },
-    showAll: function() {
+    showAll: function(category) {
         
-        data.series.map(function(inner_series) {
-            inner_series.shown = true;
+        data.series_byCat[category].map(function(series) {
+            series.shown = true;
         }, this);
         
-        legend.showOrHideAll();
+        legend.showOrHideAll(category);
 
         data.prepareData();
     },

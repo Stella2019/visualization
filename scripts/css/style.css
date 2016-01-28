@@ -217,18 +217,20 @@ button:focus {
     padding-top: 5px;
 }
 
-.legend_tooltip {
+.tooltip {
     position: fixed;
     background: white;
-    border: 0px;
+    border-width: 1px;
+    border-style: ridge;
     border-radius: 8px;
     pointer-events: none;
     opacity: 0;
     z-index: 20;
     text-transform: capitalize;
+    padding-bottom: 5px;
 }
 
-.legend_tooltip td, .legend_tooltip th {
+.tooltip td, .tooltip th {
     padding: 5px 5px 0px 5px;
 }
 

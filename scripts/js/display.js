@@ -1,3 +1,52 @@
+function Tooltip() {
+    this.div = {};
+    this.info = {};
+}
+Tooltip.prototype = {
+    init: function() {
+        this.div = d3.select('#body')
+            .append('div')
+            .attr('class', 'tooltip');
+    },
+    setData: function(new_data) {
+        if(JSON.stringify(this.data) != JSON.stringify(new_data)) {
+            // Clear & set new parameters
+            this.data = new_data;
+            this.div.selectAll('*').remove();
+
+            // Create table
+            var rows = this.div.append('table')
+                .selectAll('tr')
+                .data(Object.keys(new_data))
+                .enter()
+                .append('tr');
+
+            rows.append('th')
+                .html(function(d) { return d + ":"; });
+
+            rows.append('td')
+                .html(function(d) { return new_data[d]; });
+        }
+    },
+    on: function() {
+        this.div
+            .transition(200)
+            .style('opacity', 1);
+    },
+    move: function(x, y) {
+        this.div
+            .style({
+                left: x + 20 + "px",
+                top: y + "px"
+            });
+    },
+    off: function() {
+        this.div
+            .transition(200)
+            .style('opacity', 0);
+    }
+}
+
 function Display() {
     var self = this;
     
@@ -18,6 +67,7 @@ function Display() {
     self.plot_area = plot_area;
     self.color = {};
     self.brush = {};
+    self.tooltip = {};
 }
 
 Display.prototype = {
@@ -154,6 +204,8 @@ Display.prototype = {
             .style('fill-opacity', '0.2')
             .style('stroke-opacity', '0.6');
         
+        this.tooltip = new Tooltip;
+        this.tooltip.init();
     },
     setFocusAxisLabels: function() {
         // Display the xAxis
@@ -167,7 +219,7 @@ Display.prototype = {
         
         // Set the Y-Axis label
         disp.focus.svg.select('#y_label')
-            .text("Count of " + options.subset.getLabel() + " Tweets"
+            .text("Count of Tweets"
                   + " Every " + options.resolution.getLabel() + "");
     },
     contextChart: function() {
@@ -246,24 +298,10 @@ Display.prototype = {
             .data(data.stacked);
 
         var series_paths = series.enter().append("g")
-            .on("mouseout", legend.unHighlightSeries)
-            .on("click", function(d) {
-                var time = disp.getTimeHoveringOverAxis(this);
-
-                data.getTweets({
-                    series: d,
-                    time_min: time.min,
-                    time_max: time.max
-                });
-            })
-            .on("mouseover", legend.highlightSeries)
-            .on("mouseout", function(d) {
-                disp.focus.svg.select('path.column_hover')
-                    .style('display', 'none');
-
-                legend.unHighlightSeries(d)
-            })
-            .on("mousemove", disp.seriesHover);
+            .on("click", legend.chartClickGetTweets)
+            .on("mouseover", legend.chartHoverEnter)
+            .on("mousemove", legend.chartHoverMove)
+            .on("mouseout", legend.chartHoverEnd);
 
         series.attr("class", function(d) {
                 return "series " + d.id
@@ -273,7 +311,10 @@ Display.prototype = {
 
         series_paths.append("path")
             .attr("class", "area");
-
+      
+        disp.draw();
+    },
+    draw: function() {
         // Define the parameters of the area
         if (options.display_type.is('overlap') | options.display_type.is('lines')) {
             disp.focus.area
@@ -498,43 +539,6 @@ Display.prototype = {
                 .style('fill', series.fill)
                 .style('stroke', series.stroke);
         });
-    },
-    seriesHover: function(d) {
-        var time = disp.getTimeHoveringOverAxis(this);
-
-        var focus_column = disp.focus.svg.select('path.column_hover');
-        var old_data = focus_column.data();
-
-//      var value_i = Math.floor(xy[0] / focus.width * d.values.length);
-        var value_i = data.timestamps_nested_int.indexOf(time.min.getTime());
-        var value = d.values[value_i].value;
-        var value0 = d.values[value_i].value0;
-
-        if(!old_data || old_data.series != d.id ||
-           util.compareDates(old_data.startTime, time.min) ||
-           util.compareDates(old_data.stopTime,  time.max) ) {
-
-            focus_column.data([{
-                series: d.id,
-                startTime: time.min,
-                stopTime: time.max,
-                value: value,
-                value0: value0
-            }]);
-
-            focus_column
-                .transition()
-                .duration(50)
-                .attr("d", 
-                    disp.focus.area([
-                        {timestamp: time.min, value: value, value0: value0},
-                        {timestamp: time.max, value: value, value0: value0}
-                    ]))
-                .style('display', 'block');
-        }
-
-        if(!old_data || old_data.series != d.id)
-            legend.highlightSeries(d);
     },
     getTimeHoveringOverAxis: function(svg_element) {
         var time = {}
@@ -785,7 +789,7 @@ Display.prototype = {
                         }
                         
                         // Fetch new data
-                        data.callPHP('tweets/fetch', post, function(filedata) {
+                        data.callPHP('tweets/get', post, function(filedata) {
                             disp.tweetsModal(filedata, post, title);
                         }, function() { 
                             disp.alert('Unable to fetch new data', 'danger');

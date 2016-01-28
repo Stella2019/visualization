@@ -18,7 +18,13 @@
     // Execute Query
     $query = "" .
         "SELECT " .
-        "   COUNT(*) as count " .
+        "   Tweet.ID, " .
+        "   Tweet.Text, " .
+        "   Tweet.Distinct, " .
+        "   Tweet.Type, " .
+        "   Tweet.Username, " .
+        "   Tweet.Timestamp, " .
+        "   Tweet.Origin " .
         "FROM Tweet " .
         "JOIN TweetIn" . $collection_type . " TinC " .
         "    ON TinC.Tweet_ID = Tweet.ID " .
@@ -30,12 +36,22 @@
         $query = $query . "   AND Tweet.Type IN ('" . $_POST["type"] . "')  ";
     }
     if(isset($_POST["distinct"])) {
-        $query = $query . "   AND Tweet.Distinct = '" . $_POST["distinct"] . "'  ";
+        $query = $query . "   AND Tweet.Distinct = " . $_POST["distinct"] . "  ";
     }
     if(isset($_POST["search_text"])) {
         foreach(explode(',', $_POST["search_text"]) as $term) {
             $query = $query . "   AND LOWER(Tweet.Text) REGEXP '" . $term . "' ";
         }
+    }
+
+    if(isset($_POST["rand"])) {
+        $query = $query . " ORDER BY RAND()";
+    }
+
+    if(isset($_POST["limit"])) {
+        $query = $query . " LIMIT " . $_POST["limit"] . ";";
+    } else {
+        $query = $query . " LIMIT 5;";
     }
 
     if(isset($_POST["csv"])) {

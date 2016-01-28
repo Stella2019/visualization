@@ -69,15 +69,6 @@ function Options() {
         parent: '#choices_subset',
         callback: function () { data.prepareData(); }
     });
-    self.subset = new Option({
-        title: "Subset",
-        labels: ["All", "Distinct", "Original", "Retweet", "Reply", "Quote"],
-        ids:    ["all", "distinct", "original", "retweet", "reply", "quote"],
-        available: [0, 1, 2, 3, 4, 5],
-        default: 0,
-        parent: '#choices_subset',
-        callback: function () { data.changeData(); }
-    });
     self.shape = new Option({
         title: "Shape",
         labels: ["Linear",  "Basis",        "Step"],
@@ -86,15 +77,6 @@ function Options() {
         default: 2,
         parent: '#choices_style',
         callback: function () { data.prepareData(); }
-    });
-    self.series = new Option({
-        title: "Series",
-        labels: ["None", "Terms", "Tweet Types", "Distinct/Not"],
-        ids:    ["none", "terms", "types", "distinct"],
-        available: [0, 1, 2, 3],
-        default: 1,
-        parent: '#choices_subset',
-        callback: function () { data.changeSeries('all'); }
     });
     self.y_scale = new Option({
         title: "Y Scale",
@@ -213,15 +195,6 @@ function Options() {
         type: "toggle",
         parent: '#choices_style',
         callback: function() { disp.display(); }
-    });
-    self.found_in = new Option({
-        title: "Terms Found In",
-        labels: ["Any", "Text", "Quote", "URL"],
-        ids:    ["Any", "Text", "Quote", "URL"],
-        available: [0, 1, 2, 3],
-        default: 1,
-        parent: '#choices_subset',
-        callback: function() { data.changeData(); }
     });
     self.collection_type = new Option({
         title: "Type",
