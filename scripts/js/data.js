@@ -8,7 +8,9 @@ function Stream(args) {
     self.url = "";
     self.post = {};
     self.time_res = 1; // 1 Hour
+    self.progress = {};
     self.progress_div = '#timeseries_div';
+    self.progress_text = "Working";
     self.progress_button = false;
     self.chunk_index = 0;
     self.time_min = options.time_min.min;
@@ -34,9 +36,14 @@ Stream.prototype = {
         this.time_chunks.push(util.formatDate(this.time_max));
 
         // Start progress bar
-        disp.startProgressBar(this.name,
-                              this.progress_div,
-                              this.progress_button);
+        this.progress = new Progress({
+            name:      this.name,
+            parent_id: this.progress_div,
+            full:      this.progress_button,
+            text:      this.progress_text,
+            steps:     this.time_chunks.length - 1
+        });
+        this.progress.start();
 
         this.chunk();
     },
@@ -47,11 +54,11 @@ Stream.prototype = {
             this.on_finish();
 
             // End the progress bar and stop function
-            disp.endProgressBar(this.name);
+            this.progress.end();
             return;
         } else if(this.chunk_index < 0) {
             // End prematurely
-            disp.endProgressBar(this.name);
+            this.progress.end();
             return;
         }
 
@@ -72,9 +79,7 @@ Stream.prototype = {
         }
 
         // Update the progress bar
-        var completed = this.chunk_index + 1;
-        var total = this.time_chunks.length - 1;
-        disp.updateProgressBar(this.name, Math.floor(completed / total * 100));
+        this.progress.update(this.chunk_index + 1);
 
         this.on_chunk_finish(file_data);
 
@@ -85,7 +90,7 @@ Stream.prototype = {
     chunk_failure: function (a, b, c) {
         console.log(a, b, c);
         disp.alert(this.failure_msg);
-        disp.endProgressBar(this.name);
+        this.progress.end();
     },
     stop: function() {
         this.chunk_index = -100;
@@ -825,6 +830,7 @@ Data.prototype = {
             failure_msg: "Problem generating new series from query",
             progress_div: progress_div,
             progress_button: true,
+            progress_text: "Working",
             on_finish: data.loadCollectionData
         };
         
@@ -961,6 +967,7 @@ Data.prototype = {
             failure_msg: "Problem finding tweets that were in the rumor",
             progress_div: '#edit-window-tweetin-div',
             progress_button: true,
+            progress_text: "Working",
             on_finish: data.startLoadingCollection
         };
         

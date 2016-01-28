@@ -46,6 +46,98 @@ Tooltip.prototype = {
             .style('opacity', 0);
     }
 };
+function Progress(args) {
+    // Grab parameters
+    var valid_param = ['name', 'parent_id', 'full', 'text', 'steps'];
+    Object.keys(args).forEach(function (item) {
+        if(valid_param.includes(item)) {
+            this[item] = args[item];
+        }
+    }, this);
+    
+    // Set defaults if they aren't already set
+    this.name      = this.name      || "progress bar";
+    this.parent_id = this.parent_id || "#timeseries_div";
+    this.full      = this.full      || false;
+    this.text      = this.text      || "Working";
+    this.steps     = this.steps     || 100;
+    
+    // Make holding containers
+    this.container_div = '';
+    this.bar_div       = '';
+    
+    // Set styles
+    if(this.full) {
+        this.container_style = {
+            position: 'absolute',
+            top: '0px',
+            left: '0px',
+            width: '100%',
+            height: '100%',
+            opacity: 0.9,
+            background: 'grey',
+            'z-index': 3
+        }
+        this.bar_style = {
+            'width': '0%',
+            'font-weight': 'bold',
+            'padding': '5px 0px',
+            'text-align': 'center',
+            'font-size': '1em'
+        };
+    } else {
+        this.container_style = {
+            position: 'absolute',
+            top: '36%',
+            left: '10%',
+            width: '80%',
+            height: '40px',
+            'z-index': 3
+        };
+        this.bar_style = {
+            'width': '0%',
+            'font-weight': 'bold',
+            'padding': '10px 0px',
+            'font-size': '1em'
+        };
+    }
+}
+Progress.prototype = {
+    start: function() {        
+        // Start progress bar
+        this.container_div = d3.select(this.parent_id)
+            .append('div')
+            .attr('id', this.name + '_progress_div')
+            .attr('class', 'progress')
+            .style(this.container_style);
+        
+        this.bar_div = this.container_div
+            .append('div')
+            .attr({
+                id: this.name + "_progress",
+                class: "progress-bar progress-bar-striped active",
+                role: "progressbar",
+                'aria-valuenow': "0",
+                'aria-valuemin': "0",
+                'aria-valuemax': "100",
+                'transition': "width .1s ease"
+            })
+            .style(this.bar_style)
+            .text(this.text);
+    },
+    update: function(step, text) {
+        var percentDone =  Math.floor(step * 100 / this.steps);
+        this.text = text || this.text;
+        
+        this.bar_div
+            .attr('aria-valuenow', percentDone + "")
+            .style('width', percentDone + "%")
+            .text(this.text);
+    },
+    end: function() {
+        this.container_div.remove();
+    },
+};
 
 function Display() {
     var self = this;
@@ -69,6 +161,7 @@ function Display() {
     self.typeColor = {};
     self.brush = {};
     self.tooltip = {};
+    self.progress = {};
 }
 Display.prototype = {
     setYScale: function() {
@@ -187,6 +280,7 @@ Display.prototype = {
         
         this.tooltip = new Tooltip;
         this.tooltip.init();
+        this.tooltip = new Progress;
     },
     setFocusAxisLabels: function() {
         // Display the xAxis
@@ -649,71 +743,6 @@ Display.prototype = {
         
         alert_div.append('span')
             .html(text);
-    },
-    startProgressBar: function(name, parent_id, over_button) {
-        if(!parent_id)
-            parent_id = '#timeseries_div'; // load_collection
-        var parent_style = {
-            position: 'absolute',
-            top: '36%',
-            left: '10%',
-            width: '80%',
-            height: '40px',
-            'z-index': 3
-        }
-        var style = {
-            'width': '0%',
-            'font-weight': 'bold',
-            'padding': '10px 0px',
-            'font-size': '1em'
-        };
-        var text = "Loading";
-        if(over_button) {
-            parent_style = {
-                position: 'absolute',
-                top: '0px',
-                left: '0px',
-                width: '100%',
-                height: '100%',
-                opacity: 0.9,
-                background: 'grey',
-                'z-index': 3
-            }
-            style = {
-                'width': '0%',
-                'font-weight': 'bold',
-                'padding': '5px 0px',
-                'text-align': 'center',
-                'font-size': '1em'
-            };
-            text = "Working";
-        }
-        
-        // Start progress bar
-        d3.select(parent_id).append('div')
-            .attr('id', name + '_progress_div')
-            .attr('class', 'progress')
-            .style(parent_style)
-            .append('div')
-            .attr({
-                id: name + "_progress",
-                class: "progress-bar progress-bar-striped active",
-                role: "progressbar",
-                'aria-valuenow': "0",
-                'aria-valuemin': "0",
-                'aria-valuemax': "100",
-                'transition': "width .1s ease"
-            })
-            .style(style)
-            .text(text);
-    },
-    updateProgressBar: function(name, percentDone) {
-        d3.select('#' + name + '_progress')
-            .attr('aria-valuenow', percentDone + "")
-            .style('width', percentDone + "%");
-    },
-    endProgressBar: function(name) {
-        d3.select('#' + name + '_progress_div').remove();
     },
     setTitle: function() {
         d3.select('#chart-title')
