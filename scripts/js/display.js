@@ -280,7 +280,7 @@ Display.prototype = {
         
         this.tooltip = new Tooltip();
         this.tooltip.init();
-        this.tooltip = new Progress({});
+        this.progress = new Progress({});
     },
     setFocusAxisLabels: function() {
         // Display the xAxis
