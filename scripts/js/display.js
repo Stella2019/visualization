@@ -278,9 +278,9 @@ Display.prototype = {
             .style('fill-opacity', '0.2')
             .style('stroke-opacity', '0.6');
         
-        this.tooltip = new Tooltip;
+        this.tooltip = new Tooltip();
         this.tooltip.init();
-        this.tooltip = new Progress;
+        this.tooltip = new Progress({});
     },
     setFocusAxisLabels: function() {
         // Display the xAxis
