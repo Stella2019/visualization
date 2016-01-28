@@ -97,7 +97,7 @@ def parseFile(filename):
     
     if(options.verbose): 
         if(version is not 0):
-            print ("Parsing File: " + collection_name + " @ " + timestamp_str + '(' + version + ')')
+            print ("Parsing File: " + collection_name + " @ " + timestamp_str + '(' + str(version) + ')')
         else:
             print ("Parsing File: " + collection_name + " @ " + timestamp_str)
     
@@ -551,7 +551,8 @@ def printNestedWithKeywords(obj, pre="  "):
                 if(hasKeywords(text)):
                     print(pre + '[' + str(i) + "]:" + text)
             else:
-                printNestedWithKeywords(item, pre + '[' + str(i) + ']')
+                printNestedWithKeywords(item, pre + '[' + str(i) + ']')                
+                
     elif(type(obj) is str):
         text = rm_unicode(obj);
         if(hasKeywords(text)):
