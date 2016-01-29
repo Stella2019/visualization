@@ -40,6 +40,7 @@ function Legend() {
         'Keyword': [],
     };
     self.series_cats = Object.keys(self.series_names);
+    self.filters = {};
 }
 Legend.prototype = {
     init: function() {
@@ -57,6 +58,14 @@ Legend.prototype = {
         var legend_header = container.append('div')
             .data([section])
             .attr('class', 'legend_header');
+        
+        legend_header.append('div')
+            .attr('class', 'legend_filter_div')
+            .append('button')
+            .attr('class', 'btn btn-xs btn-default')
+            .html('<span class="glyphicon glyphicon-ban-circle"></span> Filter')
+            .on('click', this.filterToggle);
+        this.filters[section] = false;
         
         legend_header.append('span')
             .attr('class', 'legend_title')
@@ -102,6 +111,11 @@ Legend.prototype = {
         var ids = data.series_byCat[category].map(function(d) {
             return d.id;
         });    
+        console.log(ids);
+        ids = ids.filter(function(id) {
+            return id != 'fi__Any' && id != 'l_total_';
+        });
+        console.log(ids);
         
         // Hide table entries
 //        d3.select('#legend_key')
@@ -271,7 +285,7 @@ Legend.prototype = {
         
         if(legend.mouseOverToggle) {
             legend.mouseOverToggle = false;
-            data.prepareData(); 
+            pipeline.start('Find Which Data is Shown');
         }
     },
     highlightSeries: function(series) {
@@ -395,21 +409,26 @@ Legend.prototype = {
         legend.showOrHideSeries(series);
         
         if(!legend.mouseOverToggle) {
-            data.prepareData();
+            pipeline.start('Find Which Data is Shown');
         }
     },
     showOrHideSeries: function(series) {
         d3.select('.' + series.id + ' .legend_icon')
             .classed('off', !series.shown);
         
-        if(options.legend_showhidden.is("false") && !series.shown) {
+        if(options.legend_cleanup.is("true") && !series.shown) {
             $('.legend_entry.' + series.id).fadeOut();
         } else {
             $('.legend_entry.' + series.id).fadeIn().css('display', 'table-row');
         }
     },
     showOrHideAll: function(category) {
-        data.series_byCat[category].map(legend.showOrHideSeries);
+        if(category)
+            data.series_byCat[category].map(legend.showOrHideSeries);
+        else
+            legend.series_cats.map(function(category) {
+                data.series_byCat[category].map(legend.showOrHideSeries);
+            });
     },
     toggleSingle: function(series) {
         if(typeof(series) == "string")
@@ -423,7 +442,7 @@ Legend.prototype = {
         
         legend.showOrHideAll(series.category);
 
-        data.prepareData();
+        pipeline.start('Find Which Data is Shown');
     },
     showAll: function(category) {
         
@@ -433,7 +452,7 @@ Legend.prototype = {
         
         legend.showOrHideAll(category);
 
-        data.prepareData();
+        pipeline.start('Find Which Data is Shown');
     },
     hoverOverSeries: function(series) {
         if(typeof(series) == "string")
@@ -443,5 +462,83 @@ Legend.prototype = {
         if(legend.mouseOverToggle && series.shown != legend.mouseOverToggleState) {
             legend.toggleSeries(series);
         }
+    },
+    configureFilters: function() {
+        legend.series_cats.forEach(function(category) {
+            
+            var section = d3.select('.' + util.simplify(category));
+            var div = section.select('.legend_filter_div button');
+            var list = section.select('.legend_series_list')
+            if(options.chart_category.is(category)) {
+                div.attr('class', 'btn btn-xs btn-default')
+                    .attr('disabled', false)
+                    .html('In Chart');
+                
+                list.transition()
+                    .style('opacity', 1)
+                    .style('display', 'table')
+            } else if (legend.filters[category]) {
+                div.attr('class', 'btn btn-xs btn-primary')
+                    .attr('disabled', null)
+                    .html('<span class="glyphicon glyphicon-filter"></span> Filter');
+                
+                list.transition()
+                    .style('opacity', 1)
+                    .style('display', 'table')
+            } else {
+                div.attr('class', 'btn btn-xs btn-default')
+                    .attr('disabled', null)
+                    .html('<span class="glyphicon glyphicon-ban-circle"></span> Filter');
+                
+                list.transition()
+                    .style('opacity', 0)
+                    .each('end', function() {
+                        d3.select(this).style('display', 'none')
+                    });
+            }
+        });
+    },
+    filterToggle: function(category) {
+        var on = !legend.filters[category];
+        legend.filters[category] = on;
+        
+        var section = d3.select('.' + util.simplify(category));
+        var div = section.select('.legend_filter_div button');
+        var list = section.select('.legend_series_list')
+        if (on) {
+            div.attr('class', 'btn btn-xs btn-primary')
+                .attr('disabled', null)
+                .html('<span class="glyphicon glyphicon-filter"></span> Filter');
+            
+            list.transition()
+                .style('opacity', 1)
+                .style('display', 'table')
+        } else {
+            div.attr('class', 'btn btn-xs btn-default')
+                .attr('disabled', null)
+                .html('<span class="glyphicon glyphicon-ban-circle"></span> Filter');
+            
+            list.transition()
+                .style('opacity', 0)
+                .each('end', function() {
+                    d3.select(this).style('display', 'none')
+                });
+        }
+        
+        data.series_byCat[category].forEach(function(series) {
+            if(series.name == 'Any' || series.name == '_total_') {
+                series.shown = !on;
+            } else if (category == 'Tweet Type' || category == 'Distinctiveness') {
+                series.shown = true;
+            } else {
+                series.shown = on;
+            }
+            
+            legend.showOrHideSeries(series);
+        });
+        
+        // Render any changes
+        pipeline.start('Find Which Data is Shown');
+        
     }
 }

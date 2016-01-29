@@ -102,6 +102,10 @@ button:focus {
     border: solid #ddd;
     border-radius: 5px;
 }
+.legend_section {
+    margin-bottom: 10px;
+}
+
 .legend_series_list {
     margin: 5px;
     min-width: 200px;
@@ -182,6 +186,14 @@ button:focus {
     opacity: 0.9 !important;
     cursor: pointer;
 }
+.legend_filter_div {
+    position: absolute;
+    left: 0;
+    top: 0;
+    text-align: left;
+    vertical-align: middle;
+    cursor: pointer;
+}
 
 .legend_only {
     display: table-cell;
@@ -229,7 +241,6 @@ button:focus {
     text-transform: capitalize;
     padding-bottom: 5px;
 }
-
 .tooltip td, .tooltip th {
     padding: 5px 5px 0px 5px;
 }

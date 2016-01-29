@@ -138,7 +138,7 @@ Pipeline.prototype = {
             // Go to the next stage
             this.current_stage = this.current_stage + 1;
             this.nextStage();
-        }.bind(this), 1000);
+        }.bind(this), 300);
     },
     abort: function() {
         this.progress.end();

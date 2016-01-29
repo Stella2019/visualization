@@ -26,9 +26,9 @@ function Options() {
     self.choice_groups = ['data', 'subset', 'style', 'legend'];
     self.initial_buttons = ['show_options',
                        'collection_type', 'collection', 'time_limit', 'add_term',
-                       /*'series', 'subset', 'found_in', */'resolution',
+                       'rumor', /*'series', 'subset', 'found_in', */'resolution',
                        'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line',
-                       'series_order', 'legend_showhidden', 'fetched_tweet_order', 'rumor', 'chart_category'];
+                       'series_order', 'legend_cleanup', 'fetched_tweet_order', 'rumor', 'chart_category'];
     
     self.timefields = ['time_min', 'time_max'];
     self.record = ['collection', /*'subset',*/ 'resolution', 'time_limit',
@@ -36,7 +36,7 @@ function Options() {
                       'time_save', 'time_min', 'time_max',
                       'y_max_toggle', 'y_max', 'color_scale',
                       'total_line', /*'found_in',*/ 'collection_type',
-                      'series_order', 'legend_showhidden', 'show_options', 'chart_category'];
+                      'series_order', 'legend_cleanup', 'show_options', 'chart_category'];
     self.state = {};
     
     // All options
@@ -232,14 +232,14 @@ function Options() {
             pipeline.start('Order Timeseries');
         }
     });
-    self.legend_showhidden = new Option({
-        title: "Show Hidden",
+    self.legend_cleanup = new Option({
+        title: "Clean Up Legend",
         styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
-        labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Hidden Series in Legend",
-                 "<span class='glyphicon glyphicon-ok-circle'></span> Show All Series in Legend"],
+        labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Clean up Legend",
+                 "<span class='glyphicon glyphicon-ok-circle'></span> Clean Up Legend"],
         ids:    ["false", "true"],
         available: [0, 1],
-        default: 1,
+        default: 0,
         type: "toggle",
         parent: '#choices_legend',
         callback: function() { legend.showOrHideAll(); }
@@ -263,7 +263,7 @@ function Options() {
         available: [0],
         default: 0,
         type: "dropdown",
-        parent: '#choices_legend',
+        parent: '#choices_subset',
         callback: function() { data.getRumor(); },
         edit: function() { options.editWindow('rumor'); }
     });
@@ -308,7 +308,7 @@ Options.prototype = {
         options.time_save.styleFunc();
         options.total_line.styleFunc();
         options.show_options.styleFunc();
-        options.legend_showhidden.styleFunc();
+        options.legend_cleanup.styleFunc();
         $(function () {
             $('[data-toggle="popover"]').popover()
         })

@@ -398,9 +398,15 @@ Data.prototype = {
                 display_name: name,
                 name: name,
                 id: util.simplify(name),
-                order: (i + 1) * 100 + 30000, // since it is the last main series type
-                shown: true
+                order: (i + 1) * 100 + 30000 // since it is the last main series type
             };
+            
+            // Determine if it is shown
+            if(options.chart_category.is('Keyword')) {
+                entry.shown = entry.name != '_total_';
+            } else {
+                entry.shown = entry.name == '_total_';
+            }
             
             // Get rumor information
             if(name.includes('_rumor_')) {
@@ -458,6 +464,10 @@ Data.prototype = {
                     type: category,
                     category: category
                 };
+                
+                if(category == 'Found In') {
+                    entry.shown = entry.name == 'Any';
+                }
 
                 data.series.push(entry);
             });
@@ -494,7 +504,7 @@ Data.prototype = {
     calculateTimeTotals: function() {
         data.nestDataTotals('timestamps', 4);
     },
-    prepareData: function() {        
+    prepareDataOld: function() {        
 //        data.total_of_series = data_ready.map(function(datum) {
 //            return Math.max(data.series_names.reduce(function(running_sum, word) {
 //                return running_sum += datum[word];
@@ -690,6 +700,9 @@ Data.prototype = {
         // Find out what we are plotting
         var category = options.chart_category.get();
         var data_to_plot = data.series_byCat[category];
+        
+        // Set legend filter buttons
+        legend.configureFilters();
         
         // Set stack representation of data
         if(options.display_type.is("percent")) {
