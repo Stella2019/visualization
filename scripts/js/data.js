@@ -20,7 +20,7 @@ function Stream(args) {
     self.on_finish = function () {};
     
     // Save args  
-    Object.keys(args).map(function (item) {
+    Object.keys(args).forEach(function (item) {
         this[item] = args[item];
     }, this);
 }
@@ -102,14 +102,18 @@ function Data() {
     
     // Time
     self.time = {
-        timestamps: [],
+        name: "Time",
         collection_min: new Date(),
         collection_max: new Date(),
         min: new Date(),
-        max: new Date()
+        max: new Date(),
+        stamps: [],
+        stamps_nested: [],
+        stamps_nested_int: [],
+        nested_min: new Date(),
+        nested_max: new Date(),
+        data_index: 4
     };
-    self.timestamps = {};
-    self.timestamps_nested = {};
     
     // Collection info
     self.collection = {};
@@ -118,15 +122,53 @@ function Data() {
     
     // Data
     self.file = [];
-    self.stacked = {}; // formerly data_stacked
-    self.series = {}; // formerly series_data
-    self.series_byID = {};
-    self.series_byCat = {};
-    self.all = {}; // formerly data_raw
-    self.total_of_series = []; // formerly total_byTime
-    self.total_tweets = []; // formerly context_byTime
+    self.all = {};
+    self.stacked = {};
+    self.total_of_series = [];
+    self.total_tweets = [];
     
-    // Series
+    // Timeseries
+    self.series = {};
+    self.series_arr = [];
+    
+    // Categories
+    self.cats_arr = [
+        {
+            name: 'Tweet Type', id: 'lTweet_Type',
+            short: 'y', data_index: 0,
+            series_names: ['original', 'retweet', 'reply', 'quote'],
+            series_ids: ['tt_original', 'tt_retweet', 'tt_reply', 'tt_quote'],
+            series: {}, series_arr: [], series_plotted: [],
+            filter: false
+        },{
+            name: 'Distinctiveness', id: 'lDistinctiveness',
+            short: 'd', data_index: 1,
+            series_names: ['distinct', 'repeat'],
+            series_ids: ['di_distinct', 'di_repeat'],
+            series: {}, series_arr: [], series_plotted: [],
+            filter: false
+        },{
+            name: 'Found In', id: 'lFound_In',
+            short: 'f', data_index: 2,
+            series_names: ['Any', 'Text', 'Quote', 'URL'],
+            series_ids: ['fi_Any', 'fi_Text', 'fi_Quote', 'fi_URL'],
+            series: {}, series_arr: [], series_plotted: [],
+            filter: false
+        },{
+            name: 'Keyword', id: 'lKeyword',
+            short: 'k', data_index: 3,
+            series_names: ['_total_'],
+            series_ids: ['l_total'],
+            series: {}, series_arr: [], series_plotted: [],
+            filter: false
+        }
+    ];
+    self.cats = self.cats_arr.reduce(function(all, category) {
+        all[category.name] = category;
+        return all;
+    }, {});
+    
+    // Functions
     self.stack =  d3.layout.stack()
         .values(function (d) { return d.values; })
         .x(function (d) { return d.timestamp; })
@@ -156,7 +198,7 @@ Data.prototype = {
 
         
         // Format collection data
-        data.collections.map(function (collection) {
+        data.collections.forEach(function (collection) {
             // Keywords
             collection.Keywords = collection.Keywords.trim().split(/,[ ]*/);
             collection.OldKeywords = collection.OldKeywords.trim().split(/,[ ]*/);
@@ -343,20 +385,18 @@ Data.prototype = {
             .attr('disabled', null);
         
         // Get the timestamps
-        data.timestamps = util.lunique(data.file.map(function(d) { return d.Time; }));
+        data.time.stamps = util.lunique(data.file.map(function(d) { return d.Time; }));
 
-        if(data.timestamps.length == 0)
-            data.timestamps = [util.formatDate(new Date())];
+        if(data.time.stamps.length == 0)
+            data.time.stamps = [util.formatDate(new Date())];
         var keywords = Array.from(new Set(data.file.map(function(d) {return d.Keyword})));
-        legend.series_ids.Keyword = keywords.map(function(d) {
+        data.cats['Keyword'].series_names = keywords
+        data.cats['Keyword'].series_ids = keywords.map(function(d) {
             return util.simplify(d) });
-        legend.series_names.Keyword = keywords;
-//        legend.series_names_nt.Keyword = keywords.filter(
-//            function(name){ return name != '_total_'; });
 
         // Fill in missing timestamps
-        data.time.min = util.date(data.timestamps[0]);
-        data.time.max = util.date(data.timestamps[data.timestamps.length - 1]);
+        data.time.min = util.date(data.time.stamps[0]);
+        data.time.max = util.date(data.time.stamps[data.time.stamps.length - 1]);
         if(options.time_limit.get().slice(0, 1) == '-')
             last_timestamp = util.formatDate(new Date());
 
@@ -366,14 +406,14 @@ Data.prototype = {
             timestamp.setMinutes(timestamp.getMinutes() + 1)) {
             new_timestamps.push(util.formatDate(timestamp));
         }
-        data.timestamps = new_timestamps;
+        data.time.stamps = new_timestamps;
         
         data.all = [];
-        var types = legend.series_names['Tweet Type'];
-        var foundins = legend.series_names['Found In'];
+        var types = data.cats['Tweet Type'].series_names;
+        var foundins = data.cats['Found In'].series_names;
         
         for(row in data.file) {
-            var i_t = data.timestamps.indexOf(data.file[row]['Time']);
+            var i_t = data.time.stamps.indexOf(data.file[row]['Time']);
             var i_f = foundins.indexOf(data.file[row]['Found_In']);
             var i_k = keywords.indexOf(data.file[row]['Keyword']);
             var i_d = data.file[row]['Distinct'] == 1 ? 0 : 1;
@@ -392,104 +432,51 @@ Data.prototype = {
         data.file = [];
     },
     initializeSeries: function() {
-        data.series = legend.series_names['Keyword']
-            .map(function(name, i) {
-            var entry = {
-                display_name: name,
-                name: name,
-                id: util.simplify(name),
-                order: (i + 1) * 100 + 30000 // since it is the last main series type
-            };
-            
-            // Determine if it is shown
-            if(options.chart_category.is('Keyword')) {
-                entry.shown = entry.name != '_total_';
-            } else {
-                entry.shown = entry.name == '_total_';
-            }
-            
-            // Get rumor information
-            if(name.includes('_rumor_')) {
-                var rumor = name.substring(7);
-                rumor = data.rumors.reduce(function(cur, cand) {
-                    if(cand.ID == rumor)
-                        return cand;
-                    return cur;
-                }, {});
-                if(rumor) {
-                    entry.display_name = rumor.Name;
-                    entry.rumor = rumor;
-                    entry.isRumor = true;
-                }
-            }
-            
-            // Find if the entry is in either keyword list
-            entry.isKeyword = data.collection
-                .Keywords.reduce(function(prev, keyword) {
-                return prev |= keyword.toLowerCase().replace('#', '') == entry.name.toLowerCase().replace('#', '');
-            }, false);
-            entry.isOldKeyword = data.collection
-                .OldKeywords.reduce(function(prev, keyword) {
-                return prev |= keyword.toLowerCase().replace('#', '') == entry.name.toLowerCase().replace('#', '');
-            }, false);
-            
-            // Get Legend Type
-            entry.type = legend.key_data_byID['added'].label;
-            if(entry.isKeyword) {
-                entry.type = legend.key_data_byID['capture'].label;
-            } else if(entry.isOldKeyword) {
-                entry.type = legend.key_data_byID['removed'].label;
-            } else if(entry.isRumor) {
-                entry.type = legend.key_data_byID['rumor'].label;
-            }
-            entry.category = 'Keyword';
-            
-            return entry;
+        // Clear lists of series
+        data.series = {};
+        data.series_arr = [];
+        data.cats_arr.forEach(function(category) {
+            category.series = {};
+            category.series_arr = [];
+            category.series_plotted = [];
         });
         
-        // Rest of the series (Tweet Type, Found In, Distinct)
-        legend.series_cats.forEach(function(category, j) {
-            if(category == 'Keyword')
-                return; // Already done
-            
-            var series_names = legend.series_names[category];
-            var series_ids = legend.series_ids[category];
-            series_names.forEach(function(name, i) {
-                var entry = {
-                    display_name: name,
-                    name: name,
-                    id: series_ids[i],
-                    order: (i + 1) * 100 + j * 10000,
-                    shown: true,
-                    type: category,
-                    category: category
-                };
-                
-                if(category == 'Found In') {
-                    entry.shown = entry.name == 'Any';
-                }
+        // Generate series
+        data.cats_arr.forEach(function(category, j) {
+            if(category.name == 'Keyword') {
+                category.series_arr = category.series_names
+                    .map(data.generateKeywordSeries)
+            } else {
+                category.series_arr = category.series_names
+                    .map(function(name, i) {
+                    var entry = {
+                        display_name: name,
+                        name: name,
+                        id: category.series_ids[i],
+                        order: (i + 1) * 100 + j * 10000,
+                        isAggregate: name == 'Any',
+                        shown: name != 'Any',
+                        type: category.name,
+                        category: category.name
+                    };
 
-                data.series.push(entry);
+                    return entry;
+                });
+            }
+            
+            // Fill in other indices
+            category.series_arr.forEach(function(series) {
+                data.series[series.id] = series;
+                data.series_arr.push(series);
+                
+                category.series[series.id] = series;
+                if(!series.isAggregate)
+                    category.series_plotted.push(series);
             });
         });
-        
-        // Make alternative indices
-        data.series_byID = {};
-        data.series_byCat = {};
-        legend.series_cats.forEach(function(category) {
-            data.series_byCat[category] = [];
-        });
-        data.series_names = data.series.map(function(series) {
-            data.series_byID[series.id] = series;
-            data.series_byCat[series.category].push(series);
-            return series.name;
-        });
-        
-        // Start data series
-//        data.loadNewSeriesData();
 
         // Populate Legend
-        legend.series_cats.forEach(legend.populate);
+        data.cats_arr.forEach(legend.populate);
 
         // Make sure we have data before going forward
         if(!data.all) {
@@ -498,11 +485,65 @@ Data.prototype = {
             return;
         }
     },
+    generateKeywordSeries: function(name, i) {
+        var entry = {
+            display_name: name,
+            name: name,
+            id: util.simplify(name),
+            order: (i + 1) * 100 + 30000, // since it is the last main series type
+            isAggregate: name == '_total_'
+        };
+
+        // Determine if it is shown
+        if(options.chart_category.is('Keyword')) {
+            entry.shown = entry.name != '_total_';
+        } else {
+            entry.shown = entry.name == '_total_';
+        }
+
+        // Get rumor information
+        if(name.includes('_rumor_')) {
+            var rumor = name.substring(7);
+            rumor = data.rumors.reduce(function(cur, cand) {
+                if(cand.ID == rumor)
+                    return cand;
+                return cur;
+            }, {});
+            if(rumor) {
+                entry.display_name = rumor.Name;
+                entry.rumor = rumor;
+                entry.isRumor = true;
+            }
+        }
+
+        // Find if the entry is in either keyword list
+        entry.isKeyword = data.collection
+            .Keywords.reduce(function(prev, keyword) {
+            return prev |= keyword.toLowerCase().replace('#', '') == entry.name.toLowerCase().replace('#', '');
+        }, false);
+        entry.isOldKeyword = data.collection
+            .OldKeywords.reduce(function(prev, keyword) {
+            return prev |= keyword.toLowerCase().replace('#', '') == entry.name.toLowerCase().replace('#', '');
+        }, false);
+
+        // Get Legend Type
+        entry.type = legend.key_data_byID['added'].label;
+        if(entry.isKeyword) {
+            entry.type = legend.key_data_byID['capture'].label;
+        } else if(entry.isOldKeyword) {
+            entry.type = legend.key_data_byID['removed'].label;
+        } else if(entry.isRumor) {
+            entry.type = legend.key_data_byID['rumor'].label;
+        }
+        entry.category = 'Keyword';
+        
+        return entry
+    },
     calculateCategoryTotals: function() {
-        legend.series_cats.forEach(data.nestDataTotals);
+        data.cats_arr.forEach(data.nestDataTotals);
     },
     calculateTimeTotals: function() {
-        data.nestDataTotals('timestamps', 4);
+        data.nestDataTotals(data.time);
     },
     prepareDataOld: function() {        
 //        data.total_of_series = data_ready.map(function(datum) {
@@ -514,48 +555,32 @@ Data.prototype = {
 //            return {timestamp: datum.timestamp, value: datum['_total_']};
 //        });
     },
-    recalculateShown: function() {
-        var addToShownList = function(list, id, i) {
-            if(data.series_byID[id].shown) {
-                list.push(i);
-            }
-            return list;
-        }
-        
-        data.shown = {
-            y: legend.series_ids['Tweet Type']
-                        .reduce(addToShownList, []),
-            d: legend.series_ids['Distinctiveness']
-                        .reduce(addToShownList, []),
-            f: legend.series_ids['Found In']
-                        .reduce(addToShownList, []),
-            k: legend.series_ids['Keyword']
-                        .reduce(addToShownList, [])
-        }
-        
-        // Handle this later
-//        if(shown.f.length == 
-//           legend.series_names_nt['Found In'].length)
-//            shown.f = [0];
-//        if(shown.k.length == 
-//           legend.series_names_nt['Keyword'].length)
-//            shown.k = ['_total_'];
+    recalculateShown: function() {        
+        data.shown = data.cats_arr.map(function(category) {
+            return category.series_arr.reduce(function(list, series, i) {
+                if(series.shown)
+                    list.push(i); 
+                return list;
+            }, []);
+        });
     },
     getCategorySubtotals: function() {
         // Get nested timestamps
-        data.timestamps_nested = d3.nest()
+        data.time.stamps_nested = d3.nest()
             .key(data.timeInterpolate)
-            .entries(data.timestamps);
-        data.timestamps_nested = data.timestamps_nested.map(function(d) {
+            .entries(data.time.stamps);
+        data.time.stamps_nested = data.time.stamps_nested.map(function(d) {
             return new Date(d.key);
         });
-        data.timestamps_nested_int =
-            data.timestamps_nested.map(function(d) {
+        data.time.stamps_nested_int =
+            data.time.stamps_nested.map(function(d) {
             return d.getTime();
         });
+        data.time.nested_min = data.time.stamps_nested[0];
+        data.time.nested_max = data.time.stamps_nested[data.time.stamps_nested.length - 1];
 
         // Get nested data
-        legend.series_cats.forEach(data.nestDataSubtotals);
+        data.cats_arr.forEach(data.nestDataSubtotals);
     },
     timeInterpolate: function(d) {
         var time = util.date(d);
@@ -567,17 +592,17 @@ Data.prototype = {
             time.setHours(0);
         return time;
     },
-    nestDataTotals: function(category, cat_i) {
+    nestDataTotals: function(category) {
         var nest = d3.nest();
         
         // Category key
-        if(cat_i < 4) {
-            nest.key(function(d) { return d[cat_i]; });
-        } else {
+        if(category.name == "Time") {
             nest.key(function(d) { 
-                var time = data.timestamps[d[cat_i]];
+                var time = data.time.stamps[d[category.data_index]];
                 return data.timeInterpolate(time); 
             });
+        } else {
+            nest.key(function(d) { return d[category.data_index]; });
         }
         
         // Rollup
@@ -590,78 +615,60 @@ Data.prototype = {
         var nested_data = nest.entries(data.all);
         var out_data = {};
         
-        if(cat_i < 4) { // Type/Distinct/Found In/Keyword
-            return nested_data.forEach(function(nested_entry) {
-                var id = legend.series_ids[category][nested_entry.key];
-                var series_entry = data.series_byID[id];
-                
-                series_entry.sum = nested_entry.values;
-            });
-        } else { // Timestamps
+        if(category.name == "Time") { // Timestamps
             data.time_totals = nested_data.map(function(nested_entry) {
                 return {
                     timestamp: new Date(nested_entry.key),
                     value: nested_entry.values
                 };
             });
+        } else { // Type/Distinct/Found In/Keyword
+            return nested_data.forEach(function(nested_entry) {
+                // Check this
+                category.series_arr[nested_entry.key].sum = nested_entry.values;
+//                var id = category.series_ids[nested_entry.key];
+//                var series_entry = data.series_byID[id];
+//                
+//                series_entry.sum = nested_entry.values;
+            });
         }
     },
-    nestDataSubtotals: function(category, cat_i) {
+    nestDataSubtotals: function(category) {
         // Prepare nesting function
         var nest = d3.nest();
         
         // Category key
         nest.key(function(d) {
-            return d[cat_i];
+            return d[category.data_index];
         });
         
         // Time key
         nest.key(function (d) {
-            var time = util.date(data.timestamps[d[4]]);
-//            console.log(d[4], data.timestamps[d[4]], time);
-            if(options.resolution.is('tenminute'))
-                time.setMinutes(Math.floor(time.getMinutes() / 10) * 10);
-            if(options.resolution.is('hour') || options.resolution.is("day"))
-                time.setMinutes(0);
-            if(options.resolution.is("day"))
-                time.setHours(0);
-            return time;
+            var time_index = d[data.time.data_index];
+            var time = data.time.stamps[time_index];
+            return data.timeInterpolate(time);
         });
         
         // Rollup
         nest.rollup(function (leaves) {
             return d3.sum(leaves, function(d) {
-//                if(cat_i != 0 && !data.shown.y.includes(d[0]))
-//                    return 0;
-//                if(cat_i != 1 && !data.shown.d.includes(d[1]))
-//                    return 0;
-//                if(cat_i != 2 && !data.shown.f.includes(d[2]))
-//                    return 0;
-//                if(cat_i != 3 && !data.shown.k.includes(d[3]))
-//                    return 0;
-                if(!data.shown.y.includes(d[0]))
-                    return 0;
-                if(!data.shown.d.includes(d[1]))
-                    return 0;
-                if(!data.shown.f.includes(d[2]))
-                    return 0;
-                if(!data.shown.k.includes(d[3]))
-                    return 0;
-                return d[5]; 
+                var shown = d.reduce(function(yes, val, i) {
+                    return yes && (i >= 4 ? true : data.shown[i].includes(val));
+                }, true);
+                return shown ? d[5] : 0;
             });
         });
         
         var nested_data = nest.entries(data.all);
         nested_data.forEach(function(nested_entry) {
-            var id = legend.series_ids[category][nested_entry.key];
-            var series_entry = data.series_byID[id];
+            var series = category.series_arr[nested_entry.key];
             
             // Fill in values, including filling any empty space
             var series_data_indexed = {};
             nested_entry.values.forEach(function(d) {
                 series_data_indexed[d.key] = d.values;
             });
-            series_entry.values = data.timestamps_nested.map(function(d) {
+            series.values = data.time.stamps_nested.map(function(d) {
                 var value = series_data_indexed[d];
                 return {
                     timestamp: d,
@@ -670,18 +677,18 @@ Data.prototype = {
             });
             
             // Sum
-            series_entry.total = d3.sum(series_entry.values, function(d) {
+            series.total = d3.sum(series.values, function(d) {
                 return d.value;
             });
             
             // Max
-            series_entry.max = d3.max(series_entry.values, function(d) {
+            series.max = d3.max(series.values, function(d) {
                 return d.value;
             });
         });
     },
     orderSeries: function() {
-        data.series_byCat['Keyword'].sort(legend.cmp);
+        data.cats['Keyword'].series_plotted.sort(legend.cmp);
         legend.container_keywords.selectAll('div.legend_entry')
             .sort(legend.cmp_byID);
     },
@@ -699,7 +706,7 @@ Data.prototype = {
 
         // Find out what we are plotting
         var category = options.chart_category.get();
-        var data_to_plot = data.series_byCat[category];
+        var data_to_plot = data.cats[category].series_plotted;
         
         // Set legend filter buttons
         legend.configureFilters();
@@ -834,22 +841,26 @@ Data.prototype = {
         }
         
         // Distinctiveness
+        var category = data.cats['Distinctiveness'];
+        var shown = data.shown[category.data_index];
         if(args.series && args.series.type == "Distinctiveness") {
             post.distinct = args.series.name == 'distinct' ? 1 : 0;
             title += args.series.name + ' ';
-        } else if(data.shown.d.length != 2) {
-            var distinct = legend.series_names['Distinctiveness'][data.shown.d[0]];
+        } else if(shown.length != 2) {
+            var distinct = category.series_names[shown[0]];
             post.distinct = distinct == 'distinct' ? 1 : 0;
             title += distinct + ' ';
         }
         
         // Tweet Types
+        category = data.cats['Tweet Type'];
+        shown = data.shown[category.data_index];
         if(args.series && args.series.type == "Tweet Type") {
             post.type = args.series.name;
             title += args.series.name + ' ';
-        } else if(data.shown.y.length != 4) {
-            var types = data.shown.y.map(function(i) {
-                return legend.series_names['Tweet Type'][i];
+        } else if(shown.length != 4) {
+            var types = shown.map(function(i) {
+                return category.series_names[i];
             });
             post.type = types.join("','");
             title += types.join('/') + ' ';

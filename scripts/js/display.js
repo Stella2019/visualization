@@ -301,8 +301,8 @@ Display.prototype = {
                   + " Every " + options.resolution.getLabel() + "");
     },
     contextChart: function() {
-        disp.setContextTime(data.timestamps_nested[0],
-            data.timestamps_nested[data.timestamps_nested.length - 1]);
+        disp.setContextTime(data.time.nested_min,
+            data.time.nested_max);
         
         disp.context.y.domain([0, d3.max(data.time_totals, 
                 function(d) { return d.value; })])
@@ -592,7 +592,7 @@ Display.prototype = {
 
         // Get parameters
         var display_category = options.chart_category.get();
-        var keyword_names_ordered = data.series_byCat['Keyword']
+        var keyword_names_ordered = data.cats['Keyword'].series_plotted
             .map(function(series) { return series.name; });
         var type_order_numbers = [100, 200, 300, 400, 10100, 10200, 10300, 10400, 20100, 20200, 20300, 20400];
         
@@ -601,7 +601,7 @@ Display.prototype = {
             disp.color.domain(keyword_names_ordered);    
             disp.typeColor.domain(type_order_numbers);
         } else {
-            var display_names_ordered = data.series_byCat[display_category]
+            var display_names_ordered = data.cats[display_category].series_plotted
                 .map(function(series) { return series.order; });
             disp.color.domain(display_names_ordered);    
             disp.typeColor.domain(type_order_numbers
@@ -609,7 +609,7 @@ Display.prototype = {
         }
 
         // Set each series color
-        data.series.map(function(series) {
+        data.series_arr.forEach(function(series) {
             var key = series.category == 'Keyword' ? 'name' : 'order';
             
             if(series.category == display_category) {
