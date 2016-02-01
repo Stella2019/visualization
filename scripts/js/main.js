@@ -51,12 +51,6 @@ function Pipeline() {
         name: 'Initialize Series Data',
         callback: data.initializeSeries
     },{ // Prepare Data
-        name: 'Calculate Category Totals', 
-        callback: data.calculateCategoryTotals
-    },{
-        name: 'Calculate Time Totals',
-        callback: data.calculateTimeTotals
-    },{
         name: 'Find Which Data is Shown',
         callback: data.recalculateShown
     },{
@@ -133,12 +127,15 @@ Pipeline.prototype = {
         
         // Call the function of this stage
         setTimeout(function() { // Pause for a bit to let the progress bar update
+            var start = new Date().getTime();
             stage.callback();
-
+            var stop = new Date().getTime();
+            console.info(stage.name + ': ' + ((stop - start) / 1000) + 's');
+            
             // Go to the next stage
             this.current_stage = this.current_stage + 1;
             this.nextStage();
-        }.bind(this), 300);
+        }.bind(this), 5);
     },
     abort: function() {
         this.progress.end();

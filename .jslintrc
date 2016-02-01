@@ -1,0 +1,4 @@
+{
+    "node": true,
+    "global": ["data", "disp", "legend", "util", "options", "d3", "console"]
+}

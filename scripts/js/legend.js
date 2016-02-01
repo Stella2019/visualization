@@ -390,20 +390,26 @@ Legend.prototype = {
             .classed('off', !series.shown);
         
         if(options.legend_cleanup.is("true") && !series.shown) {
-            $('.legend_entry.' + series.id).fadeOut();
+            disp.fadeOut('.legend_entry.' + series.id);
         } else {
-            $('.legend_entry.' + series.id).fadeIn().css('display', 'table-row');
+            disp.fadeIn('.legend_entry.' + series.id, 'table-row');
+        }
+    },
+    showOrHideCategory: function(category) {
+        category.series_plotted
+                .forEach(legend.showOrHideSeries);
+        
+        if(options.legend_cleanup.is("true") && !category.filter) {
+            disp.fadeOut('.legend_section.' + category.id);
+        } else {
+            disp.fadeIn('.legend_section.' + category.id, 'block');
         }
     },
     showOrHideAll: function(category) {
         if(category) {
-            category.series_plotted
-                .forEach(legend.showOrHideSeries);
+            legend.showOrHideCategory(category);
         } else {
-            data.cats_arr.forEach(function(category) {
-                category.series_plotted
-                    .forEach(legend.showOrHideSeries);
-            });
+            data.cats_arr.forEach(legend.showOrHideCategory);
         }
     },
     toggleSingle: function(series) {

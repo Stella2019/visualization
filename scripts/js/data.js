@@ -79,7 +79,7 @@ Stream.prototype = {
         }
 
         // Update the progress bar
-        this.progress.update(this.chunk_index + 1);
+        this.progress.update(this.chunk_index + 1, this.progress_text);
 
         this.on_chunk_finish(file_data);
 
@@ -169,7 +169,7 @@ function Data() {
     }, {});
     
     // Functions
-    self.stack =  d3.layout.stack()
+    self.stack = d3.layout.stack()
         .values(function (d) { return d.values; })
         .x(function (d) { return d.timestamp; })
         .y(function (d) { return d.value; })
@@ -322,6 +322,7 @@ Data.prototype = {
             time_max: new Date(data.time.max),
             time_res: 3,
             failure_msg: 'Error loading data',
+            progress_text: 'Loading Data',
             on_finish: function() {
                 pipeline.start();
             },
@@ -408,23 +409,35 @@ Data.prototype = {
         }
         data.time.stamps = new_timestamps;
         
-        data.all = [];
         var types = data.cats['Tweet Type'].series_names;
         var foundins = data.cats['Found In'].series_names;
         
+        // Prepopulate with zeros
+        data.all = types.map(function(type, i_y) {
+            return [0, 1].map(function(distinct, i_d) {
+                return foundins.map(function(foundin, i_f) {
+                    return keywords.map(function(keyword, i_k) {
+                        return data.time.stamps.map(function(time, i_t) {
+                            return 0;
+                        });
+                    });
+                });
+            });
+        });        
+        // Write data
         for(row in data.file) {
-            var i_t = data.time.stamps.indexOf(data.file[row]['Time']);
+            var i_d = data.file[row]['Distinct'] == 1 ? 0 : 1;
             var i_f = foundins.indexOf(data.file[row]['Found_In']);
             var i_k = keywords.indexOf(data.file[row]['Keyword']);
-            var i_d = data.file[row]['Distinct'] == 1 ? 0 : 1;
+            var i_t = data.time.stamps.indexOf(data.file[row]['Time']);
             
             if(typeof data.file[row] !== 'object')
                 continue;
 
             types.forEach(function(tweet_type) {
                 var i_y = types.indexOf(tweet_type);
-                data.all.push([i_y, i_d, i_f, i_k, i_t,
-                    parseInt(data.file[row][tweet_type])]);
+                data.all[i_y][i_d][i_f][i_k][i_t] = 
+                    parseInt(data.file[row][tweet_type]);
             });
         }
 
@@ -539,22 +552,6 @@ Data.prototype = {
         
         return entry
     },
-    calculateCategoryTotals: function() {
-        data.cats_arr.forEach(data.nestDataTotals);
-    },
-    calculateTimeTotals: function() {
-        data.nestDataTotals(data.time);
-    },
-    prepareDataOld: function() {        
-//        data.total_of_series = data_ready.map(function(datum) {
-//            return Math.max(data.series_names.reduce(function(running_sum, word) {
-//                return running_sum += datum[word];
-//            }, 0), 1);
-//        });
-//        data.total_tweets = data_ready.map(function(datum) {
-//            return {timestamp: datum.timestamp, value: datum['_total_']};
-//        });
-    },
     recalculateShown: function() {        
         data.shown = data.cats_arr.map(function(category) {
             return category.series_arr.reduce(function(list, series, i) {
@@ -566,19 +563,31 @@ Data.prototype = {
     },
     getCategorySubtotals: function() {
         // Get nested timestamps
-        data.time.stamps_nested = d3.nest()
+        var time_stamps_nested = d3.nest()
             .key(data.timeInterpolate)
             .entries(data.time.stamps);
-        data.time.stamps_nested = data.time.stamps_nested.map(function(d) {
+        
+        // Aux time index array (so we don't have to nest again)
+        data.time.t2tn = [];
+        time_stamps_nested.forEach(function(nest, i_tn) {
+            nest.values.forEach(function(val, i_t) {
+                data.time.t2tn.push(i_tn);
+            });
+        });
+        
+        // Simplify
+        data.time.stamps_nested = time_stamps_nested.map(function(d) {
             return new Date(d.key);
         });
+        
+        // Make other time nest indices
         data.time.stamps_nested_int =
             data.time.stamps_nested.map(function(d) {
             return d.getTime();
         });
         data.time.nested_min = data.time.stamps_nested[0];
         data.time.nested_max = data.time.stamps_nested[data.time.stamps_nested.length - 1];
-
+        
         // Get nested data
         data.cats_arr.forEach(data.nestDataSubtotals);
     },
@@ -634,56 +643,59 @@ Data.prototype = {
         }
     },
     nestDataSubtotals: function(category) {
-        // Prepare nesting function
-        var nest = d3.nest();
-        
-        // Category key
-        nest.key(function(d) {
-            return d[category.data_index];
+        data.time_totals = data.time.stamps_nested.map(function(time, i_tn) {
+            return {
+                timestamp: new Date(time), 
+                value: 0
+            };
         });
-        
-        // Time key
-        nest.key(function (d) {
-            var time_index = d[data.time.data_index];
-            var time = data.time.stamps[time_index];
-            return data.timeInterpolate(time);
-        });
-        
-        // Rollup
-        nest.rollup(function (leaves) {
-            return d3.sum(leaves, function(d) {
-                var shown = d.reduce(function(yes, val, i) {
-                    return yes && (i >= 4 ? true : data.shown[i].includes(val));
-                }, true);
-                return shown ? d[5] : 0;
+        var subtotals = data.cats_arr.map(function(category) {
+            return category.series_arr.map(function(series, i_s) {
+                return data.time.stamps_nested.map(function(time, i_tn) {
+                    return 0;
+                });
             });
         });
         
-        var nested_data = nest.entries(data.all);
-        nested_data.forEach(function(nested_entry) {
-            var series = category.series_arr[nested_entry.key];
-            
-            // Fill in values, including filling any empty space
-            var series_data_indexed = {};
-            nested_entry.values.forEach(function(d) {
-                series_data_indexed[d.key] = d.values;
+        // Iterate through data adding it up
+        data.shown[0].forEach(function(i_y) {
+            data.shown[1].forEach(function(i_d) {
+                data.shown[2].forEach(function(i_f) {
+                    data.shown[3].forEach(function(i_k) {
+                        data.time.stamps.map(function(timestamp, i_t) {
+                            var value = data.all[i_y][i_d][i_f][i_k][i_t];
+                            var i_tn = data.time.t2tn[i_t];
+                            
+                            data.time_totals[i_tn].value += value;
+                            subtotals[0][i_y][i_tn] += value;
+                            subtotals[1][i_d][i_tn] += value;
+                            subtotals[2][i_f][i_tn] += value;
+                            subtotals[3][i_k][i_tn] += value;
+                        })
+                    });
+                });
             });
-            series.values = data.time.stamps_nested.map(function(d) {
-                var value = series_data_indexed[d];
-                return {
-                    timestamp: d,
-                    value: value || 0
-                }
-            });
-            
-            // Sum
-            series.total = d3.sum(series.values, function(d) {
-                return d.value;
-            });
-            
-            // Max
-            series.max = d3.max(series.values, function(d) {
-                return d.value;
+        });
+        
+        // Fill in the data in the structures
+        subtotals.forEach(function(cat_data, i_c) {
+            var category = data.cats_arr[i_c];
+            cat_data.forEach(function(series_data, i_s) {
+                var series = category.series_arr[i_s];
+                
+                series.values = series_data.map(function(d, i_tn) {
+                   return {
+                       timestamp: data.time.stamps_nested[i_tn],
+                       value: d
+                   } 
+                });
+
+                // Sum
+                series.sum = d3.sum(series_data);
+                series.total = d3.sum(series_data);
+
+                // Max
+                series.max = d3.max(series_data);
             });
         });
     },
@@ -744,8 +756,7 @@ Data.prototype = {
                 data.stacked[i].offset = 0;
                 if(i < n_series - 1) {
                     data.stacked[i].offset = data.stacked[i + 1].offset;
-                    if(data.series[i + 1].shown)
-                        data.stacked[i].offset += data.stacked[i + 1].max;
+                    data.stacked[i].offset += data.stacked[i + 1].max;
                 }
 
                 data.stacked[i].values.forEach(function(datum) {

@@ -390,8 +390,8 @@ Options.prototype = {
     },
     recordState: function(changedItem, override) {
         if(changedItem == undefined) {
-            options.state = options.record.reduce(function(state, dropdown) {
-                state[dropdown] = options[dropdown].get();
+            options.state = options.record.reduce(function(state, option) {
+                state[option] = options[option].get();
                 return state;
             }, {});
         } else {

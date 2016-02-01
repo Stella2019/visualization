@@ -882,5 +882,21 @@ Display.prototype = {
         factory.create();
         
         return factory;
+    },
+    fadeIn: function(d3_object, display) {
+        if(typeof(d3_object) == "string")
+            d3_object = d3.select(d3_object);
+        d3_object.transition()
+            .style('opacity', 1)
+            .style('display', display || 'table');
+    },
+    fadeOut: function(d3_object) {
+        if(typeof(d3_object) == "string")
+            d3_object = d3.select(d3_object);
+        d3_object.transition()
+            .style('opacity', 0)
+            .each('end', function() {
+                d3.select(this).style('display', 'none')
+            });
     }
 }
