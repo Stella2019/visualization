@@ -70,7 +70,7 @@ function Options() {
         default: 2,
         parent: '#choices_subset',
         callback: function () {
-            pipeline.start('Calculate Category Totals');
+            pipeline.start('Calculate Timeseries');
         }
     });
     self.shape = new Option({
@@ -268,10 +268,10 @@ function Options() {
         edit: function() { options.editWindow('rumor'); }
     });
     self.fetched_tweet_order = new Option({
-        title: 'Fetched Tweets',
-        labels: ["Most Repeated", "First in Time", "Random"],
+        title: 'Fetched Tweets Order',
+        labels: ["Popularity", "Time", "Random"],
         ids:    ["popular", "time", "rand"],
-        available: [1, 2],
+        available: [0, 1, 2],
         default: 1,
         type: "dropdown",
         parent: '#choices_legend',
@@ -1051,13 +1051,13 @@ Options.prototype = {
         }
         
         // Set Modal Title
-        d3.select('#selectedTweetsModal .modal-title')
+        d3.select('#modal .modal-title')
             .html(info.DisplayName ? info.DisplayName : info.Name);
 
         // Clear any data still in the modal
-        d3.select('#selectedTweetsModal .modal-options')
+        d3.select('#modal .modal-options')
             .selectAll('*').remove();
-        var modal_body = d3.select('#selectedTweetsModal .modal-body');
+        var modal_body = d3.select('#modal .modal-body');
         modal_body.selectAll('*').remove();
         
         // Append form
@@ -1176,7 +1176,7 @@ Options.prototype = {
             });
         
         // Add Lower Buttons        
-        var bottom_row = d3.select('#selectedTweetsModal .modal-options')
+        var bottom_row = d3.select('#modal .modal-options')
         
         bottom_row.append('div')
             .append('button')
@@ -1197,10 +1197,10 @@ Options.prototype = {
         form.selectAll('input')
             .on('input', options.editWindowChanged);
         
-        $('#selectedTweetsModal').modal();
+        $('#modal').modal();
     },
     editWindowRumorOptions: function() {
-        var bottom_row = d3.select('#selectedTweetsModal .modal-options')
+        var bottom_row = d3.select('#modal .modal-options')
         var option = 'rumor';
         
         var tweet_count = bottom_row.append('div')

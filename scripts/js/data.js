@@ -592,7 +592,13 @@ Data.prototype = {
         data.cats_arr.forEach(data.nestDataSubtotals);
     },
     timeInterpolate: function(d) {
-        var time = util.date(d);
+        var time;
+        if(typeof(d) == "string")
+            time = util.date(d);
+        else
+            time = new Date(d);
+        time.setMilliseconds(0);
+        time.setSeconds(0);
         if(options.resolution.is('tenminute'))
             time.setMinutes(Math.floor(time.getMinutes() / 10) * 10);
         if(options.resolution.is('hour') || options.resolution.is("day"))
@@ -847,8 +853,9 @@ Data.prototype = {
         var title = "";
 
         if(options.fetched_tweet_order.is("rand")) {
-            post.rand = '';
-//            title += 'Random ';
+            post.rand = true;
+        } else if(options.fetched_tweet_order.is("popular")) {
+            post.order_popular = true;
         }
         
         // Distinctiveness
@@ -915,14 +922,13 @@ Data.prototype = {
         post.time_max = util.formatDate(args.time_max);
         title += " and " + util.formatDate(args.time_max);
         
-        data.callPHP('tweets/get', post, function(filedata) {
-            if('csv' in post)
-                data.handleTweets(filedata);
-            else
-                disp.tweetsModal(filedata, post, title);
-        }, function() { 
-            disp.alert('Unable to retreive tweets', 'danger');
-        });
+        if('csv' in post) {
+            data.callPHP('tweets/get', post, data.handleTweets, function() { 
+                disp.alert('Unable to retreive tweets', 'danger');
+            });
+        } else {
+            disp.tweetsModal(post, title);
+        }
     },
     getRumor: function() {
         url = "scripts/php/collection/getRumor.php";
@@ -1046,5 +1052,46 @@ Data.prototype = {
             }, 333);
             return true;
         }
+    },
+    calculateNGrams: function() {
+        data.TweetCounter = new Counter();
+        data.NGramCounter = d3.range(3).map(function(d) {
+            return new Counter();
+        })
+        
+        var stream = new Stream({
+            progress_text: "Fetching Tweets",
+            url: "tweets/getTextNoURL",
+            post: {
+                event_id: data.collection.ID,
+                limit: 100
+            },
+            time_res: 6,
+            on_chunk_finish: function (file_data) {
+                tweets = JSON.parse(file_data);
+                
+                tweets.forEach(function(tweet) {
+                    var words = tweet.TextNoURL.toLowerCase().split(/[\W]+/);
+                    
+                    words.map(function(word, wi) {
+                        if(word) {
+                            var gram = word;
+                            data.NGramCounter[0].incr(gram);
+                            if(words[wi + 1]) {
+                                gram += " " + words[wi + 1];
+                                data.NGramCounter[1].incr(gram);
+                                if(words[wi + 2]) {
+                                    gram += " " + words[wi + 2];
+                                    data.NGramCounter[2].incr(gram);
+                                }
+                            }
+                        }
+                    });
+                    data.TweetCounter.incr(tweet.TextNoURL);
+                });
+            }
+        });
+        
+        stream.start();
     }
 }

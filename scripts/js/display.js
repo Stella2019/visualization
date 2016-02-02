@@ -48,7 +48,7 @@ Tooltip.prototype = {
 };
 function Progress(args) {
     // Grab parameters
-    var valid_param = ['name', 'parent_id', 'full', 'text', 'steps'];
+    var valid_param = ['name', 'parent_id', 'full', 'text', 'steps', 'initial'];
     Object.keys(args).forEach(function (item) {
         if(valid_param.includes(item)) {
             this[item] = args[item];
@@ -61,6 +61,7 @@ function Progress(args) {
     this.full      = this.full      || false;
     this.text      = this.text      || "Working";
     this.steps     = this.steps     || 100;
+    this.initial   = this.initial   || 0;
     
     // Make holding containers
     this.container_div = '';
@@ -124,6 +125,7 @@ Progress.prototype = {
             .text(this.text);
         
         this.active = true;
+        this.update(this.initial, this.text);
     },
     update: function(step, text) {
         var percentDone =  Math.floor(step * 100 / this.steps);
@@ -166,6 +168,11 @@ function Display() {
     self.typeColor = {};
     self.brush = {};
     self.tooltip = {};
+    
+    // Other variables
+    self.getTweets_post = {};
+    self.getTweets_count = 0;
+    self.getTweets_progress = {};
 }
 Display.prototype = {
     setYScale: function() {
@@ -661,8 +668,10 @@ Display.prototype = {
         } else if(options.resolution.is('day')) {
             coeff *= 60 * 24;
         }
-        time.min = new Date(Math.floor(time.hover.getTime() / coeff) * coeff)
-        time.max = new Date(time.min.getTime() + coeff)
+        time.min = new Date(Math.floor(time.hover.getTime() / coeff) * coeff);
+        
+        time.min = data.timeInterpolate(time.hover);
+        time.max = new Date(time.min.getTime() + coeff);
         
         return time;
     },
@@ -759,23 +768,164 @@ Display.prototype = {
             .html('<small>' + data.collection.Type + ':</small> ' + 
                   data.collection.DisplayName);
     },
-    tweetsModal: function(filedata, post, title) {
+    tweetsModal: function(post, title) {
 
-        d3.select('#selectedTweetsModal .modal-title')
-            .html(title);
+        var title_div = d3.select('#modal .modal-title').html('');
+        
+//        title_div.append('span').html('Tweets');
+        title_div.append('span').html(title);
+        title_div.append('span').attr('class', 'tweet_modal_count');
 
         // Clear any data still in the modal
-        d3.select('#selectedTweetsModal .modal-options')
+        d3.select('#modal .modal-options')
             .selectAll('*').remove();
-        var modal_body = d3.select('#selectedTweetsModal .modal-body');
-        modal_body.selectAll('*').remove();
+        disp.getTweets_post = post;
+        disp.getTweets_post.offset = 0;
+        disp.getTweets_post.limit = 5;
+        disp.getTweets_count = 0;
+        
+        // Add Options
+        var options_div = d3.select('.modal-options');
 
-        // Report errors if they happened
+        var order_div = options_div.append('div')
+            .attr('class', 'btn-group')
+            .style('margin-bottom', '0px');
+
+        order_div.append('span')
+            .attr('class', 'btn btn-default')
+            .attr('disabled', '')
+            .text('Order by:');
+
+        order_div.selectAll('button.tweet_modal_order')
+            .data(options.fetched_tweet_order.available)
+            .enter()
+            .append('button')
+            .attr('class', 'btn tweet_modal_order')
+            .text(function(d) {
+                return options.fetched_tweet_order.labels[d];
+            })
+            .on('click', function(d) {
+                options.fetched_tweet_order.click(d);
+
+                var post = disp.getTweets_post;
+                if(options.fetched_tweet_order.is('rand')) {
+                    post.rand = true;
+                    delete post.order_popular;
+                } else if(options.fetched_tweet_order.is('popular')) {
+                    post.order_popular = true;
+                    delete post.rand;
+                } else {
+                    delete post.order_popular;
+                    delete post.rand;
+                }
+
+                // Fetch new data
+                disp.getTweets_progress.start();
+                data.callPHP('tweets/get', post,
+                    disp.tweetModalContent, disp.tweetModalContent);
+            });
+
+        options_div.append('div')
+            .attr('class', 'btn-group')
+            .style('margin-bottom', '0px')
+            .selectAll('button.tweet_modal_step')
+            .data([-10000, -5, 5])
+            .enter()
+            .append('button')
+            .attr('class', 'btn btn-primary tweet_modal_step')
+            .on('click', function(d) {
+                var post = disp.getTweets_post;
+
+                post.offset = Math.max(post.offset + d, 0);
+                disp.tweetModalStyle();
+
+                // Fetch new data
+                disp.getTweets_progress.start();
+                data.callPHP('tweets/get', post,
+                    disp.tweetModalContent, disp.tweetModalContent);
+            })
+            .append('span')
+            .attr('class', function(d) {
+                var symbol = 'step-backward';
+                if(d == -5)
+                    symbol = 'chevron-left';
+                if(d == 5)
+                    symbol = 'chevron-right';
+            
+                return 'glyphicon glyphicon-' + symbol;
+            });
+
+        // Get the counts
+        data.callPHP('tweets/count', post, function(file_data) {
+            var count = JSON.parse(file_data);
+            count = parseInt(count[0]['count']);
+
+            disp.getTweets_count = count; 
+            disp.tweetModalStyle();
+        });
+
+        $('#modal').modal();
+        
+        // Fill the modal
+        disp.getTweets_progress = new Progress({
+            parent_id: ".modal-options",
+            text: "Fetching Tweets",
+            full: true,
+            initial: 100
+        });
+        
+        disp.getTweets_progress.start();
+        data.callPHP('tweets/get', post,
+            disp.tweetModalContent, disp.tweetModalContent);
+    },
+    tweetModalStyle: function() {
+        var offset = disp.getTweets_post.offset;
+        var limit = disp.getTweets_post.limit;
+        
+        d3.select('.tweet_modal_count')
+            .html(' ('   + (offset + 1) +  
+                  ' to ' + (offset + limit) +
+                  ' of ' + disp.getTweets_count + ') ');
+        
+        d3.selectAll('.tweet_modal_order')
+            .attr('class', function(d) {
+                if(d == options.fetched_tweet_order.indexCur())
+                    return 'btn btn-primary tweet_modal_order';
+                return 'btn btn-default tweet_modal_order';
+            });
+                        
+        d3.selectAll('.tweet_modal_step')
+            .attr('class', function(d) {
+                var max = disp.getTweets_count;
+                var offset = disp.getTweets_post.offset;
+                var limit = disp.getTweets_post.limit;
+                if((0 < offset && d < 0) ||
+                   (offset + limit < max && 0 < d) )
+                    return 'btn btn-primary tweet_modal_step';
+                return 'btn btn-default tweet_modal_step';
+            })
+            .attr('disabled', function(d) {
+                var max = disp.getTweets_count;
+                var offset = disp.getTweets_post.offset;
+                var limit = disp.getTweets_post.limit;
+                if((0 < offset && d < 0) ||
+                   (offset + limit < max && 0 < d) )
+                    return null;
+                return '';
+            });
+    },
+    tweetModalContent: function(filedata) {
+        var modal_body = d3.select('#modal .modal-body');
+        modal_body.selectAll('*').remove();
+        
+        // Handle errors
         if(filedata.indexOf('Maximum execution time') >= 0) {
             modal_body.append('div')
                 .attr('class', 'text-center')
                 .html("Error retrieving tweets. <br /><br /> Query took too long");
-        } else if (filedata.indexOf('Fatal error') >= 0 || filedata.indexOf('Errormessage') >= 0) {
+        } else if (filedata.indexOf('Fatal error') >= 0 ||
+                   filedata.indexOf('Errormessage') >= 0 ||
+                   filedata.indexOf('[{') != 0) {
             modal_body.append('div')
                 .attr('class', 'text-center')
                 .html("Error retrieving tweets. <br /><br /> " + filedata);
@@ -786,7 +936,7 @@ Display.prototype = {
             if(data.length == 0) {
                 modal_body.append('div')
                     .attr('class', 'text-center')
-                    .text("No tweets found in this selection.");
+                    .text("No more tweets found in this selection.");
             } else {
                 modal_body.append('ul')
                     .attr('class', 'list-group')
@@ -805,51 +955,17 @@ Display.prototype = {
                         content += d['Type'];
                         if(d['Origin'])
                             content += ' of <a href="https://twitter.com/emcomp/status/' + d['Origin'] + '">#' + d['Origin'] + '</a>'
+                        if(d['Count'] && d['Count'] > 1)
+                            content += ', ' + (d['Count'] - 1) + " repeats";
                         return content;
                     });
                 
-                d3.select('.modal-options').selectAll('button')
-                    .data(options.fetched_tweet_order.available)
-                    .enter()
-                    .append('button')
-                    .attr('class', 'btn btn-primary')
-                    .style('font-weight', function(d) {
-                        if(d == options.fetched_tweet_order.indexCur())
-                            return 'bold';
-                        return 'normal';
-                    })
-                    .text(function(d) {
-                        return options.fetched_tweet_order.labels[d];
-                    })
-                    .on('click', function(d) {
-                        options.fetched_tweet_order.click(d);
-                        
-//                        title = title.replace('Random', '');
-                        if(options.fetched_tweet_order.is('rand')) {
-                            post.rand = '';
-//                            title = 'Random ' + title;
-                        } else {
-                            delete post.rand;
-                        }
-                        
-                        // Fetch new data
-                        data.callPHP('tweets/get', post, function(filedata) {
-                            disp.tweetsModal(filedata, post, title);
-                        }, function() { 
-                            disp.alert('Unable to fetch new data', 'danger');
-                        });
-                    });
-                
-                data.callPHP('tweets/count', post, function(file_data) {
-                    var count = JSON.parse(file_data);
-                    
-                    d3.select('#selectedTweetsModal .modal-title')
-                        .html(count[0]['count'] + " " + title);
-                });
             }
         }
-
-        $('#selectedTweetsModal').modal();
+        
+        // Update style and stop progress bar
+        disp.getTweets_progress.end();
+        disp.tweetModalStyle();        
     },
     newPopup: function(id) {        
         // Make factory for options
@@ -858,6 +974,7 @@ Display.prototype = {
             placement: 'bottom',
             trigger: 'hover',
             html: true,
+            container: 'body',
             content: '',
             title: '',
             create: function() {
@@ -898,5 +1015,52 @@ Display.prototype = {
             .each('end', function() {
                 d3.select(this).style('display', 'none')
             });
+    },
+    nGramModal: function(filedata, post, title) {
+
+        d3.select('#modal .modal-title')
+            .html(title);
+
+        // Clear any data still in the modal
+        d3.select('#m .modal-options')
+            .selectAll('*').remove();
+        var modal_body = d3.select('#modal .modal-body');
+        modal_body.selectAll('*').remove();
+
+        // Report errors if they happened
+        // Otherwise, parse the data
+        filedata = JSON.parse(filedata);
+
+        if(data.length == 0) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .text("No tweets found in this selection.");
+        } else {
+            modal_body.append('ul')
+                .attr('class', 'list-group')
+                .selectAll('li').data(filedata).enter()
+                .append('li')
+                .attr('class', 'list-group-item')
+                .html(function(d) {
+                    var content = '<span class="badge"><a href="https://twitter.com/emcomp/status/' + d['ID'] + '">' + d['ID'] + '</a></span>';
+                    content += d['Timestamp'] + ' ';
+                    content += d['Username'] + ' said: ';
+                    content += "<br />";
+                    content += d['Text'];
+                    content += "<br />";
+                    if(d['Distinct'] == '1')
+                        content += 'distinct ';
+                    content += d['Type'];
+                    if(d['Origin'])
+                        content += ' of <a href="https://twitter.com/emcomp/status/' + d['Origin'] + '">#' + d['Origin'] + '</a>'
+                    return content;
+                });
+        }
+
+            // Add options for 
+
+//                d3.select('.modal-options').selectAll('button')
+
+        $('#modal').modal();
     }
 }

@@ -147,6 +147,99 @@ Pipeline.prototype = {
     }
 };
 
+function Counter() {
+    this.counts = new d3.map();
+}
+Counter.prototype = {
+    incr: function(key, add) {
+        add = add || 1;
+        var val = this.counts.get(key) || 0;
+        this.counts.set(key, val + add);
+    },
+    cmpCount: function(a, b) {
+        if(a.value == b.value)
+            return a.key.localeCompare(b.key);
+        return b.value - a.value
+    },
+    top: function(k) {
+        return this.top_nk(k);
+    },
+    top_nk: function(k) { // O(nk)
+        k = k || 10; // default 10
+        
+        var top = d3.range(k).map(function() {
+            return {key: "", value: 0};
+        })
+        var minVal = 0;
+        var moreThanMin = 0;
+        this.counts.forEach(function(key, val) {
+            // If it is bigger than a candidate
+            if(minVal < val) {
+                if(moreThanMin >= k - 1)
+                    top = top.filter(function(d) { return d.value > minVal});
+                top.push({
+                    key: key,
+                    value: val
+                });
+                minVal = d3.min(top, function(d) { return d.value});
+                moreThanMin = top.filter(function(d) { return d.value > minVal}).length;
+            } else if(minVal == val) {
+                top.push({
+                    key: key,
+                    value: val
+                });
+            }
+        });
+        
+        return this.firstK(this.getSorted(top), k)
+    },
+    top_nlogn: function(k) { // O(nlogn)
+        k |= 10; // default 10
+        
+        return this.firstK(this.getSorted(), k);
+    },
+    getSorted: function(arr) {
+        if(!arr)
+            arr = this.counts.entries();
+        arr.sort(this.cmpCount)
+        return arr;
+    },
+    firstK: function(arr, k) {
+        if(!arr)
+            arr = this.counts.entries();
+        k |= 10; // default 10
+        k = Math.min(k, arr.length);
+        
+        var res = [];
+        for(var i = 0; i < k; i++)
+            res.push(arr[i]);
+        return res;
+    },
+    purgeBelow: function(minimum, add_rare) { 
+        if(minimum) {
+            var self = this;
+            this.counts.forEach(function(key, val) {
+                if(val < minimum) {
+                    this.remove(key);
+                    if(add_rare)
+                        self.incr("_rare_", val);
+                }
+            });
+        } else { // Halves the size of the array
+            var sorted = this.getSorted();
+            minimum = sorted[sorted.length / 2].value + 1;
+
+            sorted.forEach(function(entry) {
+                if(entry.value < minimum) {
+                    this.counts.remove(entry.key);
+                    if(add_rare)
+                        this.incr("_rare_", entry.value);
+                }
+            }, this);
+        }
+    }
+};
+
 window.onload = initialize;
 
 function initialize() {

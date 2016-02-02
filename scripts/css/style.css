@@ -13,6 +13,7 @@
 /* Options */
 #choices {
     max-height: 150px;
+/*    overflow: scroll;*/
 }
 
 .choice {
@@ -252,6 +253,7 @@ button:focus {
 }
 .modal-options {
     display: inline-block;
+    position: relative;
     margin: 0px 5px;
 }
 .edit-box {
@@ -263,7 +265,7 @@ button:focus {
 .edit-box-query .selectType {
     width: 80px;
 }
-.modal-options div {
+.modal-options div { /* Why are there two? */
     display: inline-table;
     text-align: left;
 }
