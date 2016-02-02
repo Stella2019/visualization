@@ -37,7 +37,7 @@
     if(isset($_POST["type"]))
         $conds[] = "Tweet.Type IN ('" . $_POST["type"] . "')";
     if(isset($_POST["distinct"]))
-        $conds[] = "Tweet.Distinct = '" . $_POST["distinct"];
+        $conds[] = "Tweet.Distinct = '" . $_POST["distinct"] . "'";
     if(isset($_POST["search_text"])) {
         foreach(explode(',', $_POST["search_text"]) as $term) {
             $conds[] = "LOWER(Tweet.Text) REGEXP '" . $term . "'";
