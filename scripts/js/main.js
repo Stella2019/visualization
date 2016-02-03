@@ -151,6 +151,9 @@ function Counter() {
     this.counts = new d3.map();
 }
 Counter.prototype = {
+    has: function(key) {
+        return this.counts.get(key) || false;
+    },
     incr: function(key, add) {
         add = add || 1;
         var val = this.counts.get(key) || 0;
@@ -162,7 +165,7 @@ Counter.prototype = {
         return b.value - a.value
     },
     top: function(k) {
-        return this.top_nk(k);
+        return this.top_nlogn(k);
     },
     top_nk: function(k) { // O(nk)
         k = k || 10; // default 10
@@ -197,6 +200,22 @@ Counter.prototype = {
         k |= 10; // default 10
         
         return this.firstK(this.getSorted(), k);
+    },
+    stopwords: ['the', 'a', 'an', 'that', 'this',
+                'rt', 
+                'in', 'on', 'to', 'of', 'at', 'for', 'with', 'about',
+                'is', 'are', 'be', 'was', 'have', 'has',
+                'i', 'you', 'he', 'she', 'it', 'we', 'they',
+                'me', 'him', 'her', 'us', 'them', 
+                'my', 'your', 'his', 'its', 'our', 'their',
+                'and', 'or',
+                'as', 'if', 'so'],
+    top_no_stopwords: function(k) {
+        k |= 10; // default 10
+        var entries = this.counts.entries().filter(function(d) {
+            return !this.stopwords.includes(d.key);
+        }, this);
+        return this.firstK(this.getSorted(entries), k)
     },
     getSorted: function(arr) {
         if(!arr)

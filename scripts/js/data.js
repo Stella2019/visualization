@@ -182,6 +182,10 @@ function Data() {
     
     // Streams
     self.streamTweetCounts = null;
+    self.ngrams = {
+        main: {},
+        cmp: {}
+    };
 }
 Data.prototype = {
     loadCollections: function () {
@@ -497,6 +501,9 @@ Data.prototype = {
             pipeline.abort();
             return;
         }
+        
+        // Update NGram list to allow searches on keywords
+        options.buildNGrams();
     },
     generateKeywordSeries: function(name, i) {
         var entry = {
@@ -854,8 +861,8 @@ Data.prototype = {
 
         if(options.fetched_tweet_order.is("rand")) {
             post.rand = true;
-        } else if(options.fetched_tweet_order.is("popular")) {
-            post.order_popular = true;
+        } else if(options.fetched_tweet_order.is("prevalence")) {
+            post.order_prevalence = true;
         }
         
         // Distinctiveness
@@ -1053,45 +1060,113 @@ Data.prototype = {
             return true;
         }
     },
-    calculateNGrams: function() {
-        data.TweetCounter = new Counter();
-        data.NGramCounter = d3.range(3).map(function(d) {
+    calculateNGrams: function(selector) {
+        var ngrams = data.ngrams.main;
+        if(selector == 'ngram_cmp')
+            ngrams = data.ngrams.cmp;
+        var spec = options[selector].get();
+        
+        ngrams.nTweets = 0;
+        ngrams.TweetCounter = new Counter();
+        ngrams.nGrams = d3.range(3).map(function(d) {
+            return 0;
+        });
+        ngrams.NGramCounter = d3.range(3).map(function(d) {
             return new Counter();
         })
         
+        post = { limit: 100000 };
+        if(spec.substring(0, 2) == 'k_') {
+            var series = data.series[spec.substring(2)];
+            post.search_text = data.series.name;
+        } else if(spec.substring(0, 2) == 'r_') {
+            post.rumor_id = spec.substring(2);
+        } else { // or if it is //c_ for collection
+            post.event_id = data.collection.ID;
+        }
+        // Add filters
+        var category = data.cats['Distinctiveness'];
+        var shown = data.shown[category.data_index];
+        if(shown.length != 2) {
+            var distinct = category.series_names[shown[0]];
+            post.distinct = distinct == 'distinct' ? 1 : 0;
+        }
+        category = data.cats['Tweet Type'];
+        shown = data.shown[category.data_index];
+        if(shown.length != 4) {
+            var types = shown.map(function(i) {
+                return category.series_names[i];
+            });
+            post.type = types.join("','");
+        }
+        ngrams.post = post;
+        
         var stream = new Stream({
-            progress_text: "Fetching Tweets",
+            progress_text: "Fetching NGrams from Tweets",
             url: "tweets/getTextNoURL",
-            post: {
-                event_id: data.collection.ID,
-                limit: 100
+            post: post,
+            time_res: 1,
+            on_chunk_finish: function(file_data) { 
+                data.parseNGrams(file_data, selector);
             },
-            time_res: 6,
-            on_chunk_finish: function (file_data) {
-                tweets = JSON.parse(file_data);
-                
-                tweets.forEach(function(tweet) {
-                    var words = tweet.TextNoURL.toLowerCase().split(/[\W]+/);
-                    
-                    words.map(function(word, wi) {
-                        if(word) {
-                            var gram = word;
-                            data.NGramCounter[0].incr(gram);
-                            if(words[wi + 1]) {
-                                gram += " " + words[wi + 1];
-                                data.NGramCounter[1].incr(gram);
-                                if(words[wi + 2]) {
-                                    gram += " " + words[wi + 2];
-                                    data.NGramCounter[2].incr(gram);
-                                }
-                            }
-                        }
-                    });
-                    data.TweetCounter.incr(tweet.TextNoURL);
-                });
+            on_finish: function() { 
+                disp.nGramModal(selector);
             }
         });
         
         stream.start();
+    },
+    parseNGrams: function(file_data, selector) {
+        var ngrams = data.ngrams.main;
+        if(selector == 'ngram_cmp')
+            ngrams = data.ngrams.cmp;
+        
+        var tweets;
+        try {
+            JSON.parse(file_data);
+        } catch(err) {
+            console.log(file_data);
+            throw(err);
+            return;
+        }
+
+        tweets.forEach(function(tweet) {
+            if(ngrams.post.distinct &&  ngrams.TweetCounter.has(tweet.TextNoURL)) {
+                return;
+            }
+    
+            ngrams.nTweets += 1;
+            var text = tweet.TextNoURL.toLowerCase();
+            text = text.replace(/[^\w']+/g, ' ');
+            text = text.replace(/\w' | '\w/g, ' ');
+            var words = text.split(' ');
+
+            
+            ngrams.TweetCounter.incr(tweet.TextNoURL);
+            
+            words.map(function(word, wi) {
+                if(word) {
+                    var gram = word;
+                    ngrams.nGrams[0] += 1;
+                    ngrams.NGramCounter[0].incr(gram);
+                    if(words[wi + 1]) {
+                        gram += " " + words[wi + 1];
+                        ngrams.nGrams[1] += 1;
+                        ngrams.NGramCounter[1].incr(gram);
+                        if(words[wi + 2]) {
+                            gram += " " + words[wi + 2];
+                            ngrams.nGrams[2] += 1;
+                            ngrams.NGramCounter[2].incr(gram);
+                        }
+                    }
+                    // Add co-occurance
+                }
+            });
+        });
+        
+        // Clear rare
+//        ngrams.NGramCounter[0].purgeBelow(2);
+//        ngrams.NGramCounter[1].purgeBelow(2);
+//        ngrams.NGramCounter[2].purgeBelow(2);
     }
 }

@@ -30,18 +30,18 @@
     if(isset($_REQUEST["type"]))
         $conds[] = "Tweet.Type IN ('" . $_REQUEST["type"] . "')";
     if(isset($_REQUEST["distinct"]))
-        $conds[] = "Tweet.Distinct = '" . $_REQUEST["distinct"];
+        $conds[] = "Tweet.Distinct = '" . $_REQUEST["distinct"] . "'";
     if(isset($_REQUEST["search_text"])) {
         foreach(explode(',', $_REQUEST["search_text"]) as $term) {
-            $conds[] = "LOWER(Tweet.Text) REGEXP '" . $term;
+            $conds[] = "LOWER(Tweet.Text) REGEXP '" . $term . "'";
         }
     }
 
     if(!empty($conds))
         $query .= "" .
-            "JOIN Tweet " .
-            "    ON TweetMetadata.Tweet_ID = Tweet.ID " .
-            "WHERE " . join(" AND " , $conds);
+            " JOIN Tweet " .
+            "     ON TweetMetadata.Tweet_ID = Tweet.ID " .
+            " WHERE " . join(" AND " , $conds);
     
     // Other conditions/limits
     if(isset($_REQUEST["rand"])) {

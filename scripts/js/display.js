@@ -810,12 +810,12 @@ Display.prototype = {
                 var post = disp.getTweets_post;
                 if(options.fetched_tweet_order.is('rand')) {
                     post.rand = true;
-                    delete post.order_popular;
-                } else if(options.fetched_tweet_order.is('popular')) {
-                    post.order_popular = true;
+                    delete post.order_prevalence;
+                } else if(options.fetched_tweet_order.is('prevalence')) {
+                    post.order_prevalence = true;
                     delete post.rand;
                 } else {
-                    delete post.order_popular;
+                    delete post.order_prevalence;
                     delete post.rand;
                 }
 
@@ -933,7 +933,7 @@ Display.prototype = {
             // Otherwise, parse the data
             filedata = JSON.parse(filedata);
 
-            if(data.length == 0) {
+            if(filedata.length == 0) {
                 modal_body.append('div')
                     .attr('class', 'text-center')
                     .text("No more tweets found in this selection.");
@@ -1016,51 +1016,119 @@ Display.prototype = {
                 d3.select(this).style('display', 'none')
             });
     },
-    nGramModal: function(filedata, post, title) {
+    nGramModal: function(selector) {
+        var ngrams = data.ngrams.main;
+        var label  = options.ngram_view.getLabel();
+        if(selector == 'ngram_cmp') {
+            ngrams = data.ngrams.cmp;
+            label  = options.ngram_cmp.getLabel();
+        }
 
         d3.select('#modal .modal-title')
-            .html(title);
+            .html('NGrams for ' + label +
+                  ' (' + ngrams.nTweets + ' tweets)');
 
         // Clear any data still in the modal
         d3.select('#m .modal-options')
             .selectAll('*').remove();
-        var modal_body = d3.select('#modal .modal-body');
-        modal_body.selectAll('*').remove();
+        d3.select('#modal .modal-options')
+            .selectAll('*').remove();
+        
+        // Clear rare data
+        ngrams.NGramCounter[0].purgeBelow(10);
+        ngrams.NGramCounter[1].purgeBelow(10);
+        ngrams.NGramCounter[2].purgeBelow(10);
+        
+        // If comparing, make new counter that's a subtraction
+        // TODO
 
         // Report errors if they happened
         // Otherwise, parse the data
-        filedata = JSON.parse(filedata);
 
-        if(data.length == 0) {
+        if(false) {
+            var modal_body = d3.select('#modal .modal-body');
+            modal_body.selectAll('*').remove();
             modal_body.append('div')
                 .attr('class', 'text-center')
                 .text("No tweets found in this selection.");
         } else {
-            modal_body.append('ul')
-                .attr('class', 'list-group')
-                .selectAll('li').data(filedata).enter()
-                .append('li')
-                .attr('class', 'list-group-item')
-                .html(function(d) {
-                    var content = '<span class="badge"><a href="https://twitter.com/emcomp/status/' + d['ID'] + '">' + d['ID'] + '</a></span>';
-                    content += d['Timestamp'] + ' ';
-                    content += d['Username'] + ' said: ';
-                    content += "<br />";
-                    content += d['Text'];
-                    content += "<br />";
-                    if(d['Distinct'] == '1')
-                        content += 'distinct ';
-                    content += d['Type'];
-                    if(d['Origin'])
-                        content += ' of <a href="https://twitter.com/emcomp/status/' + d['Origin'] + '">#' + d['Origin'] + '</a>'
-                    return content;
-                });
+            disp.nGramModalFillNGrams(ngrams);
         }
 
-            // Add options for 
-
-//                d3.select('.modal-options').selectAll('button')
-
+        // Add options
+        var ops = d3.select('#modal .modal-options');
+        ops.selectAll('*').remove();
+        
+        options.makeSimpleToggle('Stopword Unigrams', '.modal-options', function(d) {
+            ngrams.exclude_stopwords = !d;
+            disp.nGramModalFillNGrams(ngrams);
+        }, ngrams.exclude_stopwords);
+        options.makeSimpleToggle('Relative', '.modal-options', function(d) {
+            ngrams.relative = d;
+            disp.nGramModalFillNGrams(ngrams);
+        }, ngrams.relative);
+        
         $('#modal').modal();
+    },
+    nGramModalFillNGrams: function(ngrams) {
+        var modal_body = d3.select('#modal .modal-body');
+        modal_body.selectAll('*').remove();
+
+        var labels = ['Unigrams', 'Bigrams', 'Trigrams'];
+        var top;
+        if(ngrams.exclude_stopwords) {
+            top = [ngrams.NGramCounter[0].top_no_stopwords(100),
+                   ngrams.NGramCounter[1].top_no_stopwords(100),
+                   ngrams.NGramCounter[2].top_no_stopwords(100)];
+        } else {
+            top = [ngrams.NGramCounter[0].top(100),
+                   ngrams.NGramCounter[1].top(100),
+                   ngrams.NGramCounter[2].top(100)];
+        }
+
+        modal_body.append('table')
+            .append('tr')
+            .selectAll('td')
+            .data(top)
+            .enter()
+            .append('td')
+            .attr('class', 'ngram_table_container')
+            .append('table')
+            .attr('class', 'ngram_table')
+            .each(function(d, i) {
+                var header = d3.select(this).append('tr');
+                header.append('th')
+                    .attr('class', 'ngram_count_label')
+                    .text(labels[i]);
+                header.append('th')
+                    .attr('class', 'ngram_count_count')
+                    .text(ngrams.Relative ? 'Freq' : 'Count');
+
+                d3.select(this)
+                    .selectAll('tr.ngram_count')
+                    .data(d)
+                    .enter()
+                    .append('tr')
+                    .attr('class', 'ngram_count');
+            });
+        
+        modal_body.selectAll('.ngram_count')
+            .append('td')
+            .attr('class', 'ngram_count_label')
+            .text(function(d) { return d.key; });
+        
+        if(ngrams.relative) {
+            modal_body.selectAll('.ngram_count')
+                .append('td')
+                .attr('class', 'ngram_count_count')
+                .text(function(d) { 
+                    return (d.value * 100.0 / ngrams.nTweets).toFixed(1); 
+            });
+        } else {
+            modal_body.selectAll('.ngram_count')
+                .append('td')
+                .attr('class', 'ngram_count_count')
+                .text(function(d) { return d.value; });
+        }
     }
 }

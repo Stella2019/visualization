@@ -4,6 +4,9 @@ function Option(args) {
     }, this);
     
     this.cur = this.ids[this.default];
+    if(!this.available) {
+        this.available = d3.range(this.ids.length);
+    }
 }
 Option.prototype = {
     get: function () { return this.cur; },
@@ -28,7 +31,8 @@ function Options() {
                        'collection_type', 'collection', 'time_limit', 'add_term',
                        'rumor', /*'series', 'subset', 'found_in', */'resolution',
                        'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line',
-                       'series_order', 'legend_cleanup', 'fetched_tweet_order', 'rumor', 'chart_category'];
+                       'series_order', 'legend_cleanup', 'fetched_tweet_order', 'rumor', 'chart_category',
+                       'ngram_view', 'ngram_cmp'];
     
     self.timefields = ['time_min', 'time_max'];
     self.record = ['collection', /*'subset',*/ 'resolution', 'time_limit',
@@ -66,7 +70,6 @@ function Options() {
         title: "Resolution",
         labels: ["Day", "Hour", "10 Minutes", "Minute"],
         ids:    ["day", "hour", "tenminute", "minute"],
-        available: [0, 1, 2, 3],
         default: 2,
         parent: '#choices_subset',
         callback: function () {
@@ -99,7 +102,6 @@ function Options() {
         title: "Y Max",
         labels: [0],
         ids:    [0],
-        available: [0],
         default: 0,
         type: "textfieldautoman",
         custom_entries_allowed: true,
@@ -113,7 +115,6 @@ function Options() {
         styles: ["btn btn-default", "btn btn-primary"],
         labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Saving", "<span class='glyphicon glyphicon-ok-circle'></span> Saving"],
         ids:    ["false", "true"],
-        available: [0, 1],
         default: 0,
         type: "toggle",
         parent: '#choices_time_right_buttons',
@@ -136,7 +137,6 @@ function Options() {
         title: "Begin",
         labels: ["2000-01-01 00:00"],
         ids:    [new Date("2000-01-01 00:00")],
-        available: [0],
         default: 0,
         custom_entries_allowed: true,
         parent: '#chart-bottom',
@@ -146,7 +146,6 @@ function Options() {
         title: "End",
         labels: ["2000-01-01 00:00"],
         ids:    [new Date("2000-01-01 00:00")],
-        available: [0],
         default: 0,
         custom_entries_allowed: true,
         parent: '#chart-bottom',
@@ -156,7 +155,6 @@ function Options() {
         title: "Tweets in",
         labels: ["First 3 Hours", "First 12 Hours", "First 24 Hours", "First 3 Days", "First Week", "All time", "Last Week", "Last 3 Days", "Last 24 Hours", "Last 12 Hours", "Last 3 Hours"],
         ids:    ["3h", "12h", "1d", "3d", '1w', 'all', '-1w', '-3d', '-1d', '-12h', '-3h'],
-        available: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         default: 2,
         parent: '#choices_data',
         callback: function() { data.loadCollectionData(); }
@@ -165,7 +163,6 @@ function Options() {
         title: "Add Term",
         labels: ["New Term"],
         ids:    ["new"],
-        available: [0],
         default: 0,
         custom_entries_allowed: true,   
         type: "textfieldconfirm",
@@ -180,7 +177,6 @@ function Options() {
         title: "Color Scale",
         labels: ["10", "20", "20b", "20c"],
         ids:    ["category10", 'category20', 'category20b', 'category20c'],
-        available: [0, 1, 2, 3],
         default: 1,
         parent: '#choices_style',
         callback: function() {
@@ -202,7 +198,6 @@ function Options() {
         styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
         labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Total Line", "<span class='glyphicon glyphicon-ok-circle'></span> Show Total Line"],
         ids:    ["false", "true"],
-        available: [0, 1],
         default: 0,
         type: "toggle",
         parent: '#choices_style',
@@ -225,7 +220,6 @@ function Options() {
         title: "Order Series by",
         labels: ["Original", "Alphabet", "Type", "Volume"],
         ids:    ["orig", "alpha", "type", "volume"],
-        available: [0, 1, 2, 3],
         default: 3,
         parent: '#choices_legend',
         callback: function() { 
@@ -238,7 +232,6 @@ function Options() {
         labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Clean up Legend",
                  "<span class='glyphicon glyphicon-ok-circle'></span> Clean Up Legend"],
         ids:    ["false", "true"],
-        available: [0, 1],
         default: 0,
         type: "toggle",
         parent: '#choices_legend',
@@ -250,7 +243,6 @@ function Options() {
         labels: ["<span class='glyphicon glyphicon-menu-up'></span> Options",
                  "<span class='glyphicon glyphicon-menu-down'></span> Options"],
         ids:    ["false", "true"],
-        available: [0, 1],
         default: 1,
         type: "toggle",
         parent: '#header',
@@ -260,7 +252,6 @@ function Options() {
         title: 'Rumor',
         labels: ["New"],
         ids:    ["_new_"],
-        available: [0],
         default: 0,
         type: "dropdown",
         parent: '#choices_subset',
@@ -269,9 +260,8 @@ function Options() {
     });
     self.fetched_tweet_order = new Option({
         title: 'Fetched Tweets Order',
-        labels: ["Popularity", "Time", "Random"],
-        ids:    ["popular", "time", "rand"],
-        available: [0, 1, 2],
+        labels: ["Prevalence", "Time", "Random"],
+        ids:    ["prevalence", "time", "rand"],
         default: 1,
         type: "dropdown",
         parent: '#choices_legend',
@@ -281,13 +271,30 @@ function Options() {
         title: 'Show in Chart',
         labels: ["Tweet Types", "Distinctiveness", "Found Ins", "Keywords"],
         ids:    ["Tweet Type", "Distinctiveness", "Found In", "Keyword"],
-        available: [0, 1, 2, 3],
         default: 3,
         type: "dropdown",
         parent: '#choices_subset',
         callback: function() { 
             pipeline.start('Prepare Timeseries Data for Chart');
         }
+    });
+    self.ngram_view = new Option({
+        title: 'Fetch NGrams',
+        labels: ["Collection"],
+        ids:    ["c_collection_"],
+        default: 0,
+        type: "dropdown",
+        parent: '#choices_legend',
+        callback: function() { data.calculateNGrams('ngram_view'); }
+    });
+    self.ngram_cmp = new Option({
+        title: 'compare w/',
+        labels: ['-', 'Collection'],
+        ids:    ['', 'c_collection_'],
+        default: 0,
+        type: "dropdown",
+        parent: '#choices_legend',
+        callback: function() { data.calculateNGrams('ngram_cmp'); }
     });
 };
 Options.prototype = {
@@ -473,6 +480,33 @@ Options.prototype = {
                 options.buildDropdown(option);
             }
         });
+    },
+    makeSimpleToggle: function(label, parent, callback, initial) {
+        if(initial == undefined)
+            initial = true;
+        
+        var style = function(element) {
+            d3.select(element)
+                .attr('class', function(d) {
+                     return 'btn btn-' + (d ? 'primary' : 'default');
+                })
+                .select('span')
+                .attr('class', function(d) {
+                     return 'glyphicon glyphicon-' + (d ? 'ok-circle' : 'ban-circle');
+                })
+        };
+        
+        d3.select(parent).append('button')
+            .data([initial])
+            .attr('id', 'toggle_' + util.simplify(label))
+            .on('click', function(d) {
+                d3.select(this).data([!d]);
+                style(this);
+                callback(!d);
+            })
+            .html("<span></span> " + label);
+        
+        style('#toggle_' + util.simplify(label));
     },
     buildToggle: function(option) {
         var set = options[option];
@@ -972,6 +1006,8 @@ Options.prototype = {
         options.recordState('rumor', true);
         
         data.setRumor();
+        
+        options.buildNGrams();
     },
     addCollectionPopup: function(collection) {
         var content = '<dl class="dl-horizontal collection_popover">';
@@ -1472,5 +1508,47 @@ Options.prototype = {
         console.log(and_terms.join(','));
         document.getElementById('edit-box-query-input')
             .value = and_terms.join(',');
+    },
+    buildNGrams: function() {
+        var labels = ['Collection'];
+        var ids = ['c_collection'];
+        
+        // Add rumors
+        var rumor_labels = options.rumor['labels']
+            .slice(0, -1).forEach(function(d) {
+            labels.push('R: ' + d);
+        });
+        var rumor_ids = options.rumor['ids'].slice(0, -1)
+            .forEach(function(d) {
+            ids.push('r_' + d);
+        });
+        
+        // Add keywords
+        if(data && data.cats && data.cats['Keyword'] && data.cats['Keyword'].series_arr.length > 1) {
+            data.cats['Keyword'].series_arr.forEach(function(series) {
+                if(series.name != '_total_') {
+                    labels.push('K: ' + series.display_name);
+                    ids.push('k_' + series.id);
+                }
+            });
+        }
+        
+        // Make view options
+        options.ngram_view.labels = labels;
+        options.ngram_view.ids = ids;
+        options.ngram_view.available = d3.range(ids.length);
+        options.buildDropdown('ngram_view');
+        
+        // Make compare options
+        labels = labels.map(function(d) { return d; });
+        ids = ids.map(function(d) { return d; });
+        labels.unshift('-');
+        ids.unshift('');
+        
+        options.ngram_cmp.labels = labels;
+        options.ngram_cmp.ids = ids;
+        options.ngram_cmp.available = d3.range(ids.length);
+        options.buildDropdown('ngram_cmp');
+        
     }
 }
