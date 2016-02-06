@@ -296,3 +296,22 @@ button:focus {
 .ngram_count_count {
     text-align: right;
 }
+
+/* Coding Table */
+.table_bar {
+    height: 80%;
+    position: absolute;
+    background: #eee; /* cornflowerblue */
+    z-index: -1;
+    top: 10%;
+    left: 0%;
+}
+#agreement_table, #tweet_table {
+    font-size: 10pt;
+}
+#agreement_table small {
+    opacity: 0.5;
+}
+.tweet_table_Text {
+    width: 60%;
+}
