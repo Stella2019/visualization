@@ -429,7 +429,7 @@ Coding.prototype = {
         rows.append('td')
             .html(function(d) {
                 var i = 1;
-                if(d['Coder 2'] == 'coder_id')
+                if(d['Coder 2'] == coder_id)
                     i = 2;
             
                 return "" +
@@ -440,7 +440,7 @@ Coding.prototype = {
         rows.append('td')
             .html(function(d) {
                 var i = 2;
-                if(d['Coder 1'] == 'coder_id')
+                if(d['Coder 1'] == coder_id)
                     i = 1;
             
                 return "" +
