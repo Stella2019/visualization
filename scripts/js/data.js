@@ -184,7 +184,9 @@ function Data() {
     self.streamTweetCounts = null;
     self.ngrams = {
         main: {},
-        cmp: {}
+        cmp: {},
+        exclude_stopwords: true,
+        relative: true
     };
 }
 Data.prototype = {
@@ -1075,14 +1077,15 @@ Data.prototype = {
             return new Counter();
         })
         
-        post = { limit: 100000 };
+        post = { 
+            event_id: data.collection.ID,
+            limit: 100000
+        };
         if(spec.substring(0, 2) == 'k_') {
             var series = data.series[spec.substring(2)];
             post.search_text = data.series.name;
         } else if(spec.substring(0, 2) == 'r_') {
             post.rumor_id = spec.substring(2);
-        } else { // or if it is //c_ for collection
-            post.event_id = data.collection.ID;
         }
         // Add filters
         var category = data.cats['Distinctiveness'];
@@ -1121,42 +1124,53 @@ Data.prototype = {
         if(selector == 'ngram_cmp')
             ngrams = data.ngrams.cmp;
         
+        // Parse tweet JSON
         var tweets;
         try {
-            JSON.parse(file_data);
+            tweets = JSON.parse(file_data);
         } catch(err) {
             console.log(file_data);
             throw(err);
             return;
         }
 
+        // For each Tweet
         tweets.forEach(function(tweet) {
             if(ngrams.post.distinct &&  ngrams.TweetCounter.has(tweet.TextNoURL)) {
                 return;
             }
-    
+            
             ngrams.nTweets += 1;
+            ngrams.TweetCounter.incr(tweet.TextNoURL);
+            
             var text = tweet.TextNoURL.toLowerCase();
             text = text.replace(/[^\w']+/g, ' ');
             text = text.replace(/\w' | '\w/g, ' ');
             var words = text.split(' ');
-
-            
-            ngrams.TweetCounter.incr(tweet.TextNoURL);
+            var tweetgrams = [new Set(), new Set(), new Set()];
             
             words.map(function(word, wi) {
                 if(word) {
                     var gram = word;
-                    ngrams.nGrams[0] += 1;
-                    ngrams.NGramCounter[0].incr(gram);
+                    if(!tweetgrams[0].has(gram)) {
+                        tweetgrams[0].add(gram);
+                        ngrams.nGrams[0] += 1;
+                        ngrams.NGramCounter[0].incr(gram);
+                    }
                     if(words[wi + 1]) {
                         gram += " " + words[wi + 1];
-                        ngrams.nGrams[1] += 1;
-                        ngrams.NGramCounter[1].incr(gram);
+                        if(!tweetgrams[1].has(gram)) {
+                            tweetgrams[1].add(gram);
+                            ngrams.nGrams[1] += 1;
+                            ngrams.NGramCounter[1].incr(gram);
+                        }
                         if(words[wi + 2]) {
                             gram += " " + words[wi + 2];
-                            ngrams.nGrams[2] += 1;
-                            ngrams.NGramCounter[2].incr(gram);
+                            if(!tweetgrams[2].has(gram)) {
+                                tweetgrams[2].add(gram);
+                                ngrams.nGrams[2] += 1;
+                                ngrams.NGramCounter[2].incr(gram);
+                            }
                         }
                     }
                     // Add co-occurance

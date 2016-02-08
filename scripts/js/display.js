@@ -1059,8 +1059,8 @@ Display.prototype = {
         var ops = d3.select('#modal .modal-options');
         ops.selectAll('*').remove();
         
-        options.makeSimpleToggle('Stopword Unigrams', '.modal-options', function(d) {
-            ngrams.exclude_stopwords = !d;
+        options.makeSimpleToggle('Exclude Stopwards', '.modal-options', function(d) {
+            ngrams.exclude_stopwords = d;
             disp.nGramModalFillNGrams(ngrams);
         }, ngrams.exclude_stopwords);
         options.makeSimpleToggle('Relative', '.modal-options', function(d) {

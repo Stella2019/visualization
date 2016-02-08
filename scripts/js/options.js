@@ -280,8 +280,8 @@ function Options() {
     });
     self.ngram_view = new Option({
         title: 'Fetch NGrams',
-        labels: ["Collection"],
-        ids:    ["c_collection_"],
+        labels: ["Whole Event"],
+        ids:    ["e_event"],
         default: 0,
         type: "dropdown",
         parent: '#choices_legend',
@@ -289,8 +289,8 @@ function Options() {
     });
     self.ngram_cmp = new Option({
         title: 'compare w/',
-        labels: ['-', 'Collection'],
-        ids:    ['', 'c_collection_'],
+        labels: ['-', 'Whole Event'],
+        ids:    ['', 'e_event'],
         default: 0,
         type: "dropdown",
         parent: '#choices_legend',
@@ -1510,8 +1510,8 @@ Options.prototype = {
             .value = and_terms.join(',');
     },
     buildNGrams: function() {
-        var labels = ['Collection'];
-        var ids = ['c_collection'];
+        var labels = ['Whole Event'];
+        var ids = ['e_event'];
         
         // Add rumors
         var rumor_labels = options.rumor['labels']
