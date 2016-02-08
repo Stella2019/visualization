@@ -237,10 +237,10 @@ Coding.prototype = {
             .selectAll('th')
             .data(['Code',
                    'Average Codes<br /><small>(% of All)</small>',
-                   '≥ 1 Code<br /><small>(% of All)</small>', 
+                   '&le; 1 Code<br /><small>(% of All)</small>', 
                    'Disagreed<br /><small>(% of All)</small>', 
-                   'Both Coded<br /><small>(% of ≥ 1 Code)</small>', 
-                   'One Coded<br /><small>(% of ≥ 1 Code)</small>', 
+                   'Both Coded<br /><small>(% of &le; 1 Code)</small>', 
+                   'One Coded<br /><small>(% of &le; 1 Code)</small>', 
                    'Krippendorff\'s Alpha<br /><small>(Agreement)</small>'])
             .enter()
             .append('th')
