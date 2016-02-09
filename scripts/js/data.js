@@ -1182,5 +1182,57 @@ Data.prototype = {
 //        ngrams.NGramCounter[0].purgeBelow(2);
 //        ngrams.NGramCounter[1].purgeBelow(2);
 //        ngrams.NGramCounter[2].purgeBelow(2);
+    },
+    rmCodeCount: function(search_text, search_name) {
+        var post = {
+            event_id: data.collection.ID,
+            keyword: search_name,
+        };
+        if(search_text == 'rumor') {
+            post.keyword = data.rumor.ID;
+        }
+        
+        data.callPHP('timeseries/rm', post, function() {
+            data.genTweetCount(search_text, search_name);
+        });
+    },
+    genCodeCount: function(search_text, search_name) {
+        var post = {
+            event_id: data.collection.ID,
+            search_name: search_name,
+            search_text: search_text
+        };
+        
+        // Generate fields
+        if(!post.search_name)
+            post.search_name = post.search_text;
+        
+        post.search_text = post.search_text
+            .replace(/\\W(.*)\\W/g, "[[:<:]]$1[[:>:]]");
+        
+        var progress_div = '#choose_add_term';
+        if(search_text == 'rumor') {
+            post.rumor_id = data.rumor.ID;
+            post.search_name = data.rumor.ID;
+            progress_div = '#edit-window-gencount-div';
+        } else {
+            options.add_term.reset();
+            $("#input_add_term").blur();
+        }
+        
+        // Initialize and start a stream
+        var args = {
+            name: 'add_term',
+            url: 'timeseries/gen',
+            post: post,
+            failure_msg: "Problem generating new series from query",
+            progress_div: progress_div,
+            progress_button: true,
+            progress_text: "Working",
+            on_finish: data.loadCollectionData
+        };
+        
+        var stream = new Stream(args);
+        stream.start();
     }
 }

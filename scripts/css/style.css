@@ -298,10 +298,14 @@ button:focus {
 }
 
 /* Coding Table */
+.table_stat {
+    z-index: 2;
+    position: relative;
+}
 .table_bar {
     height: 80%;
     position: absolute;
-    background: #eee; /* cornflowerblue */
+    background: #DEF; /* cornflowerblue */
     z-index: -1;
     top: 10%;
     left: 0%;
@@ -315,3 +319,44 @@ button:focus {
 .tweet_table_Text {
     width: 60%;
 }
+#agreement_table tr:nth-child(even){
+  background-color: #F7F7F7;
+}
+#matrices table {
+    table-layout: fixed;
+    width: inherit;
+}
+#matrices td {
+    font-size: 12px;
+    width: 23px;
+    height: 23px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: center;
+    border-right-style: dotted;
+    border-bottom-style: dotted;
+    border-top-style: none;
+    border-left-style: none;
+    border-width: 1px;
+}
+#matrices tr td:last-child {
+    border-right-style: none;
+    border-left-style: double;
+    border-left-width: 3px;
+}
+#matrices table tr:first-child, #matrices tr td:first-child {
+    font-weight: bold;
+}
+#codes_confusion_matrix td {
+    width: 30px;
+    height: 30px;
+}
+#codes_confusion_matrix tr:last-child td {
+    border-bottom-style: none;
+    border-top-style: double;
+    border-top-width: 3px;
+}
+/*
+#matrices tr:hover {
+    background: #EEE;
+}*/

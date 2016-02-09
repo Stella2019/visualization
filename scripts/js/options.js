@@ -734,10 +734,14 @@ Options.prototype = {
         }
         
         // Populate the list;
-        list.selectAll("li")
-            .data(set.available)
-            .enter()
+        var elements = list.selectAll("li")
+            .data(set.available);
+        
+        elements.enter()
             .append("li").append("a");
+        
+        elements.exit().remove(); // Remove former columns
+        elements.select('a'); // Propagate any data that needs to be
         
         set.click = function(d) {
             container.select('.current')
@@ -1280,6 +1284,20 @@ Options.prototype = {
                 class: 'btn btn-primary edit-window-routine'
             })
             .on('click', data.rmTweetCount)
+            .text('Count Tweets')
+            .append('span')
+            .attr('class', 'glyphicon glyphicon-signal');
+        
+        bottom_row.append('div')
+            .attr('id', 'edit-window-gencodecount-div')
+            .append('button')
+            .data([option])
+            .attr({
+                id: 'edit-window-gencodecount',
+                class: 'btn btn-primary edit-window-routine'
+            })
+            .on('click', data.rmCodeCount)
+            .text('Count Codes')
             .append('span')
             .attr('class', 'glyphicon glyphicon-signal');
 

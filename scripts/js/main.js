@@ -34,6 +34,15 @@ var util = {
             arr.push(i);
         }
         return arr;
+    },
+    zeros: function(length, width) { // just initialize a 1D or 2D matrix filled with zeros like in Matlab
+        if(!width) {
+            return d3.range(length).map(function() { return 0; });
+        } else {
+            return d3.range(length).map(function() { 
+                return d3.range(width).map(function() { return 0; });
+            });
+        }
     }
 }
 
@@ -259,18 +268,21 @@ Counter.prototype = {
     }
 };
 
-window.onload = initialize;
+if(!window.location.href.includes('html')) { // only for the main page
+    function initialize() {
+        options = new Options();
+        options.init();
 
-function initialize() {
-    options = new Options();
-    options.init();
+        disp = new Display();
+        disp.init();
+
+        data = new Data();
+        pipeline = new Pipeline();
+
+        data.loadCollections();
+    }
     
-    disp = new Display();
-    disp.init();
-    
-    data = new Data();
-    pipeline = new Pipeline();
-    
-    data.loadCollections();
+    window.onload = initialize;
 }
+
 
