@@ -30,7 +30,7 @@ query_add_tweet = ("INSERT INTO Tweet "
             "ON DUPLICATE KEY UPDATE `Distinct`=%(Distinct)s, `Text`=%(Text)s ")
 query_add_tweet_metadata = ("INSERT IGNORE INTO TweetMetadata "
              "(Tweet_ID, TextNoURL, ExpandedURL, QuotedText, UTCOffset) "
-             "VALUES (%(Tweet_ID)s, %(TextNoURL)s, %(ExpandedURL)s, %(QuotedText)s, %(UTCOffset)s) ")
+             "VALUES (%(ID)s, %(TextNoURL)s, %(ExpandedURL)s, %(QuotedText)s, %(UTCOffset)s) ")
 query_add_tweet_to_event = ("INSERT IGNORE INTO TweetInEvent "
              "(Tweet_ID, Event_ID)"
              "VALUES (%(Tweet_ID)s, %(Event_ID)s)")
@@ -126,108 +126,14 @@ def parseFile(filename):
     with open(filename) as data_file: 
         for line in data_file:
             if len(line) > 5:
-                data = json.loads(line)
-                text = norm_unicode(data['text'])
+                tweet = parseTweetJSON(line)
                 
-                # Remove URL, presuming they all start with http and contain no spaces
-                text_no_url = re.sub(r'http\S+',' ', text)
-                
-                push_this_tweet = True
-                if(options.words):
-                    push_this_tweet = False
-                    for word in options.words:
-                        push_this_tweet |= word.lower() in text.lower().decode()
-                
-                # Figure out if the tweet is distinct
-                distinct = 0
-                if(text_no_url not in distinct_set):
-                    distinct_set.add(text_no_url)
-                    distinct = 1
-                
-                # Get attributes of tweet
-                # Assemble other attributes
-                created_at = datetime.fromtimestamp(int(data['timestamp_ms']) / 1000);
-                
-                timestamp_exact = datetime.strftime(created_at, '%Y-%m-%d %H:%M:%S')
-                timestamp_minute = datetime.strftime(created_at, '%Y%m%d_%H%M')
-                
-                database_text = text;
-                if(len(database_text) > 200):
-                    database_text = database_text[:200]
-                if(len(text_no_url) > 200):
-                    text_no_url = text_no_url[:200]
-                tweet = {
-                    'ID': data['id'],
-                    'Text': database_text,
-                    'Distinct': distinct,
-                    'Type': 'original',
-                    'Username': None,
-                    'Timestamp': timestamp_exact,
-                    'Origin': None
-                }
-                tweet_metadata = {
-                    'Tweet_ID': data['id'],
-                    'TextNoURL': text_no_url,
-                    'ExpandedURL': None,
-                    'QuotedText': None,
-                    'UTCOffset': None
-                }
-                
-                # Type specific changes
-                
-                if("in_reply_to_status_id_str" in data and data['in_reply_to_status_id_str'] is not None): 
-                    tweet['Origin'] = data['in_reply_to_status_id_str']
-                    tweet['Type'] = 'reply'
-                    tweet_metadata['ExpandedURL'] = getExpandedURL(data)
-                    # AFAIK no record of tweet being replied to is available
-                elif("quoted_status_id_str" in data and data['quoted_status_id_str'] is not None): 
-                    tweet['Origin'] = data['quoted_status_id_str']
-                    tweet['Type'] = 'quote'
-                    if('quoted_status' in data):
-                        tweet_metadata['ExpandedURL'] = getExpandedURL(data['quoted_status'])
-                        if(tweet_metadata['ExpandedURL'] is None):
-                            tweet_metadata['ExpandedURL'] = getExpandedURL(data)
-                        if('text' in data['quoted_status']):
-                            tweet_metadata['QuotedText'] = data['quoted_status']['text']
-                elif("retweeted_status" in data and (data['retweeted_status']) is not None):
-                    if('id' in data['retweeted_status']):
-                        tweet['Origin'] = data['retweeted_status']['id']
-                    tweet['Type'] = 'retweet'
-                    tweet_metadata['ExpandedURL'] = getExpandedURL(data['retweeted_status'])
-                    if(tweet_metadata['ExpandedURL'] is None):
-                        tweet_metadata['ExpandedURL'] = getExpandedURL(data)
-                    if('text' in data['retweeted_status']):
-                        tweet_metadata['QuotedText'] = data['retweeted_status']['text']
-                else:
-                    tweet_metadata['ExpandedURL'] = getExpandedURL(data)
-                
-                
-                if("user" in data):
-                    if("screen_name" in data["user"]):
-                        tweet['Username'] = data['user']['screen_name']
-                    if("utc_offset" in data["user"]):
-                        tweet_metadata['UTCOffset'] = data['user']['utc_offset']
-                
-                if(options.printtweets): pprint(tweet)
-                
-                # Push the tweet onto the database if we are doing that
-                if(options.database and options.pushtweets and push_this_tweet):
-                    cursor.execute(query_add_tweet, tweet)
-                    cursor.execute(query_add_tweet_metadata, tweet_metadata)
-        
-                    # Also add to event
-                    tweetInEvent = {
-                        'Tweet_ID': data['id'],
-                        'Event_ID': collection['id']
-                    }
-                    cursor.execute(query_add_tweet_to_event, tweetInEvent)
-                    
                 # Figure out which minte we are at in the file
-                minute = int(timestamp_minute[-2:])
+                minute = int(tweet['TimestampMinute'][-2:])
                 minute -= file_minute # Minutes since the start of the file
                 minute += 10 # 0 represents 10 minutes before the file, 29 represents 29 minutes after
                 minute %= 60 # Make sure it looks around the hour okay
-                
+
                 if(minute > 29):
                     minute = 29 # Correct outrageous minutes
                 
@@ -239,10 +145,22 @@ def parseFile(filename):
                 # Next, increment counts if the text has the main keywords
 
                 # Search for keywords
-                keywords_found_in = checkMetaData(data)
                 for found_in in found_in_types:
-                    for keyword in keywords_found_in[found_in]:
+                    for keyword in tweet['FoundIn'][found_in]:
                         minutes[tweet["Type"]][minute][found_in][distinct][keyword] += 1
+                        
+                # Push tweet's data to database
+                if(options.database and options.pushtweets):
+                    cursor.execute(query_add_tweet, tweet)
+                    cursor.execute(query_add_tweet_metadata, tweet)
+        
+                    # Also add to event
+                    tweetInEvent = {
+                        'Tweet_ID': tweet['ID'],
+                        'Event_ID': collection['id']
+                    }
+                    cursor.execute(query_add_tweet_to_event, tweetInEvent)
+                    
                         
     if(options.database):
         
@@ -632,12 +550,95 @@ def checkMetaData(data):
        
     return found_in
 
+def parseTweetJSON(line):
+    data = json.loads(line)
+    text = norm_unicode(data['text'])
+
+    # Remove URL, presuming they all start with http and contain no spaces
+    text_no_url = re.sub(r'http\S+',' ', text)
+
+    # Figure out if the tweet is distinct
+    distinct = 0
+    if(text_no_url not in distinct_set):
+        distinct_set.add(text_no_url)
+        distinct = 1
+
+    # Get attributes of tweet
+    # Assemble other attributes
+    created_at = datetime.fromtimestamp(int(data['timestamp_ms']) / 1000);
+
+    timestamp_exact = datetime.strftime(created_at, '%Y-%m-%d %H:%M:%S')
+    timestamp_minute = datetime.strftime(created_at, '%Y%m%d_%H%M')
+
+    database_text = text;
+    if(len(database_text) > 200):
+        database_text = database_text[:200]
+    if(len(text_no_url) > 200):
+        text_no_url = text_no_url[:200]
+    tweet = {
+        'ID': data['id'],
+        'Text': database_text,
+        'Distinct': distinct,
+        'Type': 'original',
+        'Username': None,
+        'Timestamp': timestamp_exact,
+        'TimestampMinute': timestamp_minute,
+        'Origin': None,
+        'TextNoURL': text_no_url,
+        'ExpandedURL': None,
+        'QuotedText': None,
+        'UTCOffset': None
+    }
+
+    # Type specific changes
+
+    if("in_reply_to_status_id_str" in data and data['in_reply_to_status_id_str'] is not None): 
+        tweet['Origin'] = data['in_reply_to_status_id_str']
+        tweet['Type'] = 'reply'
+        tweet['ExpandedURL'] = getExpandedURL(data)
+        # AFAIK no record of tweet being replied to is available
+    elif("quoted_status_id_str" in data and data['quoted_status_id_str'] is not None): 
+        tweet['Origin'] = data['quoted_status_id_str']
+        tweet['Type'] = 'quote'
+        if('quoted_status' in data):
+            tweet['ExpandedURL'] = getExpandedURL(data['quoted_status'])
+            if(tweet['ExpandedURL'] is None):
+                tweet['ExpandedURL'] = getExpandedURL(data)
+            if('text' in data['quoted_status']):
+                tweet['QuotedText'] = data['quoted_status']['text']
+    elif("retweeted_status" in data and (data['retweeted_status']) is not None):
+        if('id' in data['retweeted_status']):
+            tweet['Origin'] = data['retweeted_status']['id']
+        tweet['Type'] = 'retweet'
+        tweet['ExpandedURL'] = getExpandedURL(data['retweeted_status'])
+        if(tweet['ExpandedURL'] is None):
+            tweet['ExpandedURL'] = getExpandedURL(data)
+        if('text' in data['retweeted_status']):
+            tweet['QuotedText'] = data['retweeted_status']['text']
+    else:
+        tweet['ExpandedURL'] = getExpandedURL(data)
+
+
+    if("user" in data):
+        if("screen_name" in data["user"]):
+            tweet['Username'] = data['user']['screen_name']
+        if("utc_offset" in data["user"]):
+            tweet['UTCOffset'] = data['user']['utc_offset']
+
+    # Search for keywords
+    tweet['FoundIn'] = checkMetaData(data)
+    
+    return tweet
+
 def rm_unicode(str):
     return str.encode('ascii', 'ignore').decode('ascii', 'ignore')
 #    return str.encode('ascii', 'replace').decode('ascii', 'replace')
 
 def norm_unicode(str):
     return rm_unicode(unicodedata.normalize('NFD', str))
+def setCollection(new_collection):
+    global collection
+    collection = new_collection
 
 if __name__ == "__main__":
     main()
