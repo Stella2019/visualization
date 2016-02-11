@@ -2,11 +2,13 @@
 var coding, options, data;
 
 function Coding() {
-    var events;
-    var rumors;
-    var rumor;
-    var coders;
-    var codes;
+    this.events = [];
+    this.rumors = [];
+    this.rumor = {};
+    this.coders = [];
+    this.codes = {};
+    
+    this.rumors_processed = 0;
 }
 Coding.prototype = {
     getData: function() {
@@ -18,13 +20,33 @@ Coding.prototype = {
 
                 data.callPHP('collection/getRumors', {}, function(d) {
                     coding.rumors = JSON.parse(d);
-                    coding.buildDropdowns();
+                    
+                    // Get the number of codes for each rumor
+                    coding.rumors.forEach(function(rumor){ 
+                        data.callPHP('coding/hasCodes', { rumor_id: rumor.ID }, function(d) {
+                            rumor.n_codes = parseInt(JSON.parse(d)[0].Count);
+                            coding.rumors_processed++;
+                            
+                            console.log(coding.rumors_processed, rumor.n_codes);
+                            if(coding.rumors_processed == coding.rumors.length) {
+                                coding.buildDropdowns();
+                            }
+                        });
+                    });
                 });
             });
         });
     },
     buildDropdowns: function() {
         // Rumors
+        coding.rumors.sort(function(a, b) {
+            if(a.Event_ID == b.Event_ID) {
+                if(a.Name > b.Name) return 1;
+                if(a.Name < b.Name) return -1;
+                return 0;
+            }
+            return parseInt(a.Event_ID) - parseInt(b.Event_ID);
+        })
         var labels = coding.rumors.map(function(rumor) {
             rumor.event = coding.events.filter(function(event){
                 return event.ID == rumor.Event_ID;
@@ -34,6 +56,10 @@ Coding.prototype = {
         var ids = coding.rumors.map(function(rumor) {
             return rumor.ID;
         });
+        var available = [];
+        coding.rumors.forEach(function(rumor, i_r) {
+            if(rumor.n_codes) available.push(i_r);
+        })
         
         options.choice_groups = [];
         options.initial_buttons = ['rumor', 'period', 'coder', 'tweets_shown', 'anonymous'];
@@ -42,6 +68,7 @@ Coding.prototype = {
             title: 'Rumor',
             labels: labels,
             ids:    ids,
+            available: available,
             default: 4,
             type: "dropdown",
             parent: '#options',
