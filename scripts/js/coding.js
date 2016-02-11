@@ -242,7 +242,7 @@ Coding.prototype = {
                 tweet.Plurality[code] = tweet.Votes[code].length == tweet.Plurality['Count'];
                 if(!tweet.Plurality['Primary'] && tweet.Plurality[code])
                     tweet.Plurality['Primary'] = code;
-                if(!tweet.Plurality[code] && tweet.Votes[code].length > 0)
+                else if(tweet.Votes[code].length > 0)
                     tweet.Plurality.Others += code + '(' + tweet.Votes[code].length + ') ';
             })
             tweet.Plurality['Uncertainty'] = tweet.Votes['Uncertainty'].length / tweet.Votes['Count'] >= 0.5;
@@ -803,13 +803,13 @@ Coding.prototype = {
         }
         var tweets_shown = options.tweets_shown.get();
         var tweets = coding.tweets_arr;
-//        
-//        // Filter out tweets by coder
-//        if(coder_id != 'all') {
-//            tweets = tweets.filter(function(code) {
-//                return code['Coder 1'] == coder_id || code['Coder 2'] == coder_id;
-//            });
-//        }
+        
+        // Filter out tweets by coder
+        if(coder_id != 'all') {
+            tweets = tweets.filter(function(tweet) {
+                return tweet.Votes.Coders.includes(parseInt(coder_id));
+            });
+        }
         
         // Add other codes for tweets
         tweets.forEach(function(tweet) {
@@ -841,7 +841,9 @@ Coding.prototype = {
 //            });
         } else if(tweets_shown != 'All') {
             tweets = tweets.filter(function(tweet) {
-                return tweet[tweets_shown + ' 1'] != tweet[tweets_shown + ' 2'];
+                return tweet.Votes[tweets_shown].length > 0 && (tweet.Votes[tweets_shown].length != tweet.Votes.Count);
+                
+//                return tweet[tweets_shown + ' 1'] != tweet[tweets_shown + ' 2'];
             });
         }
         
