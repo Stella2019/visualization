@@ -263,7 +263,7 @@ Coding.prototype = {
             })
             tweet.Plurality['Uncertainty'] = tweet.Votes['Uncertainty'].length / tweet.Votes['Count'] >= 0.5;
             tweet.Primary_Disagreement     = tweet.Votes['Count'] != tweet.Plurality['Count'];
-            tweet.Uncertainty_Disagreement = tweet.Votes['Count'] != tweet.Votes['Uncertainty'].length;
+            tweet.Uncertainty_Disagreement = (tweet.Votes['Count'] != tweet.Votes['Uncertainty'].length) && tweet.Votes['Uncertainty'].length > 0;
             
             // Find disagreement
             codes.forEach(function(code) {
@@ -814,39 +814,41 @@ Coding.prototype = {
         }
         
         // Filter out tweets by disagreement
-        if(period < 0 && tweets_shown != 'All' && coder_id != 'all') {
-            var codes = [tweets_shown];
-            if(tweets_shown == 'Primary') {
-                codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'];
-            } else if(tweets_shown == 'Disagreement') {
-                codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Uncertainty'];
-            }
-            
-            tweets = tweets.filter(function(tweet) {
-//                console.log(tweet.Text);
-                return codes.reduce(function(disagreed, code) {
-                    var coder_yes = tweet.Votes[code].includes(coder_id);
-                    var group_yes = tweet.Plurality[code];
-//                    console.log(code, coder_yes, group_yes, disagreed || (group_yes ? !coder_yes : coder_yes));
-                    return disagreed || (group_yes ? !coder_yes : coder_yes);
-                }, false);
-            });
-        } else {
-            if(tweets_shown == 'Disagreement') {
+        if(tweets_shown != 'All') {
+            if(period < 0 && coder_id != 'all') {
+                var codes = [tweets_shown];
+                if(tweets_shown == 'Primary') {
+                    codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'];
+                } else if(tweets_shown == 'Disagreement') {
+                    codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Uncertainty'];
+                }
 
                 tweets = tweets.filter(function(tweet) {
-                    return tweet.Primary_Disagreement || tweet.Uncertainty_Disagreement;
+    //                console.log(tweet.Text);
+                    return codes.reduce(function(disagreed, code) {
+                        var coder_yes = tweet.Votes[code].includes(coder_id);
+                        var group_yes = tweet.Plurality[code];
+    //                    console.log(code, coder_yes, group_yes, disagreed || (group_yes ? !coder_yes : coder_yes));
+                        return disagreed || (group_yes ? !coder_yes : coder_yes);
+                    }, false);
                 });
-    //            tweets = tweets.filter(function(tweet) {
-    //                return (tweet['Primary Agreement'] == "0" ||
-    //                   tweet['Uncertainty Agreement'] == "0");
-    //            });
-            } else if(tweets_shown != 'All') {
-                tweets = tweets.filter(function(tweet) {
-                    return tweet.Votes[tweets_shown].length > 0 && (tweet.Votes[tweets_shown].length != tweet.Votes.Count);
+            } else {
+                if(tweets_shown == 'Disagreement') {
+                    tweets = tweets.filter(function(tweet) {
+                        console.log(tweet, tweet.Primary_Disagreement, tweet.Uncertainty_Disagreement);
+                        return tweet.Primary_Disagreement || tweet.Uncertainty_Disagreement;
+                    });
+                } else if(tweets_shown == 'Primary') {
+                    tweets = tweets.filter(function(tweet) {
+                        return tweet.Primary_Disagreement;
+                    });
+                } else {
+                    tweets = tweets.filter(function(tweet) {
+                        return tweet.Votes[tweets_shown].length > 0 && (tweet.Votes[tweets_shown].length != tweet.Votes.Count);
 
-    //                return tweet[tweets_shown + ' 1'] != tweet[tweets_shown + ' 2'];
-                });
+        //                return tweet[tweets_shown + ' 1'] != tweet[tweets_shown + ' 2'];
+                    });
+                }
             }
         }
         
@@ -894,7 +896,7 @@ Coding.prototype = {
                 if(coder_id == 'all') {
                     ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
                         var n_votes_for = d.Votes[code].length;
-                        if (n_votes_for > d.Votes['Count'] / 2) {
+                        if (n_votes_for > d.Votes['Count'] / 2 || d.Plurality['Primary'] == code) {
                             text += "<span class='code_Primary code_" + code + "'>" + code + "</span>";
                             if(period < 0) text += '(' + n_votes_for + ')';
                             text += '<br />';
@@ -929,7 +931,7 @@ Coding.prototype = {
                 if(coder_id == 'all') {
                     ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
                         var n_votes_for = d.Votes[code].length;
-                        if (n_votes_for <= d.Votes['Count'] / 2 && n_votes_for > 0) {
+                        if (n_votes_for <= d.Votes['Count'] / 2 && n_votes_for > 0 && d.Plurality['Primary'] != code) {
                             text += "<span class='code_Primary code_" + code + "'>" + code + "</span>";
                             if(period < 0) text += '(' + n_votes_for + ')';
                             text += '<br />';
@@ -976,8 +978,11 @@ Coding.prototype = {
             d3.selectAll('span.code_Uncertainty')
                 .classed('small', true);
         } else if(tweets_shown != 'All') {
-            d3.selectAll('span.code_' + tweets_shown)
-                .style('font-weight', 'bold');
+            if(tweets_shown != 'Primary') {
+                d3.selectAll('span.code_' + tweets_shown)
+                    .style('font-weight', 'bold');
+            }
+            
             if(tweets_shown == 'Uncertainty') {
                 d3.selectAll('span.code_Primary')
                     .classed('small', true);
