@@ -108,7 +108,7 @@ Coding.prototype = {
             default: 1,
             type: "toggle",
             parent: '#options',
-            callback: coding.fillTable
+            callback: coding.compileReport
         });
         options.buildToggle('anonymous');
         options.anonymous.styleFunc();
@@ -643,10 +643,12 @@ Coding.prototype = {
         // Get short coder names
         var coder_names = options.coder.labels.map(function(name, i) {
             if(i == 0) return '';
-//            return name.split(' ').map(function(name_part) {
-//                return name_part[0];
-//            }).join('');
-            return i + " ";
+            if(options.anonymous.is('true')) {
+                return i + " ";
+            } 
+            return name.split(' ').map(function(name_part) {
+                return name_part[0];
+            }).join('');
         });
         
         /* Primary coder matrix */
