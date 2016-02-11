@@ -35,28 +35,30 @@ Coding.prototype = {
             return rumor.ID;
         });
         
+        options.choice_groups = [];
+        options.initial_buttons = ['rumor', 'period', 'coder', 'tweets_shown', 'anonymous'];
+        options.record = options.initial_buttons;
         options.rumor = new Option({
             title: 'Rumor',
             labels: labels,
             ids:    ids,
-            default: 0,
+            default: 4,
             type: "dropdown",
             parent: '#options',
             callback: coding.getCodes
         });
-        options.buildDropdown('rumor');
         
         // Period
         options.period = new Option({
             title: 'Period',
             labels: ['Training', 'Coding', 'Adjudicated'],
             ids:    [-1, 0, 1],
+            isnumeric: true,
             default: 1,
             type: "dropdown",
             parent: '#options',
             callback: coding.getCodes
         });
-        options.buildDropdown('period');
         
         // Coders
         labels = coding.coders.map(function(coder) {
@@ -72,12 +74,12 @@ Coding.prototype = {
             title: 'Coder',
             labels: labels,
             ids:    ids,
+            isnumeric: true,
             default: 0,
             type: "dropdown",
             parent: '#options',
             callback: coding.compileReport
         });
-        options.buildDropdown('coder');
         
         // Types of disagreement        
         options.tweets_shown = new Option({
@@ -97,7 +99,6 @@ Coding.prototype = {
             parent: '#options',
             callback: coding.getTweets
         });
-        options.buildDropdown('tweets_shown');
         
         // Types of disagreement        
         options.anonymous = new Option({
@@ -108,13 +109,11 @@ Coding.prototype = {
             default: 1,
             type: "toggle",
             parent: '#options',
-            callback: coding.compileReport
+            callback: coding.fillTable
         });
-        options.buildToggle('anonymous');
-        options.anonymous.styleFunc();
         
         // Start drawing
-        options.rumor.click(4);
+        options.init();
     },
     getCodes: function() {
         var post = {
@@ -453,10 +452,10 @@ Coding.prototype = {
             
             var n_votes = d3.sum(total_votes);
             var krippendorff_alpha = 1 - (n_votes - 1) * D_o / D_e;
-            console.log(code + ' Krippendorff\'s Alpha = ' + 
-                        '1 - (' + n_votes + ' - 1) * ' + 
-                        D_o + ' / ' + D_e + ' = ' + 
-                        krippendorff_alpha.toFixed(2));
+//            console.log(code + ' Krippendorff\'s Alpha = ' + 
+//                        '1 - (' + n_votes + ' - 1) * ' + 
+//                        D_o + ' / ' + D_e + ' = ' + 
+//                        krippendorff_alpha.toFixed(2));
             code_agreement[code]["Alpha"] = krippendorff_alpha;
             
             var agreement = 0;
@@ -643,12 +642,10 @@ Coding.prototype = {
         // Get short coder names
         var coder_names = options.coder.labels.map(function(name, i) {
             if(i == 0) return '';
-            if(options.anonymous.is('true')) {
-                return i + " ";
-            } 
-            return name.split(' ').map(function(name_part) {
-                return name_part[0];
-            }).join('');
+//            return name.split(' ').map(function(name_part) {
+//                return name_part[0];
+//            }).join('');
+            return i + " ";
         });
         
         /* Primary coder matrix */

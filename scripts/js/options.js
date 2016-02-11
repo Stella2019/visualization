@@ -44,265 +44,269 @@ function Options() {
     self.state = {};
     
     // All options
-    self.collection = new Option({
-        title: "Event",
-        labels: ["none"],
-        ids:    ["none"],
-        available: [0],
-        default: 0,
-        custom_entries_allowed: true,
-        parent: '#choices_data',
-        callback: function() { data.setCollection(); },
-        edit: function() { options.editWindow('collection');  }
-    });
-    self.display_type = new Option({
-        title: "Plot Type",
-        labels: ["Stacked", "Overlap", "Lines", "Stream", "Separate", "100%"],
-        ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
-        available: [0, 1, 2, 3, 4, 5],
-        default: 0,
-        parent: '#choices_style',
-        callback: function () {
-            pipeline.start('Prepare Timeseries Data for Chart');
-        }
-    });
-    self.resolution = new Option({
-        title: "Resolution",
-        labels: ["Day", "Hour", "10 Minutes", "Minute"],
-        ids:    ["day", "hour", "tenminute", "minute"],
-        default: 2,
-        parent: '#choices_subset',
-        callback: function () {
-            pipeline.start('Calculate Timeseries');
-        }
-    });
-    self.shape = new Option({
-        title: "Shape",
-        labels: ["Linear",  "Basis",        "Step"],
-        ids:    ["linear",  "basis-open",   "step-after"],
-        available: [0, 1, 2],
-        default: 2,
-        parent: '#choices_style',
-        callback: function () { 
-            pipeline.start('Ready Context Chart');
-        }
-    });
-    self.y_scale = new Option({
-        title: "Y Scale",
-        labels: ["Linear",  "Power", "Log", "Preserve"],
-        ids:    ["linear",  "pow",   "log", "preserve"],
-        available: [0, 1, 2],
-        default: 0,
-        parent: '#choices_style',
-        callback: function () {
-            pipeline.start('Configure Plot Area')
-        }
-    });
-    self.y_max = new Option({
-        title: "Y Max",
-        labels: [0],
-        ids:    [0],
-        default: 0,
-        type: "textfieldautoman",
-        custom_entries_allowed: true,
-        parent: '#choices_style',
-        callback: function() {
-            pipeline.start('Configure Plot Area')
-        }
-    });
-    self.time_save = new Option({
-        title: "Save Time State",
-        styles: ["btn btn-default", "btn btn-primary"],
-        labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Saving", "<span class='glyphicon glyphicon-ok-circle'></span> Saving"],
-        ids:    ["false", "true"],
-        default: 0,
-        type: "toggle",
-        parent: '#choices_time_right_buttons',
-        callback: function() { 
-            var saving = !(options.time_save.is("true"));
-            if(saving) {
-                if(options.record.indexOf('time_min') == -1)
-                    options.record.push('time_min');
-                if(options.record.indexOf('time_max') == -1)
-                    options.record.push('time_max');
-            } else {
-                if(options.record.indexOf('time_min') > -1)
-                    options.record.splice(options.record.indexOf('time_min'), 1);
-                if(options.record.indexOf('time_max')>  -1)
-                    options.record.splice(options.record.indexOf('time_max'), 1);
+    if(!location.pathname.includes('coding.html')) {
+        self.collection = new Option({
+            title: "Event",
+            labels: ["none"],
+            ids:    ["none"],
+            available: [0],
+            default: 0,
+            custom_entries_allowed: true,
+            parent: '#choices_data',
+            callback: function() { data.setCollection(); },
+            edit: function() { options.editWindow('collection');  }
+        });
+        self.display_type = new Option({
+            title: "Plot Type",
+            labels: ["Stacked", "Overlap", "Lines", "Stream", "Separate", "100%"],
+            ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
+            available: [0, 1, 2, 3, 4, 5],
+            default: 0,
+            parent: '#choices_style',
+            callback: function () {
+                pipeline.start('Prepare Timeseries Data for Chart');
             }
-        }
-    });
-    self.time_min = new Option({
-        title: "Begin",
-        labels: ["2000-01-01 00:00"],
-        ids:    [new Date("2000-01-01 00:00")],
-        default: 0,
-        custom_entries_allowed: true,
-        parent: '#chart-bottom',
-        callback: function() { disp.setFocusTime('input_field'); }
-    });
-    self.time_max = new Option({
-        title: "End",
-        labels: ["2000-01-01 00:00"],
-        ids:    [new Date("2000-01-01 00:00")],
-        default: 0,
-        custom_entries_allowed: true,
-        parent: '#chart-bottom',
-        callback: function() { disp.setFocusTime('input_field'); }
-    });
-    self.time_limit = new Option({
-        title: "Tweets in",
-        labels: ["First 3 Hours", "First 12 Hours", "First 24 Hours", "First 3 Days", "First Week", "All time", "Last Week", "Last 3 Days", "Last 24 Hours", "Last 12 Hours", "Last 3 Hours"],
-        ids:    ["3h", "12h", "1d", "3d", '1w', 'all', '-1w', '-3d', '-1d', '-12h', '-3h'],
-        default: 2,
-        parent: '#choices_data',
-        callback: function() { data.loadCollectionData(); }
-    });
-    self.add_term = new Option({
-        title: "Add Term",
-        labels: ["New Term"],
-        ids:    ["new"],
-        default: 0,
-        custom_entries_allowed: true,   
-        type: "textfieldconfirm",
-        parent: '#choices_data',
-        callback: function() {
-            data.genTweetCount(
-                options.add_term.get().toLowerCase()
-            ); 
-        }
-    });
-    self.color_scale = new Option({
-        title: "Color Scale",
-        labels: ["10", "20", "20b", "20c"],
-        ids:    ["category10", 'category20', 'category20b', 'category20c'],
-        default: 1,
-        parent: '#choices_style',
-        callback: function() {
-            pipeline.start('Set Colors');
-        }
-    });
-    self.terms_selected = new Option({
-        title: "Terms Selected",
-        labels: [""],
-        ids:    [''],
-        available: [0],
-        default: 0,
-        custom_entries_allowed: true, 
-        parent: '#choices_legend',
-        callback: function() { data.prepareData(); }
-    });
-    self.total_line = new Option({
-        title: "Show Total",
-        styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
-        labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Total Line", "<span class='glyphicon glyphicon-ok-circle'></span> Show Total Line"],
-        ids:    ["false", "true"],
-        default: 0,
-        type: "toggle",
-        parent: '#choices_style',
-        callback: function() { 
-            disp.alert('Sorry this is broken right now');
-            pipeline.start('Configure Plot Area');
-        }
-    });
-    self.collection_type = new Option({
-        title: "Type",
-        labels: ["All", "Other Type"],
-        ids:    ["All", "Other Type"],
-        available: [0, 1],
-        default: 0,
-        custom_entries_allowed: true,
-        parent: '#choices_data',
-        callback: function() { options.chooseCollectionType(); }
-    });
-    self.series_order = new Option({
-        title: "Order Series by",
-        labels: ["Original", "Alphabet", "Type", "Volume"],
-        ids:    ["orig", "alpha", "type", "volume"],
-        default: 3,
-        parent: '#choices_legend',
-        callback: function() { 
-            pipeline.start('Order Timeseries');
-        }
-    });
-    self.legend_cleanup = new Option({
-        title: "Clean Up Legend",
-        styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
-        labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Clean up Legend",
-                 "<span class='glyphicon glyphicon-ok-circle'></span> Clean Up Legend"],
-        ids:    ["false", "true"],
-        default: 0,
-        type: "toggle",
-        parent: '#choices_legend',
-        callback: function() { legend.showOrHideAll(); }
-    });
-    self.show_options = new Option({
-        title: 'Show Options',
-        styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
-        labels: ["<span class='glyphicon glyphicon-menu-up'></span> Options",
-                 "<span class='glyphicon glyphicon-menu-down'></span> Options"],
-        ids:    ["false", "true"],
-        default: 1,
-        type: "toggle",
-        parent: '#header',
-        callback: function() { options.togglePane(); }
-    });
-    self.rumor = new Option({
-        title: 'Rumor',
-        labels: ["New"],
-        ids:    ["_new_"],
-        default: 0,
-        type: "dropdown",
-        parent: '#choices_subset',
-        callback: function() { data.getRumor(); },
-        edit: function() { options.editWindow('rumor'); }
-    });
-    self.fetched_tweet_order = new Option({
-        title: 'Fetched Tweets Order',
-        labels: ["Prevalence", "Time", "Random"],
-        ids:    ["prevalence", "time", "rand"],
-        default: 1,
-        type: "dropdown",
-        parent: '#choices_legend',
-        callback: function() { /* nothing */ }
-    });
-    self.chart_category = new Option({
-        title: 'Show in Chart',
-        labels: ["Tweet Types", "Distinctiveness", "Found Ins", "Keywords"],
-        ids:    ["Tweet Type", "Distinctiveness", "Found In", "Keyword"],
-        default: 3,
-        type: "dropdown",
-        parent: '#choices_subset',
-        callback: function() { 
-            pipeline.start('Prepare Timeseries Data for Chart');
-        }
-    });
-    self.ngram_view = new Option({
-        title: 'Fetch NGrams',
-        labels: ["Whole Event"],
-        ids:    ["e_event"],
-        default: 0,
-        type: "dropdown",
-        parent: '#choices_legend',
-        callback: function() { data.calculateNGrams('ngram_view'); }
-    });
-    self.ngram_cmp = new Option({
-        title: 'compare w/',
-        labels: ['-', 'Whole Event'],
-        ids:    ['', 'e_event'],
-        default: 0,
-        type: "dropdown",
-        parent: '#choices_legend',
-        callback: function() { data.calculateNGrams('ngram_cmp'); }
-    });
+        });
+        self.resolution = new Option({
+            title: "Resolution",
+            labels: ["Day", "Hour", "10 Minutes", "Minute"],
+            ids:    ["day", "hour", "tenminute", "minute"],
+            default: 2,
+            parent: '#choices_subset',
+            callback: function () {
+                pipeline.start('Calculate Timeseries');
+            }
+        });
+        self.shape = new Option({
+            title: "Shape",
+            labels: ["Linear",  "Basis",        "Step"],
+            ids:    ["linear",  "basis-open",   "step-after"],
+            available: [0, 1, 2],
+            default: 2,
+            parent: '#choices_style',
+            callback: function () { 
+                pipeline.start('Ready Context Chart');
+            }
+        });
+        self.y_scale = new Option({
+            title: "Y Scale",
+            labels: ["Linear",  "Power", "Log", "Preserve"],
+            ids:    ["linear",  "pow",   "log", "preserve"],
+            available: [0, 1, 2],
+            default: 0,
+            parent: '#choices_style',
+            callback: function () {
+                pipeline.start('Configure Plot Area')
+            }
+        });
+        self.y_max = new Option({
+            title: "Y Max",
+            labels: [0],
+            ids:    [0],
+            default: 0,
+            type: "textfieldautoman",
+            custom_entries_allowed: true,
+            parent: '#choices_style',
+            callback: function() {
+                pipeline.start('Configure Plot Area')
+            }
+        });
+        self.time_save = new Option({
+            title: "Save Time State",
+            styles: ["btn btn-default", "btn btn-primary"],
+            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Saving", "<span class='glyphicon glyphicon-ok-circle'></span> Saving"],
+            ids:    ["false", "true"],
+            default: 0,
+            type: "toggle",
+            parent: '#choices_time_right_buttons',
+            callback: function() { 
+                var saving = !(options.time_save.is("true"));
+                if(saving) {
+                    if(options.record.indexOf('time_min') == -1)
+                        options.record.push('time_min');
+                    if(options.record.indexOf('time_max') == -1)
+                        options.record.push('time_max');
+                } else {
+                    if(options.record.indexOf('time_min') > -1)
+                        options.record.splice(options.record.indexOf('time_min'), 1);
+                    if(options.record.indexOf('time_max')>  -1)
+                        options.record.splice(options.record.indexOf('time_max'), 1);
+                }
+            }
+        });
+        self.time_min = new Option({
+            title: "Begin",
+            labels: ["2000-01-01 00:00"],
+            ids:    [new Date("2000-01-01 00:00")],
+            default: 0,
+            custom_entries_allowed: true,
+            parent: '#chart-bottom',
+            callback: function() { disp.setFocusTime('input_field'); }
+        });
+        self.time_max = new Option({
+            title: "End",
+            labels: ["2000-01-01 00:00"],
+            ids:    [new Date("2000-01-01 00:00")],
+            default: 0,
+            custom_entries_allowed: true,
+            parent: '#chart-bottom',
+            callback: function() { disp.setFocusTime('input_field'); }
+        });
+        self.time_limit = new Option({
+            title: "Tweets in",
+            labels: ["First 3 Hours", "First 12 Hours", "First 24 Hours", "First 3 Days", "First Week", "All time", "Last Week", "Last 3 Days", "Last 24 Hours", "Last 12 Hours", "Last 3 Hours"],
+            ids:    ["3h", "12h", "1d", "3d", '1w', 'all', '-1w', '-3d', '-1d', '-12h', '-3h'],
+            default: 2,
+            parent: '#choices_data',
+            callback: function() { data.loadCollectionData(); }
+        });
+        self.add_term = new Option({
+            title: "Add Term",
+            labels: ["New Term"],
+            ids:    ["new"],
+            default: 0,
+            custom_entries_allowed: true,   
+            type: "textfieldconfirm",
+            parent: '#choices_data',
+            callback: function() {
+                data.genTweetCount(
+                    options.add_term.get().toLowerCase()
+                ); 
+            }
+        });
+        self.color_scale = new Option({
+            title: "Color Scale",
+            labels: ["10", "20", "20b", "20c"],
+            ids:    ["category10", 'category20', 'category20b', 'category20c'],
+            default: 1,
+            parent: '#choices_style',
+            callback: function() {
+                pipeline.start('Set Colors');
+            }
+        });
+        self.terms_selected = new Option({
+            title: "Terms Selected",
+            labels: [""],
+            ids:    [''],
+            available: [0],
+            default: 0,
+            custom_entries_allowed: true, 
+            parent: '#choices_legend',
+            callback: function() { pipeline.start('Find Which Data is Shown'); }
+        });
+        self.total_line = new Option({
+            title: "Show Total",
+            styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
+            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Show Total Line", "<span class='glyphicon glyphicon-ok-circle'></span> Show Total Line"],
+            ids:    ["false", "true"],
+            default: 0,
+            type: "toggle",
+            parent: '#choices_style',
+            callback: function() { 
+                disp.alert('Sorry this is broken right now');
+                pipeline.start('Configure Plot Area');
+            }
+        });
+        self.collection_type = new Option({
+            title: "Type",
+            labels: ["All", "Other Type"],
+            ids:    ["All", "Other Type"],
+            available: [0, 1],
+            default: 0,
+            custom_entries_allowed: true,
+            parent: '#choices_data',
+            callback: function() { options.chooseCollectionType(); }
+        });
+        self.series_order = new Option({
+            title: "Order Series by",
+            labels: ["Original", "Alphabet", "Type", "Volume"],
+            ids:    ["orig", "alpha", "type", "volume"],
+            default: 3,
+            parent: '#choices_legend',
+            callback: function() { 
+                pipeline.start('Order Timeseries');
+            }
+        });
+        self.legend_cleanup = new Option({
+            title: "Clean Up Legend",
+            styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
+            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Clean up Legend",
+                     "<span class='glyphicon glyphicon-ok-circle'></span> Clean Up Legend"],
+            ids:    ["false", "true"],
+            default: 0,
+            type: "toggle",
+            parent: '#choices_legend',
+            callback: function() { legend.showOrHideAll(); }
+        });
+        self.show_options = new Option({
+            title: 'Show Options',
+            styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
+            labels: ["<span class='glyphicon glyphicon-menu-up'></span> Options",
+                     "<span class='glyphicon glyphicon-menu-down'></span> Options"],
+            ids:    ["false", "true"],
+            default: 1,
+            type: "toggle",
+            parent: '#header',
+            callback: function() { options.togglePane(); }
+        });
+        self.rumor = new Option({
+            title: 'Rumor',
+            labels: ["New"],
+            ids:    ["_new_"],
+            default: 0,
+            type: "dropdown",
+            parent: '#choices_subset',
+            callback: function() { data.getRumor(); },
+            edit: function() { options.editWindow('rumor'); }
+        });
+        self.fetched_tweet_order = new Option({
+            title: 'Fetched Tweets Order',
+            labels: ["Prevalence", "Time", "Random"],
+            ids:    ["prevalence", "time", "rand"],
+            default: 1,
+            type: "dropdown",
+            parent: '#choices_legend',
+            callback: function() { /* nothing */ }
+        });
+        self.chart_category = new Option({
+            title: 'Show in Chart',
+            labels: ["Tweet Types", "Distinctiveness", "Found Ins", "Keywords"],
+            ids:    ["Tweet Type", "Distinctiveness", "Found In", "Keyword"],
+            default: 3,
+            type: "dropdown",
+            parent: '#choices_subset',
+            callback: function() { 
+                pipeline.start('Prepare Timeseries Data for Chart');
+            }
+        });
+        self.ngram_view = new Option({
+            title: 'Fetch NGrams',
+            labels: ["Whole Event"],
+            ids:    ["e_event"],
+            default: 0,
+            type: "dropdown",
+            parent: '#choices_legend',
+            callback: function() { data.calculateNGrams('ngram_view'); }
+        });
+        self.ngram_cmp = new Option({
+            title: 'compare w/',
+            labels: ['-', 'Whole Event'],
+            ids:    ['', 'e_event'],
+            default: 0,
+            type: "dropdown",
+            parent: '#choices_legend',
+            callback: function() { data.calculateNGrams('ngram_cmp'); }
+        });
+    }
 };
 Options.prototype = {
     init: function() {
         
         // Build options
         options.buildTopMenu();
-        options.buildTimeWindow();
+        if(!location.pathname.includes('coding.html')) {
+            options.buildTimeWindow();
+        }
         
         // Import the current state
         options.importState();
@@ -311,11 +315,11 @@ Options.prototype = {
         };
         
         // Style elements
-        options.y_max_toggle.styleFunc();
-        options.time_save.styleFunc();
-        options.total_line.styleFunc();
-        options.show_options.styleFunc();
-        options.legend_cleanup.styleFunc();
+        options.initial_buttons.forEach(function(option) {
+            if('styleFunc' in options[option]) {
+                options[option].styleFunc();
+            }
+        });
         $(function () {
             $('[data-toggle="popover"]').popover()
         })
@@ -344,13 +348,15 @@ Options.prototype = {
         
         // Figure out what options should be different
         var changed = [];
-        Object.keys(state).map(function(option) {
+        Object.keys(state).forEach(function(option) {
             var value = state[option];
             if(["time_min", "time_max"].indexOf(option) > -1) {
                 if(options.time_save.is("false"))
                     return;
                 
                 value = new Date(value);
+            } else if(option in options && options[option].isnumeric) {
+                value = parseInt(value) || value;
             }
             
             if(option in options && !options[option].is(value)) {
@@ -377,7 +383,7 @@ Options.prototype = {
         });
         
         // If the program has been initialized
-        if(changed.length > 0 && data && data.all && data.all.Text) {
+        if(changed.length > 0 && data && data.all && data.all[0]) {
             // Render changes
 
             if(changed.indexOf("collection") > -1) {
@@ -391,8 +397,11 @@ Options.prototype = {
                 options.recordState('collection_type', true);
 
                 options.chooseCollectionType();
-            } else
-                data.prepareData(); // although we can do something else
+            } else {
+                pipeline.start('Find Which Data is Shown'); // although we can do something else
+            }
+        } else if (changed.length > 0 && location.pathname.includes('coding.html')) {
+            options.rumor.callback();
         }
     },
     recordState: function(changedItem, override) {
