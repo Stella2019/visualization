@@ -99,6 +99,20 @@ Coding.prototype = {
         });
         options.buildDropdown('tweets_shown');
         
+        // Types of disagreement        
+        options.anonymous = new Option({
+            title: "Anonymous",
+            styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
+            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Anonymous", "<span class='glyphicon glyphicon-ok-circle'></span> Anonymous"],
+            ids:    ["false", "true"],
+            default: 1,
+            type: "toggle",
+            parent: '#options',
+            callback: coding.fillTable
+        });
+        options.buildToggle('anonymous');
+        options.anonymous.styleFunc();
+        
         // Start drawing
         options.rumor.click(4);
     },
@@ -214,6 +228,7 @@ Coding.prototype = {
                 Count: 0,
                 Average: 0,
                 Unanimous: 0,
+                NotUnanimous: 0,
                 Plurality: 0,
                 JustPlurality: 0,
                 Any: 0,
@@ -221,6 +236,7 @@ Coding.prototype = {
                 
                 Average_Of_All: 0,
                 Unanimous_Of_All: 0,
+                NotUnanimous_Of_All: 0,
                 Plurality_Of_All: 0,
                 Any_Of_All: 0,
                 Unanimous_Of_Any: 0,
@@ -267,6 +283,7 @@ Coding.prototype = {
                 entry['Count']++;
                 entry['Average']       += votes_for / votes;
                 entry['Unanimous']     += unanimous               ? 1 : 0;
+                entry['NotUnanimous']  += !unanimous && any       ? 1 : 0;
                 entry['Plurality']     += plurality               ? 1 : 0;
                 entry['JustPlurality'] += plurality && !unanimous ? 1 : 0,
                 entry['Any']           += any                     ? 1 : 0;
@@ -343,11 +360,16 @@ Coding.prototype = {
             var coder_possible = coding.coders_x_coders_possible.map(function(d) { return d3.sum(d); });
             var coder_agree_perc = coder_agrees.map(function(d, i) { return d / (coder_possible[i] || 1); });
             var coder_order = d3.range(n_coders).sort(function(a, b) { return coder_agree_perc[b] - coder_agree_perc[a]; });
+            
             var available = [0]; // All
             coder_order.forEach(function(i) { 
                 if(coder_agree_perc[i] > 0)
                     available.push(i + 1);
             });
+            
+            if(options.anonymous.is('true')) {
+                available.sort(function(a, b) { return a - b; });
+            }
             options.coder.available = available;
             options.buildDropdown('coder');
         }
@@ -359,10 +381,12 @@ Coding.prototype = {
                 entry['Unanimous_Of_All'] = entry['Unanimous'] / entry['Count']; 
                 entry['Plurality_Of_All'] = entry['Plurality'] / entry['Count']; 
                 entry['Minority_Of_All'] = entry['Minority'] / entry['Count']; 
+                entry['NotUnanimous_Of_All'] = entry['NotUnanimous'] / entry['Count']; 
                 entry['Any_Of_All'] = entry['Any'] / entry['Count']; 
                 entry['Unanimous_Of_Any'] = entry['Unanimous'] / entry['Any']; 
                 entry['JustPlurality_Of_Any'] = entry['JustPlurality'] / entry['Any']; 
                 entry['Minority_Of_Any'] = entry['Minority'] / entry['Any']; 
+                entry['NotUnanimous_Of_Any'] = entry['NotUnanimous'] / entry['Any']; 
         });
 
         // Get totals
@@ -469,14 +493,18 @@ Coding.prototype = {
            'Plurality Positive<br /><small>(% of All)</small>', 
            'Disagreed<br /><small>(% of All)</small>', 
            'Unanimous Positive<br /><small>(% of Any Positive)</small>'];
-        if(coder_id != 'all') {
-            var coder_name = coding.coders[parseInt(coder_id) - 1].ShortName;
-            columns.push('Just ' + coder_name + '<br /><small>(% of Any Positive)</small>');
-            columns.push('Only Other(s) Positive<br /><small>(% of Any Positive)</small>');
-        } else {
-            columns.push('Plurality not All Positive<br /><small>(% of Any Positive)</small>');
-            columns.push('Minority Positive<br /><small>(% of Any Positive)</small>');
+        if(options.period.get() < 0) {
+            columns.push('Majority (not all) Positive<br /><small>(% of Any Positive)</small>');
         }
+        columns.push('Minority Positive<br /><small>(% of Any Positive)</small>');
+//        if(coder_id != 'all') {
+//            var coder_name = coding.coders[parseInt(coder_id) - 1].ShortName;
+//            columns.push('Just ' + coder_name + '<br /><small>(% of Any Positive)</small>');
+//            columns.push('Only Other(s) Positive<br /><small>(% of Any Positive)</small>');
+//        } else {
+//            columns.push('Majority (not all) Positive<br /><small>(% of Any Positive)</small>');
+//            columns.push('Minority Positive<br /><small>(% of Any Positive)</small>');
+//        }
         columns.push('Krippendorff\'s &alpha;<br /><small>(Agreement)</small>');
         
         agreement_table.append('thead')
@@ -501,91 +529,52 @@ Coding.prototype = {
                 else
                     return '&nbsp;&nbsp;&nbsp;&nbsp;' + d.Code;
             });
-        rows.append('td')
-            .html(function(d) {
-                return d['Average'].toFixed(0) + " <small>(" + 
-                    (d['Average_Of_All'] * 100).toFixed(0) + 
-                    "%)</small>";
-            })
-            .attr('class', 'table_stat')
-            .append('div')
-            .style({
-                width: function(d) { 
-                    return (d['Average_Of_All'] * 90) + '%'}
-            })
-            .attr('class', 'table_bar');
-        rows.append('td')
-            .html(function(d) {
-                return d['Plurality'] + " <small>(" + 
-                    (d['Plurality_Of_All'] * 100).toFixed(0) + 
-                    "%)</small>";
-            })
-            .attr('class', 'table_stat')
-            .append('div')
-            .style({
-                width: function(d) {
-                    return (d['Plurality_Of_All'] * 90) + '%'}
-            })
-            .attr('class', 'table_bar');
-        rows.append('td')
-            .html(function(d) {
-                return d['Minority'] + " <small>(" + 
-                    (d['Minority_Of_All'] * 100).toFixed(0) + 
-                    "%)</small>";
-            })
-            .attr('class', 'table_stat')
-            .append('div')
-            .style({
-                width: function(d) { 
-                    return (d['Minority_Of_All'] * 90) + '%'},
-            })
-            .attr('class', 'table_bar');
         
-        // Of 1+ Yes
-        rows.append('td')
-            .html(function(d) {
-                return d['Unanimous'] + " <small>(" + 
-                    (d['Unanimous_Of_Any'] * 100).toFixed(0) + 
-                    "%)</small>";
+        var cols = [{
+            value: 'Average',
+            portion: 'Average_Of_All'
+        },{
+            value: 'Plurality',
+            portion: 'Plurality_Of_All'
+        },{
+            value: options.period.get() < 0 ? 'Minority' : 'NotUnanimous',
+            portion: options.period.get() < 0 ? 'Minority_Of_All' : 'NotUnanimous_Of_All'
+        },{
+            value: 'Unanimous',
+            portion: 'Unanimous_Of_Any',
+            portion_color: '#ddd'
+        }];
+        if(options.period.get() < 0) {
+            cols.push({
+                value: 'JustPlurality',
+                portion: 'JustPlurality_Of_Any',
+                portion_color: '#ddd'
             })
-            .attr('class', 'table_stat')
-            .append('div')
-            .style({
-                width: function(d) { 
-                    return (d['Unanimous_Of_Any'] * 90) + '%'},
-                background: '#ddd'
-            })
-            .attr('class', 'table_bar');
+        }
+        cols.push({
+            value: options.period.get() < 0 ? 'Minority' : 'NotUnanimous',
+            portion: options.period.get() < 0 ? 'Minority_Of_Any' : 'NotUnanimous_Of_Any',
+            portion_color: '#ddd'
+        })
         
-//        if(coder_id == 'all') {
+        // Append the columns
+        cols.forEach(function(col) {
             rows.append('td')
                 .html(function(d) {
-                    return d['JustPlurality'] + " <small>(" + 
-                        (d['JustPlurality_Of_Any'] * 100).toFixed(0) + 
+                    return d[col.value].toFixed(0) + " <small>(" + 
+                        (d[col.portion] * 100).toFixed(0) + 
                         "%)</small>";
                 })
                 .attr('class', 'table_stat')
                 .append('div')
                 .style({
                     width: function(d) { 
-                        return (d['JustPlurality_Of_Any'] * 90) + '%'},
-                    background: '#ddd'
+                        return (d[col.portion] * 90) + '%'},
+                    background: col.portion_color
                 })
                 .attr('class', 'table_bar');
-            rows.append('td')
-                .html(function(d) {
-                    return d['Minority'] + " <small>(" + 
-                        (d['Minority_Of_Any'] * 100).toFixed(0) + 
-                        "%)</small>";
-                })
-                .attr('class', 'table_stat')
-                .append('div')
-                .style({
-                    width: function(d) { 
-                        return (d['Minority_Of_Any'] * 90) + '%'},
-                    background: '#ddd'
-                })
-                .attr('class', 'table_bar');
+        });
+        
 //        } else {
 //            rows.append('td')
 //                .html(function(d) {
@@ -803,48 +792,62 @@ Coding.prototype = {
         }
         var tweets_shown = options.tweets_shown.get();
         var tweets = coding.tweets_arr;
+        var period = options.period.get();
         
         // Filter out tweets by coder
         if(coder_id != 'all') {
             tweets = tweets.filter(function(tweet) {
                 return tweet.Votes.Coders.includes(parseInt(coder_id));
             });
+            
+//            // Filter out tweets by disagreement
+//            if(tweets_shown == 'Disagreement') {
+//                tweets = tweets.filter(function (tweet) {
+//                    
+//                }
+//            } else if(tweets_shown != 'All') {
+//                tweets = tweets.filter(function (tweet) {
+//                    
+//                }
+//            }
+            
         }
         
-        // Add other codes for tweets
-        tweets.forEach(function(tweet) {
-//            tweet.code1 = tweet['Plurality']['Primary']
-//            tweet.code2 = tweet['Plurality']['Primary']
-//            
-//            tweet.code1 = tweet['Uncertainty 1'];
-//            if(tweet.code1 == "0") tweet.code1 = 'No Uncertainty';
-//            if(tweet.code1 == "1") tweet.code1 = 'Uncertainty';
-            tweet.code1 = tweet['Plurality']['Primary'] + '<br/>' +
-                '<small>Uncertainty: ' + tweet['Plurality']['Uncertainty'] + '</small>';
-
-            tweet.code2 = tweet['Uncertainty 2'];
-            if(tweet.code2 == "0") tweet.code2 = 'No Uncertainty';
-            if(tweet.code2 == "1") tweet.code2 = 'Uncertainty';
-            tweet.code2 = tweet['Primary 2'] + '<br/>' +
-                '<small>' + tweet.code2 + '</small>';
-        });
-        
         // Filter out tweets by disagreement
-        if(tweets_shown == 'Disagreement') {
+        if(period < 0 && tweets_shown != 'All' && coder_id != 'all') {
+            var codes = [tweets_shown];
+            if(tweets_shown == 'Primary') {
+                codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'];
+            } else if(tweets_shown == 'Disagreement') {
+                codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Uncertainty'];
+            }
             
             tweets = tweets.filter(function(tweet) {
-                return tweet.Primary_Disagreement || tweet.Uncertainty_Disagreement;
+//                console.log(tweet.Text);
+                return codes.reduce(function(disagreed, code) {
+                    var coder_yes = tweet.Votes[code].includes(coder_id);
+                    var group_yes = tweet.Plurality[code];
+//                    console.log(code, coder_yes, group_yes, disagreed || (group_yes ? !coder_yes : coder_yes));
+                    return disagreed || (group_yes ? !coder_yes : coder_yes);
+                }, false);
             });
-//            tweets = tweets.filter(function(tweet) {
-//                return (tweet['Primary Agreement'] == "0" ||
-//                   tweet['Uncertainty Agreement'] == "0");
-//            });
-        } else if(tweets_shown != 'All') {
-            tweets = tweets.filter(function(tweet) {
-                return tweet.Votes[tweets_shown].length > 0 && (tweet.Votes[tweets_shown].length != tweet.Votes.Count);
-                
-//                return tweet[tweets_shown + ' 1'] != tweet[tweets_shown + ' 2'];
-            });
+        } else {
+            if(tweets_shown == 'Disagreement') {
+
+                tweets = tweets.filter(function(tweet) {
+                    return tweet.Primary_Disagreement || tweet.Uncertainty_Disagreement;
+                });
+    //            tweets = tweets.filter(function(tweet) {
+    //                return (tweet['Primary Agreement'] == "0" ||
+    //                   tweet['Uncertainty Agreement'] == "0");
+    //            });
+            } else if(tweets_shown != 'All') {
+                tweets = tweets.filter(function(tweet) {
+                    return tweet.Votes[tweets_shown].length > 0 && (tweet.Votes[tweets_shown].length != tweet.Votes.Count);
+
+    //                return tweet[tweets_shown + ' 1'] != tweet[tweets_shown + ' 2'];
+                });
+            }
         }
         
         // Add the table
@@ -859,8 +862,8 @@ Coding.prototype = {
             .selectAll('th')
             .data(['Tweet ID',
                    'Text',
-                   coder_id == 'all' ? 'Plurality' : coder.ShortName + "'s Label",
-                   coder_id == 'all' ? 'All' : "Other's Label"])
+                   coder_id == 'all' ? 'Majority' : coder.ShortName + "'s Label",
+                   coder_id == 'all' ? 'Minority' : "Other's Label"])
             .enter()
             .append('th')
             .html(function(d) { return d; })
@@ -886,10 +889,35 @@ Coding.prototype = {
                 if(d['Coder 2'] == coder_id)
                     i = 2;
             
-                return "" +
-                    "<span class='code_Primary code_" + d['Plurality']['Primary'] + "'>" + d['Plurality']['Primary'] + '(' + d['Plurality']['Count'] + ")</span>" +
-                    "<br />" +
-                    (d['Votes']['Uncertainty'].length >= 5 ? "<span class='code_Uncertainty'>" + (d['Votes']['Uncertainty'].length > 0 ? "Uncertainty " + d['Votes']['Uncertainty'].length : "-")  + "</span>" : '');
+                var text = '';
+            
+                if(coder_id == 'all') {
+                    ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
+                        var n_votes_for = d.Votes[code].length;
+                        if (n_votes_for > d.Votes['Count'] / 2) {
+                            text += "<span class='code_Primary code_" + code + "'>" + code + "</span>";
+                            if(period < 0) text += '(' + n_votes_for + ')';
+                            text += '<br />';
+                        }
+                    });
+                    var num_uncertain = d['Votes']['Uncertainty'].length;
+                    if(num_uncertain > d.Votes['Count'] / 2) {
+                        text += "<span class='code_Uncertainty'>Uncertainty</span>";
+                        if(period < 0) text += '(' + num_uncertain + ')';
+                        text += '<br />';
+                    }
+                } else {
+                    ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
+                        if (d.Votes[code].includes(coder_id)) {
+                            text += "<span class='code_Primary code_" + code + "'>" + code + "</span><br \>";
+                        }
+                    });
+                    if(d.Votes['Uncertainty'].includes(coder_id)) {
+                        text += "<span class='code_Uncertainty'>Uncertainty</span>"
+                    }
+                }
+            
+                return text;
             });
         rows.append('td')
             .html(function(d) {
@@ -897,10 +925,46 @@ Coding.prototype = {
                 if(d['Coder 2'] == coder_id)
                     i = 1;
             
-                return "" +
-                    "<span class='code_Primary code_" + d['Plurality']['Primary'] + "'>" + d['Plurality']['Others'] + "</span>" +
-                    "<br />" +
-                    (d['Votes']['Uncertainty'].length < 5 ? "<span class='code_Uncertainty'>" + (d['Votes']['Uncertainty'].length > 0 ? "Uncertainty " + d['Votes']['Uncertainty'].length : "-")  + "</span>" : '');
+                var text = '';
+                if(coder_id == 'all') {
+                    ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
+                        var n_votes_for = d.Votes[code].length;
+                        if (n_votes_for <= d.Votes['Count'] / 2 && n_votes_for > 0) {
+                            text += "<span class='code_Primary code_" + code + "'>" + code + "</span>";
+                            if(period < 0) text += '(' + n_votes_for + ')';
+                            text += '<br />';
+                        }
+                    });
+                    
+                    var num_uncertain = d['Votes']['Uncertainty'].length;
+                    if(num_uncertain > 0 && num_uncertain <= d.Votes['Count'] / 2) {
+                        text += "<span class='code_Uncertainty'>Uncertainty</span>";
+                        if(period < 0) text += '(' + num_uncertain + ')';
+                        text += '<br />';
+                    }
+                } else {
+                    ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
+                        var n_votes_for = d.Votes[code].length - (d.Votes[code].includes(coder_id) ? 1 : 0);
+                        if (n_votes_for > 0) {
+                            text += "<span class='code_Primary code_" + code + "'>" + code + "</span>";
+                            if(period < 0) text += '(' + n_votes_for + ')';
+                            text += '<br />';
+                        }
+                    });
+                    var num_uncertain = d['Votes']['Uncertainty'].length - (d.Votes['Uncertainty'].includes(coder_id) ? 1 : 0);
+                    if(num_uncertain > 0) {
+                        text += "<span class='code_Uncertainty'>Uncertainty</span>";
+                        if(period < 0) text += '(' + num_uncertain + ')';
+                        text += '<br />';
+                    }
+                }
+            
+                return text;
+            
+//                return "" +
+//                    "<span class='code_Primary code_" + d['Plurality']['Primary'] + "'>" + d['Plurality']['Others'] + "</span>" +
+//                    "<br />" +
+//                    (d['Votes']['Uncertainty'].length < 5 ? "<span class='code_Uncertainty'>" + (d['Votes']['Uncertainty'].length > 0 ? "Uncertainty " + d['Votes']['Uncertainty'].length : "-")  + "</span>" : '');
 //                return d;
 //                return "" +
 //                    "<span class='code_Primary code_" + d['Primary ' + i] + "'>" + d['Primary ' + i] + "</span>" +
