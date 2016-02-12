@@ -167,7 +167,9 @@ Coding.prototype = {
             if(coding.rumor.periods.includes(period))
                 options.period.available.push(i);
         });
-        if(!options.period.available.includes(options.period.default)) {
+        if(options.period.available.includes(options.period.indexCur())) {
+            options.period.default = options.period.indexCur();
+        } else {
             options.period.default = options.period.available[0];
         }
         options.buildDropdown('period');
@@ -322,7 +324,8 @@ Coding.prototype = {
                 var votes_for, plurality, coder_yes;
                 if(code == 'Primary') {
                     votes_for = tweet.Votes[code].filter(function(d) { return d != 'No Code'; }).length;
-//                    coder_yes = tweet.Votes[code].includes()
+                    var coder_index = tweet.Votes['Coders'].indexOf(parseInt(coder_id));
+                    coder_yes = coder_index > 0 && tweet.Votes[code][coder_index] != 'No Code';
                     plurality = tweet.Plurality[code] != 'No Code';
                 } else {
                     votes_for = tweet.Votes[code].length;
@@ -347,6 +350,7 @@ Coding.prototype = {
                 entry['JustOther']     += !unanimous && !coder_yes && any ? 1 : 0;
             })
             
+            // Record the confusion between coders and between codes
             tweet.Votes.Coders.map(function(coder1, ic1) {
                 var uncertainty1 = tweet.Votes['Uncertainty'].includes(coder1);
                 var primary1 = tweet.Votes['Primary'][ic1];
@@ -354,6 +358,11 @@ Coding.prototype = {
                     coding.coders_x_majority_uncertainty[coder1 - 1]++;
                 if(tweet.Plurality['Primary'] == primary1)
                     coding.coders_x_majority_primary[coder1 - 1]++;
+                
+                var primary_icoder = primary_codes.indexOf(primary1);
+                var primary_iplur = primary_codes.indexOf(tweet.Plurality['Primary']);
+                if(primary_icoder >= 0 && primary_iplur >= 0)
+                    coding.codes_x_codes[primary_icoder][primary_iplur]++;
                        
                 tweet.Votes.Coders.map(function(coder2, ic2) {
                     var primary2 = tweet.Votes['Primary'][ic2];
@@ -728,10 +737,27 @@ Coding.prototype = {
         var color2 = d3.scale.log()
             .domain([1, 3, 10, 30, 100]) //[0, 25, 50, 75, 100]
             .range(["#000000", "#ff9896", "#dbdb8d", "#98df8a", "#aec7e8"]);
-        div.append('div')
-            .html('Code Confusion')
+        var code_x_code_div = div.append('div')
+            .html('Code Confusion<br /><small>How many times a coder disagreed with the majority code</small>')
             .attr('class', 'col-sm-4')
-            .append('table')
+            .append('div')
+            .style('text-align', 'center')
+            .style('display', 'inline-block');
+        
+        code_x_code_div.append('span')
+            .html('Majority Choose<br />');
+        
+        code_x_code_div.append('span')
+            .text('Coders Choose')
+            .style({
+                float: 'left',
+                'text-orientation': 'upright',
+                'writing-mode': 'vertical-lr',
+                transform: 'translateY(35%)',
+                width: '1.5em'
+            });
+        
+        code_x_code_div.append('table')
             .attr('id', 'codes_confusion_matrix')
             .selectAll('tr')
             .data(matrix)
@@ -841,16 +867,16 @@ Coding.prototype = {
                         ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
                             var n_votes_for = d.Votes[code].length;
                             if (n_votes_for > d.Votes['Count'] / 2 || d.Plurality['Primary'] == code) {
-                                text += "<span class='code_Primary code_" + code + "'>" + code + "</span>";
-                                if(period < 0) text += '(' + n_votes_for + ')';
-                                text += '<br />';
+                                text += "<span class='code_Primary code_" + code + "'>" + code;
+                                if(period < 0) text += ' (' + n_votes_for + ')';
+                                text += '</span><br />';
                             }
                         });
                         var num_uncertain = d['Votes']['Uncertainty'].length;
                         if(num_uncertain > d.Votes['Count'] / 2) {
-                            text += "<span class='code_Uncertainty'>Uncertainty</span>";
-                            if(period < 0) text += '(' + num_uncertain + ')';
-                            text += '<br />';
+                            text += "<span class='code_Uncertainty'>Uncertainty";
+                            if(period < 0) text += ' (' + num_uncertain + ')';
+                            text += '</span>';
                         }
                     } else {
                         var code = d.Votes['Primary'][0];
@@ -880,17 +906,17 @@ Coding.prototype = {
                         ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
                             var n_votes_for = d.Votes[code].length;
                             if (n_votes_for <= d.Votes['Count'] / 2 && n_votes_for > 0 && d.Plurality['Primary'] != code) {
-                                text += "<span class='code_Primary code_" + code + "'>" + code + "</span>";
-                                if(period < 0) text += '(' + n_votes_for + ')';
-                                text += '<br />';
+                                text += "<span class='code_Primary code_" + code + "'>" + code;
+                                if(period < 0) text += ' (' + n_votes_for + ')';
+                                text += '</span><br />';
                             }
                         });
 
                         var num_uncertain = d['Votes']['Uncertainty'].length;
                         if(num_uncertain > 0 && num_uncertain <= d.Votes['Count'] / 2) {
-                            text += "<span class='code_Uncertainty'>Uncertainty</span>";
-                            if(period < 0) text += '(' + num_uncertain + ')';
-                            text += '<br />';
+                            text += "<span class='code_Uncertainty'>Uncertainty";
+                            if(period < 0) text += ' (' + num_uncertain + ')';
+                            text += '</span>';
                         }
                     } else {
                         var code = d.Votes['Primary'][1];
