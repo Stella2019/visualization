@@ -9,6 +9,9 @@ function Coding() {
     this.codes = {};
     
     this.rumor_period_counts = {};
+    
+    this.tooltip = new Tooltip();
+    this.tooltip.init();
 }
 Coding.prototype = {
     getData: function() {
@@ -82,7 +85,7 @@ Coding.prototype = {
             labels: labels,
             ids:    ids,
             available: available,
-            default: 4,
+            default: 0,
             type: "dropdown",
             parent: '#options',
             callback: coding.chooseRumor
@@ -321,19 +324,19 @@ Coding.prototype = {
             
             // Find disagreement
             codes.forEach(function(code) {
+                var votes     = tweet.Votes['Count'];
                 var votes_for, plurality, coder_yes;
                 if(code == 'Primary') {
                     votes_for = tweet.Votes[code].filter(function(d) { return d != 'No Code'; }).length;
                     var coder_index = tweet.Votes['Coders'].indexOf(parseInt(coder_id));
                     coder_yes = coder_index > 0 && tweet.Votes[code][coder_index] != 'No Code';
-                    plurality = tweet.Plurality[code] != 'No Code';
+                    plurality = tweet.Plurality[code] != 'No Code' && votes_for > 0;
                 } else {
                     votes_for = tweet.Votes[code].length;
                     coder_yes = tweet.Votes[code].includes(parseInt(coder_id));
-                    plurality = tweet.Plurality[code];
+                    plurality = tweet.Plurality[code] && votes_for > 0;
                 }
-                var votes     = tweet.Votes['Count'];
-                var unanimous = votes_for == votes;
+                var unanimous = votes_for == votes && votes_for > 0;
                 var any       = votes_for > 0;
                     
                 var entry = code_agreement[code];
@@ -396,6 +399,11 @@ Coding.prototype = {
                 available.sort(function(a, b) { return a - b; });
             }
             options.coder.available = available;
+            if(options.coder.available.includes(options.coder.indexCur())) {
+                options.coder.default = options.coder.indexCur();
+            } else {
+                options.coder.default = options.coder.available[0];
+            }
             options.buildDropdown('coder');
         }
 
@@ -624,17 +632,48 @@ Coding.prototype = {
         /* Primary coder matrix */
         var matrix = options.coder.available.map(function (i) {
             var row = options.coder.available.map(function (j) {
-                if(i == 0) return coder_names[j];
-                if(j == 0) return coder_names[i];
-                return Math.floor(coding.coders_x_coders_primary[i - 1][j - 1] /
-                                  coding.coders_x_coders_possible[i - 1][j - 1] * 100) || 0;
+                if(i == 0) {
+                    return { 
+                        FullName: options.coder.labels[j],
+                        label: coder_names[j] 
+                    };
+                }
+                if(j == 0) {
+                    return { 
+                        FullName: options.coder.labels[i],
+                        label: coder_names[i] 
+                    };
+                }
+                var entry = {
+                    Agreed: coding.coders_x_coders_primary[i - 1][j - 1],
+                    Tweets: coding.coders_x_coders_possible[i - 1][j - 1]
+                }
+                if(entry['Tweets'] == 0){
+                    entry['label'] = '-';
+                } else if(i == j){
+                    entry['label'] = '-';
+                } else {
+                    var percent = entry['Agreed'] / entry['Tweets'] * 100;
+                    entry['Percent'] = Math.floor(percent * 10) / 10 + '%';
+                    entry['label'] = Math.floor(percent) + '';
+                }
+                return entry;
             });
             if(i == 0) {
-                row.push('&sum;');
+                row.push({FullName: 'Combined', label: '&sum;'});
             } else {
-                row.push(Math.floor(
-                         d3.sum(coding.coders_x_coders_primary[i - 1]) / 
-                         d3.sum(coding.coders_x_coders_possible[i - 1]) * 100));
+                var entry = {
+                    Agreed: d3.sum(coding.coders_x_coders_primary[i - 1]),
+                    Tweets: d3.sum(coding.coders_x_coders_possible[i - 1])
+                }
+                if(entry['Tweets'] == 0){
+                    entry['label'] = '';
+                } else {
+                    var percent = entry['Agreed'] / entry['Tweets'] * 100;
+                    entry['Percent'] = Math.round(percent, -1) + '%';
+                    entry['label'] = Math.floor(percent) + '';
+                }
+                row.push(entry);
             }
             return row;
         });
@@ -666,27 +705,70 @@ Coding.prototype = {
             .data(function(d) { return d; })
             .enter()
             .append('td')
-            .html(function(d) { return d; })
+            .html(function(d) { return d.label; })
             .style('background-color', function(d) {
-                if(typeof(d) == "string") 
-                    return 'white';
-                return color(d);
+                if('Percent' in d) return color(d.label);
+                if('-' == d.label) return '#CCC';
+                return 'white';
+            })
+            .on('mouseover', function(d) {
+                var info = JSON.parse(JSON.stringify(d));
+                delete info['label'];
+                coding.tooltip.setData(info);
+                coding.tooltip.on();
+            })
+            .on('mousemove', function(d) {
+                coding.tooltip.move(d3.event.x, d3.event.y);
+            })
+            .on('mouseout', function(d) {
+                coding.tooltip.off();
             });
         
         /* Uncertainty coder matrix */
         matrix = options.coder.available.map(function (i) {
             var row = options.coder.available.map(function (j) {
-                if(i == 0) return coder_names[j];
-                if(j == 0) return coder_names[i];
-                return Math.floor(coding.coders_x_coders_uncertainty_both[i - 1][j - 1] /
-                                  coding.coders_x_coders_uncertainty_either[i - 1][j - 1] * 100) || 0;
+                if(i == 0) {
+                    return { 
+                        FullName: options.coder.labels[j],
+                        label: coder_names[j] 
+                    };
+                }
+                if(j == 0) {
+                    return { 
+                        FullName: options.coder.labels[i],
+                        label: coder_names[i] 
+                    };
+                }
+                var entry = {
+                    Agreed: coding.coders_x_coders_uncertainty_both[i - 1][j - 1],
+                    Tweets: coding.coders_x_coders_uncertainty_either[i - 1][j - 1]
+                }
+                if(entry['Tweets'] == 0){
+                    entry['label'] = '-';
+                } else if(i == j){
+                    entry['label'] = '-';
+                } else {
+                    var percent = entry['Agreed'] / entry['Tweets'] * 100;
+                    entry['Percent'] = Math.floor(percent * 10) / 10 + '%';
+                    entry['label'] = Math.floor(percent) + '';
+                }
+                return entry;
             });
             if(i == 0) {
-                row.push('&sum;');
+                row.push({FullName: 'Combined', label: '&sum;'});
             } else {
-                row.push(Math.floor(
-                         d3.sum(coding.coders_x_coders_uncertainty_both[i - 1]) / 
-                         d3.sum(coding.coders_x_coders_uncertainty_either[i - 1]) * 100));
+                var entry = {
+                    Agreed: d3.sum(coding.coders_x_coders_uncertainty_both[i - 1]),
+                    Tweets: d3.sum(coding.coders_x_coders_uncertainty_either[i - 1])
+                }
+                if(entry['Tweets'] == 0){
+                    entry['label'] = '';
+                } else {
+                    var percent = entry['Agreed'] / entry['Tweets'] * 100;
+                    entry['Percent'] = Math.round(percent, -1) + '%';
+                    entry['label'] = Math.floor(percent) + '';
+                }
+                row.push(entry);
             }
             return row;
         });
@@ -704,11 +786,23 @@ Coding.prototype = {
             .data(function(d) { return d; })
             .enter()
             .append('td')
-            .html(function(d) { return d; })
+            .html(function(d) { return d.label; })
             .style('background-color', function(d) {
-                if(typeof(d) == "string") 
-                    return 'white';
-                return color(d);
+                if('Percent' in d) return color(d.label);
+                if('-' == d.label) return '#CCC';
+                return 'white';
+            })
+            .on('mouseover', function(d) {
+                var info = JSON.parse(JSON.stringify(d));
+                delete info['label'];
+                coding.tooltip.setData(info);
+                coding.tooltip.on();
+            })
+            .on('mousemove', function(d) {
+                coding.tooltip.move(d3.event.x, d3.event.y);
+            })
+            .on('mouseout', function(d) {
+                coding.tooltip.off();
             });
         
         
@@ -753,8 +847,7 @@ Coding.prototype = {
                 float: 'left',
                 'text-orientation': 'upright',
                 'writing-mode': 'vertical-lr',
-                transform: 'translateY(35%)',
-                width: '1.5em'
+                transform: 'translateY(35%)'
             });
         
         code_x_code_div.append('table')
@@ -855,7 +948,7 @@ Coding.prototype = {
             .append('tr');
         
         rows.append('td')
-            .html(function(d) { return d.Tweet; });
+            .html(function(d) { return d.Tweet_ID; });
         rows.append('td')
             .html(function(d) { return d.Text; });
         
