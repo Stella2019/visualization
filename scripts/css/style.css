@@ -360,3 +360,7 @@ button:focus {
 #matrices tr:hover {
     background: #EEE;
 }*/
+.coding_header h2 {
+    display: inline;
+    margin-right: 30px;
+}

@@ -6,13 +6,27 @@ function Coding() {
     this.rumors = [];
     this.rumor = {};
     this.coders = [];
-    this.codes = {};
+    this.raw_codes = {};
     
     this.rumor_period_counts = {};
     
     this.tooltip = new Tooltip();
     this.tooltip.init();
     
+    this.code_list = {
+        primary: ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'],
+        primary6: ['No Code', 'Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'],
+        binary: ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Uncertainty'],
+        display: ['Primary', 'Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Uncertainty'],
+        any: ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Implicit', 'Ambiguity', 'Uncertainty', 'Difficult'],
+    };
+    this.n = {
+        tweets: 0,
+        coders: 0,
+        codes: 0,
+        codes_per_tweet: 0,
+        primary: 5
+    };
     this.nnn = 0;
 }
 Coding.prototype = {
@@ -80,7 +94,7 @@ Coding.prototype = {
         });
         
         options.choice_groups = [];
-        options.initial_buttons = ['rumor', 'period', 'coder', 'tweets_shown', 'coder_order'];
+        options.initial_buttons = ['rumor', 'period', 'coder', 'coder_order', 'tweets_shown', 'tweet_order'];
         options.record = options.initial_buttons;
         options.rumor = new Option({
             title: 'Rumor',
@@ -141,19 +155,28 @@ Coding.prototype = {
             ids:    ["All", "Disagreement", "Primary", "Uncodable", "Unrelated", "Affirm", "Deny", "Neutral", "Uncertainty"],
             default: 0,
             type: "dropdown",
-            parent: '#options',
-            callback: coding.getTweets
+            parent: '#tweets_header',
+            callback: coding.fillTweetList
         });
         
-        // Types of disagreement        
+        // Ordering Data    
         options.coder_order = new Option({
             title: "Coder Order",
             labels: ["Alphabetic", "Agreement", "Anonymous", "Cluster"],
             ids:    ['alpha', 'agreement', 'anonymous', 'cluster'],
             default: 2,
             available: [0, 1, 2],
-            parent: '#options',
+            parent: '#matrices_header',
             callback: coding.compileReport
+        });        
+        options.tweet_order = new Option({
+            title: "Tweet Order",
+            labels: ['Tweet ID', 'Text', 'Majority Code', 'Disagreement'],
+            ids:    ['tweet_id', 'text', 'majority', 'disagreement'],
+            default: 3,
+            available: [0, 1, 2, 3],
+            parent: '#tweets_header',
+            callback: coding.fillTweetList
         });
         
         // Start drawing
@@ -213,10 +236,6 @@ Coding.prototype = {
     },
     compileReport: function() {
         
-        var codes = ["Primary", "Uncodable", "Unrelated", "Affirm", "Deny", "Neutral", "Uncertainty"];
-        var primary_codes = ["Uncodable", "Unrelated", "Affirm", "Deny", "Neutral"];
-        var binary_codes = ["Uncodable", "Unrelated", "Affirm", "Deny", "Neutral", "Uncertainty"];
-        
         // Get tweets for this report
         var coder_id = options.coder.get();
         coding.tweets = {};
@@ -231,16 +250,21 @@ Coding.prototype = {
                         Coders: [],
                         Count: 0,
                         Primary: [],
+                        'No Code': [],
                         Uncodable: [],
                         Unrelated: [],
                         Affirm: [],
                         Deny: [],
                         Neutral: [],
-                        Uncertainty: []
+                        Implicit: [],
+                        Ambiguity: [],
+                        Uncertainty: [],
+                        Difficult: []
                     },
                     Plurality: {
                         Count: 0,
                         Primary: '',
+                        'No Code': [],
                         Uncodable: false,
                         Unrelated: false,
                         Affirm: false,
@@ -264,8 +288,10 @@ Coding.prototype = {
                 tweet.Votes.Coders.push(parseInt(code.Coder));
                 tweet.Votes.Count++;
                 tweet.Votes.Primary.push(code.Primary);
+                if(code.Primary == 'No Code')
+                    tweet.Votes['No Code'].push(parseInt(code.Coder));
                 
-                binary_codes.forEach(function(c) {
+                coding.code_list.any.forEach(function(c) {
                     if(code[c] == '1') {
                         tweet.Votes[c].push(parseInt(code.Coder));
                     }
@@ -274,20 +300,20 @@ Coding.prototype = {
         });
         
         // Initialize objects
-        var n_tweets = coding.tweets_arr.length
+        coding.n.tweets = coding.tweets_arr.length
 761;
-        var n_coders = coding.coders.length;
-        coding.coders_x_coders_possible = util.zeros(n_coders, n_coders);
-        coding.coders_x_coders_primary = util.zeros(n_coders, n_coders);
-        coding.coders_x_majority_primary = util.zeros(n_coders, 1);
-        coding.coders_x_majority_uncertainty = util.zeros(n_coders, 1);
-        coding.coders_x_coders_uncertainty_either = util.zeros(n_coders, n_coders);
-        coding.coders_x_coders_uncertainty_both = util.zeros(n_coders, n_coders);
-        coding.codes_x_codes = util.zeros(primary_codes.length, primary_codes.length);
+        coding.n.coders = coding.coders.length;
+        coding.coders_x_coders_possible = util.zeros(coding.n.coders, coding.n.coders);
+        coding.coders_x_coders_primary = util.zeros(coding.n.coders, coding.n.coders);
+        coding.coders_x_majority_primary = util.zeros(coding.n.coders, 1);
+        coding.coders_x_majority_uncertainty = util.zeros(coding.n.coders, 1);
+        coding.coders_x_coders_uncertainty_either = util.zeros(coding.n.coders, coding.n.coders);
+        coding.coders_x_coders_uncertainty_both = util.zeros(coding.n.coders, coding.n.coders);
+        coding.codes_x_codes = util.zeros(coding.n.primary, coding.n.primary);
         
         var code_agreement = {};
         var code_agreement_arr = [];
-        codes.forEach(function(code) {
+        coding.code_list.display.forEach(function(code) {
             var entry = {
                 Code: code,
                 Count: 0,
@@ -313,8 +339,9 @@ Coding.prototype = {
         // Find majority agreement
         coding.tweets_arr.forEach(function(tweet) {                        
             // Get the plurality
-            tweet.Plurality['Count'] = d3.max(primary_codes, function(code) { return tweet.Votes[code].length; });
-            primary_codes.forEach(function(code) {
+            coding.n.codes += tweet.Votes['Count'];
+            tweet.Plurality['Count'] = d3.max(coding.code_list.primary6, function(code) { return tweet.Votes[code].length; });
+            coding.code_list.primary6.forEach(function(code) {
                 tweet.Plurality[code] = tweet.Votes[code].length == tweet.Plurality['Count'];
                 if(!tweet.Plurality['Primary'] && tweet.Plurality[code])
                     tweet.Plurality['Primary'] = code;
@@ -324,7 +351,7 @@ Coding.prototype = {
             tweet.Uncertainty_Disagreement = (tweet.Votes['Count'] != tweet.Votes['Uncertainty'].length) && tweet.Votes['Uncertainty'].length > 0;
             
             // Find disagreement
-            codes.forEach(function(code) {
+            coding.code_list.display.forEach(function(code) {
                 var votes     = tweet.Votes['Count'];
                 var votes_for, plurality, coder_yes;
                 if(code == 'Primary') {
@@ -363,8 +390,8 @@ Coding.prototype = {
                 if(tweet.Plurality['Primary'] == primary1)
                     coding.coders_x_majority_primary[coder1 - 1]++;
                 
-                var primary_icoder = primary_codes.indexOf(primary1);
-                var primary_iplur = primary_codes.indexOf(tweet.Plurality['Primary']);
+                var primary_icoder = coding.code_list.primary.indexOf(primary1);
+                var primary_iplur = coding.code_list.primary.indexOf(tweet.Plurality['Primary']);
                 if(primary_icoder >= 0 && primary_iplur >= 0)
                     coding.codes_x_codes[primary_icoder][primary_iplur]++;
                        
@@ -382,6 +409,7 @@ Coding.prototype = {
                 })
             })
         });
+        coding.n.codes_per_tweet = coding.n.codes / coding.n.tweets;
         
         // Order coders by how well they did
         if(coder_id == 'all') {
@@ -390,7 +418,7 @@ Coding.prototype = {
             var coder_agree_perc = coder_agrees.map(function(d, i) { return d / (coder_tweets[i] || 1); });
             
             // Get the list of available coders, ones that coded any tweets
-            var coders_available = d3.range(1, n_coders + 1).filter(function(i) { return coder_tweets[i - 1] > 0; });
+            var coders_available = d3.range(1, coding.n.coders + 1).filter(function(i) { return coder_tweets[i - 1] > 0; });
             
             // Order that list if necessary
             if(options.coder_order.is('alpha')) {
@@ -412,10 +440,10 @@ Coding.prototype = {
                 var SVD = numeric.svd(distance);
 //                var first_component = SVD.V.map(function(d) { return d[coding.nnn]; });
                 
-                console.log(SVD.S[coding.nnn]);
-                console.log(SVD.U[coding.nnn], d3.sum(SVD.U[coding.nnn]));
-                console.log(SVD.V[coding.nnn], d3.sum(SVD.V[coding.nnn]));
-                var first_component = util.zeros(n_coders + 1);
+//                console.log(SVD.S[coding.nnn]);
+//                console.log(SVD.U[coding.nnn], d3.sum(SVD.U[coding.nnn]));
+//                console.log(SVD.V[coding.nnn], d3.sum(SVD.V[coding.nnn]));
+                var first_component = util.zeros(coding.n.coders + 1);
                 SVD.V.forEach(function(d, i) { first_component[coders_available[i] - 1] = d[coding.nnn]; });
                 
                 coders_available.sort(function(a, b) { 
@@ -440,13 +468,12 @@ Coding.prototype = {
 
         // Krippendorff's Alpha
         // http://repository.upenn.edu/cgi/viewcontent.cgi?article=1043&context=asc_papers
-        var primary_codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Unrelated'];
-        codes_tweets_votes = codes.map(function(code) {
+        codes_tweets_votes = coding.code_list.display.map(function(code) {
             if(code == 'Primary') {
                 return coding.tweets_arr.map(function(tweet) {
                     var arr = [0, 0, 0, 0, 0];
                     tweet.Votes.Primary.forEach(function(vote) {
-                        var codei = primary_codes.indexOf(vote);
+                        var codei = coding.code_list.primary.indexOf(vote);
                         if(codei >= 0)
                             arr[codei]++;
                     });
@@ -459,7 +486,7 @@ Coding.prototype = {
                 })
             }   
         });
-        codes.forEach(function(code, j) {
+        coding.code_list.display.forEach(function(code, j) {
             var n_vals = code == 'Primary' ? 5 : 2;
             var total_votes = d3.range(n_vals)
                                 .map(function () { return 0; });
@@ -515,7 +542,7 @@ Coding.prototype = {
     fillTable: function() {
         var coder_id = options.coder.get();
         
-        var results_div = d3.select("#general_results");
+        var results_div = d3.select("#irr");
         results_div.selectAll("*").remove();
         
         var agreement_table = results_div.append("table")
@@ -532,7 +559,7 @@ Coding.prototype = {
             columns.push(coder_name + ' Chose<br /><small>(% of Any Positive)</small>');
             columns.push('Other Chose<br /><small>(% of Any Positive)</small>');
         } else {
-            if(options.period.get() < 0) {
+            if(coding.n.codes_per_tweet > 2.5) {
                 columns.push('Majority (not all) Chose<br /><small>(% of Any Positive)</small>');
             }
             columns.push('Minority Chose<br /><small>(% of Any Positive)</small>');
@@ -562,39 +589,21 @@ Coding.prototype = {
                     return '&nbsp;&nbsp;&nbsp;&nbsp;' + d.Code;
             });
         
-        var cols = [{
-            value: 'Average',
-            of: 'All'
-        },{
-            value: 'Plurality',
-            of: 'All'
-        },{
-            value: options.period.get() < 0 ? 'Minority' : 'NotUnanimous',
-            of: 'All'
-        },{
-            value: 'Unanimous',
-            of: 'Any'
-        }];
+        var cols = [{ value: 'Average', of: 'All' },
+                    { value: 'Plurality', of: 'All' },
+                    { value: coding.n.codes_per_tweet > 2.5 ? 'Minority' : 'NotUnanimous',
+                      of: 'All' },
+                    { value: 'Unanimous', of: 'Any' }];
         if(coder_id != 'all') {
-            cols.push({
-                value: 'JustCoder',
-                of: 'Any'
-            });
-            cols.push({
-                value: 'JustOther',
-                of: 'Any'
-            });
+            cols.push({ value: 'JustCoder', of: 'Any' });
+            cols.push({ value: 'JustOther', of: 'Any' });
         } else {
-            if(options.period.get() < 0) {
-                cols.push({
-                    value: 'JustPlurality',
-                    of: 'Any'
-                });
+            if(coding.n.codes_per_tweet > 2.5) {
+                cols.push({ value: 'JustPlurality', of: 'Any' });
             }
             cols.push({
-                value: options.period.get() < 0 ? 'Minority' : 'NotUnanimous',
-                of: 'Any'
-            });
+                value: coding.n.codes_per_tweet > 2.5 ? 'Minority' : 'NotUnanimous',
+                of: 'Any' });
         }
         
         // Append the columns
@@ -635,7 +644,7 @@ Coding.prototype = {
             .attr('class', 'table_bar');
         
         coding.fillMatrices();
-        coding.getTweets();
+        coding.fillTweetList();
     },
     fillMatrices: function() {
         var div = d3.select('#matrices')
@@ -694,8 +703,8 @@ Coding.prototype = {
                 row.push({FullName: 'Combined', label: '&sum;'});
             } else {
                 var entry = {
-                    Agreed: d3.sum(coding.coders_x_coders_primary[i - 1]),
-                    Tweets: d3.sum(coding.coders_x_coders_possible[i - 1])
+                    Agreed: d3.sum(coding.coders_x_coders_primary[i - 1], function(val, j) { return j != i - 1 ? val : 0 }),
+                    Tweets: d3.sum(coding.coders_x_coders_possible[i - 1], function(val, j) { return j != i - 1 ? val : 0 })
                 }
                 if(entry['Tweets'] == 0){
                     entry['label'] = '';
@@ -844,7 +853,7 @@ Coding.prototype = {
                 if(i == 0) return {val: col_name, max: -1};
                 if(j == 0) return {val: row_name, max: -1};
                 if(i == 6 && j == 6) return {val: d3.sum(coding.codes_x_codes, function(d) { return d3.sum(d); }), max: -1};
-                if(i == 6)return {val: d3.sum(coding.codes_x_codes, function(d) { return d[j - 1];}), max: -1};
+                if(i == 6) return {val: d3.sum(coding.codes_x_codes, function(d) { return d[j - 1];}), max: -1};
                 if(j == 6) return {val: d3.sum(coding.codes_x_codes[i - 1]), max: -1};
                 
                 return {
@@ -897,7 +906,7 @@ Coding.prototype = {
 //                return color2(d.val / d.max * 100);
 //            });
     },
-    getTweets: function() {
+    fillTweetList: function() {
         var coder_id = options.coder.get();
         coder_id = parseInt(coder_id) || 'all';
         var coder = {};
@@ -911,9 +920,11 @@ Coding.prototype = {
         // Filter out tweets by coder
         if(coder_id != 'all') {
             tweets = tweets.filter(function(tweet) {
-                console.log(tweet.Votes.Coders, coder_id, tweet.Votes.Coders.includes(coder_id));
+//                console.log(tweet.Votes.Coders, coder_id, tweet.Votes.Coders.includes(coder_id));
                 return tweet.Votes.Coders.includes(coder_id);
             });
+        } else { // Clone the array
+            tweets = tweets.map(function(tweet) { return tweet; });
         }
         
         // Filter out tweets by disagreement
@@ -927,7 +938,7 @@ Coding.prototype = {
                 }
 
                 tweets = tweets.filter(function(tweet) {
-                    return codes.reduce(function(disagreed, code) {
+                    return coding.code_list.display.reduce(function(disagreed, code) {
                         var coder_yes = tweet.Votes[code].includes(coder_id);
                         var group_yes = tweet.Plurality[code];
                         return disagreed || (group_yes ? !coder_yes : coder_yes);
@@ -950,9 +961,33 @@ Coding.prototype = {
             }
         }
         
+        // Order the tweets
+        if(options.tweet_order.is('text')) {
+            tweets.sort(function(a, b) {
+                if(a.Text > b.Text) return 1;
+                if(a.Text < b.Text) return -1;
+                return 0;
+            });
+        } else if(options.tweet_order.is('majority')) {
+            tweets.sort(function(a, b) {
+                if(a.Plurality['Primary'] == b.Plurality['Primary']) return a.Plurality['Count'] - b.Plurality['Count'];
+                if(a.Plurality['Primary'] > b.Plurality['Primary']) return 1;
+                if(a.Plurality['Primary'] < b.Plurality['Primary']) return -1;
+                return 0;
+            });
+        } else if(options.tweet_order.is('disagreement')) {
+            tweets.sort(function(a, b) {
+                return a.Plurality['Count'] - b.Plurality['Count'];
+            });
+        } else {
+            tweets.sort(function(a, b) {
+                return a.Tweet_ID - b.Tweet_ID;
+            });
+        }
+        
         // Add the table
         d3.select('#tweet_table').remove();
-        var table = d3.select('#individual_results')
+        var table = d3.select('#tweets')
             .append('table')
             .attr('id', 'tweet_table')
             .attr('class', 'table table-hover');
@@ -962,8 +997,8 @@ Coding.prototype = {
             .selectAll('th')
             .data(['Tweet ID',
                    'Text',
-                   coder_id == 'all' ? (period < 0 ? 'Majority' : 'Coder 1') : coder.ShortName + "'s Label",
-                   coder_id == 'all' ? (period < 0 ? 'Minority' : 'Coder 2') : "Other's Label"])
+                   coder_id == 'all' ? (coding.n.codes_per_tweet > 2.5 ? 'Majority' : 'Coder 1') : coder.ShortName + "'s Label",
+                   coder_id == 'all' ? (coding.n.codes_per_tweet > 2.5 ? 'Minority' : 'Coder 2') : "Other's Label"])
             .enter()
             .append('th')
             .html(function(d) { return d; })
@@ -987,19 +1022,19 @@ Coding.prototype = {
             .html(function(d) {
                 var text = '';
                 if(coder_id == 'all') {
-                    if(period < 0) {
-                        ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
+                    if(coding.n.codes_per_tweet > 2.5) {
+                        coding.code_list.primary6.forEach(function(code) {
                             var n_votes_for = d.Votes[code].length;
                             if (n_votes_for > d.Votes['Count'] / 2 || d.Plurality['Primary'] == code) {
                                 text += "<span class='code_Primary code_" + code + "'>" + code;
-                                if(period < 0) text += ' (' + n_votes_for + ')';
+                                if(coding.n.codes_per_tweet > 2.5) text += ' (' + n_votes_for + ')';
                                 text += '</span><br />';
                             }
                         });
                         var num_uncertain = d['Votes']['Uncertainty'].length;
                         if(num_uncertain > d.Votes['Count'] / 2) {
                             text += "<span class='code_Uncertainty'>Uncertainty";
-                            if(period < 0) text += ' (' + num_uncertain + ')';
+                            if(coding.n.codes_per_tweet > 2.5) text += ' (' + num_uncertain + ')';
                             text += '</span>';
                         }
                     } else {
@@ -1010,7 +1045,7 @@ Coding.prototype = {
                         text += "<span class='code_Uncertainty'>" + (uncertainty ? 'Uncertainty' : '-') + "</span>";
                     }
                 } else {
-                    ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
+                    coding.code_list.primary6.forEach(function(code) {
                         if (d.Votes[code].includes(coder_id)) {
                             text += "<span class='code_Primary code_" + code + "'>" + code + "</span><br \>";
                         }
@@ -1021,17 +1056,24 @@ Coding.prototype = {
                 }
             
                 return text;
+            })
+            .on('mouseover', coding.tweetTooltip)
+            .on('mousemove', function(d) {
+                coding.tooltip.move(d3.event.x, d3.event.y);
+            })
+            .on('mouseout', function(d) {
+                coding.tooltip.off();
             });
         rows.append('td')
             .html(function(d) {
                 var text = '';
                 if(coder_id == 'all') {
-                    if(period < 0) {
-                        ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
+                    if(coding.n.codes_per_tweet > 2.5) {
+                        coding.code_list.primary6.forEach(function(code) {
                             var n_votes_for = d.Votes[code].length;
                             if (n_votes_for <= d.Votes['Count'] / 2 && n_votes_for > 0 && d.Plurality['Primary'] != code) {
                                 text += "<span class='code_Primary code_" + code + "'>" + code;
-                                if(period < 0) text += ' (' + n_votes_for + ')';
+                                if(coding.n.codes_per_tweet > 2.5) text += ' (' + n_votes_for + ')';
                                 text += '</span><br />';
                             }
                         });
@@ -1039,7 +1081,7 @@ Coding.prototype = {
                         var num_uncertain = d['Votes']['Uncertainty'].length;
                         if(num_uncertain > 0 && num_uncertain <= d.Votes['Count'] / 2) {
                             text += "<span class='code_Uncertainty'>Uncertainty";
-                            if(period < 0) text += ' (' + num_uncertain + ')';
+                            if(coding.n.codes_per_tweet > 2.5) text += ' (' + num_uncertain + ')';
                             text += '</span>';
                         }
                     } else {
@@ -1050,33 +1092,30 @@ Coding.prototype = {
                         text += "<span class='code_Uncertainty'>" + (uncertainty ? 'Uncertainty' : '-') + "</span>";
                     }
                 } else {
-                    ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'].forEach(function(code) {
+                    coding.code_list.primary6.forEach(function(code) {
                         var n_votes_for = d.Votes[code].length - (d.Votes[code].includes(coder_id) ? 1 : 0);
                         if (n_votes_for > 0) {
-                            text += "<span class='code_Primary code_" + code + "'>" + code + "</span>";
-                            if(period < 0) text += '(' + n_votes_for + ')';
-                            text += '<br />';
+                            text += "<span class='code_Primary code_" + code + "'>" + code;
+                            if(coding.n.codes_per_tweet > 2.5 || n_votes_for > 1) text += ' (' + n_votes_for + ')';
+                            text += '</span><br />';
                         }
                     });
                     var num_uncertain = d['Votes']['Uncertainty'].length - (d.Votes['Uncertainty'].includes(coder_id) ? 1 : 0);
                     if(num_uncertain > 0) {
-                        text += "<span class='code_Uncertainty'>Uncertainty</span>";
-                        if(period < 0) text += '(' + num_uncertain + ')';
-                        text += '<br />';
+                        text += "<span class='code_Uncertainty'>Uncertainty";
+                        if(coding.n.codes_per_tweet > 2.5 || num_uncertain > 1) text += ' (' + num_uncertain + ')';
+                        text += '</span><br />';
                     }
                 }
             
                 return text;
-            
-//                return "" +
-//                    "<span class='code_Primary code_" + d['Plurality']['Primary'] + "'>" + d['Plurality']['Others'] + "</span>" +
-//                    "<br />" +
-//                    (d['Votes']['Uncertainty'].length < 5 ? "<span class='code_Uncertainty'>" + (d['Votes']['Uncertainty'].length > 0 ? "Uncertainty " + d['Votes']['Uncertainty'].length : "-")  + "</span>" : '');
-//                return d;
-//                return "" +
-//                    "<span class='code_Primary code_" + d['Primary ' + i] + "'>" + d['Primary ' + i] + "</span>" +
-//                    "<br />" +
-//                    "<span class='code_Uncertainty'>" + (d['Uncertainty ' + i] == "1" ? "Uncertainty" : "-")  + "</span>"
+            })
+            .on('mouseover', coding.tweetTooltip)
+            .on('mousemove', function(d) {
+                coding.tooltip.move(d3.event.x, d3.event.y);
+            })
+            .on('mouseout', function(d) {
+                coding.tooltip.off();
             });
         
         if(tweets_shown == 'Disagreement') {
@@ -1099,6 +1138,29 @@ Coding.prototype = {
             d3.selectAll('span.code_Uncertainty')
                 .classed('small', true);
         }
+    },
+    tweetTooltip: function(d) {
+        var voters = d.Votes['Coders'];
+        var votes = {};
+        voters.forEach(function(voter) { votes[voter] = ''; });
+        
+        coding.code_list.any.forEach(function(code) {
+            d.Votes[code].forEach(function(voter) {
+                votes[voter] += code + ' ';
+            });
+        });
+        
+        if(!options.coder_order.is('anonymous')) {
+            var votes2 = {};
+            voters.forEach(function(voter) {
+                var name = coding.coders[voter - 1].ShortName;
+                votes2[name] = votes[voter];
+            })
+            votes = votes2;
+        }
+        
+        coding.tooltip.setData(votes);
+        coding.tooltip.on();
     }
 };
 
