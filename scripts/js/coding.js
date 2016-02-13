@@ -12,6 +12,8 @@ function Coding() {
     
     this.tooltip = new Tooltip();
     this.tooltip.init();
+    
+    this.nnn = 0;
 }
 Coding.prototype = {
     getData: function() {
@@ -78,7 +80,7 @@ Coding.prototype = {
         });
         
         options.choice_groups = [];
-        options.initial_buttons = ['rumor', 'period', 'coder', 'tweets_shown', 'anonymous'];
+        options.initial_buttons = ['rumor', 'period', 'coder', 'tweets_shown', 'coder_order'];
         options.record = options.initial_buttons;
         options.rumor = new Option({
             title: 'Rumor',
@@ -144,15 +146,14 @@ Coding.prototype = {
         });
         
         // Types of disagreement        
-        options.anonymous = new Option({
-            title: "Anonymous",
-            styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
-            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Anonymous", "<span class='glyphicon glyphicon-ok-circle'></span> Anonymous"],
-            ids:    ["false", "true"],
-            default: 1,
-            type: "toggle",
+        options.coder_order = new Option({
+            title: "Coder Order",
+            labels: ["Alphabetic", "Agreement", "Anonymous", "Cluster"],
+            ids:    ['alpha', 'agreement', 'anonymous', 'cluster'],
+            default: 2,
+            available: [0, 1, 2],
             parent: '#options',
-            callback: coding.fillTable
+            callback: coding.compileReport
         });
         
         // Start drawing
@@ -385,20 +386,50 @@ Coding.prototype = {
         // Order coders by how well they did
         if(coder_id == 'all') {
             var coder_agrees = coding.coders_x_coders_primary.map(function(d) { return d3.sum(d); });
-            var coder_possible = coding.coders_x_coders_possible.map(function(d) { return d3.sum(d); });
-            var coder_agree_perc = coder_agrees.map(function(d, i) { return d / (coder_possible[i] || 1); });
-            var coder_order = d3.range(n_coders).sort(function(a, b) { return coder_agree_perc[b] - coder_agree_perc[a]; });
+            var coder_tweets = coding.coders_x_coders_possible.map(function(d) { return d3.sum(d); });
+            var coder_agree_perc = coder_agrees.map(function(d, i) { return d / (coder_tweets[i] || 1); });
             
-            var available = [0]; // All
-            coder_order.forEach(function(i) { 
-                if(coder_agree_perc[i] > 0)
-                    available.push(i + 1);
-            });
+            // Get the list of available coders, ones that coded any tweets
+            var coders_available = d3.range(1, n_coders + 1).filter(function(i) { return coder_tweets[i - 1] > 0; });
             
-            if(options.anonymous.is('true')) {
-                available.sort(function(a, b) { return a - b; });
-            }
-            options.coder.available = available;
+            // Order that list if necessary
+            if(options.coder_order.is('alpha')) {
+                coders_available.sort(function(a, b) {
+                    var name1 = coding.coders[a - 1].Name;
+                    var name2 = coding.coders[b - 1].Name;
+                    if(name1 > name2) return 1;
+                    if(name1 < name2) return -1;
+                    return 0;
+                });
+            } else if (options.coder_order.is('cluster')) {
+                var distance = coders_available.map(function(i) {
+                    return coders_available.map(function(j) {
+                        return (coding.coders_x_coders_primary[i-1][j-1] / coding.coders_x_coders_possible[i-1][j-1]) || 1000;
+                    });
+                });
+//                    
+//                var distance = coding.coders_x_coders_primary
+                var SVD = numeric.svd(distance);
+//                var first_component = SVD.V.map(function(d) { return d[coding.nnn]; });
+                
+                console.log(SVD.S[coding.nnn]);
+                console.log(SVD.U[coding.nnn], d3.sum(SVD.U[coding.nnn]));
+                console.log(SVD.V[coding.nnn], d3.sum(SVD.V[coding.nnn]));
+                var first_component = util.zeros(n_coders + 1);
+                SVD.V.forEach(function(d, i) { first_component[coders_available[i] - 1] = d[coding.nnn]; });
+                
+                coders_available.sort(function(a, b) { 
+                    return first_component[b - 1] - first_component[a - 1];
+                });
+            } else if (options.coder_order.is('agreement')) {
+                coders_available.sort(function(a, b) { 
+                    return coder_agree_perc[b - 1] - coder_agree_perc[a - 1];
+                })
+            } // Otherwise anonymous, will do it in numeric order
+            coders_available.unshift(0); // Add All option
+            
+            // Update the dropdown
+            options.coder.available = coders_available;
             if(options.coder.available.includes(options.coder.indexCur())) {
                 options.coder.default = options.coder.indexCur();
             } else {
@@ -621,7 +652,7 @@ Coding.prototype = {
         // Get short coder names
         var coder_names = options.coder.labels.map(function(name, i) {
             if(i == 0) return '';
-            if(options.anonymous.is("true"))
+            if(options.coder_order.is("anonymous"))
                 return i + " ";
             
             return name.split(' ').map(function(name_part) {
