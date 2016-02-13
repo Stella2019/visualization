@@ -76,7 +76,7 @@ Coding.prototype = {
             rumor.event = coding.events.filter(function(event){
                 return event.ID == rumor.Event_ID;
             })[0];
-            return rumor.event.Name + ": " + rumor.Name;
+            return rumor.event.DisplayName + ": " + rumor.Name;
         });
         var ids = coding.rumors.map(function(rumor) {
             return rumor.ID;
@@ -94,7 +94,10 @@ Coding.prototype = {
         });
         
         options.choice_groups = [];
-        options.initial_buttons = ['rumor', 'period', 'coder', 'coder_order', 'tweets_shown', 'tweet_order'];
+        options.initial_buttons = ['show_irr', 'show_matrices', 'show_tweets',
+                                   'rumor', 'period', 'coder',
+                                   'coder_order',
+                                   'tweets_shown', 'tweet_order'];
         options.record = options.initial_buttons;
         options.rumor = new Option({
             title: 'Rumor',
@@ -103,7 +106,7 @@ Coding.prototype = {
             available: available,
             default: 0,
             type: "dropdown",
-            parent: '#options',
+            parent: '#irr_header',
             callback: coding.chooseRumor
         });
         
@@ -115,7 +118,7 @@ Coding.prototype = {
             isnumeric: true,
             default: 1,
             type: "dropdown",
-            parent: '#options',
+            parent: '#irr_header',
             callback: coding.getCodes
         });
         
@@ -136,13 +139,13 @@ Coding.prototype = {
             isnumeric: true,
             default: 0,
             type: "dropdown",
-            parent: '#options',
+            parent: '#irr_header',
             callback: coding.compileReport
         });
         
         // Types of disagreement        
         options.tweets_shown = new Option({
-            title: 'Tweets Shown',
+            title: 'Show',
             labels: ['All',
                      'Any Disagreement',
                      'Disagreement on Primary Code',
@@ -161,7 +164,7 @@ Coding.prototype = {
         
         // Ordering Data    
         options.coder_order = new Option({
-            title: "Coder Order",
+            title: "Order",
             labels: ["Alphabetic", "Agreement", "Anonymous", "Cluster"],
             ids:    ['alpha', 'agreement', 'anonymous', 'cluster'],
             default: 2,
@@ -170,7 +173,7 @@ Coding.prototype = {
             callback: coding.compileReport
         });        
         options.tweet_order = new Option({
-            title: "Tweet Order",
+            title: "Order",
             labels: ['Tweet ID', 'Text', 'Majority Code', 'Disagreement'],
             ids:    ['tweet_id', 'text', 'majority', 'disagreement'],
             default: 3,
@@ -179,8 +182,54 @@ Coding.prototype = {
             callback: coding.fillTweetList
         });
         
+        // subsection toggles
+        options.show_irr = new Option({
+            title: 'Show Interrator Reliability Statistics',
+            styles: ["btn btn-sm", "btn btn-sm btn-default"],
+            labels: ["<span class='glyphicon glyphicon-menu-down'></span>",
+                     "<span class='glyphicon glyphicon-menu-up'></span>"],
+            ids:    ["false", "true"],
+            default: 1,
+            type: "toggle",
+            parent: '#irr_header',
+            callback: function() { coding.togglePane('irr', 1000); }
+        });
+        options.show_matrices = new Option({
+            title: 'Show Matrices',
+            styles: ["btn btn-sm", "btn btn-sm btn-default"],
+            labels: ["<span class='glyphicon glyphicon-menu-down'></span>",
+                     "<span class='glyphicon glyphicon-menu-up'></span>"],
+            ids:    ["false", "true"],
+            default: 0,
+            type: "toggle",
+            parent: '#matrices_header',
+            callback: function() { coding.togglePane('matrices', 1000); }
+        });
+        // subsection toggles
+        options.show_tweets = new Option({
+            title: 'Show Tweets',
+            styles: ["btn btn-sm", "btn btn-sm btn-default"],
+            labels: ["<span class='glyphicon glyphicon-menu-down'></span>",
+                     "<span class='glyphicon glyphicon-menu-up'></span>"],
+            ids:    ["false", "true"],
+            default: 0,
+            type: "toggle",
+            parent: '#tweets_header',
+            callback: function() { coding.togglePane('tweets', 1000); }
+        });
+        
+        
         // Start drawing
         options.init();
+        
+        // Change some of the appearances
+        d3.selectAll('.choice')
+            .style('vertical-align', 'top');
+        d3.selectAll('.btn-primary')
+            .classed('btn-default', true)
+            .classed('btn-primary', false);
+        
+        coding.chooseRumor();
     },
     chooseRumor: function() {
         coding.rumor = {};
@@ -540,6 +589,8 @@ Coding.prototype = {
         coding.fillTable();
     },
     fillTable: function() {
+        coding.togglePane('irr');
+        
         var coder_id = options.coder.get();
         
         var results_div = d3.select("#irr");
@@ -647,6 +698,8 @@ Coding.prototype = {
         coding.fillTweetList();
     },
     fillMatrices: function() {
+        coding.togglePane('matrices');
+        
         var div = d3.select('#matrices')
             .attr('class', 'row');
         div.selectAll('*').remove();
@@ -907,6 +960,8 @@ Coding.prototype = {
 //            });
     },
     fillTweetList: function() {
+        coding.togglePane('tweets');
+        
         var coder_id = options.coder.get();
         coder_id = parseInt(coder_id) || 'all';
         var coder = {};
@@ -1161,6 +1216,26 @@ Coding.prototype = {
         
         coding.tooltip.setData(votes);
         coding.tooltip.on();
+    },
+    togglePane: function(pane, duration) {
+        if(options['show_' + pane].is("true")) {
+            d3.select('#' + pane)
+                .transition(duration || 10)
+                .style('opacity', 1)
+                .style('transform', 'scaleY(1)')
+                .style('transform-origin', 'top')
+                .style('display', 'block');
+        
+        } else {
+            d3.select('#' + pane)
+                .transition(duration || 10)
+                .style('opacity', 0)
+                .style('transform', 'scaleY(0)')
+                .style('transform-origin', 'top')
+                .each('end', function() {
+                    d3.select(this).style('display', 'none')
+                });
+        }
     }
 };
 
