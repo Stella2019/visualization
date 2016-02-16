@@ -94,10 +94,11 @@ Coding.prototype = {
         });
         
         options.choice_groups = [];
-        options.initial_buttons = ['show_irr', 'show_matrices', 'show_tweets',
+        options.initial_buttons = ['show_irr', 'show_matrices', 'show_tweets', 'show_tweet_types', 'show_ngrams',
                                    'rumor', 'period', 'coder',
                                    'coder_order',
-                                   'tweets_shown', 'tweet_order'];
+                                   'tweets_shown', 'tweet_order',
+                                   'ngrams_exclude_stopwords', 'ngrams_relative'];
         options.record = options.initial_buttons;
         options.rumor = new Option({
             title: 'Rumor',
@@ -171,7 +172,7 @@ Coding.prototype = {
             available: [0, 1, 2],
             parent: '#matrices_header',
             callback: coding.compileReport
-        });        
+        });
         options.tweet_order = new Option({
             title: "Order",
             labels: ['Tweet ID', 'Text', 'Majority Code', 'Disagreement'],
@@ -180,6 +181,32 @@ Coding.prototype = {
             available: [0, 1, 2, 3],
             parent: '#tweets_header',
             callback: coding.fillTweetList
+        });
+        
+        // NGram Display
+        options.ngrams_exclude_stopwords = new Option({
+            title: "Exclude Stopwords",
+            styles: ["btn btn-sm", "btn btn-sm btn-default"],
+            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Exclude Stopwords",
+                     "<span class='glyphicon glyphicon-ok-circle'></span> Exclude Stopwords"],
+            ids:    ['false', 'true'],
+            default: 1,
+            type: 'toggle',
+            available: [0, 1],
+            parent: '#ngrams_header',
+            callback: coding.NGramList
+        });
+        options.ngrams_relative = new Option({
+            title: "Relative",
+            styles: ["btn btn-sm", "btn btn-sm btn-default"],
+            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Relative Counts",
+                     "<span class='glyphicon glyphicon-ok-circle'></span> Relative Counts"],
+            ids:    ['false', 'true'],
+            default: 0,
+            type: 'toggle',
+            available: [0, 1],
+            parent: '#ngrams_header',
+            callback: coding.NGramList
         });
         
         // subsection toggles
@@ -215,6 +242,28 @@ Coding.prototype = {
             type: "toggle",
             parent: '#tweets_header',
             callback: function() { coding.togglePane('tweets', 1000); }
+        });
+        options.show_tweet_types = new Option({
+            title: 'Show Tweet Types',
+            styles: ["btn btn-sm", "btn btn-sm btn-default"],
+            labels: ["<span class='glyphicon glyphicon-menu-down'></span>",
+                     "<span class='glyphicon glyphicon-menu-up'></span>"],
+            ids:    ["false", "true"],
+            default: 0,
+            type: "toggle",
+            parent: '#tweet_types_header',
+            callback: function() { coding.togglePane('tweet_types', 1000); }
+        });
+        options.show_ngrams = new Option({
+            title: 'Show N-Grams',
+            styles: ["btn btn-sm", "btn btn-sm btn-default"],
+            labels: ["<span class='glyphicon glyphicon-menu-down'></span>",
+                     "<span class='glyphicon glyphicon-menu-up'></span>"],
+            ids:    ["false", "true"],
+            default: 0,
+            type: "toggle",
+            parent: '#ngrams_header',
+            callback: function() { coding.togglePane('ngrams', 1000); }
         });
         
         
@@ -584,11 +633,14 @@ Coding.prototype = {
             code_agreement[code]["Agreement Level"] = agreement;
         });
         
-        // Write data
+        // Display data
         coding.code_agreement_arr = code_agreement_arr;
-        coding.fillTable();
+        coding.IRRTable();
+        coding.fillMatrices();
+        coding.fillTweetList();
+        coding.getMoreInformation();
     },
-    fillTable: function() {
+    IRRTable: function() {
         coding.togglePane('irr');
         
         var coder_id = options.coder.get();
@@ -695,9 +747,6 @@ Coding.prototype = {
                     return agreement_colors[d['Agreement Level']]}
             })
             .attr('class', 'table_bar');
-        
-        coding.fillMatrices();
-        coding.fillTweetList();
     },
     fillMatrices: function() {
         coding.togglePane('matrices');
@@ -977,7 +1026,6 @@ Coding.prototype = {
         // Filter out tweets by coder
         if(coder_id != 'all') {
             tweets = tweets.filter(function(tweet) {
-//                console.log(tweet.Votes.Coders, coder_id, tweet.Votes.Coders.includes(coder_id));
                 return tweet.Votes.Coders.includes(coder_id);
             });
         } else { // Clone the array
@@ -1237,6 +1285,282 @@ Coding.prototype = {
                 .each('end', function() {
                     d3.select(this).style('display', 'none')
                 });
+        }
+    },
+    getMoreInformation: function() {
+        var post = {
+            rumor_id: options.rumor.get(),
+            period: options.period.get()
+        };
+        
+        data.callPHP('coding/getTweets', post, coding.tweetTypeTable);
+        coding.countNGrams();
+    },
+    tweetTypeTable: function(file_data) {
+        coding.togglePane('tweet_types');
+        
+        var tweetsDB;
+        try {
+            tweetsDB = JSON.parse(file_data);
+        } catch(err) {
+            console.log(file_data);
+            return;
+        }
+        
+        // Add information to the tweets
+        tweetsDB.forEach(function(tweetDB) {
+            var tweet = coding.tweets[tweetDB.ID];
+            if(tweet) {
+                tweet.Type = tweetDB.Type
+            } else {
+                console.log('Somethings wrong mapping tweets, couldn\'t find ID ' + tweetDB.ID);
+            }
+        });
+        
+        // Get Type Counts
+        coding.type_counts_byCode = coding.code_list.binary.map(function(code) {
+            return {
+                Code: code,
+                Original: 0,
+                Retweet: 0,
+                Reply: 0,
+                Quote: 0,
+                Unknown: 0,
+                'Any Type': 0
+            }
+        });
+        coding.type_counts_byCode.unshift({
+            Code: 'Total',
+            Original: 0,
+            Retweet: 0,
+            Reply: 0,
+            Quote: 0,
+            Unknown: 0,
+            'Any Type': 0
+        });
+        
+        coding.tweets_arr.forEach(function(tweet) {
+            var type = tweet.Type || 'Unknown';
+            if(type.charAt(0) >= 'a') type = type.charAt(0).toUpperCase() + type.substring(1);
+            coding.type_counts_byCode[0][type]++;
+            coding.type_counts_byCode[0]['Any Type']++;
+            
+            coding.code_list.binary.forEach(function(code, i_code) {
+                var votes     = tweet.Votes['Count'];
+                var votes_for = tweet.Votes[code].length;
+                
+                var val = votes_for / votes;
+                var entry = coding.type_counts_byCode[i_code + 1];
+                entry['Any Type'] += val;
+                entry[type]       += val;
+            });
+        });
+        
+        
+        // Format area
+        var results_div = d3.select("#tweet_types");
+        results_div.selectAll("*").remove();
+        
+        results_div.append('span')
+            .text('Computed using the Average tweet assignment for each tweet in lieu of adjudicated data.');
+        
+        var table = results_div.append("table")
+            .attr('id', 'agreement_table')
+            .attr('class', 'table');
+        
+        
+        var columns = [{ value: 'Original', of: 'Any Type' },
+                    { value: 'Retweet',  of: 'Any Type' },
+                    { value: 'Reply',    of: 'Any Type' },
+                    { value: 'Quote',    of: 'Any Type' },
+                    { value: 'Unknown',  of: 'Any Type' },
+                    { value: 'Original', of: 'All Originals' },
+                    { value: 'Retweet',  of: 'All Retweets' },
+                    { value: 'Reply',    of: 'All Replies' },
+                    { value: 'Quote',    of: 'All Quotes' }];
+        
+        var colors = {
+            'Total': '#eee',
+            'Uncodable': null,
+            'Unrelated': '#eee',
+            'Affirm': null,
+            'Deny': '#eee',
+            'Neutral': null,
+            'Uncertainty': '#eee',
+            'All Originals': '#edc',
+            'All Retweets': '#eec',
+            'All Replies': '#dec',
+            'All Quotes': '#cde'
+        }
+        
+        var column_names = columns.map(function(col) {
+            return col.value + '<br /><small>(% of ' + col.of + ')</small>';
+        });
+        column_names.unshift('Code');
+        
+        table.append('thead')
+            .append('tr')
+            .selectAll('th')
+            .data(column_names)
+            .enter()
+            .append('th')
+            .html(function(d) { return d; })
+            .style('width', (100 / column_names.length) + '%');
+        
+        var rows = table.append('tbody')
+            .selectAll('tr')
+            .data(coding.type_counts_byCode)
+            .enter()
+            .append('tr');
+        
+        rows.append('td')
+            .html(function(d) {
+                return d.Code;
+            });
+        
+        // Append the columns
+        columns.forEach(function(col) {
+            rows.append('td')
+                .html(function(d) {
+                    var of = d[col.of];
+                    if(of == undefined) // Then it's the column total
+                        of = coding.type_counts_byCode[0][col.value];
+                    return d[col.value].toFixed(0) + " <small>(" + 
+                        (d[col.value] / of * 100).toFixed(0) + 
+                        "%)</small>";
+                })
+                .attr('class', 'table_stat')
+                .append('div')
+                .style({
+                    width: function(d) { 
+                        var of = d[col.of];
+                        if(of == undefined) // Then it's the column total
+                            of = coding.type_counts_byCode[0][col.value];
+                        return (d[col.value] / of * 90) + '%'},
+                    background: function(d) { return colors[col.of] || colors[d.Code]; }
+                })
+                .attr('class', 'table_bar');
+        });
+    },
+    countNGrams: function() {
+        // Make structures
+        coding.ngrams = {};
+        var ngrams = coding.ngrams;
+        
+        ngrams.nTweets = 0;
+        ngrams.TweetCounter = new Counter();
+        ngrams.nGrams = d3.range(3).map(function(d) {
+            return 0;
+        });
+        ngrams.NGramCounter = d3.range(3).map(function(d) {
+            return new Counter();
+        });
+        
+        // Add up ngrams
+        coding.tweets_arr.forEach(function(tweet) {
+            tweet.TextNoURL = tweet.Text.replace(/http\S+/g, ' ');
+
+            ngrams.nTweets += 1;
+            ngrams.TweetCounter.incr(tweet.TextNoURL);
+
+            var text = tweet.TextNoURL.toLowerCase();
+            text = text.replace(/[^\w']+/g, ' ');
+            text = text.replace(/\w' | '\w/g, ' ');
+            var words = text.split(' ');
+            var tweetgrams = [new Set(), new Set(), new Set()];
+
+            words.map(function(word, wi) {
+                if(word) {
+                    var gram = word;
+                    if(!tweetgrams[0].has(gram)) {
+                        tweetgrams[0].add(gram);
+                        ngrams.nGrams[0] += 1;
+                        ngrams.NGramCounter[0].incr(gram);
+                    }
+                    if(words[wi + 1]) {
+                        gram += " " + words[wi + 1];
+                        if(!tweetgrams[1].has(gram)) {
+                            tweetgrams[1].add(gram);
+                            ngrams.nGrams[1] += 1;
+                            ngrams.NGramCounter[1].incr(gram);
+                        }
+                        if(words[wi + 2]) {
+                            gram += " " + words[wi + 2];
+                            if(!tweetgrams[2].has(gram)) {
+                                tweetgrams[2].add(gram);
+                                ngrams.nGrams[2] += 1;
+                                ngrams.NGramCounter[2].incr(gram);
+                            }
+                        }
+                    }
+                    // Add co-occurance
+                }
+            });
+        });
+        
+        coding.NGramList();
+    },
+    NGramList: function() {
+        var ngrams = coding.ngrams;
+        var div = d3.select('#ngrams');
+        div.selectAll('*').remove();
+
+        var labels = ['Unigrams', 'Bigrams', 'Trigrams'];
+        var top;
+        if(options.ngrams_exclude_stopwords.is("true")) {
+            top = [ngrams.NGramCounter[0].top_no_stopwords(100),
+                   ngrams.NGramCounter[1].top_no_stopwords(100),
+                   ngrams.NGramCounter[2].top_no_stopwords(100)];
+        } else {
+            top = [ngrams.NGramCounter[0].top(100),
+                   ngrams.NGramCounter[1].top(100),
+                   ngrams.NGramCounter[2].top(100)];
+        }
+        var relative = options.ngrams_relative.is("true");
+
+        div.append('table')
+            .append('tr')
+            .selectAll('td')
+            .data(top)
+            .enter()
+            .append('td')
+            .attr('class', 'ngram_table_container')
+            .append('table')
+            .attr('class', 'ngram_table')
+            .each(function(d, i) {
+                var header = d3.select(this).append('tr');
+                header.append('th')
+                    .attr('class', 'ngram_count_label')
+                    .text(labels[i]);
+                header.append('th')
+                    .attr('class', 'ngram_count_count')
+                    .text(relative ? 'Freq' : 'Count');
+
+                d3.select(this)
+                    .selectAll('tr.ngram_count')
+                    .data(d)
+                    .enter()
+                    .append('tr')
+                    .attr('class', 'ngram_count');
+            });
+        
+        div.selectAll('.ngram_count')
+            .append('td')
+            .attr('class', 'ngram_count_label')
+            .text(function(d) { return d.key; });
+        
+        if(ngrams.relative) {
+            div.selectAll('.ngram_count')
+                .append('td')
+                .attr('class', 'ngram_count_count')
+                .text(function(d) { 
+                    return (d.value * 100.0 / ngrams.nTweets).toFixed(1); 
+            });
+        } else {
+            div.selectAll('.ngram_count')
+                .append('td')
+                .attr('class', 'ngram_count_count')
+                .text(function(d) { return d.value; });
         }
     }
 };
