@@ -205,7 +205,6 @@ Coding.prototype = {
             parent: '#matrices_header',
             callback: function() { coding.togglePane('matrices', 1000); }
         });
-        // subsection toggles
         options.show_tweets = new Option({
             title: 'Show Tweets',
             styles: ["btn btn-sm", "btn btn-sm btn-default"],
@@ -349,6 +348,7 @@ Coding.prototype = {
         });
         
         // Initialize objects
+        coding.n.codes = 0;
         coding.n.tweets = coding.tweets_arr.length
 761;
         coding.n.coders = coding.coders.length;
@@ -447,7 +447,7 @@ Coding.prototype = {
                 tweet.Votes.Coders.map(function(coder2, ic2) {
                     var primary2 = tweet.Votes['Primary'][ic2];
                     coding.coders_x_coders_possible[coder1 - 1][coder2 - 1]++;
-                    if(primary1 == primary2)
+                    if(primary1 == primary2 && primary1 != 'No Code')
                         coding.coders_x_coders_primary[coder1 - 1][coder2 - 1]++;
                     
                     var uncertainty2 = tweet.Votes['Uncertainty'].includes(coder2);
@@ -603,7 +603,7 @@ Coding.prototype = {
         var columns = ['Code',
            'Average Chose<br /><small>(% of All)</small>',
            'Majority Chose<br /><small>(% of All)</small>', 
-           'Disagreed<br /><small>(% of All)</small>', 
+            (coding.n.codes_per_tweet > 2.5 ? 'Minority Chose' : 'Disagreed') + '<br /><small>(% of All)</small>', 
            'Unanimous<br /><small>(% of Any Positive)</small>'];
         if(coder_id != 'all') {
             var coder_name = coding.coders[parseInt(coder_id) - 1].ShortName;
@@ -612,8 +612,10 @@ Coding.prototype = {
         } else {
             if(coding.n.codes_per_tweet > 2.5) {
                 columns.push('Majority (not all) Chose<br /><small>(% of Any Positive)</small>');
+                columns.push('Minority Chose<br /><small>(% of Any Positive)</small>');
+            } else {
+                columns.push('Disagreed<br /><small>(% of Any Positive)</small>');
             }
-            columns.push('Minority Chose<br /><small>(% of Any Positive)</small>');
         }
         columns.push('Krippendorff\'s &alpha;<br /><small>(Agreement)</small>');
         
@@ -851,8 +853,8 @@ Coding.prototype = {
                 row.push({FullName: 'Combined', label: '&sum;'});
             } else {
                 var entry = {
-                    Agreed: d3.sum(coding.coders_x_coders_uncertainty_both[i - 1]),
-                    Tweets: d3.sum(coding.coders_x_coders_uncertainty_either[i - 1])
+                    Agreed: d3.sum(coding.coders_x_coders_uncertainty_both[i - 1], function(val, j) { return j != i - 1 ? val : 0 }),
+                    Tweets: d3.sum(coding.coders_x_coders_uncertainty_either[i - 1], function(val, j) { return j != i - 1 ? val : 0 })
                 }
                 if(entry['Tweets'] == 0){
                     entry['label'] = '';
