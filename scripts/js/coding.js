@@ -1568,7 +1568,7 @@ Coding.prototype = {
             top = [ngrams.NGramCounter[0].top_no_stopwords(100),
                    ngrams.NGramCounter[1].top_no_stopwords(100),
                    ngrams.NGramCounter[2].top_no_stopwords(100),
-                   ngrams.CoOccurCounter.top(100),
+                   ngrams.CoOccurCounter.top_no_stopwords(100),
                    ngrams.URLCounter.top(100)];
         } else {
             top = [ngrams.NGramCounter[0].top(100),

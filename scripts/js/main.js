@@ -224,8 +224,12 @@ Counter.prototype = {
                 'as', 'if', 'so'],
     top_no_stopwords: function(k) {
         k |= 10; // default 10
+        var stopwords = this.stopwords;
+        
         var entries = this.counts.entries().filter(function(d) {
-            return !this.stopwords.includes(d.key);
+            return !d.key.split(' ').reduce(function(found, word) {
+                return found || stopwords.includes(word);
+            }, false);
         }, this);
         return this.firstK(this.getSorted(entries), k)
     },
