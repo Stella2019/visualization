@@ -1581,19 +1581,24 @@ Coding.prototype = {
         if(counts == 'tf-idf' && coding.ngrams.Any) {
             var ngrams_all = coding.ngrams.Any;
             top[0].forEach(function(entry) {
-                entry.value *= Math.log(ngrams_all.nTweets / ngrams_all.NGramCounter[0].has(entry.key));
+                entry['# for all in Rumor'] = ngrams_all.NGramCounter[0].has(entry.key);
+                entry['TF-IDF Rumor'] = entry.value * Math.log(ngrams_all.nTweets / entry['# for all in Rumor']);
             });
             top[1].forEach(function(entry) {
-                entry.value *= Math.log(ngrams_all.nTweets / ngrams_all.NGramCounter[1].has(entry.key));
+                entry['# for all in Rumor'] = ngrams_all.NGramCounter[1].has(entry.key);
+                entry['TF-IDF Rumor'] = entry.value * Math.log(ngrams_all.nTweets / entry['# for all in Rumor']);
             });
             top[2].forEach(function(entry) {
-                entry.value *= Math.log(ngrams_all.nTweets / ngrams_all.NGramCounter[2].has(entry.key));
+                entry['# for all in Rumor'] = ngrams_all.NGramCounter[2].has(entry.key);
+                entry['TF-IDF Rumor'] = entry.value * Math.log(ngrams_all.nTweets / entry['# for all in Rumor']);
             });            
             top[3].forEach(function(entry) {
-                entry.value *= Math.log(ngrams_all.nTweets / ngrams_all.CoOccurCounter.has(entry.key));
+                entry['# for all in Rumor'] = ngrams_all.CoOccurCounter.has(entry.key);
+                entry['TF-IDF Rumor'] = entry.value * Math.log(ngrams_all.nTweets / entry['# for all in Rumor']);
             });
             top[4].forEach(function(entry) {
-                entry.value *= Math.log(ngrams_all.nTweets / ngrams_all.URLCounter.has(entry.key));
+                entry['# for all in Rumor'] = ngrams_all.URLCounter.has(entry.key);
+                entry['TF-IDF Rumor'] = entry.value * Math.log(ngrams_all.nTweets / entry['# for all in Rumor']);
             });
             
             top[0].sort(function(a, b) { return b.value - a.value; });
@@ -1648,7 +1653,7 @@ Coding.prototype = {
                 .append('td')
                 .attr('class', 'ngram_count_count')
                 .text(function(d) { 
-                    return d.value.toFixed(1); 
+                    return d['TF-IDF Rumor'].toFixed(1); 
             });
         } else {
             div.selectAll('.ngram_count')
@@ -1656,6 +1661,17 @@ Coding.prototype = {
                 .attr('class', 'ngram_count_count')
                 .text(function(d) { return d.value; });
         }
+        div.selectAll('.ngram_count_count')
+            .on('mouseover', function(d) {
+                coding.tooltip.setData(d);
+                coding.tooltip.on();
+            })
+            .on('mousemove', function() {
+                coding.tooltip.move(d3.event.x, d3.event.y);
+            })
+            .on('mouseout', function() {
+                coding.tooltip.off();
+            });
     }
 };
 
