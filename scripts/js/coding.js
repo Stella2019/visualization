@@ -1601,11 +1601,11 @@ Coding.prototype = {
                 entry['TF-IDF Rumor'] = entry.value * Math.log(ngrams_all.nTweets / entry['# for all in Rumor']);
             });
             
-            top[0].sort(function(a, b) { return b.value - a.value; });
-            top[1].sort(function(a, b) { return b.value - a.value; });
-            top[2].sort(function(a, b) { return b.value - a.value; });
-            top[3].sort(function(a, b) { return b.value - a.value; });
-            top[4].sort(function(a, b) { return b.value - a.value; });
+            top[0].sort(function(a, b) { return b['TF-IDF Rumor'] - a['TF-IDF Rumor']; });
+            top[1].sort(function(a, b) { return b['TF-IDF Rumor'] - a['TF-IDF Rumor']; });
+            top[2].sort(function(a, b) { return b['TF-IDF Rumor'] - a['TF-IDF Rumor']; });
+            top[3].sort(function(a, b) { return b['TF-IDF Rumor'] - a['TF-IDF Rumor']; });
+            top[4].sort(function(a, b) { return b['TF-IDF Rumor'] - a['TF-IDF Rumor']; });
         }
 //        var relative = options.ngrams_relative.is("true");
 
@@ -1648,7 +1648,7 @@ Coding.prototype = {
                 .text(function(d) { 
                     return (d.value * 100.0 / ngrams.nTweets).toFixed(1); 
             });
-        } else if (counts == 'tf-idf') {
+        } else if (counts == 'tf-idf' && coding.ngrams.Any) {
             div.selectAll('.ngram_count')
                 .append('td')
                 .attr('class', 'ngram_count_count')
