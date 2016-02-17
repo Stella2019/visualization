@@ -1507,7 +1507,7 @@ Coding.prototype = {
             if(newTweet || newURL) {
                 var text = tweet.TextNoURL.toLowerCase();
                 text = text.replace(/[^\w']+/g, ' ');
-                text = text.replace(/\w' | '\w/g, ' ');
+                text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
                 var words = text.split(' ');
                 var tweetgrams = [new Set(), new Set(), new Set(), new Set()];
 
