@@ -291,7 +291,12 @@ button:focus {
     background: #EEE;
 }
 .ngram_count td {
-/*    padding: 1px 3px;*/
+    padding: 1px 3px;
+}
+.ngram_count_label {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
 }
 .ngram_count_count {
     text-align: right;
@@ -320,7 +325,7 @@ button:focus {
     width: 60%;
 }
 #agreement_table tr:nth-child(even){
-  background-color: #F7F7F7;
+    background-color: #F7F7F7;
 }
 #matrices table {
     table-layout: fixed;

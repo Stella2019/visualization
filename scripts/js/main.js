@@ -163,6 +163,9 @@ Counter.prototype = {
     has: function(key) {
         return this.counts.get(key) || false;
     },
+    set: function(key, val) {
+        this.counts.set(key, val);
+    },
     incr: function(key, add) {
         add = add || 1;
         var val = this.counts.get(key) || 0;

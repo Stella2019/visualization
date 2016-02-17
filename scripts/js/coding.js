@@ -28,6 +28,7 @@ function Coding() {
         primary: 5
     };
     this.nnn = 0;
+    this.ngrams = {};
 }
 Coding.prototype = {
     getData: function() {
@@ -94,11 +95,11 @@ Coding.prototype = {
         });
         
         options.choice_groups = [];
-        options.initial_buttons = ['show_irr', 'show_matrices', 'show_tweets', 'show_tweet_types', 'show_ngrams',
-                                   'rumor', 'period', 'coder',
-                                   'coder_order',
-                                   'tweets_shown', 'tweet_order',
-                                   'ngrams_exclude_stopwords', 'ngrams_relative'];
+        options.initial_buttons = ['show_irr', 'rumor', 'period', 'coder',
+                                   'show_matrices',  'coder_order',
+                                   'show_tweets', 'tweets_coded', 'tweets_focus', 'tweet_order',
+                                   'show_tweet_types', 'tweet_types_bars',
+                                   'show_ngrams', 'ngrams_exclude_stopwords', 'ngrams_counts', 'ngrams_coded'];
         options.record = options.initial_buttons;
         options.rumor = new Option({
             title: 'Rumor',
@@ -145,18 +146,29 @@ Coding.prototype = {
         });
         
         // Types of disagreement        
-        options.tweets_shown = new Option({
-            title: 'Show',
+        options.tweets_coded = new Option({
+            title: 'Coded',
+            labels: ['Any',
+                     'Primary Code',
+                     'Uncodable',
+                     'Unrelated',
+                     'Related',
+                     'Affirm',
+                     'Deny',
+                     'Neutral',
+                     'Uncertainty'],
+            ids:    ["Any", "Primary", "Uncodable", "Unrelated", 'Related', "Affirm", "Deny", "Neutral", "Uncertainty"],
+            default: 0,
+            type: "dropdown",
+            parent: '#tweets_header',
+            callback: coding.fillTweetList
+        });    
+        options.tweets_focus = new Option({
+            title: 'Focus',
             labels: ['All',
-                     'Any Disagreement',
-                     'Disagreement on Primary Code',
-                     'Disagreement on Uncodable',
-                     'Disagreement on Unrelated',
-                     'Disagreement on Affirm',
-                     'Disagreement on Deny',
-                     'Disagreement on Neutral',
-                     'Disagreement on Uncertainty'],
-            ids:    ["All", "Disagreement", "Primary", "Uncodable", "Unrelated", "Affirm", "Deny", "Neutral", "Uncertainty"],
+                     'Majority Coded',
+                     'Disagreement'],
+            ids:    ["All", "Majority", "Disagreement"],
             default: 0,
             type: "dropdown",
             parent: '#tweets_header',
@@ -178,43 +190,70 @@ Coding.prototype = {
             labels: ['Tweet ID', 'Text', 'Majority Code', 'Disagreement'],
             ids:    ['tweet_id', 'text', 'majority', 'disagreement'],
             default: 3,
-            available: [0, 1, 2, 3],
             parent: '#tweets_header',
             callback: coding.fillTweetList
+        });
+        
+        // Tweet Types Table
+        options.tweet_types_bars = new Option({
+            title: "Show Bars For",
+            labels: ['% of All', '% within each Tweet Type', '% within each Code', 'None'],
+            ids:    ['all', 'tweet_type', 'code', 'none'],
+            default: 0,
+            parent: '#tweet_types_header',
+            callback: coding.tweetTypeTable
         });
         
         // NGram Display
         options.ngrams_exclude_stopwords = new Option({
             title: "Exclude Stopwords",
-            styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Exclude Stopwords",
-                     "<span class='glyphicon glyphicon-ok-circle'></span> Exclude Stopwords"],
+            styles: ["btn btn-sm btn-default", "btn btn-sm"],
+            labels: ["Including Stopwords",
+                     "Excluding Stopwords"],
             ids:    ['false', 'true'],
             default: 1,
             type: 'toggle',
-            available: [0, 1],
             parent: '#ngrams_header',
             callback: coding.NGramList
         });
-        options.ngrams_relative = new Option({
-            title: "Relative",
-            styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Relative Counts",
-                     "<span class='glyphicon glyphicon-ok-circle'></span> Relative Counts"],
-            ids:    ['false', 'true'],
+//        options.ngrams_relative = new Option({
+//            title: "Relative",
+//            styles: ["btn btn-sm", "btn btn-sm btn-default"],
+//            labels: ["Absolute Counts",
+//                     "Relative Counts"],
+//            ids:    ['false', 'true'],
+//            default: 0,
+//            type: 'toggle',
+//            parent: '#ngrams_header',
+//            callback: coding.NGramList
+//        });
+        options.ngrams_counts = new Option({
+            title: "Counts",
+            labels: ['Raw', '% of Tweets', 'TF-IDF Rumor'],
+            ids:    ['raw', 'nTweets', 'tf-idf'],
             default: 0,
-            type: 'toggle',
-            available: [0, 1],
             parent: '#ngrams_header',
             callback: coding.NGramList
+        });
+        options.ngrams_coded = new Option({
+            title: "For Tweets Coded",
+            labels: ['Any', 'Uncodable', 'Unrelated', 'Related',
+                     'Affirm', 'Deny', 'Neutral',
+                     'Uncertainty'],
+            ids:    ['Any', 'Uncodable', 'Unrelated', 'Related',
+                     'Affirm', 'Deny', 'Neutral', 
+                     'Uncertainty'],
+            default: 0,
+            parent: '#ngrams_header',
+            callback: coding.countNGrams
         });
         
         // subsection toggles
         options.show_irr = new Option({
             title: 'Show Interrator Reliability Statistics',
             styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-menu-down'></span>",
-                     "<span class='glyphicon glyphicon-menu-up'></span>"],
+            labels: ["<span class='glyphicon glyphicon-menu-up'></span>",
+                     "<span class='glyphicon glyphicon-menu-down'></span>"],
             ids:    ["false", "true"],
             default: 1,
             type: "toggle",
@@ -224,8 +263,8 @@ Coding.prototype = {
         options.show_matrices = new Option({
             title: 'Show Matrices',
             styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-menu-down'></span>",
-                     "<span class='glyphicon glyphicon-menu-up'></span>"],
+            labels: ["<span class='glyphicon glyphicon-menu-up'></span>",
+                     "<span class='glyphicon glyphicon-menu-down'></span>"],
             ids:    ["false", "true"],
             default: 0,
             type: "toggle",
@@ -235,8 +274,8 @@ Coding.prototype = {
         options.show_tweets = new Option({
             title: 'Show Tweets',
             styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-menu-down'></span>",
-                     "<span class='glyphicon glyphicon-menu-up'></span>"],
+            labels: ["<span class='glyphicon glyphicon-menu-up'></span>",
+                     "<span class='glyphicon glyphicon-menu-down'></span>"],
             ids:    ["false", "true"],
             default: 0,
             type: "toggle",
@@ -246,8 +285,8 @@ Coding.prototype = {
         options.show_tweet_types = new Option({
             title: 'Show Tweet Types',
             styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-menu-down'></span>",
-                     "<span class='glyphicon glyphicon-menu-up'></span>"],
+            labels: ["<span class='glyphicon glyphicon-menu-up'></span>",
+                     "<span class='glyphicon glyphicon-menu-down'></span>"],
             ids:    ["false", "true"],
             default: 0,
             type: "toggle",
@@ -257,8 +296,8 @@ Coding.prototype = {
         options.show_ngrams = new Option({
             title: 'Show N-Grams',
             styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-menu-down'></span>",
-                     "<span class='glyphicon glyphicon-menu-up'></span>"],
+            labels: ["<span class='glyphicon glyphicon-menu-up'></span>",
+                     "<span class='glyphicon glyphicon-menu-down'></span>"],
             ids:    ["false", "true"],
             default: 0,
             type: "toggle",
@@ -1019,7 +1058,8 @@ Coding.prototype = {
         if(coder_id != 'all') {
             coder = coding.coders[coder_id - 1];
         }
-        var tweets_shown = options.tweets_shown.get();
+        var tweets_coded = options.tweets_coded.get();
+        var tweets_focus = options.tweets_focus.get();
         var tweets = coding.tweets_arr;
         var period = options.period.get();
         
@@ -1032,38 +1072,27 @@ Coding.prototype = {
             tweets = tweets.map(function(tweet) { return tweet; });
         }
         
-        // Filter out tweets by disagreement
-        if(tweets_shown != 'All') {
-            if(period < 0 && coder_id != 'all') {
-                var codes = [tweets_shown];
-                if(tweets_shown == 'Primary') {
+        // Filter out tweets by code & focus
+        if(tweets_coded != 'Any') {
+            var codes = [tweets_coded];
+            if(tweets_coded == 'Related')
+                    codes = ['Affirm', 'Deny', 'Neutral'];
+            if(tweets_coded == 'Primary')
                     codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'];
-                } else if(tweets_shown == 'Disagreement') {
-                    codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Uncertainty'];
-                }
-
-                tweets = tweets.filter(function(tweet) {
-                    return coding.code_list.display.reduce(function(disagreed, code) {
-                        var coder_yes = tweet.Votes[code].includes(coder_id);
-                        var group_yes = tweet.Plurality[code];
-                        return disagreed || (group_yes ? !coder_yes : coder_yes);
-                    }, false);
-                });
-            } else {
-                if(tweets_shown == 'Disagreement') {
-                    tweets = tweets.filter(function(tweet) {
-                        return tweet.Primary_Disagreement || tweet.Uncertainty_Disagreement;
-                    });
-                } else if(tweets_shown == 'Primary') {
-                    tweets = tweets.filter(function(tweet) {
-                        return tweet.Primary_Disagreement;
-                    });
-                } else {
-                    tweets = tweets.filter(function(tweet) {
-                        return tweet.Votes[tweets_shown].length > 0 && (tweet.Votes[tweets_shown].length != tweet.Votes.Count);
-                    });
-                }
-            }
+            tweets = tweets.filter(function(tweet) {
+                return codes.reduce(function(found, code) {
+                    if(tweets_focus == 'All'){
+                        found |= tweet.Votes[code].length > 0;
+                    } else if (tweets_focus == 'Majority') {
+                        found |= tweet.Plurality[code];
+                    } else if (tweets_focus == 'Disagreement') {
+                        found |= (tweet.Votes[code].length > 0 && tweet.Votes[code].length < tweet.Votes['Count']);
+                    }
+                    if(coder_id != 'all')
+                        found |= tweet.Votes[code].includes(coder_id);
+                    return found;
+                }, false);
+            });
         }
         
         // Order the tweets
@@ -1223,16 +1252,18 @@ Coding.prototype = {
                 coding.tooltip.off();
             });
         
-        if(tweets_shown == 'Disagreement') {
+        
+        // ["All", "Majority", "Disagreement", "Primary Disagreement", "Uncertainty Disagreement"],
+        if(tweets_focus == 'Disagreement') {
             d3.selectAll('span.code_Uncertainty')
                 .classed('small', true);
-        } else if(tweets_shown != 'All') {
-            if(tweets_shown != 'Primary') {
-                d3.selectAll('span.code_' + tweets_shown)
+        } else if(tweets_focus != 'All') {
+            if(tweets_focus != 'Primary') {
+                d3.selectAll('span.code_' + tweets_focus)
                     .style('font-weight', 'bold');
             }
             
-            if(tweets_shown == 'Uncertainty') {
+            if(tweets_focus == 'Uncertainty') {
                 d3.selectAll('span.code_Primary')
                     .classed('small', true);
             } else {
@@ -1293,12 +1324,14 @@ Coding.prototype = {
             period: options.period.get()
         };
         
-        data.callPHP('coding/getTweets', post, coding.tweetTypeTable);
-        coding.countNGrams();
+        // Wait otherwise some page elements may be stuck
+        setTimeout(function() {
+            
+             data.callPHP('coding/getTweets', post, coding.parseTweetInformation);
+        }, 1000);
+       
     },
-    tweetTypeTable: function(file_data) {
-        coding.togglePane('tweet_types');
-        
+    parseTweetInformation: function(file_data) {
         var tweetsDB;
         try {
             tweetsDB = JSON.parse(file_data);
@@ -1311,51 +1344,57 @@ Coding.prototype = {
         tweetsDB.forEach(function(tweetDB) {
             var tweet = coding.tweets[tweetDB.ID];
             if(tweet) {
-                tweet.Type = tweetDB.Type
+                tweet.Type = tweetDB.Type;
+                tweet.ExpandedURL = tweetDB.ExpandedURL;
             } else {
-                console.log('Somethings wrong mapping tweets, couldn\'t find ID ' + tweetDB.ID);
+//                console.log('Somethings wrong mapping tweets, couldn\'t find ID ' + tweetDB.ID);
             }
         });
         
-        // Get Type Counts
-        coding.type_counts_byCode = coding.code_list.binary.map(function(code) {
-            return {
-                Code: code,
-                Original: 0,
-                Retweet: 0,
-                Reply: 0,
-                Quote: 0,
-                Unknown: 0,
-                'Any Type': 0
-            }
-        });
-        coding.type_counts_byCode.unshift({
-            Code: 'Total',
-            Original: 0,
-            Retweet: 0,
-            Reply: 0,
-            Quote: 0,
-            Unknown: 0,
-            'Any Type': 0
-        });
+        coding.tweetTypeTable();
+        if(!options.ngrams_coded.is('Any'))
+            coding.countNGrams(options.ngrams_coded.get());
+        coding.countNGrams('Any');
+    },
+    tweetTypeTable: function() {
+        coding.togglePane('tweet_types');
+        
+        var rows = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Uncertainty', 'Total'];
+        var columns = ['Original', 'Retweet', 'Reply', 'Quote', 'Unknown', 'Total'];
+        
+        coding.code_type_counts = rows.map(function(row) {
+            return columns.map(function(col) {
+                return {
+                    Code: row,
+                    Type: col,
+                    Value: 0,
+                    Of: 0
+                }
+            })
+        })
         
         coding.tweets_arr.forEach(function(tweet) {
             var type = tweet.Type || 'Unknown';
             if(type.charAt(0) >= 'a') type = type.charAt(0).toUpperCase() + type.substring(1);
-            coding.type_counts_byCode[0][type]++;
-            coding.type_counts_byCode[0]['Any Type']++;
+            var i_type = columns.indexOf(type);
+            coding.code_type_counts[6][i_type]['Value'] += 1; // total
             
             coding.code_list.binary.forEach(function(code, i_code) {
                 var votes     = tweet.Votes['Count'];
                 var votes_for = tweet.Votes[code].length;
-                
-                var val = votes_for / votes;
-                var entry = coding.type_counts_byCode[i_code + 1];
-                entry['Any Type'] += val;
-                entry[type]       += val;
+                coding.code_type_counts[i_code][i_type]['Value'] += votes_for / votes;
+                coding.code_type_counts[i_code][5]['Value'] += votes_for / votes; // total
             });
         });
         
+        // Add totals
+        var denom = options.tweet_types_bars.get();
+        coding.code_type_counts[6][5].Value = d3.sum(coding.code_type_counts[6], function(d) { return d.Value; });
+        coding.code_type_counts.forEach(function(row, i_code) {
+            row.forEach(function(cell, i_type) {
+                cell['Of'] = coding.code_type_counts[denom == 'code' ? i_code : 6][denom == 'tweet_type' ? i_type : 5].Value;
+            });
+        });
         
         // Format area
         var results_div = d3.select("#tweet_types");
@@ -1368,34 +1407,10 @@ Coding.prototype = {
             .attr('id', 'agreement_table')
             .attr('class', 'table');
         
+        var colors = d3.scale.category10()
+            .domain(denom == 'tweet_type' ? columns : rows);
         
-        var columns = [{ value: 'Original', of: 'Any Type' },
-                    { value: 'Retweet',  of: 'Any Type' },
-                    { value: 'Reply',    of: 'Any Type' },
-                    { value: 'Quote',    of: 'Any Type' },
-                    { value: 'Unknown',  of: 'Any Type' },
-                    { value: 'Original', of: 'All Originals' },
-                    { value: 'Retweet',  of: 'All Retweets' },
-                    { value: 'Reply',    of: 'All Replies' },
-                    { value: 'Quote',    of: 'All Quotes' }];
-        
-        var colors = {
-            'Total': '#eee',
-            'Uncodable': null,
-            'Unrelated': '#eee',
-            'Affirm': null,
-            'Deny': '#eee',
-            'Neutral': null,
-            'Uncertainty': '#eee',
-            'All Originals': '#edc',
-            'All Retweets': '#eec',
-            'All Replies': '#dec',
-            'All Quotes': '#cde'
-        }
-        
-        var column_names = columns.map(function(col) {
-            return col.value + '<br /><small>(% of ' + col.of + ')</small>';
-        });
+        var column_names = columns.map(function(col) { return col ; });
         column_names.unshift('Code');
         
         table.append('thead')
@@ -1407,48 +1422,54 @@ Coding.prototype = {
             .html(function(d) { return d; })
             .style('width', (100 / column_names.length) + '%');
         
-        var rows = table.append('tbody')
+        var table_rows = cells = table.append('tbody')
             .selectAll('tr')
-            .data(coding.type_counts_byCode)
+            .data(coding.code_type_counts)
             .enter()
             .append('tr');
         
-        rows.append('td')
+        table_rows.append('td')
             .html(function(d) {
-                return d.Code;
-            });
+                return d[0].Code;
+            })
         
-        // Append the columns
-        columns.forEach(function(col) {
-            rows.append('td')
-                .html(function(d) {
-                    var of = d[col.of];
-                    if(of == undefined) // Then it's the column total
-                        of = coding.type_counts_byCode[0][col.value];
-                    return d[col.value].toFixed(0) + " <small>(" + 
-                        (d[col.value] / of * 100).toFixed(0) + 
-                        "%)</small>";
-                })
-                .attr('class', 'table_stat')
-                .append('div')
-                .style({
-                    width: function(d) { 
-                        var of = d[col.of];
-                        if(of == undefined) // Then it's the column total
-                            of = coding.type_counts_byCode[0][col.value];
-                        return (d[col.value] / of * 90) + '%'},
-                    background: function(d) { return colors[col.of] || colors[d.Code]; }
-                })
-                .attr('class', 'table_bar');
-        });
+        table_rows.selectAll('td.table_stat')
+            .data(function(d) { return d; })
+            .enter()
+            .append('td')
+            .html(function(d) {
+                var main_text = d.Value.toFixed(0);
+                var sub_text = denom == 'none' ? '' :
+                    ' <small>(' + (d.Value / d.Of * 100).toFixed(0) + '%)</small>';
+                return main_text + sub_text;
+            })
+            .attr('class', 'table_stat')
+            .append('div')
+            .style({
+                width: function(d) { return (denom == 'none' ? 0 : d.Value / d.Of * 90) + '%'},
+                background: function(d) { 
+                    if(denom == 'all') return null
+                    var color = d3.hsl(colors(denom == 'tweet_type' ? d.Type : d.Code));
+                    color.s *= .85;
+                    color.l *= 1.5;
+                    return color; 
+                }
+            })
+            .attr('class', 'table_bar');
+        
     },
-    countNGrams: function() {
+    countNGrams: function(subset) {
+        subset = subset || options.ngrams_coded.get();
+        
         // Make structures
-        coding.ngrams = {};
-        var ngrams = coding.ngrams;
+        coding.ngrams[subset] = {};
+        var ngrams = coding.ngrams[subset];
         
         ngrams.nTweets = 0;
+        ngrams.CoOccurs = 0
         ngrams.TweetCounter = new Counter();
+        ngrams.URLCounter = new Counter();
+        ngrams.CoOccurCounter = new Counter();
         ngrams.nGrams = d3.range(3).map(function(d) {
             return 0;
         });
@@ -1456,67 +1477,132 @@ Coding.prototype = {
             return new Counter();
         });
         
+        var tweets = coding.tweets_arr;
+        if(subset != 'Any') {
+            var codes = [subset];
+            if(subset == 'Related')
+                    codes = ['Affirm', 'Deny', 'Neutral'];
+//            if(subset == 'Primary')
+//                    codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'];
+            tweets = tweets.filter(function(tweet) {
+                return codes.reduce(function(found, code) {
+                    return found || tweet.Plurality[code];
+                }, false);
+            });
+        }
+        
         // Add up ngrams
-        coding.tweets_arr.forEach(function(tweet) {
+        tweets.forEach(function(tweet) {
             tweet.TextNoURL = tweet.Text.replace(/http\S+/g, ' ');
 
             ngrams.nTweets += 1;
+            
+            var newTweet = ngrams.TweetCounter.has(tweet.TextNoURL);
+            var newURL = ngrams.URLCounter.has(tweet.ExpandedURL);
+            
             ngrams.TweetCounter.incr(tweet.TextNoURL);
+            ngrams.URLCounter.incr(tweet.ExpandedURL);
 
-            var text = tweet.TextNoURL.toLowerCase();
-            text = text.replace(/[^\w']+/g, ' ');
-            text = text.replace(/\w' | '\w/g, ' ');
-            var words = text.split(' ');
-            var tweetgrams = [new Set(), new Set(), new Set()];
+            
+            if(newTweet || newURL) {
+                var text = tweet.TextNoURL.toLowerCase();
+                text = text.replace(/[^\w']+/g, ' ');
+                text = text.replace(/\w' | '\w/g, ' ');
+                var words = text.split(' ');
+                var tweetgrams = [new Set(), new Set(), new Set(), new Set()];
 
-            words.map(function(word, wi) {
-                if(word) {
-                    var gram = word;
-                    if(!tweetgrams[0].has(gram)) {
-                        tweetgrams[0].add(gram);
-                        ngrams.nGrams[0] += 1;
-                        ngrams.NGramCounter[0].incr(gram);
-                    }
-                    if(words[wi + 1]) {
-                        gram += " " + words[wi + 1];
-                        if(!tweetgrams[1].has(gram)) {
-                            tweetgrams[1].add(gram);
-                            ngrams.nGrams[1] += 1;
-                            ngrams.NGramCounter[1].incr(gram);
+                words.forEach(function(word, wi) {
+                    if(word) {
+                        var gram = word;
+                        if(!tweetgrams[0].has(gram)) {
+                            tweetgrams[0].add(gram);
+                            ngrams.nGrams[0] += 1;
+                            ngrams.NGramCounter[0].incr(gram);
                         }
-                        if(words[wi + 2]) {
-                            gram += " " + words[wi + 2];
-                            if(!tweetgrams[2].has(gram)) {
-                                tweetgrams[2].add(gram);
-                                ngrams.nGrams[2] += 1;
-                                ngrams.NGramCounter[2].incr(gram);
+                        if(words[wi + 1]) {
+                            gram += " " + words[wi + 1];
+                            if(!tweetgrams[1].has(gram)) {
+                                tweetgrams[1].add(gram);
+                                ngrams.nGrams[1] += 1;
+                                ngrams.NGramCounter[1].incr(gram);
+                            }
+                            if(words[wi + 2]) {
+                                gram += " " + words[wi + 2];
+                                if(!tweetgrams[2].has(gram)) {
+                                    tweetgrams[2].add(gram);
+                                    ngrams.nGrams[2] += 1;
+                                    ngrams.NGramCounter[2].incr(gram);
+                                }
                             }
                         }
+                        for(var wj = wi + 1; wj < words.length; wj++) { 
+                            gram = word + ' & ' + words[wj];
+                            if(words[wj] < word)
+                                gram = words[wj] + ' & ' + word;
+                            // Add co-occurance
+                            if(!tweetgrams[3].has(gram) && words[wj]) {
+                                tweetgrams[3].add(gram);
+                                ngrams.CoOccurs += 1;
+                                ngrams.CoOccurCounter.incr(gram);
+                            }
+                            
+                        }
                     }
-                    // Add co-occurance
-                }
-            });
+                });
+            } // New Tweet or New URL
         });
         
         coding.NGramList();
     },
     NGramList: function() {
-        var ngrams = coding.ngrams;
+        coding.togglePane('ngrams');
+        
+        var counts = options.ngrams_counts.get();
+        var ngrams = coding.ngrams[options.ngrams_coded.get()];
         var div = d3.select('#ngrams');
         div.selectAll('*').remove();
 
-        var labels = ['Unigrams', 'Bigrams', 'Trigrams'];
+        var labels = ['Unigrams', 'Bigrams', 'Trigrams', 'Co-Occurance', 'URLs'];
         var top;
         if(options.ngrams_exclude_stopwords.is("true")) {
             top = [ngrams.NGramCounter[0].top_no_stopwords(100),
                    ngrams.NGramCounter[1].top_no_stopwords(100),
-                   ngrams.NGramCounter[2].top_no_stopwords(100)];
+                   ngrams.NGramCounter[2].top_no_stopwords(100),
+                   ngrams.CoOccurCounter.top(100),
+                   ngrams.URLCounter.top(100)];
         } else {
             top = [ngrams.NGramCounter[0].top(100),
                    ngrams.NGramCounter[1].top(100),
-                   ngrams.NGramCounter[2].top(100)];
+                   ngrams.NGramCounter[2].top(100),
+                   ngrams.CoOccurCounter.top(100),
+                   ngrams.URLCounter.top(100)];
         }
-        var relative = options.ngrams_relative.is("true");
+
+        if(counts == 'tf-idf' && coding.ngrams.Any) {
+            var ngrams_all = coding.ngrams.Any;
+            top[0].forEach(function(entry) {
+                entry.value *= Math.log(ngrams_all.nTweets / ngrams_all.NGramCounter[0].has(entry.key));
+            });
+            top[1].forEach(function(entry) {
+                entry.value *= Math.log(ngrams_all.nTweets / ngrams_all.NGramCounter[1].has(entry.key));
+            });
+            top[2].forEach(function(entry) {
+                entry.value *= Math.log(ngrams_all.nTweets / ngrams_all.NGramCounter[2].has(entry.key));
+            });            
+            top[3].forEach(function(entry) {
+                entry.value *= Math.log(ngrams_all.nTweets / ngrams_all.CoOccurCounter.has(entry.key));
+            });
+            top[4].forEach(function(entry) {
+                entry.value *= Math.log(ngrams_all.nTweets / ngrams_all.URLCounter.has(entry.key));
+            });
+            
+            top[0].sort(function(a, b) { return b.value - a.value; });
+            top[1].sort(function(a, b) { return b.value - a.value; });
+            top[2].sort(function(a, b) { return b.value - a.value; });
+            top[3].sort(function(a, b) { return b.value - a.value; });
+            top[4].sort(function(a, b) { return b.value - a.value; });
+        }
+//        var relative = options.ngrams_relative.is("true");
 
         div.append('table')
             .append('tr')
@@ -1525,6 +1611,7 @@ Coding.prototype = {
             .enter()
             .append('td')
             .attr('class', 'ngram_table_container')
+            .style('width', '20%')
             .append('table')
             .attr('class', 'ngram_table')
             .each(function(d, i) {
@@ -1534,7 +1621,7 @@ Coding.prototype = {
                     .text(labels[i]);
                 header.append('th')
                     .attr('class', 'ngram_count_count')
-                    .text(relative ? 'Freq' : 'Count');
+                    .text(counts == 'tf-idf' ? 'TF-IDF' : counts == 'nTweets' ? 'Freq' : 'Count');
 
                 d3.select(this)
                     .selectAll('tr.ngram_count')
@@ -1549,12 +1636,19 @@ Coding.prototype = {
             .attr('class', 'ngram_count_label')
             .text(function(d) { return d.key; });
         
-        if(ngrams.relative) {
+        if(counts == 'nTweets') {
             div.selectAll('.ngram_count')
                 .append('td')
                 .attr('class', 'ngram_count_count')
                 .text(function(d) { 
                     return (d.value * 100.0 / ngrams.nTweets).toFixed(1); 
+            });
+        } else if (counts == 'tf-idf') {
+            div.selectAll('.ngram_count')
+                .append('td')
+                .attr('class', 'ngram_count_count')
+                .text(function(d) { 
+                    return d.value.toFixed(1); 
             });
         } else {
             div.selectAll('.ngram_count')
