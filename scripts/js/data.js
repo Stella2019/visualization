@@ -13,8 +13,8 @@ function Stream(args) {
     self.progress_text = "Working";
     self.progress_button = false;
     self.chunk_index = 0;
-    self.time_min = options.time_min.min;
-    self.time_max = options.time_max.max;
+    self.time_min = data.time.selected_min;
+    self.time_max = data.time.selected_max;
     self.failure_msg = 'Problem with data stream';
     self.on_chunk_finish = function () {};
     self.on_finish = function () {};
@@ -43,6 +43,7 @@ Stream.prototype = {
             text:      this.progress_text,
             steps:     this.time_chunks.length - 1
         });
+        console.log('Starting Stream', this);
         this.progress.start();
 
         this.chunk();
@@ -105,8 +106,10 @@ function Data() {
         name: "Time",
         collection_min: new Date(),
         collection_max: new Date(),
-        min: new Date(),
-        max: new Date(),
+        selected_min: new Date(),
+        selected_max: new Date(),
+        min: new Date(), // of possible data
+        max: new Date(), // of possible data
         stamps: [],
         stamps_nested: [],
         stamps_nested_int: [],
@@ -278,8 +281,8 @@ Data.prototype = {
         
         // Get times to load
         if(options.time_limit.is('all')) {
-            data.time.min = new Date(data.time.collection_min);
-            data.time.max = new Date(data.time.collection_max);
+            data.time.selected_min = new Date(data.time.collection_min);
+            data.time.selected_max = new Date(data.time.collection_max);
         } else {
             var time_limit = options.time_limit.get();
             var sign = time_limit.slice(0, 1) == '-' ? -1 : 1;
@@ -300,15 +303,15 @@ Data.prototype = {
             }
 
             if(sign == -1) {
-                data.time.min = new Date(data.time.collection_max);
-                data.time.min.setHours(data.time.min.getHours() + hours_diff * sign);
+                data.time.selected_min = new Date(data.time.collection_max);
+                data.time.selected_min.setHours(data.time.selected_min.getHours() + hours_diff * sign);
                 
-                data.time.max = new Date(data.time.collection_max);
+                data.time.selected_max = new Date(data.time.collection_max);
             } else {
-                data.time.min = new Date(data.time.collection_min);
+                data.time.selected_min = new Date(data.time.collection_min);
                 
-                data.time.max = new Date(data.time.collection_min);
-                data.time.max.setHours(data.time.max.getHours() + hours_diff * sign);
+                data.time.selected_max = new Date(data.time.collection_min);
+                data.time.selected_max.setHours(data.time.selected_max.getHours() + hours_diff * sign);
             }
         }
         
@@ -324,8 +327,8 @@ Data.prototype = {
             name: 'load_collection',
             url: 'timeseries/get',
             post: {event_id: data.collection.ID},
-            time_min: new Date(data.time.min),
-            time_max: new Date(data.time.max),
+            time_min: new Date(data.time.selected_min),
+            time_max: new Date(data.time.selected_max),
             time_res: 3,
             failure_msg: 'Error loading data',
             progress_text: 'Loading Data',
@@ -390,6 +393,19 @@ Data.prototype = {
         // Format selections
         d3.select('#choose_collection button')
             .attr('disabled', null);
+        
+        
+        // If there is no data, abort the pipeline
+        if(data.file.length == 0) {
+            disp.alert('No Timeseries Data in Database');
+            
+            // Hardcode the max/min time
+            options.time_min.min = new Date(data.time.selected_min);
+            options.time_max.max = new Date(data.time.selected_max);
+            
+            pipeline.abort();
+            return;
+        }
         
         // Get the timestamps
         data.time.stamps = util.lunique(data.file.map(function(d) { return d.Time; }));
@@ -963,8 +979,8 @@ Data.prototype = {
         var post = {
             event_id: data.collection.ID,
             rumor_id: data.rumor.ID,
-            time_min: util.formatDate(options.time_min.min),
-            time_max: util.formatDate(options.time_max.max),
+            time_min: util.formatDate(data.time.selected_min),
+            time_max: util.formatDate(data.time.selected_max),
             total: ''
         };
         
@@ -1190,6 +1206,8 @@ Data.prototype = {
         };
         if(search_text == 'rumor') {
             post.keyword = data.rumor.ID;
+            d3.select('#edit-window-gencount')
+                .attr('disabled', '');
         }
         
         data.callPHP('timeseries/rm', post, function() {
@@ -1215,6 +1233,8 @@ Data.prototype = {
             post.rumor_id = data.rumor.ID;
             post.search_name = data.rumor.ID;
             progress_div = '#edit-window-gencount-div';
+            d3.select('#edit-window-gencount')
+                .attr('disabled', null);
         } else {
             options.add_term.reset();
             $("#input_add_term").blur();

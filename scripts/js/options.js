@@ -44,7 +44,7 @@ function Options() {
     self.state = {};
     
     // All options
-    if(!location.pathname.includes('coding.html')) {
+    if(!location.pathname.includes('coding.html') && !location.pathname.includes('status.html')) {
         self.collection = new Option({
             title: "Event",
             labels: ["none"],
@@ -304,7 +304,7 @@ Options.prototype = {
         
         // Build options
         options.buildTopMenu();
-        if(!location.pathname.includes('coding.html')) {
+        if(!location.pathname.includes('coding.html') && !location.pathname.includes('status.html')) {
             options.buildTimeWindow();
         }
         
@@ -1293,9 +1293,9 @@ Options.prototype = {
                 class: 'btn btn-primary edit-window-routine'
             })
             .on('click', data.rmTweetCount)
-            .text('Count Tweets')
-            .append('span')
-            .attr('class', 'glyphicon glyphicon-signal');
+            .text('Count Tweets');
+//            .append('span')
+//            .attr('class', 'glyphicon glyphicon-signal');
         
         bottom_row.append('div')
             .attr('id', 'edit-window-gencodecount-div')
@@ -1306,9 +1306,9 @@ Options.prototype = {
                 class: 'btn btn-primary edit-window-routine'
             })
             .on('click', data.rmCodeCount)
-            .text('Count Codes')
-            .append('span')
-            .attr('class', 'glyphicon glyphicon-signal');
+            .text('Count Codes');
+//            .append('span')
+//            .attr('class', 'glyphicon glyphicon-signal');
 
         bottom_row.append('div')
             .attr('id', 'edit-window-fetch100-div')
@@ -1372,8 +1372,12 @@ Options.prototype = {
         var queryarea = form.select('.edit-box-query');
         var querybox = queryarea.append('table');
         
+//        console.log(info);
         var rows = querybox.selectAll('tr.edit-box-query-and')
-            .data(function(d) { return info[d].split(','); })
+            .data(function(d) { 
+                var query = info[d] || '';
+                return query.split(','); 
+            })
             .enter()
             .append('tr')
             .attr('class', 'edit-box-query-and');

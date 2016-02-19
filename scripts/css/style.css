@@ -300,6 +300,7 @@ button:focus {
 }
 .ngram_count_count {
     text-align: right;
+    white-space: nowrap;
 }
 
 /* Coding Table */

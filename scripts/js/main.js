@@ -139,7 +139,7 @@ Pipeline.prototype = {
             var start = new Date().getTime();
             stage.callback();
             var stop = new Date().getTime();
-            console.info(stage.name + ': ' + ((stop - start) / 1000) + 's');
+//            console.info(stage.name + ': ' + ((stop - start) / 1000) + 's');
             
             // Go to the next stage
             this.current_stage = this.current_stage + 1;
@@ -148,7 +148,7 @@ Pipeline.prototype = {
     },
     abort: function() {
         this.progress.end();
-        this.current_stage = -1;
+        this.current_stage = -2;
     },
     finish: function() {
         this.progress.end();
@@ -275,7 +275,7 @@ Counter.prototype = {
     }
 };
 
-if(!window.location.href.includes('html')) { // only for the main page
+if(!location.pathname.includes('coding.html') && !location.pathname.includes('status.html')) { // only for the main page
     function initialize() {
         options = new Options();
         options.init();
