@@ -16,7 +16,7 @@ StatusReport.prototype = {
             SR.events_arr = JSON.parse(d);
             datasets--;
             if(datasets == 0)
-                SR.getMoreInformation();
+                SR.configureData();
         });
 
         data.callPHP('collection/getRumors', {}, function(d) {
@@ -24,10 +24,10 @@ StatusReport.prototype = {
             
             datasets--;
             if(datasets == 0)
-                SR.getMoreInformation();
+                SR.configureData();
         });
     },
-    getMoreInformation: function() {
+    configureData: function() {
         // Link all of the data
         SR.events_arr.forEach(function(event) {
             // Add fields
@@ -72,6 +72,10 @@ StatusReport.prototype = {
             SR.rumors[rumor.ID] = rumor;
         });
         
+        setTimeout(SR.loadMoreData, 100);
+        SR.buildDropdowns();
+    },
+    loadMoreData: function() {
         // Get additional data
         var datasets = 3;
 
@@ -106,7 +110,7 @@ StatusReport.prototype = {
             
 //            datasets--;
 //            if(datasets == 0)
-                SR.buildTable();
+                SR.computeAggregates();
         });
         // Get the number of tweets for each rumor
         data.callPHP('timeseries/getStatistics', {}, function(d) {
@@ -126,7 +130,7 @@ StatusReport.prototype = {
             
 //            datasets--;
 //            if(datasets == 0)
-                SR.buildTable();
+                SR.computeAggregates();
         });
         // Get the number of tweets for each rumor
         data.callPHP('coding/rumorPeriodCounts', {}, function(d) {
@@ -140,15 +144,21 @@ StatusReport.prototype = {
             
             counts.forEach(function(rumorperiod) {
                 if(rumorperiod.Period == 0)
-                    SR.rumors[rumorperiod.Rumor].Codes = rumorperiod.Count;
+                    SR.rumors[rumorperiod.Rumor].CodedTweets = rumorperiod.Count;
             });
             
 //            datasets--;
 //            if(datasets == 0)
-                SR.buildTable();
+                SR.computeAggregates();
         });
-        
-        SR.buildDropdowns();
+    },
+    computeAggregates: function() {
+        SR.event_types_arr.forEach(function(d) {
+            d.Tweets      = d3.sum(d.events, function(e) { return e.Tweets      || 0; });
+            d.CodedTweets = d3.sum(d.events, function(e) { return e.CodedTweets || 0; });
+            d.Datapoints  = d3.sum(d.events, function(e) { return e.Datapoints  || 0; });
+        });
+        SR.updateTableCounts();
     },
     buildDropdowns: function() {
         options.choice_groups = [];
@@ -175,7 +185,7 @@ StatusReport.prototype = {
             default: 1,
             type: "dropdown",
             parent: '#status_table_header',
-            callback: SR.buildTable
+            callback: SR.setVisibility
         });        
         
         // Start drawing
@@ -193,7 +203,7 @@ StatusReport.prototype = {
     },
     buildTable: function() {
         var columns = ['Collection',
-                       'Tweets', 'Codes', 'Timeseries<br /><small>Minutes</small>',
+                       'Tweets', 'Coded Tweets', 'Timeseries<br /><small>Minutes</small>',
                        'First Tweet', 'Last Tweet', 
                        'Open <span class="glyphicon glyphicon-new-window"></span>'];
         
@@ -238,28 +248,17 @@ StatusReport.prototype = {
             .style('padding-left', function(d) { return 10 + d.Level * 20 + 'px';})
             .style('font-weight', function(d) { return d.Level == 1 ? 'bold' : 'normal' });
         
-        // Number of Tweets
+        // Counts
         table_body.selectAll('tr')
             .append('td')
-            .html(function(d) {
-                if(d.Level == 0)
-                    return d3.sum(d.events, function(e) { return e.Tweets; });
-                return 'Tweets' in d ? d.Tweets : '';
-            })
+            .attr('class', 'cell-tweets');
         table_body.selectAll('tr')
             .append('td')
-            .html(function(d) { return 'Codes' in d ? d.Codes : ''; })
+            .attr('class', 'cell-codedtweets');
         table_body.selectAll('tr')
             .append('td')
-            .html(function(d) { 
-                if(!('Datapoints' in d)) return '';
-                var days = Math.floor(d.Datapoints / 60 / 24);
-                var hours = Math.floor(d.Datapoints / 60) % 24;
-                var minutes = d.Datapoints % 60;
-                if(days) return days + 'd ' + hours + 'h ' + minutes + 'm';
-                if(hours) return hours + 'h ' + minutes + 'm';
-                return minutes + 'm';
-            })
+            .attr('class', 'cell-datapoints');
+        SR.updateTableCounts();
         
         // Times
         table_body.selectAll('tr')
@@ -276,13 +275,73 @@ StatusReport.prototype = {
             .append('button')
             .attr('class', 'btn btn-xs btn-default')
             .append('span')
-            .attr('class', 'glyphicon glyphicon-signal');
+            .attr('class', 'glyphicon glyphicon-edit')
+            .on('click', SR.edit);
 
+        table_body.selectAll('tr.row_event td.cell_options')
+            .append('button')
+            .attr('class', 'btn btn-xs btn-default')
+            .style('margin-left', '5px')
+            .append('span')
+            .attr('class', 'glyphicon glyphicon-signal')
+            .on('click', SR.openTimeseries);
+        
         table_body.selectAll('tr.row_rumor td.cell_options')
             .append('button')
             .attr('class', 'btn btn-xs btn-default')
             .text('Codes')
-            .style('margin-left', '5px');
+            .style('margin-left', '5px')
+            .on('click', SR.openCodingReport);
+    },
+    setVisibility: function() {
+        if(options.empties.is('true')) {
+            d3.selectAll('tr.row-zero')
+                .style('display', 'table-row');
+        } else {
+            d3.selectAll('tr.row-zero')
+                .style('display', 'none');
+        }
+    },
+    updateTableCounts: function() {
+        var table_body = d3.select('tbody');
+        
+        // Update the text of rows with the counts
+        table_body.selectAll('td.cell-tweets')
+            .html(function(d) { return 'Tweets' in d ? d.Tweets : ''; });
+        table_body.selectAll('td.cell-codedtweets')
+            .html(function(d) { return 'CodedTweets' in d ? d.CodedTweets : ''; });
+        table_body.selectAll('td.cell-datapoints')
+            .html(function(d) { 
+                if(!('Datapoints' in d)) return '';
+                var days = Math.floor(d.Datapoints / 60 / 24);
+                var hours = Math.floor(d.Datapoints / 60) % 24;
+                var minutes = d.Datapoints % 60;
+                if(days) return days + 'd ' + hours + 'h ' + minutes + 'm';
+                if(hours) return hours + 'h ' + minutes + 'm';
+                return minutes + 'm';
+            });
+        
+        // Set visibility of zero/non-zero rows
+        table_body.selectAll('tr')
+            .classed('row-zero', function(d) { return !(d.Tweets || d.Datapoints || d.CodedTweets) ; });
+        SR.setVisibility();  
+    },
+    edit: function(d) {
+        if(d.Level == 1) { // Event
+            data.collection = d;
+            options.editWindow('collection');
+        } else if(d.Level == 2) { // Event
+            data.rumor = d;
+            options.editWindow('rumor');
+        }
+        
+        console.log(d);
+    },
+    openTimeseries: function(d) {
+        window.open('index.html#!collection="' + d.ID + '"');
+    },
+    openCodingReport: function(d) {
+        window.open('coding.html#!rumor="' + d.ID + '"');
     }
 };
 

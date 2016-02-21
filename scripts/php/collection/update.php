@@ -31,6 +31,8 @@
             array_push($changed, " `Name`='" . $_POST["Name"] . "'");
         if(isset($_POST["Query"]) and !empty($_POST["Query"]))
             array_push($changed, " `Query`='" . $_POST["Query"] . "'");
+        if(isset($_POST["Definition"]) and !empty($_POST["Definition"]))
+            array_push($changed, " `Definition`='" . $_POST["Definition"] . "'");
         if(isset($_POST["StartTime"]) and !empty($_POST["StartTime"]))
             array_push($changed, " `StartTime`='" . $_POST["StartTime"] . "'");
         if(isset($_POST["StopTime"]) and !empty($_POST["StopTime"]))

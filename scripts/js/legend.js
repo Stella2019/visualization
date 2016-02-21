@@ -199,12 +199,14 @@ Legend.prototype = {
     },
     cmp: function(a, b) {
         if(options.series_order.is('alpha')) {
-            a = a.name.toLowerCase();
-            b = b.name.toLowerCase();
+            var name1 = a.display_name || a.name || '';
+            var name2 = b.display_name || b.name || '';
+            name1 = name1.toLowerCase();
+            name2 = name2.toLowerCase();
             
-            if(a < b)
+            if(name1 < name2)
                 return -1;
-            else if(a > b)
+            else if(name1 > name2)
                 return 1;
             return 0
             

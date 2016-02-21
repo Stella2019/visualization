@@ -1088,8 +1088,8 @@ Options.prototype = {
             
     },
     editWindow: function(option) {
-        var set = options[option];
-        var id = set.get();
+//        var set = options[option];
+//        var id = set.get();
         
         var info = data[option];
         
@@ -1297,16 +1297,16 @@ Options.prototype = {
 //            .append('span')
 //            .attr('class', 'glyphicon glyphicon-signal');
         
-        bottom_row.append('div')
-            .attr('id', 'edit-window-gencodecount-div')
-            .append('button')
-            .data([option])
-            .attr({
-                id: 'edit-window-gencodecount',
-                class: 'btn btn-primary edit-window-routine'
-            })
-            .on('click', data.rmCodeCount)
-            .text('Count Codes');
+//        bottom_row.append('div')
+//            .attr('id', 'edit-window-gencodecount-div')
+//            .append('button')
+//            .data([option])
+//            .attr({
+//                id: 'edit-window-gencodecount',
+//                class: 'btn btn-primary edit-window-routine'
+//            })
+//            .on('click', data.rmCodeCount)
+//            .text('Count Codes');
 //            .append('span')
 //            .attr('class', 'glyphicon glyphicon-signal');
 

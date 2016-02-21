@@ -43,7 +43,6 @@ Stream.prototype = {
             text:      this.progress_text,
             steps:     this.time_chunks.length - 1
         });
-        console.log('Starting Stream', this);
         this.progress.start();
 
         this.chunk();
@@ -869,7 +868,11 @@ Data.prototype = {
         };
         
         var stream = new Stream(args);
-        stream.start();
+        
+        // Wait to start it so graphical changes can propagate
+        setTimeout(function() {
+            stream.start();
+        }, 10);
     },
     getTweets: function(args) {
         var post = {
