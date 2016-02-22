@@ -67,6 +67,8 @@ def main():
                         help='List event numbers to be grouped into aggregate event')
     parser.add_argument("-c", "--config", required=False, default='../../local.conf',
                         help='Name of configuration file')
+    parser.add_argument("-m", "--minimum_date", required=False,
+                        help='Minimum date for files to be accepted')
     parser.add_argument("path", action="store",
                         help="Path to file/folder where the collections are to be processed.")
     global options
@@ -94,6 +96,11 @@ def parseFile(filename):
     timestamp_str = filename_with_content[-18:-5]
     file_minute = int(timestamp_str[-2:])
     timestamp = datetime.strptime(timestamp_str, '%Y%m%d_%H%M')
+    if(options.minimum_date):
+        min_timestamp = datetime.strptime(options.minimum_date, '%Y%m%d_%H%M')
+        if(timestamp < min_timestamp):
+            print ("FileTooEarly: " + collection_name + " @ " + timestamp_str)
+            return
     
     if(options.verbose): 
         if(version is not 0):
@@ -149,6 +156,7 @@ def parseFile(filename):
                     for keyword in tweet['FoundIn'][found_in]:
                         minutes[tweet["Type"]][minute][found_in][distinct][keyword] += 1
                         
+                tweet['FoundIn'] = None # Erase since mysqlconnector will get confused
                 # Push tweet's data to database
                 if(options.database and options.pushtweets):
                     cursor.execute(query_add_tweet, tweet)
