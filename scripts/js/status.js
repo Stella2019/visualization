@@ -514,6 +514,9 @@ StatusReport.prototype = {
         } else {
             var ordr = order.replace(' ', '');
             table_body.selectAll('tr').sort(function(a, b) {
+                if(!a[ordr] && !b[ordr]) return 0;
+                if(!a[ordr]) return 1;
+                if(!b[ordr]) return -1;
                 return (ascending == 'true' ? 1 : -1) * d3.ascending(a[ordr], b[ordr]);
             });
         }
