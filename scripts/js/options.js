@@ -297,6 +297,8 @@ function Options() {
             parent: '#choices_legend',
             callback: function() { data.calculateNGrams('ngram_cmp'); }
         });
+        
+        self.updateCollectionCallback = function() { data.load_rumors(); };
     }
 };
 Options.prototype = {
@@ -1358,7 +1360,7 @@ Options.prototype = {
     },
     editWindowUpdated: function() {
         // Reload the rumor list
-        data.loadRumors();
+        options.updateCollectionCallback();
         
         // Turn update to normal
         d3.select('#edit-window-save')

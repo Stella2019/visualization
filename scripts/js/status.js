@@ -28,6 +28,12 @@ StatusReport.prototype = {
         });
     },
     configureData: function() {
+        // Clear any old data
+        this.events = {};
+        this.rumors = {};
+        this.event_types = {};
+        this.event_types_arr = [];
+        
         // Link all of the data
         SR.events_arr.forEach(function(event) {
             // Add fields
@@ -94,6 +100,10 @@ StatusReport.prototype = {
                 var collection = 'events';
                 if(count.Type == 'Rumor') {
                     collection = 'rumors';
+                }
+                if(!SR[collection][count.ID]) {
+                    console.log('Invalid Collection ' + count.Type + ' ' + count.ID);
+                    return;
                 }
                 
                 ints.forEach(function(field) {
@@ -190,6 +200,13 @@ StatusReport.prototype = {
         });
     },
     computeAggregates: function() {
+        SR.events_arr.forEach(function(e) {
+//            e.Tweets         = e.Tweets         || d3.sum(e.rumors, function(r) { return r.Tweets         || 0; });
+//            e.DistinctTweets = e.DistinctTweets || d3.sum(e.rumors, function(r) { return r.DistinctTweets || 0; });
+            e.CodedTweets    = e.CodedTweets    || d3.sum(e.rumors, function(r) { return r.CodedTweets    || 0; });
+//            e.Datapoints     = e.Datapoints     || d3.sum(e.rumors, function(r) { return r.Datapoints     || 0; });
+        });
+        
         SR.event_types_arr.forEach(function(d) {
             d.Tweets         = d3.sum(d.events, function(e) { return e.Tweets         || 0; });
             d.DistinctTweets = d3.sum(d.events, function(e) { return e.DistinctTweets || 0; });
@@ -201,8 +218,9 @@ StatusReport.prototype = {
     },
     buildDropdowns: function() {
         options.choice_groups = [];
-        options.initial_buttons = ['levels', 'empties'];
-        options.record = options.initial_buttons;
+        options.initial_buttons = ['empties'];
+        options.record = ['empties', 'order', 'ascending'];
+        options.updateCollectionCallback = SR.getData;
         
         options.levels = new Option({
             title: 'Show',
@@ -225,7 +243,35 @@ StatusReport.prototype = {
             type: "dropdown",
             parent: '#status_table_header',
             callback: SR.setVisibility
-        });        
+        });
+        options.hierarchical = new Option({
+            title: 'Show Hierarchy',
+            labels: ['Yes', 'No'],
+            ids:    ["true", "false"],
+            default: 1,
+            type: "dropdown",
+            parent: '#status_table_header',
+            callback: function() { SR.sort('Hierarchy'); }
+        });
+        var orders = ['ID', 'Collection', 'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Datapoints', 'First Tweet'];
+        options.order = new Option({
+            title: 'Order',
+            labels: orders,
+            ids:    orders,
+            default: 0,
+            type: "dropdown",
+            parent: '#status_table_header',
+            callback: function() { SR.sort('Hierarchy'); }
+        });
+        options.ascending = new Option({
+            title: 'Ascending',
+            labels: ['True', 'False'],
+            ids:    ['true', 'false'],
+            default: 0,
+            type: "dropdown",
+            parent: '#status_table_header',
+            callback: function() { SR.sort('Hierarchy'); }
+        });
         
         // Start drawing
         options.init();
@@ -241,10 +287,10 @@ StatusReport.prototype = {
         SR.buildTable();
     },
     buildTable: function() {
-        var columns = ['Collection',
-                       'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Timeseries<br /><small>Minutes</small>',
+        var columns = ['ID', 'Collection',
+                       'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Datapoints',
                        'First Tweet', //'Last Tweet', 
-                       'Open <span class="glyphicon glyphicon-new-window"></span>'];
+                       'Open'];// <span class="glyphicon glyphicon-new-window"></span>
         
         d3.select('#table-container').selectAll('*').remove();
         var table = d3.select('#table-container')
@@ -257,7 +303,13 @@ StatusReport.prototype = {
             .data(columns)
             .enter()
             .append('th')
+            .attr('class', function(d) { if(d != 'Open') return 'col-sortable'; })
             .html(function(d) { return d; });
+        
+        table.selectAll('.col-sortable')
+            .on('click', SR.clickSort)
+            .append('span')
+            .attr('class', 'glyphicon glyphicon-sort glyphicon-hiddenclick');
         
         var table_body = table.append('tbody');
         
@@ -280,16 +332,21 @@ StatusReport.prototype = {
             });
         })
         
-        // Populate columns
+        // ID & Label
+        table_body.selectAll('tr')
+            .append('td')
+            .html(function(d) { return d.Level > 0 ? d.ID : ''; })
+//            .style('font-weight', function(d) { return d.Level == 1 ? 'bold' : 'normal' });
+        
         table_body.selectAll('tr')
             .append('td')
             .html(function(d) { return d.Label; })
-            .style('padding-left', function(d) { return 10 + d.Level * 20 + 'px';})
-            .style('font-weight', function(d) { return d.Level == 1 ? 'bold' : 'normal' })
-            .attr('class', 'cell-label')
-            .append('span')
-            .attr('class', 'button-recount')
-            .html(function(d) { return d.Level > 0 ? 'ID: ' + d.ID : ''; });
+//            .style('padding-left', function(d) { return 10 + d.Level * 20 + 'px';})
+//            .style('font-weight', function(d) { return d.Level == 1 ? 'bold' : 'normal' })
+            .attr('class', 'cell-label');
+//            .append('span')
+//            .attr('class', 'glyphicon-hiddenclick')
+//            .html(function(d) { return d.Level > 0 ? 'ID: ' + d.ID : ''; });
         
         // Counts
         table_body.selectAll('tr')
@@ -314,32 +371,65 @@ StatusReport.prototype = {
 //            .attr('class', 'cell-lastdate');
         
         // Buttons
-        table_body.selectAll('tr.row_event, tr.row_rumor')
+        table_body.selectAll('tr')
             .append('td')
             .attr('class', 'cell_options')
-            .append('button')
-            .attr('class', 'btn btn-xs btn-default')
+        
+        table_body.selectAll('tr.row_event td.cell_options, tr.row_rumor td.cell_options')
             .append('span')
-            .attr('class', 'glyphicon glyphicon-edit')
+            .attr('class', 'glyphicon glyphicon-edit glyphicon-hoverclick')
             .on('click', SR.edit);
 
         table_body.selectAll('tr.row_event td.cell_options')
-            .append('button')
-            .attr('class', 'btn btn-xs btn-default')
-            .style('margin-left', '5px')
             .append('span')
-            .attr('class', 'glyphicon glyphicon-signal')
+            .attr('class', 'glyphicon glyphicon-signal glyphicon-hoverclick')
+            .style('margin-left', '5px')
             .on('click', SR.openTimeseries);
         
         table_body.selectAll('tr.row_rumor td.cell_options')
-            .append('button')
-            .attr('class', 'btn btn-xs btn-default')
+            .append('span')
+//            .attr('class', 'btn btn-xs btn-default')
             .text('Codes')
+            .attr('class', 'glyphicon-hoverclick')
             .style('margin-left', '5px')
             .on('click', SR.openCodingReport);
         
         // Set the counts
         SR.updateTableCounts();
+    },
+    formatThousands: function(value) {
+//        var unit = '';
+//        if(value > 1e9) {
+//            value /= 1e9;
+//            unit = ' G';
+//        }
+//        if(value > 1e6) {
+//            value /= 1e6;
+//            unit = ' M';
+//        }
+//        if(value > 1e3) {
+//            value /= 1e3;
+//            unit = ' K';
+//        }
+//        return value.toFixed(value < 10 && value > 0 ? 1 : 0) + unit;
+        
+        var res = '';
+        for (var i = Math.floor(Math.log10(value)); i >= 0; i--) {
+//            console.log(value, res, value / Math.pow(10, i), i);
+            res += Math.floor(value / Math.pow(10, i));
+            if(i % 3 == 0)
+                res += ' ';
+            value = value % Math.pow(10, i);
+        }
+        return res + '&nbsp;';
+    },
+    formatMinutes: function(value) {
+        var days = Math.floor(value / 60 / 24);
+        var hours = Math.floor(value / 60) % 24;
+        var minutes = value % 60;
+        if(days) return days + 'd ' + (hours < 10 ? '0' : '') + hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm&nbsp;';
+        if(hours) return hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm&nbsp;';
+        return minutes + 'm&nbsp;';
     },
     setVisibility: function() {
         var table_body = d3.select('tbody');
@@ -355,34 +445,19 @@ StatusReport.prototype = {
         var table_body = d3.select('tbody');
         
         // Update the text of rows with the counts
-//        table_body.selectAll('td.cell-tweets')
-//            .html(function(d) {
-//                if('DistinctTweets' in d)
-//                    return ('Tweets' in d ? d.Tweets + '<br />' : '') 
-//                        + '<small>' + d.DistinctTweets + '</small>'; 
-//                return 'Tweets' in d ? d.Tweets : ''; 
-//            });
         table_body.selectAll('td.cell-tweets')
-            .html(function(d) { return 'Tweets' in d ? d.Tweets : ''; });
+            .html(function(d) { return 'Tweets' in d ? SR.formatThousands(d.Tweets) : ''; });
         table_body.selectAll('td.cell-distincttweets')
-            .html(function(d) { return 'DistinctTweets' in d ? d.DistinctTweets : ''; });
+            .html(function(d) { return 'DistinctTweets' in d ? SR.formatThousands(d.DistinctTweets) : ''; });
         table_body.selectAll('td.cell-codedtweets')
-            .html(function(d) { return 'CodedTweets' in d ? d.CodedTweets : ''; });
+            .html(function(d) { return 'CodedTweets' in d ? SR.formatThousands(d.CodedTweets) : ''; });
         table_body.selectAll('td.cell-datapoints')
-            .html(function(d) { 
-                if(!('Datapoints' in d)) return '';
-                var days = Math.floor(d.Datapoints / 60 / 24);
-                var hours = Math.floor(d.Datapoints / 60) % 24;
-                var minutes = d.Datapoints % 60;
-                if(days) return days + 'd ' + hours + 'h ' + minutes + 'm';
-                if(hours) return hours + 'h ' + minutes + 'm';
-                return minutes + 'm';
-            });
+            .html(function(d) { return 'Datapoints' in d ? SR.formatMinutes(d.Datapoints) : ''; });
         
         // Append the refresh button
         table_body.selectAll('td.cell-count')
             .append('span')
-            .attr('class', 'glyphicon glyphicon-refresh button-recount')
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
             .on('click', SR.recount);
         
         // Set visibility of zero/non-zero rows
@@ -405,10 +480,59 @@ StatusReport.prototype = {
             options.editWindow('rumor');
         }
     },
+    clickSort: function(order) {
+        var table_body = d3.select('tbody');
+        var header = d3.select(this);
+        var clicked = header.data()[0];
+        var order = options.order.get();
+        var ascending = options.ascending.get();
+        console.log(clicked, order, ascending);
+        
+        d3.selectAll('.col-sortable span')
+            .attr('class', 'glyphicon glyphicon-sort glyphicon-hiddenclick');
+        
+        // If it is clicked on what it is currently doing, flip it
+        if(clicked == order) {
+            ascending = ascending == "true" ? "false" : "true";
+            options.ascending.set(ascending);
+        } else { // Otherwise it's a new order
+            order = clicked;
+            options.order.set(order);
+            ascending = order == 'Collection' ? 'true' : 'false';
+            options.ascending.set(ascending);
+        }
+        
+        // Sort the columns
+        if(order == 'ID') {
+            table_body.selectAll('tr').sort(function(a, b) {
+                return (ascending == 'true' ? 1 : -1) * (a.ID - b.ID);
+            });
+        } else if(order == 'Collection') {
+            table_body.selectAll('tr').sort(function(a, b) {
+                return (ascending == 'true' ? 1 : -1) * d3.ascending(a.Label, b.Label);
+            });
+        } else {
+            var ordr = order.replace(' ', '');
+            table_body.selectAll('tr').sort(function(a, b) {
+                return (ascending == 'true' ? 1 : -1) * d3.ascending(a[ordr], b[ordr]);
+            });
+        }
+        
+        // Set the header's glyphicon class to reflect the order
+        if(ascending == 'true' && order == 'Collection') {
+            header.select('span').attr('class', 'glyphicon glyphicon-sort-by-alphabet glyphicon-hoverclick');
+        } else if(ascending == 'false' && order == 'Collection') {
+            header.select('span').attr('class', 'glyphicon glyphicon-sort-by-alphabet-alt glyphicon-hoverclick');
+        } else if(ascending == 'true') {
+            header.select('span').attr('class', 'glyphicon glyphicon-sort-by-attributes glyphicon-hoverclick');
+        } else if(ascending == 'false') {
+            header.select('span').attr('class', 'glyphicon glyphicon-sort-by-attributes-alt glyphicon-hoverclick');
+        }
+    },
     recount: function(d) {
         // Prepare statement
-        var div = d3.select(this.parentNode);
-        var quantity_class = div.attr('class').split(' ')[0];
+        var cell = d3.select(this.parentNode);
+        var quantity_class = cell.attr('class').split(' ')[0];
         var quantity = quantity_class.includes('coded') ? 'CodedTweets' : 
                    quantity_class.includes('distinct') ? 'DistinctTweets' : 
                    quantity_class.includes('datapoint') ? 'Datapoints' : 'Tweets';
@@ -443,7 +567,15 @@ StatusReport.prototype = {
             // Update value
             var val = JSON.parse(result)[0].Count;
             d[quantity] = val;
-            div.html(val);
+            if(quantity == 'Datapoint') {
+                cell.html(SR.formatMinutes(val));
+            } else {
+                cell.html(SR.formatThousands(val));
+            }
+            cell.append('span')
+                .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
+                .on('click', SR.recount);
+            
             
             // Remove loading sign
             loading.end();
