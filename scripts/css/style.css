@@ -370,3 +370,27 @@ button:focus {
     display: inline;
     margin-right: 30px;
 }
+
+/* Status */
+.cell-count {
+    position: relative;
+}
+.button-recount {
+    float: right;
+    opacity: 0;
+    cursor: pointer;
+}
+td:hover .button-recount {
+    opacity: 0.5;
+}
+/*
+.loading-count {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-color: #ccc;
+    left: 0;
+    top: 0;
+    opacity: 0.5;
+}
+*/

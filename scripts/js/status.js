@@ -76,6 +76,43 @@ StatusReport.prototype = {
         SR.buildDropdowns();
     },
     loadMoreData: function() {
+        var ints = ['Tweets', 'DistinctTweets', 'CodedTweets', 'Datapoints'];
+        var fields = ['FirstTweet', 'LastTweet', 'FirstDatapoint', 'LastDatapoint'];
+        
+        // Get the number of tweets for each rumor
+        data.callPHP('count/get', {}, function(d) {
+        console.log('gotData', d);
+            var counts;
+            try {
+                counts = JSON.parse(d);
+            } catch(err) {
+                console.log(d);
+                return;
+            }
+            
+            counts.forEach(function(count) {
+                var collection = 'events';
+                if(count.Type == 'Rumor') {
+                    collection = 'rumors';
+                }
+                
+                ints.forEach(function(field) {
+                    if(field in count) {
+                        SR[collection][count.ID][field] = parseInt(count[field]);
+                    }
+                });
+                fields.forEach(function(field) {
+                    if(field in count) {
+                        SR[collection][count.ID][field] = count[field];
+                    }
+                });
+            });
+            
+            SR.computeAggregates();
+        });
+        
+        return;
+        
         // Get additional data
         var datasets = 3;
 
@@ -94,7 +131,7 @@ StatusReport.prototype = {
         
         // Get the number of tweets for each rumor
         data.callPHP('collection/getRumorStatistics', {}, function(d) {
-            var counts 
+            var counts;
             try {
                 counts = JSON.parse(d);
             } catch(err) {
@@ -114,7 +151,7 @@ StatusReport.prototype = {
         });
         // Get the number of tweets for each rumor
         data.callPHP('timeseries/getStatistics', {}, function(d) {
-            var counts 
+            var counts ;
             try {
                 counts = JSON.parse(d);
             } catch(err) {
@@ -134,7 +171,7 @@ StatusReport.prototype = {
         });
         // Get the number of tweets for each rumor
         data.callPHP('coding/rumorPeriodCounts', {}, function(d) {
-            var counts 
+            var counts ;
             try {
                 counts = JSON.parse(d);
             } catch(err) {
@@ -154,10 +191,12 @@ StatusReport.prototype = {
     },
     computeAggregates: function() {
         SR.event_types_arr.forEach(function(d) {
-            d.Tweets      = d3.sum(d.events, function(e) { return e.Tweets      || 0; });
-            d.CodedTweets = d3.sum(d.events, function(e) { return e.CodedTweets || 0; });
-            d.Datapoints  = d3.sum(d.events, function(e) { return e.Datapoints  || 0; });
+            d.Tweets         = d3.sum(d.events, function(e) { return e.Tweets         || 0; });
+            d.DistinctTweets = d3.sum(d.events, function(e) { return e.DistinctTweets || 0; });
+            d.CodedTweets    = d3.sum(d.events, function(e) { return e.CodedTweets    || 0; });
+            d.Datapoints     = d3.sum(d.events, function(e) { return e.Datapoints     || 0; });
         });
+        
         SR.updateTableCounts();
     },
     buildDropdowns: function() {
@@ -203,8 +242,8 @@ StatusReport.prototype = {
     },
     buildTable: function() {
         var columns = ['Collection',
-                       'Tweets', 'Coded Tweets', 'Timeseries<br /><small>Minutes</small>',
-                       'First Tweet', 'Last Tweet', 
+                       'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Timeseries<br /><small>Minutes</small>',
+                       'First Tweet', //'Last Tweet', 
                        'Open <span class="glyphicon glyphicon-new-window"></span>'];
         
         d3.select('#table-container').selectAll('*').remove();
@@ -231,12 +270,12 @@ StatusReport.prototype = {
             event_type.events.forEach(function(event) {
                 table_body.append('tr')
                     .data([event])
-                    .attr('class', 'row_event');
+                    .attr('class', function(d) { return 'row_event row_event_' + d.ID; });
                 
                 event.rumors.forEach(function(rumor) {
                     table_body.append('tr')
                         .data([rumor])
-                        .attr('class', 'row_rumor');
+                        .attr('class', function(d) { return 'row_rumor row_rumor_' + d.ID; });
                 });
             });
         })
@@ -246,27 +285,33 @@ StatusReport.prototype = {
             .append('td')
             .html(function(d) { return d.Label; })
             .style('padding-left', function(d) { return 10 + d.Level * 20 + 'px';})
-            .style('font-weight', function(d) { return d.Level == 1 ? 'bold' : 'normal' });
+            .style('font-weight', function(d) { return d.Level == 1 ? 'bold' : 'normal' })
+            .attr('class', 'cell-label')
+            .append('span')
+            .attr('class', 'button-recount')
+            .html(function(d) { return d.Level > 0 ? 'ID: ' + d.ID : ''; });
         
         // Counts
         table_body.selectAll('tr')
             .append('td')
-            .attr('class', 'cell-tweets');
+            .attr('class', 'cell-tweets cell-count');
         table_body.selectAll('tr')
             .append('td')
-            .attr('class', 'cell-codedtweets');
+            .attr('class', 'cell-distincttweets cell-count');
         table_body.selectAll('tr')
             .append('td')
-            .attr('class', 'cell-datapoints');
-        SR.updateTableCounts();
+            .attr('class', 'cell-codedtweets cell-count');
+        table_body.selectAll('tr')
+            .append('td')
+            .attr('class', 'cell-datapoints cell-count');
         
         // Times
         table_body.selectAll('tr')
             .append('td')
-            .html(function(d) { return 'First' in d ? d.First || '-' : ''; })
-        table_body.selectAll('tr')
-            .append('td')
-            .html(function(d) { return 'Last' in d ? d.Last || '-' : ''; })
+            .attr('class', 'cell-firstdate');
+//        table_body.selectAll('tr')
+//            .append('td')
+//            .attr('class', 'cell-lastdate');
         
         // Buttons
         table_body.selectAll('tr.row_event, tr.row_rumor')
@@ -292,12 +337,16 @@ StatusReport.prototype = {
             .text('Codes')
             .style('margin-left', '5px')
             .on('click', SR.openCodingReport);
+        
+        // Set the counts
+        SR.updateTableCounts();
     },
     setVisibility: function() {
-        if(options.empties.is('true')) {
-            d3.selectAll('tr.row-zero')
-                .style('display', 'table-row');
-        } else {
+        var table_body = d3.select('tbody');
+        
+        table_body.selectAll('tr')
+            .style('display', 'table-row');
+        if(options.empties.is('false')) {
             d3.selectAll('tr.row-zero')
                 .style('display', 'none');
         }
@@ -306,8 +355,17 @@ StatusReport.prototype = {
         var table_body = d3.select('tbody');
         
         // Update the text of rows with the counts
+//        table_body.selectAll('td.cell-tweets')
+//            .html(function(d) {
+//                if('DistinctTweets' in d)
+//                    return ('Tweets' in d ? d.Tweets + '<br />' : '') 
+//                        + '<small>' + d.DistinctTweets + '</small>'; 
+//                return 'Tweets' in d ? d.Tweets : ''; 
+//            });
         table_body.selectAll('td.cell-tweets')
             .html(function(d) { return 'Tweets' in d ? d.Tweets : ''; });
+        table_body.selectAll('td.cell-distincttweets')
+            .html(function(d) { return 'DistinctTweets' in d ? d.DistinctTweets : ''; });
         table_body.selectAll('td.cell-codedtweets')
             .html(function(d) { return 'CodedTweets' in d ? d.CodedTweets : ''; });
         table_body.selectAll('td.cell-datapoints')
@@ -321,10 +379,22 @@ StatusReport.prototype = {
                 return minutes + 'm';
             });
         
+        // Append the refresh button
+        table_body.selectAll('td.cell-count')
+            .append('span')
+            .attr('class', 'glyphicon glyphicon-refresh button-recount')
+            .on('click', SR.recount);
+        
         // Set visibility of zero/non-zero rows
         table_body.selectAll('tr')
             .classed('row-zero', function(d) { return !(d.Tweets || d.Datapoints || d.CodedTweets) ; });
         SR.setVisibility();  
+        
+        // Dates
+        table_body.selectAll('td.cell-firstdate')
+            .html(function(d) { return 'FirstTweet' in d ? d.FirstTweet || '-' : ''; });
+        table_body.selectAll('td.cell-lastdate')
+            .html(function(d) { return 'LastTweet' in d ? d.LastTweet || '-' : ''; });
     },
     edit: function(d) {
         if(d.Level == 1) { // Event
@@ -334,8 +404,50 @@ StatusReport.prototype = {
             data.rumor = d;
             options.editWindow('rumor');
         }
+    },
+    recount: function(d) {
+        // Prepare statement
+        var div = d3.select(this.parentNode);
+        var quantity_class = div.attr('class').split(' ')[0];
+        var quantity = quantity_class.includes('coded') ? 'CodedTweets' : 
+                   quantity_class.includes('distinct') ? 'DistinctTweets' : 
+                   quantity_class.includes('datapoint') ? 'Datapoints' : 'Tweets';
+        var post = {
+            Collection: d.Level == 1 ? 'Event' : 'Rumor',
+            Quantity: quantity,
+            ID: d.ID
+        }
         
-        console.log(d);
+        // Start loading sign
+        var loading = new Progress({
+            'initial': 100,
+            'parent_id': '.row_' + (d.Level == 1 ? 'event' : 'rumor') + '_' + d.ID + ' .' + quantity_class,
+            full: true, 
+            text: ' '
+        });
+        loading.start();
+//        div.classed('cell-counting', true)
+//            .html();
+//        var loading = div.append('div')
+//            .attr('class', 'loading-count')
+//            .html('Loading');
+        
+        // Start the recount
+        data.callPHP('count/compute', post, function(result) {
+            if(result.includes('Error')) {
+                loading.update(100, 'Error');
+                console.log(result);
+                return;
+            }
+            
+            // Update value
+            var val = JSON.parse(result)[0].Count;
+            d[quantity] = val;
+            div.html(val);
+            
+            // Remove loading sign
+            loading.end();
+        })
     },
     openTimeseries: function(d) {
         window.open('index.html#!collection="' + d.ID + '"');
