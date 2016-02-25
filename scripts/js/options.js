@@ -317,7 +317,7 @@ Options.prototype = {
         };
         
         // Style elements
-        options.initial_buttons.forEach(function(option) {
+        options.record.forEach(function(option) {
             if('styleFunc' in options[option]) {
                 options[option].styleFunc();
             }
