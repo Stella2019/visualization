@@ -37,6 +37,7 @@ StatusReport.prototype = {
         // Link all of the data
         SR.events_arr.forEach(function(event) {
             // Add fields
+            event.ID = parseInt(event.ID);
             event.rumors = [];
             event.Label = event.DisplayName || event.Name;
             event.Level = 1;
@@ -56,12 +57,14 @@ StatusReport.prototype = {
                 SR.event_types[type] = new_event_type;
                 SR.event_types_arr.push(new_event_type);
             }
+            event['Event Type'] = SR.event_types[type];
             
             // Add to indiced object
             SR.events[event.ID] = event;
         });
         SR.rumors_arr.forEach(function(rumor) {
             // Add fields
+            rumor.ID = parseInt(rumor.ID);
             rumor.Label = rumor.Name;
             rumor.Level = 2;
             rumor.Tweets = 0;
@@ -73,6 +76,7 @@ StatusReport.prototype = {
             } else {
                 rumor.Event.rumors = [rumor];
             }
+            rumor['Event Type'] = rumor.Event['Event Type'];
             
             // Add to indiced object
             SR.rumors[rumor.ID] = rumor;
@@ -82,12 +86,11 @@ StatusReport.prototype = {
         SR.buildDropdowns();
     },
     loadMoreData: function() {
-        var ints = ['Tweets', 'DistinctTweets', 'CodedTweets', 'Datapoints'];
+        var ints = ['Tweets', 'DistinctTweets', 'CodedTweets', 'AdjudTweets', 'Datapoints'];
         var fields = ['FirstTweet', 'LastTweet', 'FirstDatapoint', 'LastDatapoint'];
         
         // Get the number of tweets for each rumor
         data.callPHP('count/get', {}, function(d) {
-        console.log('gotData', d);
             var counts;
             try {
                 counts = JSON.parse(d);
@@ -204,6 +207,7 @@ StatusReport.prototype = {
 //            e.Tweets         = e.Tweets         || d3.sum(e.rumors, function(r) { return r.Tweets         || 0; });
 //            e.DistinctTweets = e.DistinctTweets || d3.sum(e.rumors, function(r) { return r.DistinctTweets || 0; });
             e.CodedTweets    = e.CodedTweets    || d3.sum(e.rumors, function(r) { return r.CodedTweets    || 0; });
+            e.AdjudTweets    = e.AdjudTweets    || d3.sum(e.rumors, function(r) { return r.AdjudTweets    || 0; });
 //            e.Datapoints     = e.Datapoints     || d3.sum(e.rumors, function(r) { return r.Datapoints     || 0; });
         });
         
@@ -211,15 +215,20 @@ StatusReport.prototype = {
             d.Tweets         = d3.sum(d.events, function(e) { return e.Tweets         || 0; });
             d.DistinctTweets = d3.sum(d.events, function(e) { return e.DistinctTweets || 0; });
             d.CodedTweets    = d3.sum(d.events, function(e) { return e.CodedTweets    || 0; });
+            d.AdjudTweets    = d3.sum(d.events, function(e) { return e.AdjudTweets    || 0; });
             d.Datapoints     = d3.sum(d.events, function(e) { return e.Datapoints     || 0; });
+            d.FirstTweet_Min = d3.min(d.events, function(e) { return e.FirstTweet     || 0; });
+            d.FirstTweet_Max = d3.max(d.events, function(e) { return e.FirstTweet     || 0; });
+            d.ID_Min         = d3.min(d.events, function(e) { return parseInt(e.ID)   || 0; });
+            d.ID_Max         = d3.max(d.events, function(e) { return parseInt(e.ID)   || 0; });
         });
         
         SR.updateTableCounts();
     },
     buildDropdowns: function() {
         options.choice_groups = [];
-        options.initial_buttons = ['empties'];
-        options.record = ['empties', 'order', 'ascending'];
+        options.initial_buttons = ['empties', 'hierarchical'];
+        options.record = ['empties', 'order', 'ascending', 'hierarchical'];
         options.updateCollectionCallback = SR.getData;
         
         options.levels = new Option({
@@ -245,15 +254,15 @@ StatusReport.prototype = {
             callback: SR.setVisibility
         });
         options.hierarchical = new Option({
-            title: 'Show Hierarchy',
+            title: 'Maintain Hierarchy',
             labels: ['Yes', 'No'],
             ids:    ["true", "false"],
-            default: 1,
+            default: 0,
             type: "dropdown",
             parent: '#status_table_header',
-            callback: function() { SR.sort('Hierarchy'); }
+            callback: function() { SR.clickSort(); }
         });
-        var orders = ['ID', 'Collection', 'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Datapoints', 'First Tweet'];
+        var orders = ['ID', 'Collection', 'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Adjud Tweets', 'Datapoints', 'First Tweet'];
         options.order = new Option({
             title: 'Order',
             labels: orders,
@@ -261,7 +270,7 @@ StatusReport.prototype = {
             default: 0,
             type: "dropdown",
             parent: '#status_table_header',
-            callback: function() { SR.sort('Hierarchy'); }
+            callback: function() { SR.clickSort(); }
         });
         options.ascending = new Option({
             title: 'Ascending',
@@ -270,7 +279,7 @@ StatusReport.prototype = {
             default: 0,
             type: "dropdown",
             parent: '#status_table_header',
-            callback: function() { SR.sort('Hierarchy'); }
+            callback: function() { SR.clickSort(); }
         });
         
         // Start drawing
@@ -288,14 +297,15 @@ StatusReport.prototype = {
     },
     buildTable: function() {
         var columns = ['ID', 'Collection',
-                       'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Datapoints',
+                       'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Adjudicated', 'Datapoints',
                        'First Tweet', //'Last Tweet', 
                        'Open'];// <span class="glyphicon glyphicon-new-window"></span>
         
         d3.select('#table-container').selectAll('*').remove();
         var table = d3.select('#table-container')
             .append('table')
-            .attr('class', 'table')
+            .attr('id', 'status_table')
+            .attr('class', 'table table-sm')
         
         table.append('thead')
             .append('tr')
@@ -358,6 +368,9 @@ StatusReport.prototype = {
         table_body.selectAll('tr')
             .append('td')
             .attr('class', 'cell-codedtweets cell-count');
+        table_body.selectAll('tr')
+            .append('td')
+            .attr('class', 'cell-adjudtweets cell-count');
         table_body.selectAll('tr')
             .append('td')
             .attr('class', 'cell-datapoints cell-count');
@@ -451,6 +464,8 @@ StatusReport.prototype = {
             .html(function(d) { return 'DistinctTweets' in d ? SR.formatThousands(d.DistinctTweets) : ''; });
         table_body.selectAll('td.cell-codedtweets')
             .html(function(d) { return 'CodedTweets' in d ? SR.formatThousands(d.CodedTweets) : ''; });
+        table_body.selectAll('td.cell-adjudtweets')
+            .html(function(d) { return 'AdjudTweets' in d ? SR.formatThousands(d.AdjudTweets) : ''; });
         table_body.selectAll('td.cell-datapoints')
             .html(function(d) { return 'Datapoints' in d ? SR.formatMinutes(d.Datapoints) : ''; });
         
@@ -467,9 +482,9 @@ StatusReport.prototype = {
         
         // Dates
         table_body.selectAll('td.cell-firstdate')
-            .html(function(d) { return 'FirstTweet' in d ? d.FirstTweet || '-' : ''; });
-        table_body.selectAll('td.cell-lastdate')
-            .html(function(d) { return 'LastTweet' in d ? d.LastTweet || '-' : ''; });
+            .html(function(d) { return 'FirstTweet' in d && d.FirstTweet ? d.FirstTweet.slice(0,-3) || '-' : ''; });
+//        table_body.selectAll('td.cell-lastdate')
+//            .html(function(d) { return 'LastTweet' in d && d.LastTweet ? d.LastTweet.slice(0,-3) || '-' : ''; });
     },
     edit: function(d) {
         if(d.Level == 1) { // Event
@@ -486,16 +501,17 @@ StatusReport.prototype = {
         var clicked = header.data()[0];
         var order = options.order.get();
         var ascending = options.ascending.get();
-        console.log(clicked, order, ascending);
         
-        d3.selectAll('.col-sortable span')
-            .attr('class', 'glyphicon glyphicon-sort glyphicon-hiddenclick');
+        if(clicked) {
+            d3.selectAll('.col-sortable span')
+                .attr('class', 'glyphicon glyphicon-sort glyphicon-hiddenclick');
+        }
         
         // If it is clicked on what it is currently doing, flip it
         if(clicked == order) {
             ascending = ascending == "true" ? "false" : "true";
             options.ascending.set(ascending);
-        } else { // Otherwise it's a new order
+        } else if (clicked) { // Otherwise it's a new order
             order = clicked;
             options.order.set(order);
             ascending = order == 'Collection' ? 'true' : 'false';
@@ -503,33 +519,161 @@ StatusReport.prototype = {
         }
         
         // Sort the columns
-        if(order == 'ID') {
-            table_body.selectAll('tr').sort(function(a, b) {
-                return (ascending == 'true' ? 1 : -1) * (a.ID - b.ID);
-            });
-        } else if(order == 'Collection') {
-            table_body.selectAll('tr').sort(function(a, b) {
-                return (ascending == 'true' ? 1 : -1) * d3.ascending(a.Label, b.Label);
-            });
+        if(options.hierarchical.is('true')) {
+            var quantity = order.replace(' ', '');
+            if(quantity == 'Collection') quantity = 'Label';
+            var ascending_minmax = ascending == 'true' ? 'Min' : 'Max';
+            var ascending_bin = ascending == 'true' ? 1 : -1;
+            
+            table_body.selectAll('tr').sort(function(c, d) {
+                
+                var cmp = function(a, b) {
+                // Get possible values
+                var A2 = a.Level == 2 ? a[quantity] : null;
+                var B2 = b.Level == 2 ? b[quantity] : null;
+                var A1 = a.Level == 2 ? a.Event[quantity] : a.Level == 1 ? a[quantity] : null;
+                var B1 = b.Level == 2 ? b.Event[quantity] : b.Level == 1 ? b[quantity] : null;
+                var Atype = a.Level == 0 ? a : a['Event Type'];
+                var Btype = b.Level == 0 ? b : b['Event Type'];
+                var A0 = Atype[quantity] || Atype[quantity + '_' + ascending_minmax];
+                var B0 = Btype[quantity] || Btype[quantity + '_' + ascending_minmax];
+                console.log(A0, A1, A2, a.Level, a.Label);
+                console.log(B0, B1, B2, b.Level, b.Label);
+                
+                // Compare Event Types
+                if(!A0 && !B0) return 0;
+                if(!A0) return 1;
+                if(!B0) return -1;
+                if(A0 < B0) return -1 * ascending_bin;
+                if(A0 > B0) return 1 * ascending_bin;
+//                if(a.Level == 0 && b.Level == 0) return 0;
+                if(a.Level == 0 && b.Level > 0) return -1;
+                if(a.Level > 0 && b.Level == 0) return 1;
+                
+                // Compare Events
+                if(!A1 && !B1) return 0;
+                if(!A1) return 1;
+                if(!B1) return -1;
+                if(A1 < B1) return -1 * ascending_bin;
+                if(A1 > B1) return 1 * ascending_bin;
+//                if(a.Level == 0 && b.Level == 0) return 0;
+                if(a.Level == 1 && b.Level > 1) return -1;
+                if(a.Level > 1 && b.Level == 1) return 1;
+                
+                // Compare Rumors
+                if(!A2 && !B2) return 0;
+                if(!A2) return 1;
+                if(!B2) return -1;
+                if(A2 < B2) return -1 * ascending_bin;
+                if(A2 > B2) return 1 * ascending_bin;
+                
+                return 0;
+            };
+                
+                var res = cmp(c, d);
+                console.log(res);
+                return res;
+                });
+            
+//            
+//            if(order == 'ID') {
+//                table_body.selectAll('tr').sort(function(a, b) {
+//                    var A = parseInt(a.ID); var B = parseInt(b.ID);
+//                    if(a.Level == 0) {
+//                        A = A || a['ID_' + ascending_minmax];
+//                    }
+//                    if(b.Level == 0) {
+//                        B = B || b['ID_' + ascending_minmax];
+//                    }
+//
+//                    var cmp = A - B;
+//                    return ascending_bin * cmp || a.Level - b.Level;
+//                });
+//            } else if(order == 'Collection') {
+//                table_body.selectAll('tr').sort(function(a, b) {
+//                    var A = a.label;
+//                    var B = b.label;
+//
+//                    return ascending_bin * d3.ascending(B, A);
+//                });
+//            } else {
+//                var ordr = order.replace(' ', '');
+//                table_body.selectAll('tr').sort(function(a, b) {
+//                    var A = a[ordr];
+//                    var B = b[ordr];
+//
+//                    if(a.Level == 0) {
+//                        A = A || a[ordr + '_' + ascending_minmax];
+//                    }
+//                    if(b.Level == 0) {
+//                        B = B || b[ordr + '_' + ascending_minmax];
+//                    }
+//
+//                    if(!A && !B) return 0;
+//                    if(!A) return 1;
+//                    if(!B) return -1;
+//
+//                    var cmp = d3.ascending(A, B);
+//                    return ascending_bin * cmp || a.Level - b.Level;
+//                });
+//            }
         } else {
-            var ordr = order.replace(' ', '');
-            table_body.selectAll('tr').sort(function(a, b) {
-                if(!a[ordr] && !b[ordr]) return 0;
-                if(!a[ordr]) return 1;
-                if(!b[ordr]) return -1;
-                return (ascending == 'true' ? 1 : -1) * d3.ascending(a[ordr], b[ordr]);
-            });
+            var ascending_minmax = ascending == 'true' ? 'Max' : 'Min';
+            var ascending_bin = ascending == 'true' ? 1 : -1;
+            if(order == 'ID') {
+                table_body.selectAll('tr').sort(function(a, b) {
+                    var A = parseInt(a.ID); var B = parseInt(b.ID);
+                    if(a.Level == 0) {
+                        A = A || a['ID_' + ascending_minmax];
+                    }
+                    if(b.Level == 0) {
+                        B = B || b['ID_' + ascending_minmax];
+                    }
+
+                    var cmp = A - B;
+                    return ascending_bin * cmp || a.Level - b.Level;
+                });
+            } else if(order == 'Collection') {
+                table_body.selectAll('tr').sort(function(a, b) {
+                    var A = a.label;
+                    var B = b.label;
+
+                    return ascending_bin * d3.ascending(B, A);
+                });
+            } else {
+                var ordr = order.replace(' ', '');
+                table_body.selectAll('tr').sort(function(a, b) {
+                    var A = a[ordr];
+                    var B = b[ordr];
+
+                    if(a.Level == 0) {
+                        A = A || a[ordr + '_' + ascending_minmax];
+                    }
+                    if(b.Level == 0) {
+                        B = B || b[ordr + '_' + ascending_minmax];
+                    }
+
+                    if(!A && !B) return 0;
+                    if(!A) return 1;
+                    if(!B) return -1;
+
+                    var cmp = d3.ascending(A, B);
+                    return ascending_bin * cmp || a.Level - b.Level;
+                });
+            }
         }
         
         // Set the header's glyphicon class to reflect the order
-        if(ascending == 'true' && order == 'Collection') {
-            header.select('span').attr('class', 'glyphicon glyphicon-sort-by-alphabet glyphicon-hoverclick');
-        } else if(ascending == 'false' && order == 'Collection') {
-            header.select('span').attr('class', 'glyphicon glyphicon-sort-by-alphabet-alt glyphicon-hoverclick');
-        } else if(ascending == 'true') {
-            header.select('span').attr('class', 'glyphicon glyphicon-sort-by-attributes glyphicon-hoverclick');
-        } else if(ascending == 'false') {
-            header.select('span').attr('class', 'glyphicon glyphicon-sort-by-attributes-alt glyphicon-hoverclick');
+        if(clicked) {
+            if(ascending == 'true' && order == 'Collection') {
+                header.select('span').attr('class', 'glyphicon glyphicon-sort-by-alphabet glyphicon-hoverclick');
+            } else if(ascending == 'false' && order == 'Collection') {
+                header.select('span').attr('class', 'glyphicon glyphicon-sort-by-alphabet-alt glyphicon-hoverclick');
+            } else if(ascending == 'true') {
+                header.select('span').attr('class', 'glyphicon glyphicon-sort-by-attributes glyphicon-hoverclick');
+            } else if(ascending == 'false') {
+                header.select('span').attr('class', 'glyphicon glyphicon-sort-by-attributes-alt glyphicon-hoverclick');
+            }
         }
     },
     recount: function(d) {
@@ -537,6 +681,7 @@ StatusReport.prototype = {
         var cell = d3.select(this.parentNode);
         var quantity_class = cell.attr('class').split(' ')[0];
         var quantity = quantity_class.includes('coded') ? 'CodedTweets' : 
+                   quantity_class.includes('adjud') ? 'AdjudTweets' : 
                    quantity_class.includes('distinct') ? 'DistinctTweets' : 
                    quantity_class.includes('datapoint') ? 'Datapoints' : 'Tweets';
         var post = {

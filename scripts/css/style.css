@@ -373,6 +373,9 @@ button:focus {
 
 
 /* Status */
+#status_table {
+    font-size: .9em;
+}
 .cell-count {
     position: relative;
     text-align: right;
@@ -410,6 +413,7 @@ th:hover .glyphicon-hiddenclick {
 }
 .row_type .cell-label {
     padding-left: 10px;
+    font-weight: bold;
 }
 .row_event {
     background-color: aliceblue;
