@@ -35,21 +35,36 @@ Coding.prototype = {
         var progress = 0;
         
         data.callPHP('coding/getCoders', {}, function(d) {
-            coding.coders = JSON.parse(d);
+            try {
+                coding.coders = JSON.parse(d);
+            } catch(err) {
+                console.log(file_data);
+                return;
+            }
             progress++
             if(progress == 4)
                 coding.buildDropdowns();
         });
             
         data.callPHP('collection/getEvents', {}, function(d) {
-            coding.events = JSON.parse(d);
+            try {
+                coding.events = JSON.parse(d);
+            } catch(err) {
+                console.log(file_data);
+                return;
+            }
             progress++
             if(progress == 4)
                 coding.buildDropdowns();
         });
 
         data.callPHP('collection/getRumors', {}, function(d) {
-            coding.rumors = JSON.parse(d);
+            try {
+                coding.rumors = JSON.parse(d);
+            } catch(err) {
+                console.log(file_data);
+                return;
+            }
             progress++
             if(progress == 4)
                 coding.buildDropdowns();
@@ -57,7 +72,13 @@ Coding.prototype = {
 
         // Get the number of codes for each rumor
         data.callPHP('coding/rumorPeriodCounts', {}, function(d) {
-            coding.rumor_period_counts = JSON.parse(d);
+            try {
+                coding.rumor_period_counts = JSON.parse(d);
+            } catch(err) {
+                console.log(file_data);
+                return;
+            }
+            
             progress++
             if(progress == 4)
                 coding.buildDropdowns();

@@ -573,7 +573,13 @@ def parseTweetJSON(line):
 
     # Get attributes of tweet
     # Assemble other attributes
-    created_at = datetime.fromtimestamp(int(data['timestamp_ms']) / 1000);
+    if('timestamp_ms' in data):
+        created_at = datetime.fromtimestamp(int(data['timestamp_ms']) / 1000);
+    elif('created_ts' in data and '$date' in data['created_ts']):
+        created_at = datetime.fromtimestamp(int(data['created_ts']['$date']) / 1000);
+    else:
+        print('Error getting timestamp for tweet ' + data['id'] + ': ' +  text)
+    
 
     timestamp_exact = datetime.strftime(created_at, '%Y-%m-%d %H:%M:%S')
     timestamp_minute = datetime.strftime(created_at, '%Y%m%d_%H%M')
