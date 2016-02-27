@@ -7,19 +7,19 @@
 //    $time_max = $_GET["time_max"];
 
     // Execute Query
-    if($_GET["rumor_id"] == '_new_') {
+    if($_REQUEST["rumor_id"] == '_new_') {
         // Insert values (presuming they all exist)
         // otherwise the PHP will terminate with the error
         $query = "" .
             "INSERT INTO Rumor " .
             "(Event_ID, `Name`, Definition, `Query`, StartTime, StopTime) " .
             " VALUES (" . 
-            $_GET["event_id"] . ", " . 
+            $_REQUEST["event_id"] . ", " . 
             "'New Rumor'" . ", " . 
             "''" . ", " . 
-            "''" . ", " . 
-            $_GET["time_min"] . ", " . 
-            $_GET["time_max"] . ") ";
+            "''" . ", '" . 
+            $_REQUEST["time_min"] . "', '" . 
+            $_REQUEST["time_max"] . "') ";
 
         $result = $mysqli->query($query);
         if (!$result) {
@@ -38,7 +38,7 @@
         // Get the last inserted rumor, so we get the rumor ID
         $query = "" .
             "SELECT * FROM Rumor" .
-            " WHERE ID = " . $_GET["rumor_id"];
+            " WHERE ID = " . $_REQUEST["rumor_id"];
  
         include '../printJSON.php';
     }

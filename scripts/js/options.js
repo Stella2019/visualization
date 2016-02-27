@@ -28,8 +28,8 @@ function Options() {
     
     self.choice_groups = ['data', 'subset', 'style', 'legend'];
     self.initial_buttons = ['show_options',
-                       'collection_type', 'collection', 'time_limit', 'add_term',
-                       'rumor', /*'series', 'subset', 'found_in', */'resolution',
+                       'collection_type', 'collection', 'rumor', 'time_limit', 
+                       /*'series', 'subset', 'found_in', */'resolution', 'add_term', 
                        'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line',
                        'series_order', 'legend_cleanup', 'fetched_tweet_order', 'rumor', 'chart_category',
                        'ngram_view', 'ngram_cmp'];
@@ -167,7 +167,7 @@ function Options() {
             default: 0,
             custom_entries_allowed: true,   
             type: "textfieldconfirm",
-            parent: '#choices_data',
+            parent: '#choices_subset',
             callback: function() {
                 data.genTweetCount(
                     options.add_term.get().toLowerCase()
@@ -251,11 +251,11 @@ function Options() {
         });
         self.rumor = new Option({
             title: 'Rumor',
-            labels: ["New"],
-            ids:    ["_new_"],
+            labels: ["- None -", "- New -"],
+            ids:    ["_none_", "_new_"],
             default: 0,
             type: "dropdown",
-            parent: '#choices_subset',
+            parent: '#choices_data',
             callback: function() { data.getRumor(); },
             edit: function() { options.editWindow('rumor'); }
         });
@@ -334,7 +334,8 @@ Options.prototype = {
         try {
 //            state = JSON.parse(window.location.hash.slice(1));
 //            console.debug(state);
-            var strstate = window.location.hash.slice(2);
+            var loc = decodeURIComponent(window.location.hash);
+            var strstate = loc.slice(2);
             if(strstate.length <= 0)
                 return;
             var arrstate = strstate.split('&');
@@ -996,16 +997,18 @@ Options.prototype = {
         options.chooseCollectionType();
     },
     buildRumors: function() {
-        var rumor_names = data.rumors.map(function(collection) {
-            return collection.Name;
+        var rumor_names = data.rumors.map(function(rumor) {
+            return rumor.Name;
         });
         
         // Generate Collections List
         options.rumor['labels'] = rumor_names;
+        options.rumor['labels'].unshift('None');
         options.rumor['labels'].push('- New -');
         options.rumor['ids'] = data.rumors.map(function(rumor) { return rumor['ID']; });
+        options.rumor['ids'].unshift('_none_');
         options.rumor['ids'].push('_new_');
-        options.rumor['available'] = util.range(rumor_names.length + 1);
+        options.rumor['available'] = util.range(options.rumor['labels'].length);
         
         // Find the current collection
         var cur = options.rumor.get();
@@ -1094,8 +1097,7 @@ Options.prototype = {
 //        var id = set.get();
         
         var info = data[option];
-        
-        if(!info) {
+        if(!info || !('ID' in info)) {
             disp.alert('No information.', 'warning');
             
             return

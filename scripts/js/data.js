@@ -959,23 +959,28 @@ Data.prototype = {
         }
     },
     getRumor: function() {
-        url = "scripts/php/collection/getRumor.php";
-        url += "?rumor_id=" + options.rumor.get();
-        url += "&event_id=" + data.collection.ID;
-        url += '&time_min="' + util.formatDate(data.collection.StartTime) + '"';
-        url += '&time_max="' + util.formatDate(data.collection.StopTime) + '"';
-        url += '&definition="' + "hello" + '"';
-        url += '&query="' + "pzbooks|[[:<:]]bot[[:>:]],know|knew|predict|before|[[:<:]]11[[:>:]]|early" + '"';
+        var post = {
+            rumor_id: options.rumor.get(),
+            event_id: data.collection.ID,
+            time_min: util.formatDate(data.time.min),
+            time_max: util.formatDate(data.time.max)
+        }
+//        url += '&definition="' + "hello" + '"';
+//        url += '&query="' + "pzbooks|[[:<:]]bot[[:>:]],know|knew|predict|before|[[:<:]]11[[:>:]]|early" + '"';
         
-        if(options.rumor.get() == '_new_')
-            url += "&new";
+        if(options.rumor.is('_new_'))
+            post.url = "new";
+        if(options.rumor.is('_none_'))
+            return; // End this, there is no rumor to get
         
-        d3.json(url, function(error, filedata) {
-            if (error) throw error;
-
-            data.rumor = filedata[0];
-            delete data.rumor['StartTime'];
-            delete data.rumor['StopTime']; 
+        data.callPHP('collection/getRumor', post, function(d) {
+            try {
+                data.rumor = JSON.parse(d)[0];
+//                delete data.rumor['StartTime'];
+//                delete data.rumor['StopTime']; 
+            } catch (e) {
+                console.log(d);
+            }
         });
     },
     getRumorCount: function() {
