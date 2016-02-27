@@ -298,7 +298,7 @@ function Options() {
             callback: function() { data.calculateNGrams('ngram_cmp'); }
         });
         
-        self.updateCollectionCallback = function() { data.load_rumors(); };
+        self.updateCollectionCallback = function() { data.loadRumors(); };
     }
 };
 Options.prototype = {
