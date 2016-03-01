@@ -13,8 +13,8 @@ function Stream(args) {
     self.progress_text = "Working";
     self.progress_button = false;
     self.chunk_index = 0;
-    self.time_min = data.time.selected_min;
-    self.time_max = data.time.selected_max;
+    self.time_min = options.load_time_min.date;
+    self.time_max = options.load_time_max.date;
     self.failure_msg = 'Problem with data stream';
     self.on_chunk_finish = function () {};
     self.on_finish = function () {};
@@ -105,8 +105,6 @@ function Data() {
         name: "Time",
         collection_min: new Date(),
         collection_max: new Date(),
-        selected_min: new Date(),
-        selected_max: new Date(),
         min: new Date(), // of possible data
         max: new Date(), // of possible data
         stamps: [],
@@ -258,6 +256,15 @@ Data.prototype = {
         
         disp.setTitle();
         
+        // Save times for the collection
+        data.time.collection_min = new Date(data.collection.StartTime);
+        if(data.collection.StopTime == "Ongoing") {
+            data.time.collection_max = new Date();
+        } else {
+            data.time.collection_max = new Date(data.collection.StopTime);
+        }
+        options.configureLoadTimeWindow();
+        
         data.loadCollectionData();
     },
     loadCollectionData: function () {
@@ -269,50 +276,6 @@ Data.prototype = {
         // Clear the raw data objects
         data.file = [];
         data.all = {};
-        
-        // Get times from collection
-        data.time.collection_min = new Date(data.collection.StartTime);
-        if(data.collection.StopTime == "Ongoing") {
-            data.time.collection_max = new Date();
-        } else {
-            data.time.collection_max = new Date(data.collection.StopTime);
-        }
-        
-        // Get times to load
-        if(options.time_limit.is('all')) {
-            data.time.selected_min = new Date(data.time.collection_min);
-            data.time.selected_max = new Date(data.time.collection_max);
-        } else {
-            var time_limit = options.time_limit.get();
-            var sign = time_limit.slice(0, 1) == '-' ? -1 : 1;
-
-            time_limit = time_limit.slice(-2);
-            var hours_diff = 0;
-
-            if (time_limit == '3h') {
-                hours_diff = 3;
-            } else if (time_limit == '2h') { // 12h, but we sliced it
-                hours_diff = 12;
-            } else if(time_limit == '1d') {
-                hours_diff = 24;
-            } else if(time_limit == '3d') {
-                hours_diff = 24 * 3;
-            } else if(time_limit == '1w') {
-                hours_diff = 24 * 7;
-            }
-
-            if(sign == -1) {
-                data.time.selected_min = new Date(data.time.collection_max);
-                data.time.selected_min.setHours(data.time.selected_min.getHours() + hours_diff * sign);
-                
-                data.time.selected_max = new Date(data.time.collection_max);
-            } else {
-                data.time.selected_min = new Date(data.time.collection_min);
-                
-                data.time.selected_max = new Date(data.time.collection_min);
-                data.time.selected_max.setHours(data.time.selected_max.getHours() + hours_diff * sign);
-            }
-        }
         
         // Load information about the rumors related to the collection
         data.loadRumors();
@@ -326,8 +289,8 @@ Data.prototype = {
             name: 'load_collection',
             url: 'timeseries/get',
             post: {event_id: data.collection.ID},
-            time_min: new Date(data.time.selected_min),
-            time_max: new Date(data.time.selected_max),
+            time_min: new Date(options.load_time_min.date),
+            time_max: new Date(options.load_time_max.date),
             time_res: 3,
             failure_msg: 'Error loading data',
             progress_text: 'Loading Data',
@@ -399,8 +362,8 @@ Data.prototype = {
             disp.alert('No Timeseries Data in Database');
             
             // Hardcode the max/min time
-            options.time_min.min = new Date(data.time.selected_min);
-            options.time_max.max = new Date(data.time.selected_max);
+            options.time_min.min = new Date(options.load_time_min.date);
+            options.time_max.max = new Date(options.load_time_max.date);
             
             pipeline.abort();
             return;
@@ -419,8 +382,8 @@ Data.prototype = {
         // Fill in missing timestamps
         data.time.min = util.date(data.time.stamps[0]);
         data.time.max = util.date(data.time.stamps[data.time.stamps.length - 1]);
-        if(options.time_limit.get().slice(0, 1) == '-')
-            last_timestamp = util.formatDate(new Date());
+//        if(options.time_limit.get().slice(0, 1) == '-')
+//            last_timestamp = util.formatDate(new Date());
 
         var new_timestamps = [];
         for(var timestamp = new Date(data.time.min);
@@ -459,6 +422,12 @@ Data.prototype = {
                 var i_y = types.indexOf(tweet_type);
                 data.all[i_y][i_d][i_f][i_k][i_t] = 
                     parseInt(data.file[row][tweet_type]);
+                
+                // Fix for FoundIn Any/Text
+                if(i_f > 0 && data.all[i_y][i_d][0][i_k][i_t] == 0) {
+                    data.all[i_y][i_d][0][i_k][i_t] = 
+                        parseInt(data.file[row][tweet_type]);
+                }
             });
         }
 
@@ -584,6 +553,14 @@ Data.prototype = {
                 return list;
             }, []);
         });
+        
+        // All series
+        if(!data.cats['Found In'].filter
+           && data.shown[2].includes(1)
+           && data.shown[2].includes(2)
+           && data.shown[2].includes(3)) {
+            data.shown[2] = [0];
+        }
     },
     getCategorySubtotals: function() {
         // Get nested timestamps
@@ -987,8 +964,8 @@ Data.prototype = {
         var post = {
             event_id: data.collection.ID,
             rumor_id: data.rumor.ID,
-            time_min: util.formatDate(data.time.selected_min),
-            time_max: util.formatDate(data.time.selected_max),
+            time_min: util.formatDate(options.load_time_min.date),
+            time_max: util.formatDate(options.load_time_max.date),
             total: ''
         };
         

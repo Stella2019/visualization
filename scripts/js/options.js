@@ -28,14 +28,14 @@ function Options() {
     
     self.choice_groups = ['data', 'subset', 'style', 'legend'];
     self.initial_buttons = ['show_options',
-                       'collection_type', 'collection', 'rumor', 'time_limit', 
+                       'collection_type', 'collection', 'rumor', 'load_time_window', 
                        /*'series', 'subset', 'found_in', */'resolution', 'add_term', 
                        'display_type', 'shape', 'color_scale', 'y_scale', 'y_max', 'total_line',
                        'series_order', 'legend_cleanup', 'fetched_tweet_order', 'rumor', 'chart_category',
                        'ngram_view', 'ngram_cmp'];
     
     self.timefields = ['time_min', 'time_max'];
-    self.record = ['collection', /*'subset',*/ 'resolution', 'time_limit',
+    self.record = ['collection', /*'subset',*/ 'resolution', 'load_time_window', 'load_time_min', 'load_time_max',
                       'display_type', 'y_scale', 'shape', /*'series',*/
                       'time_save', 'time_min', 'time_max',
                       'y_max_toggle', 'y_max', 'color_scale',
@@ -80,7 +80,7 @@ function Options() {
         self.shape = new Option({
             title: "Shape",
             labels: ["Linear",  "Basis",        "Step"],
-            ids:    ["linear",  "basis-open",   "step-after"],
+            ids:    ["linear",  "basis-open",   "step-before"],
             available: [0, 1, 2],
             default: 2,
             parent: '#choices_style',
@@ -152,14 +152,14 @@ function Options() {
             parent: '#chart-bottom',
             callback: function() { disp.setFocusTime('input_field'); }
         });
-        self.time_limit = new Option({
-            title: "Tweets in",
-            labels: ["First 3 Hours", "First 12 Hours", "First 24 Hours", "First 3 Days", "First Week", "All time", "Last Week", "Last 3 Days", "Last 24 Hours", "Last 12 Hours", "Last 3 Hours"],
-            ids:    ["3h", "12h", "1d", "3d", '1w', 'all', '-1w', '-3d', '-1d', '-12h', '-3h'],
-            default: 2,
-            parent: '#choices_data',
-            callback: function() { data.loadCollectionData(); }
-        });
+//        self.time_limit = new Option({
+//            title: "Tweets in",
+//            labels: ["First 3 Hours", "First 12 Hours", "First 24 Hours", "First 3 Days", "First Week", "All time", "Last Week", "Last 3 Days", "Last 24 Hours", "Last 12 Hours", "Last 3 Hours"],
+//            ids:    ["3h", "12h", "1d", "3d", '1w', 'all', '-1w', '-3d', '-1d', '-12h', '-3h'],
+//            default: 2,
+//            parent: '#choices_data',
+//            callback: function() { data.loadCollectionData(); }
+//        });
         self.add_term = new Option({
             title: "Add Term",
             labels: ["New Term"],
@@ -297,6 +297,40 @@ function Options() {
             parent: '#choices_legend',
             callback: function() { data.calculateNGrams('ngram_cmp'); }
         });
+        self.load_time_window = new Option({
+            title: "Time Window",
+            labels: ["First Day", "First 3 Days", "Whole Collection", "Custom",],
+            ids:    ['1d', '3d', 'all', 'custom'],
+            default: 0,
+            parent: '#choices_data',
+            callback: function() { 
+                if(options.load_time_window.is('custom')) {
+                    options.editLoadTimeWindow();
+                } else {
+                    options.configureLoadTimeWindow();
+                    data.loadCollectionData();
+                }
+            },
+            edit: function() { options.editLoadTimeWindow(); }
+        });
+        self.load_time_min = new Option({
+            title: "Time Min",
+            labels: [''],
+            ids: [''],
+            date: new Date(),
+            default: 0,
+            parent: '#choices_data',
+            custom_entries_allowed: true
+        })
+        self.load_time_max = new Option({
+            title: "Time Max",
+            labels: [''],
+            ids: [''],
+            date: new Date(),
+            default: 0,
+            parent: '#choices_data',
+            custom_entries_allowed: true
+        })
         
         self.updateCollectionCallback = function() { data.loadRumors(); };
     }
@@ -1585,5 +1619,176 @@ Options.prototype = {
         options.ngram_cmp.available = d3.range(ids.length);
         options.buildDropdown('ngram_cmp');
         
+    },
+//    initializeLoadTimeWindow: function() {
+//        options.load_time_min.date = new Date(data.time.collection_min);
+//        options.load_time_max.date = new Date(data.time.collection_max);
+//        options.configureLoadTimeWindow();
+//    },
+    configureLoadTimeWindow: function() {
+        var window = options.load_time_window.get();
+        
+        if(window == '1d') {
+            options.load_time_min.date = new Date(data.time.collection_min);
+            options.load_time_max.date = new Date(data.time.collection_min);
+            options.load_time_max.date.setHours(options.load_time_max.date.getHours() + 24);
+        } else if(window == '3d') {
+            options.load_time_min.date = new Date(data.time.collection_min);
+            options.load_time_max.date = new Date(data.time.collection_min);
+            options.load_time_max.date.setHours(options.load_time_max.date.getHours() + 24 * 3);
+        } else if(window == 'all') {
+            options.load_time_min.date = new Date(data.time.collection_min);
+            options.load_time_max.date = new Date(data.time.collection_max);
+        } else { // Custom
+//            data.time.selected_min = new Date(options.data_time.custom_min);
+//            data.time.selected_max = new Date(options.data_time.custom_max);
+        }
+        
+        // Outer Bounds
+        if(options.load_time_min.date < data.time.collection_min) {
+            options.load_time_min.date = new Date(data.time.collection_min);
+        }
+        if(options.load_time_max.date > data.time.collection_max) {
+            options.load_time_max.date = new Date(data.time.collection_max);
+        }
+        // Inner Bound
+        if(options.load_time_max.date < options.load_time_min.date) {
+            options.load_time_max.date = new Date(options.load_time_min.date);
+        }
+            
+        // Set Text Fields
+        options.load_time_min.set(util.formDate(options.load_time_min.date));
+        options.load_time_max.set(util.formDate(options.load_time_max.date));
+        options.recordState('load_time_min', false);
+        options.recordState('load_time_max', false);
+        
+    },
+    editLoadTimeWindow: function() {
+        options.load_time_window.set('custom');
+        var date_min = new Date(options.load_time_min.date);
+        var date_max = new Date(options.load_time_max.date);
+        
+        // Set Modal Title
+        d3.select('#modal .modal-title')
+            .html('Set Time Window');
+
+        // Clear any data still in the modal
+        d3.select('#modal .modal-options')
+            .selectAll('*').remove();
+        var modal_body = d3.select('#modal .modal-body');
+        modal_body.selectAll('*').remove();
+        
+        // Append form
+        var form = modal_body.append('form')
+            .attr({
+                id: 'edit_form',
+                method: 'post',
+                class: 'form-horizontal'
+            })
+            .on('submit', function() {
+                event.preventDefault();
+                return false; 
+            });
+        
+        var divs = form.selectAll('div.form-group')
+            .data([{
+                    label: 'From',
+                    time: date_min,
+                    min: data.time.collection_min,
+                    max: data.time.collection_max
+                },{
+                    label: 'To',
+                    time: date_max,
+                    min: data.time.collection_min,
+                    max: data.time.collection_max
+                }])
+            .enter()
+            .append('div')
+            .attr('class', 'form-group');
+        
+        divs.append('label')
+            .attr('for', function(d) { return 'edit_datatime_' + d.label; })
+            .attr('class', 'col-sm-3 control-label')
+            .text(function(d) { return d.label });
+        
+        var entries = divs.append('div')
+            .attr('class', 'col-sm-9 edit-box edit-box-date input-group')
+            .style('width', '1px');
+        
+        
+        entries.append('div')
+            .attr('class', 'input-group-btn')
+            .append('button')
+            .attr('class', 'btn btn-default')
+            .html('<span class="glyphicon glyphicon-step-backward"></span>')
+            .on('click', function(d) {
+                if(d.label == 'From') {
+                    date_min = new Date(data.time.collection_min);
+                    document.getElementById('edit_datatime_' + d.label).value = util.formDate(date_min);
+                } else { // To
+                    date_max = new Date(date_min);
+                    document.getElementById('edit_datatime_' + d.label).value = util.formDate(date_max);
+                }
+            });
+        
+        entries.append('input')
+            .attr({
+                class: 'form-control',
+                type: 'datetime-local',
+                id: function(d) { return 'edit_load_time_' + d.label; },
+                value: function(d) { return util.formDate(d.time); },
+                min: function(d) { return util.formDate(d.min); },
+                max: function(d) { return util.formDate(d.max); }
+            })
+            .on('change', function(d) {
+                var date = new Date(document.getElementById('edit_load_time_' + d.label).value);
+                date.setHours(date.getHours() + 8);
+                if(d.label == 'From') {
+                    date_min = date;
+                } else { // To
+                    date_max = date;
+                }
+            });
+        
+        entries.append('div')
+            .attr('class', 'input-group-btn')
+            .append('button')
+            .attr('class', 'btn btn-default')
+            .html('<span class="glyphicon glyphicon-step-forward"></span>')
+            .on('click', function(d) {
+                if(d.label == 'From') {
+                    date_min = new Date(date_max);
+                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(date_min);
+                } else { // To
+                    date_max = new Date(data.time.collection_max);
+                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(date_max);
+                }
+            });
+        
+        // Accept
+        var ops = d3.select('#modal .modal-options')
+        ops.selectAll('*').remove();
+        
+        ops.append('button')
+            .attr({
+//                id: 'edit-window-tweetin',
+                class: 'btn btn-primary edit-window-routine'
+            })
+            .on('click', function(d) {
+                // Set values
+                options.load_date_min.date = date_min;
+                options.load_date_max.date = date_max;
+                
+                // Close modal
+                $('#modal').modal(false);
+                
+                // Functions
+                options.configureLoadTimeWindow();
+                data.loadCollectionData(); 
+            })
+            .text('Update');
+        
+        
+        $('#modal').modal(true);
     }
 }

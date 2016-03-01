@@ -319,7 +319,7 @@ Legend.prototype = {
         var old_data = focus_column.data();
 
 //      var value_i = Math.floor(xy[0] / focus.width * d.values.length);
-        var value_i = data.time.stamps_nested_int.indexOf(time.min.getTime());
+        var value_i = data.time.stamps_nested_int.indexOf(time.min.getTime()) + 1;
         var value = series.values[value_i].value;
         var value0 = series.values[value_i].value0;
         

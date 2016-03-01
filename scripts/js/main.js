@@ -3,6 +3,7 @@ var options, legend, disp, data, pipeline;
 
 var util = {
     formatDate: d3.time.format("%Y-%m-%d %H:%M:%S"),
+    formDate: function(d) { return util.formatDate(new Date(new Date(new Date(d).setSeconds(0)).setMilliseconds(0))).replace(' ', 'T'); },
     date2monthstr: d3.time.format("%Y-%m"),
     date: function(str) {
         return util.formatDate.parse(str);
