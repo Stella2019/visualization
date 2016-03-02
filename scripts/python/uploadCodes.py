@@ -83,15 +83,15 @@ def main():
                 code['Coder']     = coder_id
                 code['Rumor']     = options.rumor_id
                 code['Period']    = options.period
-                code['Uncodable'] = bool(code['Uncodable'])
-                code['Unrelated'] = bool(code['Unrelated'])
-                code['Affirm']    = bool(code['Affirm'])
-                code['Deny']      = bool(code['Deny'])
-                code['Neutral']   = bool(code['Neutral'])
-                code['Implicit']  = bool(code['Implicit'])
-                code['Ambiguity'] = bool(code['Ambiguity'])
-                code['Uncertainty'] = bool(code['Uncertainty'])
-                code['Difficult'] = bool(code['Difficult'])
+                code['Uncodable'] = bool(code['Uncodable']) if 'Uncodable' in code else 0
+                code['Unrelated'] = bool(code['Unrelated']) if 'Unrelated' in code else 0
+                code['Affirm']    = bool(code['Affirm'])    if 'Affirm' in code else 0
+                code['Deny']      = bool(code['Deny'])      if 'Deny' in code else 0
+                code['Neutral']   = bool(code['Neutral'])   if 'Neutral' in code else 0
+                code['Implicit']  = bool(code['Implicit'])  if 'Implicit' in code else 0
+                code['Ambiguity'] = bool(code['Ambiguity']) if 'Ambiguity' in code else 0
+                code['Uncertainty'] = bool(code['Uncertainty']) if 'Uncertainty' in code else 0
+                code['Difficult'] = bool(code['Difficult']) if 'Difficult' in code else 0
                 
                 if('text' in code):
                     code['Text'] = code['text']
