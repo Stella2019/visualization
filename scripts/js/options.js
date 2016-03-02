@@ -1661,12 +1661,12 @@ Options.prototype = {
         options.load_time_max.set(util.formDate(options.load_time_max.date));
         options.recordState('load_time_min', false);
         options.recordState('load_time_max', false);
+        options.recordState('load_time_window', false);
         
     },
     editLoadTimeWindow: function() {
-        options.load_time_window.set('custom');
-        var date_min = new Date(options.load_time_min.date);
-        var date_max = new Date(options.load_time_max.date);
+        options.load_time_min.custom = new Date(options.load_time_min.date);
+        options.load_time_max.custom = new Date(options.load_time_max.date);
         
         // Set Modal Title
         d3.select('#modal .modal-title')
@@ -1693,12 +1693,12 @@ Options.prototype = {
         var divs = form.selectAll('div.form-group')
             .data([{
                     label: 'From',
-                    time: date_min,
+                    time: options.load_time_min.custom,
                     min: data.time.collection_min,
                     max: data.time.collection_max
                 },{
                     label: 'To',
-                    time: date_max,
+                    time: options.load_time_max.custom,
                     min: data.time.collection_min,
                     max: data.time.collection_max
                 }])
@@ -1707,7 +1707,7 @@ Options.prototype = {
             .attr('class', 'form-group');
         
         divs.append('label')
-            .attr('for', function(d) { return 'edit_datatime_' + d.label; })
+            .attr('for', function(d) { return 'edit_load_time_' + d.label; })
             .attr('class', 'col-sm-3 control-label')
             .text(function(d) { return d.label });
         
@@ -1723,11 +1723,11 @@ Options.prototype = {
             .html('<span class="glyphicon glyphicon-step-backward"></span>')
             .on('click', function(d) {
                 if(d.label == 'From') {
-                    date_min = new Date(data.time.collection_min);
-                    document.getElementById('edit_datatime_' + d.label).value = util.formDate(date_min);
+                    options.load_time_min.custom = new Date(data.time.collection_min);
+                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options.load_time_min.custom);
                 } else { // To
-                    date_max = new Date(date_min);
-                    document.getElementById('edit_datatime_' + d.label).value = util.formDate(date_max);
+                    options.load_time_max.custom = new Date(options.load_time_min.custom);
+                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options.load_time_max.custom);
                 }
             });
         
@@ -1744,9 +1744,9 @@ Options.prototype = {
                 var date = new Date(document.getElementById('edit_load_time_' + d.label).value);
                 date.setHours(date.getHours() + 8);
                 if(d.label == 'From') {
-                    date_min = date;
+                    options.load_time_min.custom = date;
                 } else { // To
-                    date_max = date;
+                    options.load_time_max.custom = date;
                 }
             });
         
@@ -1757,15 +1757,15 @@ Options.prototype = {
             .html('<span class="glyphicon glyphicon-step-forward"></span>')
             .on('click', function(d) {
                 if(d.label == 'From') {
-                    date_min = new Date(date_max);
-                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(date_min);
+                    options.load_time_min.custom = new Date(options.load_time_max.custom);
+                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options.load_time_min.custom);
                 } else { // To
-                    date_max = new Date(data.time.collection_max);
-                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(date_max);
+                    options.load_time_max.custom = new Date(data.time.collection_max);
+                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options.load_time_max.custom);
                 }
             });
         
-        // Accept
+        // Accept Button
         var ops = d3.select('#modal .modal-options')
         ops.selectAll('*').remove();
         
@@ -1776,8 +1776,9 @@ Options.prototype = {
             })
             .on('click', function(d) {
                 // Set values
-                options.load_date_min.date = date_min;
-                options.load_date_max.date = date_max;
+                options.load_time_window.set('custom');
+                options.load_time_min.date = options.load_time_min.custom;
+                options.load_time_max.date = options.load_time_max.custom;
                 
                 // Close modal
                 $('#modal').modal(false);
