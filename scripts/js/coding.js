@@ -120,7 +120,7 @@ Coding.prototype = {
                                    'show_matrices',  'coder_order',
                                    'show_tweets', 'tweets_coded', 'tweets_focus', 'tweet_order',
                                    'show_tweet_types', 'tweet_types_bars',
-                                   'show_ngrams', 'ngrams_exclude_stopwords', /*'ngrams_counts',*/ 'ngrams_multiplier', 'ngrams_coded', 'ngrams_filter', 'ngrams_tables'];
+                                   'show_ngrams', 'ngrams_exclude_stopwords', 'ngrams_topx', 'ngrams_multiplier', 'ngrams_coded', 'ngrams_filter', 'ngrams_tables'];
         options.record = options.initial_buttons;
         options.rumor = new Option({
             title: 'Rumor',
@@ -237,17 +237,6 @@ Coding.prototype = {
             parent: '#ngrams_header',
             callback: coding.NGramList
         });
-//        options.ngrams_relative = new Option({
-//            title: "Relative",
-//            styles: ["btn btn-sm", "btn btn-sm btn-default"],
-//            labels: ["Absolute Counts",
-//                     "Relative Counts"],
-//            ids:    ['false', 'true'],
-//            default: 0,
-//            type: 'toggle',
-//            parent: '#ngrams_header',
-//            callback: coding.NGramList
-//        });
         options.ngrams_counts = new Option({
             title: "Frequency",
             labels: ['Binary', 'Total', 'Log Normal'],
