@@ -486,7 +486,7 @@ Coding.prototype = {
         coding.coders_x_coders_primary = util.zeros(coding.n.coders, coding.n.coders);
         coding.coders_x_majority_primary = util.zeros(coding.n.coders, 1);
         coding.coders_x_majority_uncertainty = util.zeros(coding.n.coders, 1);
-        coding.coders_x_coders_uncertainty_either = util.zeros(coding.n.coders, coding.n.coders);
+        coding.coders_x_coders_uncertainty_first = util.zeros(coding.n.coders, coding.n.coders);
         coding.coders_x_coders_uncertainty_both = util.zeros(coding.n.coders, coding.n.coders);
         coding.codes_x_codes = util.zeros(coding.n.primary, coding.n.primary);
         
@@ -581,8 +581,8 @@ Coding.prototype = {
                         coding.coders_x_coders_primary[coder1 - 1][coder2 - 1]++;
                     
                     var uncertainty2 = tweet.Votes['Uncertainty'].includes(coder2);
-                    if(uncertainty1 || uncertainty2)
-                        coding.coders_x_coders_uncertainty_either[coder1 - 1][coder2 - 1]++ // any
+                    if(uncertainty2)// || uncertainty2)
+                        coding.coders_x_coders_uncertainty_first[coder1 - 1][coder2 - 1]++ // any
                     if(uncertainty1 && uncertainty2)
                         coding.coders_x_coders_uncertainty_both[coder1 - 1][coder2 - 1]++ // all
                 })
@@ -966,7 +966,7 @@ Coding.prototype = {
                 }
                 var entry = {
                     Agreed: coding.coders_x_coders_uncertainty_both[i - 1][j - 1],
-                    Tweets: coding.coders_x_coders_uncertainty_either[i - 1][j - 1]
+                    Tweets: coding.coders_x_coders_uncertainty_first[i - 1][j - 1]
                 }
                 if(entry['Tweets'] == 0){
                     entry['label'] = '-';
@@ -984,7 +984,7 @@ Coding.prototype = {
             } else {
                 var entry = {
                     Agreed: d3.sum(coding.coders_x_coders_uncertainty_both[i - 1], function(val, j) { return j != i - 1 ? val : 0 }),
-                    Tweets: d3.sum(coding.coders_x_coders_uncertainty_either[i - 1], function(val, j) { return j != i - 1 ? val : 0 })
+                    Tweets: d3.sum(coding.coders_x_coders_uncertainty_first[i - 1], function(val, j) { return j != i - 1 ? val : 0 })
                 }
                 if(entry['Tweets'] == 0){
                     entry['label'] = '';
@@ -999,10 +999,29 @@ Coding.prototype = {
         });
         
         // Make Table
-        div.append('div')
+        
+        var uncertainty_div = div.append('div')
             .html('Coder Agreement on Uncertainty Codes<br ><small>When at least one Uncertainty code, same color scale</small>')
             .attr('class', 'col-sm-4')
-            .append('table')
+            .append('div')
+            .style('text-align', 'center')
+            .style('display', 'inline-block');
+        
+        uncertainty_div.append('span')
+            .html('Coder coded uncertain<br />');
+        
+        uncertainty_div.append('span')
+            .text('Other coder agreed')
+            .style({
+                'text-orientation': 'sideways',
+                'writing-mode': 'vertical-lr',
+                position: 'absolute',
+                left: '-5px',
+                height: '90%',
+                top: '10%'
+            });
+        
+        uncertainty_div.append('table')
             .selectAll('tr')
             .data(matrix)
             .enter()
@@ -1070,7 +1089,7 @@ Coding.prototype = {
             .text('Coders Choose')
             .style({
                 float: 'left',
-                'text-orientation': 'upright',
+                'text-orientation': 'sideways',//upright
                 'writing-mode': 'vertical-lr',
                 transform: 'translateY(35%)'
             });
