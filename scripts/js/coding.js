@@ -136,8 +136,8 @@ Coding.prototype = {
         // Period
         options.period = new Option({
             title: 'Period',
-            labels: ['Adjudicated', 'Coding', 'Training 1', 'Training 2', 'Training 3', 'Training 4'],
-            ids:    [1, 0, -1, -2, -3, -4],
+            labels: ['Adjudicated', 'Auxiliary Adjudication', 'Coding', 'Training 1', 'Training 2', 'Training 3', 'Training 4'],
+            ids:    [1, 2, 0, -1, -2, -3, -4],
             isnumeric: true,
             default: 1,
             type: "dropdown",
@@ -168,7 +168,7 @@ Coding.prototype = {
         
         // Types of disagreement        
         options.tweets_coded = new Option({
-            title: 'Coded',
+            title: 'Code',
             labels: ['Any',
                      'Primary Code',
                      'Uncodable',
