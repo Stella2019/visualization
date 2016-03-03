@@ -944,7 +944,7 @@ Display.prototype = {
                     .append('li')
                     .attr('class', 'list-group-item')
                     .html(function(d) {
-                        var content = '<span class="badge"><a href="https://twitter.com/emcomp/status/' + d['ID'] + '">' + d['ID'] + '</a></span>';
+                        var content = '<span class="badge"><a href="https://twitter.com/emcomp/status/' + d['ID'] + '" target="_blank">' + d['ID'] + '</a></span>';
                         content += d['Timestamp'] + ' ';
                         content += d['Username'] + ' said: ';
                         content += "<br />";
@@ -954,7 +954,7 @@ Display.prototype = {
                             content += 'distinct ';
                         content += d['Type'];
                         if(d['Origin'])
-                            content += ' of <a href="https://twitter.com/emcomp/status/' + d['Origin'] + '">#' + d['Origin'] + '</a>'
+                            content += ' of <a href="https://twitter.com/emcomp/status/' + d['Origin'] + '" target="_blank">#' + d['Origin'] + '</a>'
                         if(d['Count'] && d['Count'] > 1)
                             content += ', ' + (d['Count'] - 1) + " repeats";
                         return content;
