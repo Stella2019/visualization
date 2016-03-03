@@ -51,7 +51,7 @@ def main():
     # Set parameters
 #    event_name = "Sydney Siege" # Umpqua Paris
 #    rumor_name = "Hadley" # Crisis Actors Bot Prediction
-    periods = ['Training 4', 'Training 3', 'Training 2', 'Training', 'Coding', 'Adjudication'];
+    periods = ['Training 4', 'Training 3', 'Training 2', 'Training', 'Coding', 'Adjudication', 'AuxAdjud'];
     period_name = periods[options.period + 4];
     
 #    rumor_id = 10
