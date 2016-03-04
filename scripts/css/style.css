@@ -11,6 +11,41 @@
 }
 
 /* Options */
+.sidebar {
+    position: fixed;
+    top: 10px;
+    width: 200px;
+    border: solid 5px #eee;
+    border-left: none;
+    background: white;
+    left: -170px;
+    transition: left 500ms;
+}
+.sidebar:hover {
+    left: 0px;
+}
+.sidebar h4 {
+    padding: 5px;
+    border-bottom: 1px solid #e5e5e5;
+}
+.sidebar ul {
+    list-style-type: none;
+    padding-left: 20px;
+}
+.sidebar .section-title {
+    position: absolute;
+    right: 0px;
+    text-orientation: sideways;
+    writing-mode: vertical-lr;
+    transform: translateY(-50%);
+    top: 50%;
+    opacity: 1;
+    transition: opacity 500ms;
+}
+.sidebar:hover .section-title {
+    opacity: 0;
+}
+
 #choices {
     max-height: 150px;
 /*    overflow: scroll;*/
@@ -327,6 +362,14 @@ button:focus {
 }
 #agreement_table tr:nth-child(even){
     background-color: #F7F7F7;
+}
+#matrices ylabel {
+    top: 50%;
+    height: 100%;
+    transform: translate(-200%, -50%);
+    text-orientation: sideways;
+    writing-mode: vertical-lr;
+    position: absolute;
 }
 #matrices table {
     table-layout: fixed;

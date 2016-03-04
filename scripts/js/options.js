@@ -362,6 +362,8 @@ Options.prototype = {
         
         // Record the state
         options.recordState(null, true);
+        
+        options.buildSidebar();
     },
     importState: function() {
         var state;
@@ -1620,11 +1622,6 @@ Options.prototype = {
         options.buildDropdown('ngram_cmp');
         
     },
-//    initializeLoadTimeWindow: function() {
-//        options.load_time_min.date = new Date(data.time.collection_min);
-//        options.load_time_max.date = new Date(data.time.collection_max);
-//        options.configureLoadTimeWindow();
-//    },
     configureLoadTimeWindow: function() {
         var window = options.load_time_window.get();
         
@@ -1791,5 +1788,44 @@ Options.prototype = {
         
         
         $('#modal').modal(true);
+    },
+    buildSidebar: function() {
+        var sidebar = d3.select('body').append('div')
+            .attr('class', 'sidebar');
+        
+        // Pages
+        var pages_panel = sidebar.append('div')
+            .attr('id', 'sidebar_pages')
+        
+        pages_panel.append('h4')
+            .html('Pages')
+        
+        var pages = [{
+            label: "Overview",
+            url: "status.html"
+        },{
+            label: "Timeseries",
+            url: "index.html"
+        },{
+            label: "Coding",
+            url: "coding.html"
+        }]
+            
+        pages_panel.append('ul')
+            .selectAll('li')
+            .data(pages)
+            .enter()
+            .append('li')
+            .style('list-style-type', 'none')
+            .append('a')
+            .attr('href', function(d) { return d.url; })
+            .attr('target', '_blank')
+            .html(function(d) { return d.label; });
+        
+        pages_panel.append('div')
+            .attr('class', 'section-title')
+            .html('Pages')
+        
+        //
     }
 }

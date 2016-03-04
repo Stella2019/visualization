@@ -13,14 +13,25 @@ StatusReport.prototype = {
         var datasets = 2;
             
         data.callPHP('collection/getEvents', {}, function(d) {
-            SR.events_arr = JSON.parse(d);
+            try {
+                SR.events_arr = JSON.parse(d);
+            } catch(err) {
+                console.log(d);
+                return;
+            }
+            
             datasets--;
             if(datasets == 0)
                 SR.configureData();
         });
 
         data.callPHP('collection/getRumors', {}, function(d) {
-            SR.rumors_arr = JSON.parse(d);
+            try {
+                SR.rumors_arr = JSON.parse(d);
+            } catch(err) {
+                console.log(d);
+                return;
+            }
             
             datasets--;
             if(datasets == 0)
@@ -105,7 +116,7 @@ StatusReport.prototype = {
                     collection = 'rumors';
                 }
                 if(!SR[collection][count.ID]) {
-                    console.log('Invalid Collection ' + count.Type + ' ' + count.ID);
+//                    console.log('Invalid Collection ' + count.Type + ' ' + count.ID);
                     return;
                 }
                 

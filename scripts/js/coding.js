@@ -1012,14 +1012,7 @@ Coding.prototype = {
         
         uncertainty_div.append('span')
             .text('Other coder agreed')
-            .style({
-                'text-orientation': 'sideways',
-                'writing-mode': 'vertical-lr',
-                position: 'absolute',
-                left: '-5px',
-                height: '90%',
-                top: '10%'
-            });
+            .attr('class', 'ylabel');
         
         uncertainty_div.append('table')
             .selectAll('tr')
@@ -1086,13 +1079,8 @@ Coding.prototype = {
             .html('Majority Choose<br />');
         
         code_x_code_div.append('span')
+            .attr('class', 'ylabel')
             .text('Coders Choose')
-            .style({
-                float: 'left',
-                'text-orientation': 'sideways',//upright
-                'writing-mode': 'vertical-lr',
-                transform: 'translateY(35%)'
-            });
         
         code_x_code_div.append('table')
             .attr('id', 'codes_confusion_matrix')
