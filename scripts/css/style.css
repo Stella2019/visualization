@@ -24,26 +24,44 @@
 .sidebar:hover {
     left: 0px;
 }
+.sidebar .sidepanel {
+    position: relative;
+}
 .sidebar h4 {
     padding: 5px;
     border-bottom: 1px solid #e5e5e5;
 }
-.sidebar ul {
-    list-style-type: none;
-    padding-left: 20px;
-}
 .sidebar .section-title {
     position: absolute;
-    right: 0px;
-    text-orientation: sideways;
-    writing-mode: vertical-lr;
-    transform: translateY(-50%);
+    transition: 500ms;
+    background: white;
     top: 50%;
     opacity: 1;
-    transition: opacity 500ms;
+    
+    transform: translateY(-50%) rotate(90deg) translateY(85%);
+    transform-origin: left;
+    left: 200px;
+    
+/*
+    transform: translateY(-50%) rotate(90deg) translateY(-50%);
+    right: 0px;
+*/
+    
+/*    transform: rotate(90deg);*/
+/*    transform-origin: top;*/
+/*    left: 175px;*/
 }
 .sidebar:hover .section-title {
     opacity: 0;
+/*
+    transform: none;
+    top: 0px;
+    left: 0px;
+    font-weight: bold;
+    font-size: 1.2em;
+    padding: 5px;
+    font-size: 18px;
+*/
 }
 
 #choices {

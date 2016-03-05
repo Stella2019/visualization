@@ -255,24 +255,6 @@ StatusReport.prototype = {
             parent: '#status_table_header',
             callback: SR.buildTable
         });
-        options.empties = new Option({
-            title: 'Show Rows with No Tweets',
-            labels: ['Yes', 'No'],
-            ids:    ["true", "false"],
-            default: 1,
-            type: "dropdown",
-            parent: '#status_table_header',
-            callback: SR.setVisibility
-        });
-        options.hierarchical = new Option({
-            title: 'Maintain Hierarchy',
-            labels: ['Yes', 'No'],
-            ids:    ["true", "false"],
-            default: 0,
-            type: "dropdown",
-            parent: '#status_table_header',
-            callback: function() { SR.clickSort(); }
-        });
         var orders = ['ID', 'Collection', 'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Adjud Tweets', 'Datapoints', 'First Tweet'];
         options.order = new Option({
             title: 'Order',
@@ -292,16 +274,34 @@ StatusReport.prototype = {
             parent: '#status_table_header',
             callback: function() { SR.clickSort(); }
         });
+        options['View'] = {
+            empties: new Option({
+                name: 'empties',
+                title: 'Show Rows with No Tweets',
+                labels: ['Yes', 'No'],
+                ids:    ["true", "false"],
+                default: 1,
+                type: "dropdown",
+                parent: '#status_table_header',
+                callback: SR.setVisibility
+            }), 
+            hierarchical: new Option({
+                name: 'hierarchical',
+                title: 'Maintain Hierarchy',
+                labels: ['Yes', 'No'],
+                ids:    ["true", "false"],
+                default: 0,
+                type: "dropdown",
+                parent: '#status_table_header',
+                callback: function() { SR.clickSort(); }
+            })
+        };
+        options.panels       = ['View'];
+        options.hierarchical = options['View']['hierarchical'];
+        options.empties      = options['View']['empties'];
         
         // Start drawing
         options.init();
-        
-        // Change some of the appearances
-        d3.selectAll('.choice')
-            .style('vertical-align', 'top');
-        d3.selectAll('.btn-primary')
-            .classed('btn-default', true)
-            .classed('btn-primary', false);
         
         //status....
         SR.buildTable();

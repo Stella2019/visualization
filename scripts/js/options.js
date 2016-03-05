@@ -339,7 +339,9 @@ Options.prototype = {
     init: function() {
         
         // Build options
-        options.buildTopMenu();
+        if(!options.panels) {
+            options.buildTopMenu();
+        }
         if(!location.pathname.includes('coding.html') && !location.pathname.includes('status.html')) {
             options.buildTimeWindow();
         }
@@ -1795,7 +1797,8 @@ Options.prototype = {
         
         // Pages
         var pages_panel = sidebar.append('div')
-            .attr('id', 'sidebar_pages')
+            .attr('id', 'panel_pages')
+            .attr('class', 'sidepanel');
         
         pages_panel.append('h4')
             .html('Pages')
@@ -1812,6 +1815,10 @@ Options.prototype = {
         }]
             
         pages_panel.append('ul')
+            .style({
+                'list-style-type': 'none',
+                'padding-left': '20px'
+            })
             .selectAll('li')
             .data(pages)
             .enter()
@@ -1826,6 +1833,123 @@ Options.prototype = {
             .attr('class', 'section-title')
             .html('Pages')
         
-        //
+        // Add all other sidebar items
+        if(!options.panels) return;
+        
+        options.panels.forEach(function(panel_name) {
+            var panel_div = sidebar.append('div')
+                .attr('id', 'panel_' + util.simplify(panel_name))
+                .attr('class', 'sidepanel');
+
+            panel_div.append('h4')
+                .html(panel_name);
+
+            var panel = options[panel_name];
+            Object.keys(panel).forEach(function(option_name) {
+                options.buildSidebarOption(panel[option_name], panel_div);
+            })
+            
+            panel_div.append('div')
+                .attr('class', 'section-title')
+                .html(panel_name);
+        });
+    },
+    buildSidebarOption: function(option, panel_div) {
+        
+        // Make containers
+        var container = panel_div.append("div")
+            .attr("class", "choice")
+            .style("text-transform", "capitalize")
+            .append("div")
+                .attr("id", "choose_" + option.name)
+                .attr("class", "dropdown");
+        
+        var list_open = container.select('button.dropdown-toggle')
+        if(!list_open[0][0]) {
+            container.append('div')
+                .html(option.title)
+                .style('margin-left', '5px');
+            
+            list_open = container.append("button")
+                .style('margin-left', '20px')
+                .attr({type: "button",
+                    class: 'btn btn-sm btn-default dropdown-toggle',
+                    'data-toggle': "dropdown",
+                    'aria-haspopup': true,
+                    'aria-expanded': false});
+            
+            list_open.append('span')
+                .attr('class', 'current')
+                .style('text-transform', 'capitalize')
+                .html('Label');
+
+            list_open.append('text')
+                .text(' ');
+            list_open.append('span')
+                .attr('class', 'caret');
+        }
+        
+        var list = container.select('ul');
+        if(!list[0][0]) {
+            list = container.append('ul')
+                .style({
+                    'margin-left': '20px',
+                    'min-width': '0px'
+                })
+                .attr({class: 'dropdown-menu'});
+        }
+        
+        // Populate the list;
+        var elements = list.selectAll("li")
+            .data(option.available);
+        
+        elements.enter()
+            .append("li").append("a");
+        
+        elements.exit().remove(); // Remove former columns
+        elements.select('a'); // Propagate any data that needs to be
+        
+        option.click = function(d) {
+            container.select('.current')
+                .text(option.labels[d]);
+
+            option.set(option.ids[d]);
+            options.recordState(option.name);
+
+            option.callback();
+        }
+        
+        list.selectAll('a')
+            .attr("id", function(d) { return option.name + "_" + option.ids[d]; })
+            .html(function(d) {
+                return option.labels[d];
+            })
+            .on("click", option.click);
+
+        // Save the current value to the interface and the history
+        container.select('.current')
+            .text(option.labels[option.default]);
+        
+        // Add an edit button if there is an edit function
+        if('edit' in option) {
+            var edit_button = container.select('button.edit-button')
+            if(!edit_button[0][0]) {
+                container.classed('btn-group', true);
+
+                list_open.style({
+                    'border-top-right-radius': '0px',
+                    'border-bottom-right-radius': '0px',
+                    'border-right': 'none'
+                });
+
+                edit_button = container.append('button')
+                    .attr('class', 'btn btn-sm btn-default edit-button')
+                    .on('click', option.edit)
+                    .append('span')
+                    .attr('class', 'glyphicon glyphicon-pencil');
+            }
+        }
+        
+        options.state[option] = option.ids[option.default];
     }
 }
