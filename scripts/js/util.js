@@ -1,6 +1,3 @@
-// Structure that will be used throughout the other data
-var options, legend, disp, data, pipeline;
-
 var util = {
     formatDate: d3.time.format("%Y-%m-%d %H:%M:%S"),
     formDate: function(d) { return util.formatDate(new Date(new Date(new Date(d).setSeconds(0)).setMilliseconds(0))).replace(' ', 'T'); },
@@ -275,22 +272,4 @@ Counter.prototype = {
         }
     }
 };
-
-if(!location.pathname.includes('coding.html') && !location.pathname.includes('status.html')) { // only for the main page
-    function initialize() {
-        options = new Options();
-        options.init();
-
-        disp = new Display();
-        disp.init();
-
-        data = new Data();
-        pipeline = new Pipeline();
-
-        data.loadCollections();
-    }
-    
-    window.onload = initialize;
-}
-
 
