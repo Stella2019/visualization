@@ -7,7 +7,7 @@ function Timeseries () {
 Timeseries.prototype = {
     setOptions: function() {
         options = new Options();
-        options.panels = ['Dataset', 'View', 'Select', 'Series', 'Analysis'];
+        options.panels = ['Dataset', 'View', 'Series', 'Analysis'];
         
         options['Dataset'] = {
             'Event Type': new Option({
@@ -37,12 +37,12 @@ Timeseries.prototype = {
                 edit: function() { options.editWindow('rumor'); }
             }),
             'Time Window': new Option({
-                title: "Time Window",
+                title: "Time",
                 labels: ["First Day", "First 3 Days", "Whole Collection", "Custom",],
                 ids:    ['1d', '3d', 'all', 'custom'],
                 default: 0,
                 callback: function() { 
-                    if(options.load_time_window.is('custom')) {
+                    if(options['Dataset']['Time Window'].is('custom')) {
                         options.editLoadTimeWindow();
                     } else {
                         options.configureLoadTimeWindow();
@@ -68,19 +68,6 @@ Timeseries.prototype = {
                 default: 0,
                 hidden: true,
                 custom_entries_allowed: true
-            }),
-            'Add Term': new Option({
-                title: "Add Term",
-                labels: ["New Term"],
-                ids:    ["new"],
-                default: 0,
-                custom_entries_allowed: true,   
-                type: "textfieldconfirm",
-                callback: function() {
-                    data.genTweetCount(
-                        options.add_term.get().toLowerCase()
-                    ); 
-                }
             })
         };
         options['View'] = {
@@ -151,31 +138,29 @@ Timeseries.prototype = {
                     disp.alert('Sorry this is broken right now');
                     pipeline.start('Configure Plot Area');
                 }
-            })
-        };
-        options['Select'] = {
-            'Time Saving': new Option({
-                title: "Save Time State",
-                labels: ["No", 'Yes'],
-                ids:    ["false", "true"],
-                default: 0,
-                type: "toggle",
-                parent: '#choices_time_right_buttons',
-                callback: function() { 
-                    var saving = !(options.time_save.is("true"));
-                    if(saving) {
-                        if(options.record.indexOf('time_min') == -1)
-                            options.record.push('time_min');
-                        if(options.record.indexOf('time_max') == -1)
-                            options.record.push('time_max');
-                    } else {
-                        if(options.record.indexOf('time_min') > -1)
-                            options.record.splice(options.record.indexOf('time_min'), 1);
-                        if(options.record.indexOf('time_max')>  -1)
-                            options.record.splice(options.record.indexOf('time_max'), 1);
-                    }
-                }
             }),
+//            'Time Saving': new Option({
+//                title: "Save Time State",
+//                labels: ["No", 'Yes'],
+//                ids:    ["false", "true"],
+//                default: 0,
+//                type: "toggle",
+//                parent: '#choices_time_right_buttons',
+//                callback: function() { 
+//                    var saving = !(options.time_save.is("true"));
+//                    if(saving) {
+//                        if(options.record.indexOf('time_min') == -1)
+//                            options.record.push('time_min');
+//                        if(options.record.indexOf('time_max') == -1)
+//                            options.record.push('time_max');
+//                    } else {
+//                        if(options.record.indexOf('time_min') > -1)
+//                            options.record.splice(options.record.indexOf('time_min'), 1);
+//                        if(options.record.indexOf('time_max')>  -1)
+//                            options.record.splice(options.record.indexOf('time_max'), 1);
+//                    }
+//                }
+//            }),
             'Time Min': new Option({
                 title: "Begin",
                 labels: ["2000-01-01 00:00"],
@@ -183,6 +168,7 @@ Timeseries.prototype = {
                 default: 0,
                 custom_entries_allowed: true,
                 parent: '#chart-bottom',
+                no_render: true,
                 callback: function() { disp.setFocusTime('input_field'); }
             }),
             'Time Max': new Option({
@@ -192,18 +178,9 @@ Timeseries.prototype = {
                 default: 0,
                 custom_entries_allowed: true,
                 parent: '#chart-bottom',
+                no_render: true,
                 callback: function() { disp.setFocusTime('input_field'); }
-            }),
-//            'Series': new Option({
-//                title: "Terms Selected",
-//                labels: [""],
-//                ids:    [''],
-//                available: [0],
-//                default: 0,
-//                custom_entries_allowed: true, 
-//                parent: '#choices_legend',
-//                callback: function() { pipeline.start('Find Which Data is Shown'); }
-//            })
+            })
         };
         options['Series'] = {
             'Chart Category': new Option({
@@ -225,6 +202,19 @@ Timeseries.prototype = {
                     pipeline.start('Order Timeseries');
                 }
             }),
+            'Add Term': new Option({
+                title: "Add Term",
+                labels: ["New Term"],
+                ids:    ["new"],
+                default: 0,
+                custom_entries_allowed: true,   
+                type: "textfieldconfirm",
+                callback: function() {
+                    data.genTweetCount(
+                        options['Series']['Add Term'].get().toLowerCase()
+                    ); 
+                }
+            }),
             'Clean Legend': new Option({
                 title: "Clean Up Legend",
                 styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
@@ -234,6 +224,16 @@ Timeseries.prototype = {
                 type: "toggle",
                 callback: function() { legend.showOrHideAll(); }
             })
+//            'Shown': new Option({
+//                title: "Terms Selected",
+//                labels: [""],
+//                ids:    [''],
+//                available: [0],
+//                default: 0,
+//                custom_entries_allowed: true, 
+//                parent: '#choices_legend',
+//                callback: function() { pipeline.start('Find Which Data is Shown'); }
+//            })
         };     
         options['Analysis'] = {
             'Fetched Tweet Order': new Option({

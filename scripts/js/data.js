@@ -13,8 +13,8 @@ function Stream(args) {
     self.progress_text = "Working";
     self.progress_button = false;
     self.chunk_index = 0;
-    self.time_min = options.load_time_min.date;
-    self.time_max = options.load_time_max.date;
+    self.time_min = options['Dataset']['Time Min'].date;
+    self.time_max = options['Dataset']['Time Max'].date;
     self.failure_msg = 'Problem with data stream';
     self.on_chunk_finish = function () {};
     self.on_finish = function () {};
@@ -246,7 +246,7 @@ Data.prototype = {
         data.setCollection();
     },
     setCollection: function () {
-        var collection_id = options.collection.get();
+        var collection_id = options['Dataset']['Event'].get();
         
         data.collection = data.collections.reduce(function (collection, candidate) {
             if (collection.ID == collection_id)
@@ -281,7 +281,7 @@ Data.prototype = {
         data.loadRumors();
         
 //        data.startLoadingCollection();
-        d3.select('#choose_collection button')
+        d3.select('#choose_Dataset_Event button')
             .attr('disabled', true);
         
         // Send a signal to start loading the collection
@@ -289,8 +289,8 @@ Data.prototype = {
             name: 'load_collection',
             url: 'timeseries/get',
             post: {event_id: data.collection.ID},
-            time_min: new Date(options.load_time_min.date),
-            time_max: new Date(options.load_time_max.date),
+            time_min: new Date(options['Dataset']['Time Min'].date),
+            time_max: new Date(options['Dataset']['Time Max'].date),
             time_res: 3,
             failure_msg: 'Error loading data',
             progress_text: 'Loading Data',
@@ -322,7 +322,7 @@ Data.prototype = {
         options.buildRumors();
     },
     setRumor: function() {
-        var rumor_id = options.rumor.get();
+        var rumor_id = options['Dataset']['Rumor'].get();
         
         data.rumor = data.rumors.reduce(function(rumor, candidate) {
             if(rumor.ID == rumor_id)
@@ -344,7 +344,7 @@ Data.prototype = {
             
                 // End the progress bar and stop function
                 disp.endProgressBar('load_collection');
-                d3.select('#choose_collection button')
+                d3.select('#choose_Dataset_Event button')
                     .attr('disabled', null);
             }, 1000);
                 
@@ -353,7 +353,7 @@ Data.prototype = {
     },
     parseLoadedCollectionData: function() {
         // Format selections
-        d3.select('#choose_collection button')
+        d3.select('#choose_Dataset_Event button')
             .attr('disabled', null);
         
         
@@ -362,8 +362,8 @@ Data.prototype = {
             disp.alert('No Timeseries Data in Database');
             
             // Hardcode the max/min time
-            options.time_min.min = new Date(options.load_time_min.date);
-            options.time_max.max = new Date(options.load_time_max.date);
+            options['View']['Time Min'].min = new Date(options['Dataset']['Time Min'].date);
+            options['View']['Time Max'].max = new Date(options['Dataset']['Time Max'].date);
             
             pipeline.abort();
             return;
@@ -501,7 +501,7 @@ Data.prototype = {
         };
 
         // Determine if it is shown
-        if(options.chart_category.is('Keyword')) {
+        if(options['Series']['Chart Category'].is('Keyword')) {
             entry.shown = entry.name != '_total_';
         } else {
             entry.shown = entry.name == '_total_';
@@ -600,11 +600,11 @@ Data.prototype = {
             time = new Date(d);
         time.setMilliseconds(0);
         time.setSeconds(0);
-        if(options.resolution.is('tenminute'))
+        if(options['View']['Resolution'].is('tenminute'))
             time.setMinutes(Math.floor(time.getMinutes() / 10) * 10);
-        if(options.resolution.is('hour') || options.resolution.is("day"))
+        if(options['View']['Resolution'].is('hour') || options['View']['Resolution'].is("day"))
             time.setMinutes(0);
-        if(options.resolution.is("day"))
+        if(options['View']['Resolution'].is("day"))
             time.setHours(0);
         return time;
     },
@@ -713,25 +713,25 @@ Data.prototype = {
     },
     makeChartTimeseries: function() {        
         // Configure stream types
-        if (options.display_type.is("wiggle")) {
+        if (options['View']['Plot Type'].is("wiggle")) {
             data.stack.offset("wiggle");
-        } else if (options.display_type.is("stream_expand")) {
+        } else if (options['View']['Plot Type'].is("stream_expand")) {
             data.stack.offset("expand");
-        } else if (options.display_type.is("stream")) {
+        } else if (options['View']['Plot Type'].is("stream")) {
             data.stack.offset("silhouette");
         } else {
             data.stack.offset("zero");
         }
 
         // Find out what we are plotting
-        var category = options.chart_category.get();
+        var category = options['Series']['Chart Category'].get();
         var data_to_plot = data.cats[category].series_plotted;
         
         // Set legend filter buttons
         legend.configureFilters();
         
         // Set stack representation of data
-        if(options.display_type.is("percent")) {
+        if(options['View']['Plot Type'].is("percent")) {
             data_100 = data_to_plot.map(function(series) {
                 var new_series = JSON.parse(JSON.stringify(series)); // Cheap cloning
                 new_series.values = new_series.values.map(function(datum, i) {
@@ -758,7 +758,7 @@ Data.prototype = {
 
         // Convert to separate area plot if that's asked for
         n_datapoints = data.stacked[0].values.length;
-        if(options.display_type.is("separate")) {
+        if(options['View']['Plot Type'].is("separate")) {
             for (var i = n_series - 1; i >= 0; i--) {
                 data.stacked[i].offset = 0;
                 if(i < n_series - 1) {
@@ -822,13 +822,13 @@ Data.prototype = {
         post.search_text = post.search_text
             .replace(/\\W(.*)\\W/g, "[[:<:]]$1[[:>:]]");
         
-        var progress_div = '#choose_add_term';
+        var progress_div = '#choose_Series_Add_Term';
         if(search_text == 'rumor') {
             post.rumor_id = data.rumor.ID;
             post.search_name = data.rumor.ID;
             progress_div = '#edit-window-gencount-div';
         } else {
-            options.add_term.reset();
+            options['Series']['Add Term'].reset();
             $("#input_add_term").blur();
         }
         
@@ -857,9 +857,9 @@ Data.prototype = {
         };
         var title = "";
 
-        if(options.fetched_tweet_order.is("rand")) {
+        if(options['Analysis']['Fetched Tweet Order'].is("rand")) {
             post.rand = true;
-        } else if(options.fetched_tweet_order.is("prevalence")) {
+        } else if(options['Analysis']['Fetched Tweet Order'].is("prevalence")) {
             post.order_prevalence = true;
         }
         
@@ -918,9 +918,9 @@ Data.prototype = {
             post.csv = args.csv;
         
         if(!('time_min' in args))
-            args.time_min = options.time_min.min;
+            args.time_min = options['View']['Time Min'].min;
         if(!('time_max' in args))
-            args.time_max = options.time_max.max;
+            args.time_max = options['View']['Time Max'].max;
 
         post.time_min = util.formatDate(args.time_min);
         title += " between <br />" + util.formatDate(args.time_min);
@@ -937,7 +937,7 @@ Data.prototype = {
     },
     getRumor: function() {
         var post = {
-            rumor_id: options.rumor.get(),
+            rumor_id: options['Dataset']['Rumor'].get(),
             event_id: data.collection.ID,
             time_min: util.formatDate(data.time.min),
             time_max: util.formatDate(data.time.max)
@@ -945,9 +945,9 @@ Data.prototype = {
 //        url += '&definition="' + "hello" + '"';
 //        url += '&query="' + "pzbooks|[[:<:]]bot[[:>:]],know|knew|predict|before|[[:<:]]11[[:>:]]|early" + '"';
         
-        if(options.rumor.is('_new_'))
+        if(options['Dataset']['Rumor'].is('_new_'))
             post.url = "new";
-        if(options.rumor.is('_none_'))
+        if(options['Dataset']['Rumor'].is('_none_'))
             return; // End this, there is no rumor to get
         
         data.callPHP('collection/getRumor', post, function(d) {
@@ -964,8 +964,8 @@ Data.prototype = {
         var post = {
             event_id: data.collection.ID,
             rumor_id: data.rumor.ID,
-            time_min: util.formatDate(options.load_time_min.date),
-            time_max: util.formatDate(options.load_time_max.date),
+            time_min: util.formatDate(options['Dataset']['Time Min'].date),
+            time_max: util.formatDate(options['Dataset']['Time Max'].date),
             total: ''
         };
         
@@ -1213,7 +1213,7 @@ Data.prototype = {
         post.search_text = post.search_text
             .replace(/\\W(.*)\\W/g, "[[:<:]]$1[[:>:]]");
         
-        var progress_div = '#choose_add_term';
+        var progress_div = '#choose_Series_Add_Term';
         if(search_text == 'rumor') {
             post.rumor_id = data.rumor.ID;
             post.search_name = data.rumor.ID;
@@ -1221,7 +1221,7 @@ Data.prototype = {
             d3.select('#edit-window-gencount')
                 .attr('disabled', null);
         } else {
-            options.add_term.reset();
+            options['Series']['Add Term'].reset();
             $("#input_add_term").blur();
         }
         

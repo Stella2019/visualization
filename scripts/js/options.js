@@ -34,8 +34,10 @@ Options.prototype = {
         
         // Build options
 //            options.buildTopMenu();
-//            options.buildTimeWindow();
         options.buildSidebar();
+        if('TS' in window) { // it is a timeseries page
+            options.buildTimeWindow();
+        }
         
         // Import the current state
         options.importState();
@@ -44,9 +46,12 @@ Options.prototype = {
         };
         
         // Style elements
-        $(function () {
-            $('[data-toggle="popover"]').popover()
-        })
+        if('TS' in window) {
+            options['View']['Y Max Toggle'].style();
+            $(function () {
+                $('[data-toggle="popover"]').popover()
+            })
+        }
         
         // Record the state
         options.recordState(true);
@@ -81,7 +86,7 @@ Options.prototype = {
                 option.set(option_value);
                 changed.push(option_name);
                 
-                d3.select("#choose_" + panel_name + "_" + option_name).select('.current')
+                d3.select("#choose_" + util.simplify(panel_name) + "_" + util.simplify(option_name)).select('.current')
                     .text(option.getLabel());
             });
         });
@@ -124,10 +129,10 @@ Options.prototype = {
             if(changed.indexOf("collection") > -1) {
                 data.setCollection();
                 
-                options.collection_type.set(data.collection['Type']);
+                options['Dataset']['Event Type'].set(data.collection['Type']);
 
-                d3.select('#choose_collection_type').select('.current')
-                    .text(options.collection_type.getLabel());
+                d3.select('#choose_Dataset_Event_Type').select('.current')
+                    .text(options['Dataset']['Event Type'].getLabel());
 
                 options.recordState(true);
 
@@ -282,36 +287,43 @@ Options.prototype = {
                 set.callback();
             });
     },
-    buildTextToggle: function(option) {
-        var set = options[option];
+    buildTextToggle: function(panel_name, option_name) {
+        var option = options[panel_name][option_name];
+        var choice_name = util.simplify(panel_name) + '_' + util.simplify(option_name);
         
-        // Make container
-        var superId = "choose_" + option;
-        var container = d3.select(set.parent).append("div")
-            .attr("class", "choice")
-            .style("display", "inline-table")
-            .style("vertical-align", "top")
-            .style("text-transform", "capitalize")
-            .append("div")
-                .attr("id", superId)
-                .attr("class", "input-group input-group-sm");
+        // Set container
+        var container = d3.select('#choose_' + choice_name);
+        if(!container[0][0]) {
+            container = d3.select('#panel_' + util.simplify(panel_name)).append("div")
+                .attr("class", "choice")
+                .style("display", "inline-table")
+                .style("vertical-align", "top")
+                .style("text-transform", "capitalize")
+                .append("div")
+                    .attr("id", "choose_" + choice_name)
+                    .attr("class", "input-group input-group-xs");
+        }
         
-        // Add title
-        container.append('span')
-            .attr('class', 'input-group-addon')
-            .html(set.title);
+        // Add label
+        container.selectAll('div.sidebar-label')
+            .data([option.title])
+            .enter().append('div')
+            .attr('class', 'sidebar-label');
+        container.select('div.sidebar-label')
+            .html(function(d) { return d; })
+            .style('display', 'inline-block')
+            .style('margin-left', '5px')
+            .style('margin-right', '5px');
         
-        // Add toggle option
-        var toggleOption = option + "_toggle";
+//        container.append('span')
+//            .attr('class', 'input-group-addon')
+//            .html(option.title);
         
-        options[toggleOption] = new Option({
-            title: "Save " + set.title + " State",
-            styles: ["btn btn-default", "btn btn-primary"],
+        // Add toggle option        
+        var op_toggle = new Option({
+            title: "Save " + option.title + " State",
             labels: ["Auto", "Manual"],
-//            labels: ["<span class='glyphicon glyphicon-pencil'></span>", "<span class='glyphicon glyphicon-pencil'></span>"],
             tooltips: ["Click to toggle manual mode", "Click to toggle automatic mode"],
-//            labels: [set.title, set.title],
-//            labels: ["<span class='glyphicon glyphicon-ban-circle'></span> Auto", "<span class='glyphicon glyphicon-ok-circle'></span> Manual"],
             ids:    ["false", "true"],
             available: [0, 1],
             default: 0,
@@ -319,67 +331,61 @@ Options.prototype = {
                 options.recordState();
                 pipeline.start('Configure Plot Area');
             },
-            styleFunc: function() {
-                d3.select('#input_' + option)
-                    .attr('disabled', options[toggleOption].get() == "true" ? null : true);
-                d3.select('#choice_' + toggleOption)
-                    .attr('class', function() {
-                        return options[toggleOption].styles[options[toggleOption].indexCur()];
-                    })
+            style: function() {
+                var op_toggle = options[panel_name][option_name + " Toggle"];
+                d3.select('#input_' + choice_name)
+                    .attr('disabled', op_toggle.get() == "true" ? null : true);
+                d3.select('#choice_' + choice_name + '_toggle')
+                    .attr('class', 'btn btn-xs btn-default')
                     .attr('data-content', function() {
-                        return options[toggleOption].tooltips[options[toggleOption].indexCur()];
+                        return op_toggle.tooltips[op_toggle.indexCur()];
                     })
                     .html(function() {
-                        return options[toggleOption].getLabel();
+                        return op_toggle.getLabel();
                     });
             }
         });
+        options[panel_name][option_name + " Toggle"] = op_toggle;
         
         container.append("input")
-            .attr("id", "input_" + option)
+            .attr("id", "input_" + choice_name)
+            .attr("type", 'number')
             .style("width", "80px")
-            .attr("class", "text-center form-control")
+            .style("float", "right")
+            .style("padding", "0px")
+            .attr("class", "text-center form-control input-xs")
             .on('keyup', function(d) {
-                set.set(this.value);
-                options.recordState();
+                option.set(this.value);
+                options.recordState(true);
             
-                options[option].callback();
+                option.callback();
             });
         
         container.append('div')
             .attr('class', 'input-group-btn')
             .append('button')
             .attr({
-                id: 'choice_' + toggleOption,
+                id: 'choice_' + choice_name + '_toggle',
                 'data-toggle': "popover",
                 'data-trigger': "hover",
                 'data-placement': "bottom",
                 'data-content': "Tooltip on bottom"
             })
             .on('click', function(d) {
-                var saving = !(options[toggleOption].get() == "true");
-                options[toggleOption].set(saving ? "true" : "false");
-                options[toggleOption].styleFunc();
+                var saving = !(op_toggle.get() == "true");
+                op_toggle.set(saving ? "true" : "false");
+                op_toggle.style();
             
-                if(saving) {
-                    if(options.record.indexOf(option) == -1)
-                        options.record.push(option);
-                } else {
-                    if(options.record.indexOf(option) > -1)
-                        options.record.splice(options.record.indexOf(option), 1);
-                }
-            
-                options[toggleOption].callback();
+                op_toggle.callback();
             });
         
-        options[option].update = function(value) {
-            document.getElementById("input_" + option)
-                .value = value;
-        };
-        
+        option.updateInInterface = function(d) {
+            document.getElementById("input_" + choice_name)
+                .value = d;
 
-        options.state[toggleOption] = options[toggleOption].get();
-        options.state[option] = set.ids[set.default];
+            option.set(d);
+            options.recordState(true);
+        };
     },
     buildTextConfirm: function(option) {
         var set = options[option];
@@ -576,14 +582,14 @@ Options.prototype = {
         
         container.append("input")
 //            .style('width', '140px') // add 40 px for timezones
-            .attr("id", "choose_time_min")
+            .attr("id", "choose_lView_lTime_Min")
             .attr("class", "text-center form-control");
         container.append("span")
             .attr("class", "input-group-addon")
             .text("  to  ");
         container.append("input")
 //            .style('width', '140px')
-            .attr("id", "choose_time_max")
+            .attr("id", "choose_lView_lTime_Max")
             .attr("class", "text-center form-control");
         
         var left_buttons = container.append('div')
@@ -609,27 +615,6 @@ Options.prototype = {
                 disp.setFocusTime('button_time_to_end');
             });
         
-        options.time_save.styleFunc = function() {
-            d3.select('#choice_time_save')
-                .attr('class', function() {
-                    return options.time_save.styles[options.time_save.indexCur()];
-                })
-                .html(function() {
-                    return options.time_save.getLabel();
-                });
-        }
-        
-        left_buttons.append('button')
-            .attr('id', 'choice_time_save')
-            .on('click', function(d) {
-                var saving = !(options.time_save.is("true"));
-                options.time_save.set(saving ? "true" : "false");
-                options.time_save.styleFunc();
-                options.recordState();
-            
-                options.time_save.callback();
-            });
- 
         var startDateTextBox = $('#choose_time_min');
         var endDateTextBox = $('#choose_time_max');
         
@@ -680,40 +665,43 @@ Options.prototype = {
 //        d3.selectAll('#ui-datepicker-div button').classed('btn btn-default', true);
     },
     buildCollections: function() {
+        var event_op = options['Dataset']['Event'];
+        var event_type_op = options['Dataset']['Event Type'];
+        
         // Generate Collections List
-        options.collection['labels'] = data.collection_names;
-        options.collection['ids'] = data.collections.map(function(collection) { return collection['ID']; });
-        options.collection['available'] = util.range(data.collections.length);
+        event_op['labels'] = data.collection_names;
+        event_op['ids'] = data.collections.map(function(collection) { return collection['ID']; });
+        event_op['available'] = util.range(data.collections.length);
         
         // Find the current collection
-        var cur = options.collection.get();
-        options.collection.default = data.collections.reduce(function(candidate, collection, i) {
+        var cur = event_op.get();
+        event_op.default = data.collections.reduce(function(candidate, collection, i) {
             if(collection['ID'] == cur)
                 return i;
             return candidate;
         }, 0);
-        options.collection.set(options.collection['ids'][options.collection.default]);
+        event_op.set(event_op['ids'][event_op.default]);
         
         // Make the dropdown
-        options.buildDropdown('collection');
+        options.buildSidebarOption('Dataset', 'Event');
         options.recordState(true);
         
         // Generate Types of Collections
         var types = util.lunique(data.collections.map(function(collection) { return collection['Type']; }));
         types.unshift('All'); // Add 'All' to begining
         
-        options.collection_type['labels'] = types;
-        options.collection_type['ids'] = types;
-        options.collection_type['available'] = util.range(types.length);
+        event_type_op['labels'] = types;
+        event_type_op['ids'] = types;
+        event_type_op['available'] = util.range(types.length);
         
         // Set the type to match the current collection
-        options.collection_type.default = options.collection_type['ids'].indexOf(
-            data.collections[options.collection.default]['Type'] );
-        options.collection_type.set(types[options.collection_type.default]);
+        event_type_op.default = event_type_op['ids'].indexOf(
+            data.collections[event_op.default]['Type']);
+        event_type_op.set(types[event_type_op.default]);
         
         // Make the dropdown for collection types
 
-        options.buildDropdown('collection_type');
+        options.buildSidebarOption('Dataset', 'Event Type');
         options.recordState(true);
 
         // Add additional information for collections
@@ -729,25 +717,26 @@ Options.prototype = {
         });
         
         // Generate Collections List
-        options.rumor['labels'] = rumor_names;
-        options.rumor['labels'].unshift('None');
-        options.rumor['labels'].push('- New -');
-        options.rumor['ids'] = data.rumors.map(function(rumor) { return rumor['ID']; });
-        options.rumor['ids'].unshift('_none_');
-        options.rumor['ids'].push('_new_');
-        options.rumor['available'] = util.range(options.rumor['labels'].length);
+        rumor_op = options['Dataset']['Rumor'];
+        rumor_op['labels'] = rumor_names;
+        rumor_op['labels'].unshift('None');
+        rumor_op['labels'].push('- New -');
+        rumor_op['ids'] = data.rumors.map(function(rumor) { return rumor['ID']; });
+        rumor_op['ids'].unshift('_none_');
+        rumor_op['ids'].push('_new_');
+        rumor_op['available'] = util.range(rumor_op['labels'].length);
         
         // Find the current collection
-        var cur = options.rumor.get();
-        options.rumor.default = data.rumors.reduce(function(candidate, rumor, i) {
+        var cur = rumor_op.get();
+        rumor_op.default = data.rumors.reduce(function(candidate, rumor, i) {
             if(rumor['ID'] == cur)
                 return i;
             return candidate;
         }, 0);
-        options.rumor.set(options.rumor['ids'][options.rumor.default]);
+        rumor_op.set(rumor_op['ids'][rumor_op.default]);
         
         // Make the dropdown
-        options.buildDropdown('rumor');
+        options.buildSidebarOption('Dataset', 'Rumor');
         options.recordState(true);
         
         data.setRumor();
@@ -786,8 +775,8 @@ Options.prototype = {
             .set('placement', 'right');
     },
     chooseCollectionType: function() {
-        var curType = options.collection_type.get();
-        var curCollection = options.collection.get();
+        var curType = options['Dataset']['Event Type'].get();
+        var curCollection = options['Dataset']['Event'].get();
         var firstValid = -1; 
         
         data.collections.map(function(collection, i) {
@@ -808,10 +797,10 @@ Options.prototype = {
         
         // If the current collection does not match this type, then make a new one
         if(curCollection == 'invalid') {
-            options.collection.set(options.collection.ids[firstValid]);
+            options['Dataset']['Event'].set(options['Dataset']['Event'].ids[firstValid]);
                         
             d3.select('#choose_collection').select('.current')
-                .text(options.collection.getLabel());
+                .text(options['Dataset']['Event'].getLabel());
 
             options.recordState(true);
 
@@ -1276,11 +1265,11 @@ Options.prototype = {
         var ids = ['e_event'];
         
         // Add rumors
-        var rumor_labels = options.rumor['labels']
+        var rumor_labels = options['Dataset']['Rumor']['labels']
             .slice(0, -1).forEach(function(d) {
             labels.push('R: ' + d);
         });
-        var rumor_ids = options.rumor['ids'].slice(0, -1)
+        var rumor_ids = options['Dataset']['Rumor']['ids'].slice(0, -1)
             .forEach(function(d) {
             ids.push('r_' + d);
         });
@@ -1296,10 +1285,10 @@ Options.prototype = {
         }
         
         // Make view options
-        options.ngram_view.labels = labels;
-        options.ngram_view.ids = ids;
-        options.ngram_view.available = d3.range(ids.length);
-        options.buildDropdown('ngram_view');
+        options['Analysis']['N-Gram View'].labels = labels;
+        options['Analysis']['N-Gram View'].ids = ids;
+        options['Analysis']['N-Gram View'].available = d3.range(ids.length);
+        options.buildSidebarOption('Analysis', 'N-Gram View');
         
         // Make compare options
         labels = labels.map(function(d) { return d; });
@@ -1307,52 +1296,54 @@ Options.prototype = {
         labels.unshift('-');
         ids.unshift('');
         
-        options.ngram_cmp.labels = labels;
-        options.ngram_cmp.ids = ids;
-        options.ngram_cmp.available = d3.range(ids.length);
-        options.buildDropdown('ngram_cmp');
+        options['Analysis']['N-Gram Compare'].labels = labels;
+        options['Analysis']['N-Gram Compare'].ids = ids;
+        options['Analysis']['N-Gram Compare'].available = d3.range(ids.length);
+        options.buildSidebarOption('Analysis', 'N-Gram Compare');
         
     },
     configureLoadTimeWindow: function() {
-        var window = options.load_time_window.get();
+        var window = options['Dataset']['Time Window'].get();
+        var time_min_op = options['Dataset']['Time Min'];
+        var time_max_op = options['Dataset']['Time Max'];
         
         if(window == '1d') {
-            options.load_time_min.date = new Date(data.time.collection_min);
-            options.load_time_max.date = new Date(data.time.collection_min);
-            options.load_time_max.date.setHours(options.load_time_max.date.getHours() + 24);
+            time_min_op.date = new Date(data.time.collection_min);
+            time_max_op.date = new Date(data.time.collection_min);
+            time_max_op.date.setHours(time_max_op.date.getHours() + 24);
         } else if(window == '3d') {
-            options.load_time_min.date = new Date(data.time.collection_min);
-            options.load_time_max.date = new Date(data.time.collection_min);
-            options.load_time_max.date.setHours(options.load_time_max.date.getHours() + 24 * 3);
+            time_min_op.date = new Date(data.time.collection_min);
+            time_max_op.date = new Date(data.time.collection_min);
+            time_max_op.date.setHours(time_max_op.date.getHours() + 24 * 3);
         } else if(window == 'all') {
-            options.load_time_min.date = new Date(data.time.collection_min);
-            options.load_time_max.date = new Date(data.time.collection_max);
+            time_min_op.date = new Date(data.time.collection_min);
+            options['Dataset']['Time Max'].date = new Date(data.time.collection_max);
         } else { // Custom
 //            data.time.selected_min = new Date(options.data_time.custom_min);
 //            data.time.selected_max = new Date(options.data_time.custom_max);
         }
         
         // Outer Bounds
-        if(options.load_time_min.date < data.time.collection_min) {
-            options.load_time_min.date = new Date(data.time.collection_min);
+        if(time_min_op.date < data.time.collection_min) {
+            time_min_op.date = new Date(data.time.collection_min);
         }
-        if(options.load_time_max.date > data.time.collection_max) {
-            options.load_time_max.date = new Date(data.time.collection_max);
+        if(time_max_op.date > data.time.collection_max) {
+            time_max_op.date = new Date(data.time.collection_max);
         }
         // Inner Bound
-        if(options.load_time_max.date < options.load_time_min.date) {
-            options.load_time_max.date = new Date(options.load_time_min.date);
+        if(time_max_op.date < time_min_op.date) {
+            time_max_op.date = new Date(time_min_op.date);
         }
             
         // Set Text Fields
-        options.load_time_min.set(util.formDate(options.load_time_min.date));
-        options.load_time_max.set(util.formDate(options.load_time_max.date));
+        time_min_op.set(util.formDate(time_min_op.date));
+        time_max_op.set(util.formDate(time_max_op.date));
         options.recordState(false);
         
     },
     editLoadTimeWindow: function() {
-        options.load_time_min.custom = new Date(options.load_time_min.date);
-        options.load_time_max.custom = new Date(options.load_time_max.date);
+        options['Dataset']['Time Min'].custom = new Date(options['Dataset']['Time Min'].date);
+        options['Dataset']['Time Max'].custom = new Date(options['Dataset']['Time Max'].date);
         
         // Set Modal Title
         d3.select('#modal .modal-title')
@@ -1379,12 +1370,12 @@ Options.prototype = {
         var divs = form.selectAll('div.form-group')
             .data([{
                     label: 'From',
-                    time: options.load_time_min.custom,
+                    time: options['Dataset']['Time Min'].custom,
                     min: data.time.collection_min,
                     max: data.time.collection_max
                 },{
                     label: 'To',
-                    time: options.load_time_max.custom,
+                    time: options['Dataset']['Time Max'].custom,
                     min: data.time.collection_min,
                     max: data.time.collection_max
                 }])
@@ -1409,11 +1400,11 @@ Options.prototype = {
             .html('<span class="glyphicon glyphicon-step-backward"></span>')
             .on('click', function(d) {
                 if(d.label == 'From') {
-                    options.load_time_min.custom = new Date(data.time.collection_min);
-                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options.load_time_min.custom);
+                    options['Dataset']['Time Min'].custom = new Date(data.time.collection_min);
+                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options['Dataset']['Time Min'].custom);
                 } else { // To
-                    options.load_time_max.custom = new Date(options.load_time_min.custom);
-                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options.load_time_max.custom);
+                    options['Dataset']['Time Max'].custom = new Date(options['Dataset']['Time Min'].custom);
+                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options['Dataset']['Time Max'].custom);
                 }
             });
         
@@ -1430,9 +1421,9 @@ Options.prototype = {
                 var date = new Date(document.getElementById('edit_load_time_' + d.label).value);
                 date.setHours(date.getHours() + 8);
                 if(d.label == 'From') {
-                    options.load_time_min.custom = date;
+                    options['Dataset']['Time Min'].custom = date;
                 } else { // To
-                    options.load_time_max.custom = date;
+                    options['Dataset']['Time Max'].custom = date;
                 }
             });
         
@@ -1443,11 +1434,11 @@ Options.prototype = {
             .html('<span class="glyphicon glyphicon-step-forward"></span>')
             .on('click', function(d) {
                 if(d.label == 'From') {
-                    options.load_time_min.custom = new Date(options.load_time_max.custom);
-                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options.load_time_min.custom);
+                    options['Dataset']['Time Min'].custom = new Date(options['Dataset']['Time Max'].custom);
+                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options['Dataset']['Time Min'].custom);
                 } else { // To
-                    options.load_time_max.custom = new Date(data.time.collection_max);
-                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options.load_time_max.custom);
+                    options['Dataset']['Time Max'].custom = new Date(data.time.collection_max);
+                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options['Dataset']['Time Max'].custom);
                 }
             });
         
@@ -1462,9 +1453,9 @@ Options.prototype = {
             })
             .on('click', function(d) {
                 // Set values
-                options.load_time_window.set('custom');
-                options.load_time_min.date = options.load_time_min.custom;
-                options.load_time_max.date = options.load_time_max.custom;
+                options['Dataset']['Time Window'].set('custom');
+                options['Dataset']['Time Min'].date = options['Dataset']['Time Min'].custom;
+                options['Dataset']['Time Max'].date = options['Dataset']['Time Max'].custom;
                 
                 // Close modal
                 $('#modal').modal(false);
@@ -1550,10 +1541,16 @@ Options.prototype = {
             console.log('Option ' + option_name + ' does not exist');
             return;
         }
-//        console.log(panel, option);
+        
+        // Rendering alternatives
+        if(option.no_render) return;
+        if(option.type && option.type == 'textfieldautoman') {
+            options.buildTextToggle(panel_name, option_name);
+            return;
+        }
         
         // Make containers
-        var container = d3.select('#choose_' + panel_name + '_' + option_name);
+        var container = d3.select('#choose_' + util.simplify(panel_name) + '_' + util.simplify(option_name));
         
         // If it does not exist, create it
         if(!container[0][0]) {
@@ -1561,7 +1558,7 @@ Options.prototype = {
                 .attr("class", "choice")
                 .style("text-transform", "capitalize")
                 .append("div")
-                    .attr("id", "choose_" + panel_name + '_' + option_name)
+                    .attr("id", "choose_" + util.simplify(panel_name) + '_' + util.simplify(option_name))
                     .attr("class", "dropdown");
         }
         
@@ -1578,8 +1575,8 @@ Options.prototype = {
                     class: 'btn btn-xs btn-default dropdown-toggle',
                     'data-toggle': "dropdown",
                     'aria-haspopup': true,
-                    'aria-expanded': false})
-                .style('float', 'none');
+                    'aria-expanded': false});
+//                .style('float', 'none');
             
             list_open.append('span')
                 .attr('class', 'current')
@@ -1654,7 +1651,7 @@ Options.prototype = {
                 edit_button = container.append('button')
                     .attr('class', 'btn btn-xs btn-default edit-button')
                     .on('click', option.edit)
-                    .style('float', 'none')
+                    .style('float', 'right')
                     .append('span')
                     .attr('class', 'glyphicon glyphicon-pencil');
             }

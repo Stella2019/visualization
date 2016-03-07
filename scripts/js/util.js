@@ -41,6 +41,12 @@ var util = {
                 return d3.range(width).map(function() { return 0; });
             });
         }
+    },
+    rshift: function(num, bits) {
+        return num / Math.pow(2, bits);
+    },
+    twitterID2Timestamp: function(ID) {
+        return new Date(util.rshift(ID, 22) + 1288834974657);
     }
 }
 

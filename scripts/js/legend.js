@@ -198,7 +198,7 @@ Legend.prototype = {
         legend.showOrHideAll(category);
     },
     cmp: function(a, b) {
-        if(options.series_order.is('alpha')) {
+        if(options['Series']['Order'].is('alpha')) {
             var name1 = a.display_name || a.name || '';
             var name2 = b.display_name || b.name || '';
             name1 = name1.toLowerCase();
@@ -210,7 +210,7 @@ Legend.prototype = {
                 return 1;
             return 0
             
-        } else if(options.series_order.is('volume')) {
+        } else if(options['Series']['Order'].is('volume')) {
             a = a.sum;
             b = b.sum;
 
@@ -219,7 +219,7 @@ Legend.prototype = {
             else if(a > b)
                 return -1;
             return 0
-        } else if(options.series_order.is('type')) {
+        } else if(options['Series']['Order'].is('type')) {
             if((a.isKeyword && !b.isKeyword) || (a.isOldKeyword && !b.isKeyword && !b.isOldKeyword))
                 return -1;
             else if((!a.isKeyword && b.isKeyword) || (!a.isOldKeyword && !a.isKeyword && b.isOldKeyword))
@@ -391,7 +391,7 @@ Legend.prototype = {
         d3.select('.' + series.id + ' .legend_icon')
             .classed('off', !series.shown);
         
-        if(options.legend_cleanup.is("true") && !series.shown) {
+        if(options['Series']['Clean Legend'].is("true") && !series.shown) {
             disp.fadeOut('.legend_entry.' + series.id);
         } else {
             disp.fadeIn('.legend_entry.' + series.id, 'table-row');
@@ -401,7 +401,7 @@ Legend.prototype = {
         category.series_plotted
                 .forEach(legend.showOrHideSeries);
         
-        if(options.legend_cleanup.is("true") && !category.filter) {
+        if(options['Series']['Clean Legend'].is("true") && !category.filter) {
             disp.fadeOut('.legend_section.' + category.id);
         } else {
             disp.fadeIn('.legend_section.' + category.id, 'block');
@@ -452,7 +452,7 @@ Legend.prototype = {
     configureFilters: function() {
         data.cats_arr.forEach(function(category) {
             // Toggle on if it is the display chart
-            if(options.chart_category.is(category.name)) {
+            if(options['Series']['Chart Category'].is(category.name)) {
                 category.filter = true;
             }
             
@@ -507,7 +507,7 @@ Legend.prototype = {
                 });
         }
         
-        if(options.chart_category.is(category.name)) {
+        if(options['Series']['Chart Category'].is(category.name)) {
             div.attr('disabled', true)
                 .html('In Chart');
         }

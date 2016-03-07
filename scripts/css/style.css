@@ -39,6 +39,7 @@
     background: white;
     opacity: 1;
     white-space: nowrap;
+    z-index: 10;
     
     writing-mode: vertical-lr;
     height: 100%;
@@ -58,6 +59,15 @@
 .choice {
     display: inline-block;
     padding: 2px;
+    width: 100%
+}
+.choice .dropdown {
+    width: 100%;
+}
+.choice .btn {
+    max-width: 100%;
+    white-space: normal;
+    float: right;
 }
 
 .input-group-addon.primary {
@@ -477,4 +487,13 @@ th:hover .glyphicon-hiddenclick {
 .row_rumor .cell-label {
     font-style: italic;
     padding-left: 30px;
+}
+
+/* Other */
+.input-xs {
+    height: 22px;
+    padding: 5px 5px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-radius: 3px;
 }

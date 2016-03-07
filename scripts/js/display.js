@@ -178,21 +178,21 @@ Display.prototype = {
     setYScale: function() {
         var focus = this.focus;
         
-        if(options.y_scale.is("linear")) {
+        if(options['View']['Y Scale'].is("linear")) {
             focus.y = d3.scale.linear()
                 .range([focus.height, 0]);
             focus.y_total_line = d3.scale.linear()
                 .range([focus.height, 0]);
             focus.yAxis.scale(focus.y)
                 .tickFormat(null);
-        } else if(options.y_scale.is("pow")) {
+        } else if(options['View']['Y Scale'].is("pow")) {
             focus.y = d3.scale.sqrt()
                 .range([focus.height, 0]);
             focus.y_total_line = d3.scale.sqrt()
                 .range([focus.height, 0]);
             focus.yAxis.scale(focus.y)
                 .tickFormat(null);
-        } else if(options.y_scale.is("log")) {
+        } else if(options['View']['Y Scale'].is("log")) {
             focus.y = d3.scale.log()
                 .clamp(true)
                 .range([focus.height, 0]);
@@ -244,14 +244,14 @@ Display.prototype = {
             .orient("left");
 
         focus.area = d3.svg.area()
-            .interpolate(options.shape.get())
+            .interpolate(options['View']['Shape'].get())
             .x(function (d) { return focus.x(d.timestamp); });
         focus.area_total_line = d3.svg.area()
-            .interpolate(options.shape.get())
+            .interpolate(options['View']['Shape'].get())
             .x(function (d) { return focus.x(d.timestamp); });
 
         context.area = d3.svg.area()
-            .interpolate(options.shape.get())
+            .interpolate(options['View']['Shape'].get())
             .x(function(d) { return context.x(d.timestamp); })
             .y0(context.height)
             .y1(function(d) { return context.y(d.value); });
@@ -305,7 +305,7 @@ Display.prototype = {
         // Set the Y-Axis label
         disp.focus.svg.select('#y_label')
             .text("Count of Tweets"
-                  + " Every " + options.resolution.getLabel() + "");
+                  + " Every " + options['View']['Resolution'].getLabel() + "");
     },
     contextChart: function() {
         disp.setContextTime(data.time.nested_min,
@@ -316,7 +316,7 @@ Display.prototype = {
                 .range([disp.context.height, 0]);
 
         disp.context.area
-            .interpolate(options.shape.get());
+            .interpolate(options['View']['Shape'].get());
 
         disp.context.svg.selectAll(".x, .area").remove();
         disp.context.svg.append("path")
@@ -356,7 +356,7 @@ Display.prototype = {
         // I want the starting chart to emanate from the
         // middle of the display.
         disp.focus.area
-            .interpolate(options.shape.get())
+            .interpolate(options['View']['Shape'].get())
             .y0(focus.height / 2)
             .y1(focus.height / 2);
 
@@ -385,7 +385,7 @@ Display.prototype = {
     },
     drawTimeseries: function() {
         // Define the parameters of the area
-        if (options.display_type.is('overlap') | options.display_type.is('lines')) {
+        if (options['View']['Plot Type'].is('overlap') | options['View']['Plot Type'].is('lines')) {
             disp.focus.area
                 .y0(disp.focus.height)
                 .y1(function (d) { return disp.focus.y(d.value); });
@@ -401,8 +401,8 @@ Display.prototype = {
             .duration(750)
 
         // Transition to the new area
-        var fill_opacity = options.display_type.is("lines") ? 0.0 : 
-                        (options.display_type.is("overlap") ? 0.1 : 0.8);
+        var fill_opacity = options['View']['Plot Type'].is("lines") ? 0.0 : 
+                        (options['View']['Plot Type'].is("overlap") ? 0.1 : 0.8);
 
         disp.focus.svg.selectAll(".series")
             .classed("lines", false);
@@ -416,7 +416,7 @@ Display.prototype = {
     setYAxes: function() {
         // Set the Y Domain
         var y_min = 0;
-        if(options.y_scale.is("log"))
+        if(options['View']['Y Scale'].is("log"))
             y_min = 1;
 
         var y_max = 100;
@@ -433,23 +433,22 @@ Display.prototype = {
                 return d.value;
             }));
 
-        if(options.y_max_toggle.get() == "true") {
-            y_max = options.y_max.get();
+        if(options['View']['Y Max Toggle'].get() == "true") {
+            y_max = options['View']['Y Max'].get();
         } else {
-            if (options.display_type.is('overlap') | options.display_type.is('lines')) {
+            if (options['View']['Plot Type'].is('overlap') | options['View']['Plot Type'].is('lines')) {
                 y_max = biggest_datapoint;
 
-                if(options.total_line.is("true"))
+                if(options['View']['Total Line'].is("true"))
                     y_max = Math.max(y_max, biggest_totalpoint);
-            } else if (options.display_type.is('percent')) {
+            } else if (options['View']['Plot Type'].is('percent')) {
                 y_max = 100;
             } else {
                 y_max = highest_datapoint;
-                if(options.total_line.is("true"))
+                if(options['View']['Total Line'].is("true"))
                     y_max = Math.max(y_max, biggest_totalpoint);
             }
-            options.y_max.update(y_max);
-            options.y_max.set(y_max);
+            options['View']['Y Max'].updateInInterface(y_max);
         }
 
         disp.focus.y.domain([y_min, y_max])
@@ -457,7 +456,7 @@ Display.prototype = {
         disp.focus.y_total_line.domain([y_min, y_max])
             .range([disp.focus.height, 0]);
 
-        if(options.y_scale.is("log")) {
+        if(options['View']['Y Scale'].is("log")) {
             disp.focus.yAxis.scale(disp.focus.y)
                 .tickFormat(disp.focus.y.tickFormat(10, ",.0f"));
         }
@@ -478,10 +477,14 @@ Display.prototype = {
     },
     setContextTime: function(time_min, time_max) {
         // Establish the maximum and minimum time of the data series
-        var startTime = options.time_min.get();
-        var endTime =   options.time_max.get();
+        var startTime = options['View']['Time Min'].get();
+        var endTime =   options['View']['Time Max'].get();
+        if(typeof(startTime) == 'string')
+            startTime = new Date(startTime);
+        if(typeof(endTime) == 'string')
+            endTime = new Date(endTime);
 
-        if(startTime.getTime() == endTime.getTime() || options.time_save.get() == "false") {
+        if(startTime.getTime() == endTime.getTime()) {
             startTime = time_min;
             endTime = time_max;
         } else {
@@ -501,25 +504,27 @@ Display.prototype = {
         }
 
         // Set the time option
-        options.time_min.set(startTime);
-        options.time_min.min = new Date(time_min);
-        options.time_max.set(endTime);
-        options.time_max.max = new Date(time_max);
+        options['View']['Time Min'].set(startTime);
+        options['View']['Time Min'].min = new Date(time_min);
+        options['View']['Time Max'].set(endTime);
+        options['View']['Time Max'].max = new Date(time_max);
 
         // Set the manual field constraints
-        var startDateTextBox = $('#choose_time_min');
+        var startDateTextBox = $('#choose_lView_lTime_Min');
         startDateTextBox.datetimepicker('option', 'minDate', time_min);
         startDateTextBox.datetimepicker('option', 'maxDate', endTime);
         startDateTextBox.datetimepicker("setDate", startTime);
 
-        var endDateTextBox = $('#choose_time_max');
+        var endDateTextBox = $('#choose_lView_lTime_Max');
         endDateTextBox.datetimepicker('option', 'minDate', startTime);
         endDateTextBox.datetimepicker('option', 'maxDate', time_max);
         endDateTextBox.datetimepicker("setDate", endTime);
     },
     setFocusTime: function(origin) {
-        var startDateTextBox = $('#choose_time_min');
-        var endDateTextBox = $('#choose_time_max');
+        var time_min_textbox = $('#choose_lView_lTime_Max');
+        var time_max_textbox = $('#choose_lView_lTime_Max');
+        var time_min_op = options['View']['Time Min'];
+        var time_max_op = options['View']['Time Max'];
         var startTime, endTime;
         var brushEvent = false;
 
@@ -531,48 +536,48 @@ Display.prototype = {
 
             brushEvent = true;
         } else if(origin == "input_field") {
-            startTime = startDateTextBox.datetimepicker('getDate');
-            endTime   =   endDateTextBox.datetimepicker('getDate');
+            startTime = time_min_textbox.datetimepicker('getDate');
+            endTime   = time_max_textbox.datetimepicker('getDate');
         } else if(origin == "button_time_to_start") { // The min and max possible?
-            startTime = new Date(options.time_min.min);
+            startTime = new Date(time_min_op.min);
         } else if(origin == "button_time_minus_6h") { // The min and max possible?
-            startTime = options.time_min.get();
+            startTime = time_min_op.get();
             startTime.setHours(startTime.getHours() - 6);
         } else if(origin == "button_time_minus_1h") { // The min and max possible?
-            startTime = options.time_min.get();
+            startTime = time_min_op.get();
             startTime.setHours(startTime.getHours() - 1);
         } else if(origin == "button_time_to_end") { // The min and max possible?
-            endTime   = new Date(options.time_max.max);
+            endTime   = new Date(time_max_op.max);
         } else if(origin == "button_time_plus_1h") { // The min and max possible?
-            startTime = options.time_min.get();
+            startTime = time_min_op.get();
             startTime.setHours(startTime.getHours() + 1);
         } else if(origin == "button_time_plus_6h") { // The min and max possible?
-            startTime = options.time_min.get();
+            startTime = time_min_op.get();
             startTime.setHours(startTime.getHours() + 6);
         }
 
         if(!startTime)
-            startTime = options.time_min.get();
+            startTime = time_min_op.get();
         if(!endTime)
-            endTime   = options.time_max.get();
+            endTime   = time_max_op.get();
 
         // Bound the start and end times
-        if(startTime < options.time_min.min)
-            startTime = new Date(options.time_min.min);
-        if(endTime > options.time_max.max)
-            endTime = new Date(options.time_max.max);
+        if(startTime < time_min_op.min)
+            startTime = new Date(time_min_op.min);
+        if(endTime > time_max_op.max)
+            endTime = new Date(time_max_op.max);
         if(startTime >= endTime ) {
-            startTime = new Date(options.time_min.min);
-            endTime = new Date(options.time_max.max);
+            startTime = new Date(time_min_op.min);
+            endTime = new Date(time_max_op.max);
         }
 
-        startDateTextBox.datetimepicker("setDate", startTime);
-          endDateTextBox.datetimepicker("setDate", endTime);
+        time_min_textbox.datetimepicker("setDate", startTime + "");
+        time_max_textbox.datetimepicker("setDate", endTime + "");
 
-        options.time_min.set(startTime);
-        options.time_max.set(endTime);
+        time_min_op.set(startTime);
+        time_max_op.set(endTime);
 
-        if(startTime > options.time_min.min || endTime < options.time_max.max) {    
+        if(startTime > time_min_op.min || endTime < time_max_op.max) {    
             if(!brushEvent) {
                 // Update the brush
                 disp.brush.extent([startTime, endTime])
@@ -583,8 +588,7 @@ Display.prototype = {
             d3.selectAll(".brush").call(disp.brush.clear());//brush.clear();
         }
 
-        options.recordState('time_min');
-        options.recordState('time_max');
+        options.recordState();
 
         disp.focus.x.domain(disp.brush.empty() ? disp.context.x.domain() : disp.brush.extent());
         disp.focus.svg.selectAll("path.area")
@@ -598,7 +602,7 @@ Display.prototype = {
         disp.setColorScale();
 
         // Get parameters
-        var display_category = options.chart_category.get();
+        var display_category = options['Series']['Chart Category'].get();
         var keyword_names_ordered = data.cats['Keyword'].series_plotted
             .map(function(series) { return series.name; });
         var type_order_numbers = [100, 200, 300, 400, 10100, 10200, 10300, 10400, 20100, 20200, 20300, 20400];
@@ -638,7 +642,7 @@ Display.prototype = {
             .range(["#CCC"]);
         
         
-        switch(options.color_scale.get()) {
+        switch(options['View']['Color Scale'].get()) {
             case "category10":
                 this.color = d3.scale.category10();
                 break;
@@ -661,11 +665,11 @@ Display.prototype = {
         var xy = d3.mouse(svg_element);
         time.hover = disp.focus.x.invert(xy[0]);
         var coeff = 1000 * 60; // get a minute on other side
-        if(options.resolution.is('tenminute')) {
+        if(options['View']['Resolution'].is('tenminute')) {
             coeff *= 10;
-        } else if(options.resolution.is('hour')) {
+        } else if(options['View']['Resolution'].is('hour')) {
             coeff *= 60;
-        } else if(options.resolution.is('day')) {
+        } else if(options['View']['Resolution'].is('day')) {
             coeff *= 60 * 24;
         }
         time.min = new Date(Math.floor(time.hover.getTime() / coeff) * coeff);
@@ -693,7 +697,7 @@ Display.prototype = {
             .duration(750);
 
         var multiplier = 1;
-        if(options.display_type.is('percent')) {
+        if(options['View']['Plot Type'].is('percent')) {
             var biggest_totalpoint = data.total_tweets.reduce(function (cur_max, d) {
                 return Math.max(cur_max, d.value);
             }, 0);
@@ -701,11 +705,11 @@ Display.prototype = {
         }
 
         disp.focus.area_total_line
-            .interpolate(options.shape.get())
+            .interpolate(options['View']['Shape'].get())
             .y0(disp.focus.height)
             .y1(function (d) { return disp.focus.y_total_line(d.value * multiplier); });
 
-        if(options.total_line.is("false"))
+        if(options['View']['Total Line'].is("false"))
             disp.focus.area_total_line.y1(disp.focus.height);
 
         transition.select("path.area_total_line")
@@ -713,8 +717,8 @@ Display.prototype = {
 
         // Set visibility
         legend.key.select('.legend_key_total_line')
-            .classed('hidden', options.total_line.is("false"));
-    //    container.style('display', options.total_line.is("true") ? 'block' : 'none');
+            .classed('hidden', options['View']['Total Line'].is("false"));
+    //    container.style('display', options['View']['Total Line'].is("true") ? 'block' : 'none');
     },
     alert: function(text, style_class, parent) {
         if(!style_class)
@@ -797,21 +801,21 @@ Display.prototype = {
             .text('Order by:');
 
         order_div.selectAll('button.tweet_modal_order')
-            .data(options.fetched_tweet_order.available)
+            .data(options['View']['Fetched Tweet Order'].available)
             .enter()
             .append('button')
             .attr('class', 'btn tweet_modal_order')
             .text(function(d) {
-                return options.fetched_tweet_order.labels[d];
+                return options['View']['Fetched Tweet Order'].labels[d];
             })
             .on('click', function(d) {
-                options.fetched_tweet_order.click(d);
+                options['View']['Fetched Tweet Order'].click(d);
 
                 var post = disp.getTweets_post;
-                if(options.fetched_tweet_order.is('rand')) {
+                if(options['View']['Fetched Tweet Order'].is('rand')) {
                     post.rand = true;
                     delete post.order_prevalence;
-                } else if(options.fetched_tweet_order.is('prevalence')) {
+                } else if(options['View']['Fetched Tweet Order'].is('prevalence')) {
                     post.order_prevalence = true;
                     delete post.rand;
                 } else {
@@ -889,7 +893,7 @@ Display.prototype = {
         
         d3.selectAll('.tweet_modal_order')
             .attr('class', function(d) {
-                if(d == options.fetched_tweet_order.indexCur())
+                if(d == options['View']['Fetched Tweet Order'].indexCur())
                     return 'btn btn-primary tweet_modal_order';
                 return 'btn btn-default tweet_modal_order';
             });
@@ -1018,10 +1022,10 @@ Display.prototype = {
     },
     nGramModal: function(selector) {
         var ngrams = data.ngrams.main;
-        var label  = options.ngram_view.getLabel();
+        var label  = options['Analysis']['N-Gram View'].getLabel();
         if(selector == 'ngram_cmp') {
             ngrams = data.ngrams.cmp;
-            label  = options.ngram_cmp.getLabel();
+            label  = options['Analysis']['N-Gram Compare'].getLabel();
         }
 
         d3.select('#modal .modal-title')
