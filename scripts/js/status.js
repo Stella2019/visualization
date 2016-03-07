@@ -237,68 +237,57 @@ StatusReport.prototype = {
         SR.updateTableCounts();
     },
     buildDropdowns: function() {
-        options.choice_groups = [];
-        options.initial_buttons = ['empties', 'hierarchical'];
-        options.record = ['empties', 'order', 'ascending', 'hierarchical'];
         options.updateCollectionCallback = SR.getData;
         
-        options.levels = new Option({
-            title: 'Show',
-            labels: ['All Levels',
-                     'Event Types & Events',
-                     'Events',
-                     'Events & Rumors',
-                     'Rumors'],
-            ids:    ["all", "etr", "e", "er", "r"],
-            default: 0,
-            type: "dropdown",
-            parent: '#status_table_header',
-            callback: SR.buildTable
-        });
         var orders = ['ID', 'Collection', 'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Adjud Tweets', 'Datapoints', 'First Tweet'];
-        options.order = new Option({
-            title: 'Order',
-            labels: orders,
-            ids:    orders,
-            default: 0,
-            type: "dropdown",
-            parent: '#status_table_header',
-            callback: function() { SR.clickSort(); }
-        });
-        options.ascending = new Option({
-            title: 'Ascending',
-            labels: ['True', 'False'],
-            ids:    ['true', 'false'],
-            default: 0,
-            type: "dropdown",
-            parent: '#status_table_header',
-            callback: function() { SR.clickSort(); }
-        });
         options['View'] = {
             empties: new Option({
-                name: 'empties',
                 title: 'Show Rows with No Tweets',
                 labels: ['Yes', 'No'],
                 ids:    ["true", "false"],
                 default: 1,
                 type: "dropdown",
-                parent: '#status_table_header',
                 callback: SR.setVisibility
             }), 
             hierarchical: new Option({
-                name: 'hierarchical',
                 title: 'Maintain Hierarchy',
                 labels: ['Yes', 'No'],
                 ids:    ["true", "false"],
                 default: 0,
                 type: "dropdown",
-                parent: '#status_table_header',
-                callback: function() { SR.clickSort(); }
+                callback: function() { SR.clickSort(false, 'maintain_direction'); }
+            }),
+//            levels: new Option({
+//                title: 'Show',
+//                labels: ['All Levels',
+//                         'Event Types & Events',
+//                         'Events',
+//                         'Events & Rumors',
+//                         'Rumors'],
+//                ids:    ["all", "etr", "e", "er", "r"],
+//                default: 0,
+//                type: "dropdown",
+//                parent: '#status_table_header',
+//                callback: SR.buildTable
+//            }),
+            order: new Option({
+                title: 'Order',
+                labels: orders,
+                ids:    orders,
+                default: 0,
+                type: "dropdown",
+                callback: function() { SR.clickSort(false, 'maintain_direction'); }
+            }),
+            ascending: new Option({
+                title: 'Ascending',
+                labels: ['Ascending', 'Descending'],
+                ids:    ['true', 'false'],
+                default: 0,
+                type: "dropdown",
+                callback: function() { SR.clickSort(false, 'maintain_direction'); }
             })
         };
-        options.panels       = ['View'];
-        options.hierarchical = options['View']['hierarchical'];
-        options.empties      = options['View']['empties'];
+        options.panels = ['View'];
         
         // Start drawing
         options.init();
@@ -308,7 +297,7 @@ StatusReport.prototype = {
     },
     buildTable: function() {
         var columns = ['ID', 'Collection',
-                       'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Adjudicated', 'Datapoints',
+                       'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Adjud Tweets', 'Datapoints',
                        'First Tweet', //'Last Tweet', 
                        'Open'];// <span class="glyphicon glyphicon-new-window"></span>
         
@@ -324,7 +313,10 @@ StatusReport.prototype = {
             .data(columns)
             .enter()
             .append('th')
-            .attr('class', function(d) { if(d != 'Open') return 'col-sortable'; })
+            .attr('class', function(d) {
+                if(d == 'Open') return null;
+                return 'col-sortable col-' + util.simplify(d); 
+            })
             .html(function(d) { return d; });
         
         table.selectAll('.col-sortable')
@@ -460,7 +452,7 @@ StatusReport.prototype = {
         
         table_body.selectAll('tr')
             .style('display', 'table-row');
-        if(options.empties.is('false')) {
+        if(options['View']['empties'].is('false')) {
             d3.selectAll('tr.row-zero')
                 .style('display', 'none');
         }
@@ -496,6 +488,8 @@ StatusReport.prototype = {
             .html(function(d) { return 'FirstTweet' in d && d.FirstTweet ? d.FirstTweet.slice(0,-3) || '-' : ''; });
 //        table_body.selectAll('td.cell-lastdate')
 //            .html(function(d) { return 'LastTweet' in d && d.LastTweet ? d.LastTweet.slice(0,-3) || '-' : ''; });
+        
+        SR.clickSort(false, 'maintain_direction');
     },
     edit: function(d) {
         if(d.Level == 1) { // Event
@@ -506,12 +500,13 @@ StatusReport.prototype = {
             options.editWindow('rumor');
         }
     },
-    clickSort: function(order) {
+    clickSort: function(order, option) {
         var table_body = d3.select('tbody');
-        var header = d3.select(this);
+        if(!order) order = options['View']['order'].get();
+        var header = d3.select('.col-' + util.simplify(order));
         var clicked = header.data()[0];
-        var order = options.order.get();
-        var ascending = options.ascending.get();
+        var order = options['View']['order'].get();
+        var ascending = options['View']['ascending'].get();
         
         if(clicked) {
             d3.selectAll('.col-sortable span')
@@ -519,26 +514,26 @@ StatusReport.prototype = {
         }
         
         // If it is clicked on what it is currently doing, flip it
-        if(clicked == order) {
+        if(clicked == order && option != 'maintain_direction') {
             ascending = ascending == "true" ? "false" : "true";
-            options.ascending.set(ascending);
+            options['View']['ascending'].updateInInterface_id(ascending);
         } else if (clicked) { // Otherwise it's a new order
             order = clicked;
-            options.order.set(order);
-            ascending = order == 'Collection' ? 'true' : 'false';
-            options.ascending.set(ascending);
+            options['View']['order'].updateInInterface_id(order);
+            if(option != 'maintain_direction') {
+                ascending = order == 'Collection' ? 'true' : 'false';
+                options['View']['ascending'].updateInInterface_id(ascending);   
+            }
         }
         
         // Sort the columns
-        if(options.hierarchical.is('true')) {
+        if(options['View']['hierarchical'].is('true')) {
             var quantity = order.replace(' ', '');
             if(quantity == 'Collection') quantity = 'Label';
             var ascending_minmax = ascending == 'true' ? 'Min' : 'Max';
             var ascending_bin = ascending == 'true' ? 1 : -1;
             
-            table_body.selectAll('tr').sort(function(c, d) {
-                
-                var cmp = function(a, b) {
+            table_body.selectAll('tr').sort(function(a, b) {
                 // Get possible values
                 var A2 = a.Level == 2 ? a[quantity] : null;
                 var B2 = b.Level == 2 ? b[quantity] : null;
@@ -548,9 +543,9 @@ StatusReport.prototype = {
                 var Btype = b.Level == 0 ? b : b['Event Type'];
                 var A0 = Atype[quantity] || Atype[quantity + '_' + ascending_minmax];
                 var B0 = Btype[quantity] || Btype[quantity + '_' + ascending_minmax];
-                console.log(A0, A1, A2, a.Level, a.Label);
-                console.log(B0, B1, B2, b.Level, b.Label);
-                
+//                    console.log(A0, A1, A2, a.Level, a.Label);
+//                    console.log(B0, B1, B2, b.Level, b.Label);
+
                 // Compare Event Types
                 if(!A0 && !B0) return 0;
                 if(!A0) return 1;
@@ -560,7 +555,7 @@ StatusReport.prototype = {
 //                if(a.Level == 0 && b.Level == 0) return 0;
                 if(a.Level == 0 && b.Level > 0) return -1;
                 if(a.Level > 0 && b.Level == 0) return 1;
-                
+
                 // Compare Events
                 if(!A1 && !B1) return 0;
                 if(!A1) return 1;
@@ -570,64 +565,16 @@ StatusReport.prototype = {
 //                if(a.Level == 0 && b.Level == 0) return 0;
                 if(a.Level == 1 && b.Level > 1) return -1;
                 if(a.Level > 1 && b.Level == 1) return 1;
-                
+
                 // Compare Rumors
                 if(!A2 && !B2) return 0;
                 if(!A2) return 1;
                 if(!B2) return -1;
                 if(A2 < B2) return -1 * ascending_bin;
                 if(A2 > B2) return 1 * ascending_bin;
-                
+
                 return 0;
-            };
-                
-                var res = cmp(c, d);
-                console.log(res);
-                return res;
-                });
-            
-//            
-//            if(order == 'ID') {
-//                table_body.selectAll('tr').sort(function(a, b) {
-//                    var A = parseInt(a.ID); var B = parseInt(b.ID);
-//                    if(a.Level == 0) {
-//                        A = A || a['ID_' + ascending_minmax];
-//                    }
-//                    if(b.Level == 0) {
-//                        B = B || b['ID_' + ascending_minmax];
-//                    }
-//
-//                    var cmp = A - B;
-//                    return ascending_bin * cmp || a.Level - b.Level;
-//                });
-//            } else if(order == 'Collection') {
-//                table_body.selectAll('tr').sort(function(a, b) {
-//                    var A = a.label;
-//                    var B = b.label;
-//
-//                    return ascending_bin * d3.ascending(B, A);
-//                });
-//            } else {
-//                var ordr = order.replace(' ', '');
-//                table_body.selectAll('tr').sort(function(a, b) {
-//                    var A = a[ordr];
-//                    var B = b[ordr];
-//
-//                    if(a.Level == 0) {
-//                        A = A || a[ordr + '_' + ascending_minmax];
-//                    }
-//                    if(b.Level == 0) {
-//                        B = B || b[ordr + '_' + ascending_minmax];
-//                    }
-//
-//                    if(!A && !B) return 0;
-//                    if(!A) return 1;
-//                    if(!B) return -1;
-//
-//                    var cmp = d3.ascending(A, B);
-//                    return ascending_bin * cmp || a.Level - b.Level;
-//                });
-//            }
+            });
         } else {
             var ascending_minmax = ascending == 'true' ? 'Max' : 'Min';
             var ascending_bin = ascending == 'true' ? 1 : -1;
@@ -741,10 +688,12 @@ StatusReport.prototype = {
         })
     },
     openTimeseries: function(d) {
-        window.open('index.html#!collection="' + d.ID + '"');
+        var state = JSON.stringify({collection: d.ID});
+        window.open('index.html#' + state);
     },
     openCodingReport: function(d) {
-        window.open('coding.html#!rumor="' + d.ID + '"');
+        var state = JSON.stringify({rumor: d.ID});
+        window.open('coding.html#' + state);
     }
 };
 

@@ -11,7 +11,6 @@ function Coding() {
     this.rumor_period_counts = {};
     
     this.tooltip = new Tooltip();
-    this.tooltip.init();
     
     this.code_list = {
         primary: ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'],
@@ -31,6 +30,37 @@ function Coding() {
     this.ngrams = {};
 }
 Coding.prototype = {
+    buildPage: function() {
+        options.panels = ['Dataset', 'Reliability', 'Matrices', 'Tweets', 'Tweet Types', 'N-Grams'];
+        
+        var divs = d3.select('body')
+            .append('div')
+            .attr('id', 'body')
+            .attr('class', 'container')
+            .selectAll('div')
+            .data(options.panels.slice(1))
+            .enter()
+            .append('div')
+            .attr('id', function(d) { return util.simplify(d); })
+            .style({
+                opacity: 0,
+                transform: 'scaleY(0)',
+                'transform-origin': 'top',
+                display: 'none'
+            });
+        
+        divs.append('div')
+            .attr('id', function(d) { return util.simplify(d) + '_header'; })
+            .attr('class', 'page-header coding_header')
+            .append('h2')
+            .html(function(d) { return d; });
+        
+        divs.append('div')
+            .attr('id', function(d) { return util.simplify(d) + '_body'; });
+        
+        coding.tooltip.init();
+        coding.getData();
+    },
     getData: function() {
         var progress = 0;
         
@@ -43,37 +73,37 @@ Coding.prototype = {
             }
             progress++
             if(progress == 4)
-                coding.buildDropdowns();
+                coding.buildOptions();
         });
             
-        data.callPHP('collection/getEvents', {}, function(d) {
+        data.callPHP('collection/getEvents', {}, function(file_data) {
             try {
-                coding.events = JSON.parse(d);
+                coding.events = JSON.parse(file_data);
             } catch(err) {
                 console.log(file_data);
                 return;
             }
             progress++
             if(progress == 4)
-                coding.buildDropdowns();
+                coding.buildOptions();
         });
 
-        data.callPHP('collection/getRumors', {}, function(d) {
+        data.callPHP('collection/getRumors', {}, function(file_data) {
             try {
-                coding.rumors = JSON.parse(d);
+                coding.rumors = JSON.parse(file_data);
             } catch(err) {
                 console.log(file_data);
                 return;
             }
             progress++
             if(progress == 4)
-                coding.buildDropdowns();
+                coding.buildOptions();
         });
 
         // Get the number of codes for each rumor
-        data.callPHP('coding/rumorPeriodCounts', {}, function(d) {
+        data.callPHP('coding/rumorPeriodCounts', {}, function(file_data) {
             try {
-                coding.rumor_period_counts = JSON.parse(d);
+                coding.rumor_period_counts = JSON.parse(file_data);
             } catch(err) {
                 console.log(file_data);
                 return;
@@ -81,10 +111,10 @@ Coding.prototype = {
             
             progress++
             if(progress == 4)
-                coding.buildDropdowns();
+                coding.buildOptions();
         });
     },
-    buildDropdowns: function() {
+    buildOptions: function() {
         // Rumors
         coding.rumors.sort(function(a, b) {
             if(a.Event_ID == b.Event_ID) {
@@ -94,16 +124,17 @@ Coding.prototype = {
             }
             return parseInt(a.Event_ID) - parseInt(b.Event_ID);
         })
-        var labels = coding.rumors.map(function(rumor) {
+        var rumor_labels = coding.rumors.map(function(rumor) {
             rumor.event = coding.events.filter(function(event){
                 return event.ID == rumor.Event_ID;
             })[0];
             return rumor.event.DisplayName + ": " + rumor.Name;
         });
-        var ids = coding.rumors.map(function(rumor) {
+        var rumor_ids = coding.rumors.map(function(rumor) {
             return rumor.ID;
         });
-        var available = [];
+        var rumor_available = [];
+        
         coding.rumors.forEach(function(rumor, i_r) {
             rumor.periods = [];
             coding.rumor_period_counts.forEach(function(count) {
@@ -111,279 +142,243 @@ Coding.prototype = {
                     rumor.periods.push(parseInt(count.Period));
             });
             if(rumor.periods.length) {
-                available.push(i_r);
+                rumor_available.push(i_r);
             }
         });
         
-        options.choice_groups = [];
-        options.initial_buttons = ['show_irr', 'rumor', 'period', 'coder',
-                                   'show_matrices',  'coder_order',
-                                   'show_tweets', 'tweets_coded', 'tweets_focus', 'tweet_order',
-                                   'show_tweet_types', 'tweet_types_bars',
-                                   'show_ngrams', 'ngrams_exclude_stopwords', 'ngrams_topx', 'ngrams_multiplier', 'ngrams_coded', 'ngrams_filter', 'ngrams_tables'];
-        options.record = options.initial_buttons;
-        options.rumor = new Option({
-            title: 'Rumor',
-            labels: labels,
-            ids:    ids,
-            available: available,
-            default: 0,
-            type: "dropdown",
-            parent: '#irr_header',
-            callback: coding.chooseRumor
-        });
-        
-        // Period
-        options.period = new Option({
-            title: 'Period',
-            labels: ['Adjudicated', 'Auxiliary Adjudication', 'Coding', 'Training 1', 'Training 2', 'Training 3', 'Training 4'],
-            ids:    [1, 2, 0, -1, -2, -3, -4],
-            isnumeric: true,
-            default: 1,
-            type: "dropdown",
-            parent: '#irr_header',
-            callback: coding.getCodes
-        });
-        
         // Coders
-        labels = coding.coders.map(function(coder) {
+        var coder_labels = coding.coders.map(function(coder) {
             return coder.Name;
         });
-        labels.unshift('All');
-        ids = coding.coders.map(function(coder) {
+        coder_labels.unshift('All');
+        var coder_ids = coding.coders.map(function(coder) {
             return coder.ID;
         });
-        ids.unshift('all');
+        coder_ids.unshift('all');
         
-        options.coder = new Option({
-            title: 'Coder',
-            labels: labels,
-            ids:    ids,
-            isnumeric: true,
-            default: 0,
-            type: "dropdown",
-            parent: '#irr_header',
-            callback: coding.compileReport
-        });
+        // Make Panel Options
+        options['Dataset'] = {
+            Rumor: new Option({
+                title: 'Rumor',
+                labels: rumor_labels,
+                ids:    rumor_ids,
+                available: rumor_available,
+                default: 0,
+                type: "dropdown",
+                callback: coding.chooseRumor
+            }),
+            Period: new Option({
+                title: 'Period',
+                labels: ['Adjudicated', 'Auxiliary Adjudication', 'Coding', 'Training 1', 'Training 2', 'Training 3', 'Training 4'],
+                ids:    [1, 2, 0, -1, -2, -3, -4],
+                isnumeric: true,
+                default: 1,
+                type: "dropdown",
+                callback: coding.getCodes
+            })
+        };
+        options['Reliability'] = {
+            Show: new Option({
+                title: 'Show',
+                styles: ["btn btn-sm", "btn btn-sm btn-default"],
+                labels: ["No", "Yes"],
+                ids:    ["false", "true"],
+                default: 1,
+                type: "toggle",
+                callback: function() { coding.togglePane('Reliability', 1000); }
+            }),
+            Coder: new Option({
+                title: 'Coder',
+                labels: coder_labels,
+                ids:    coder_ids,
+                isnumeric: true,
+                default: 0,
+                type: "dropdown",
+                callback: coding.compileReport
+            })
+        };
+        options['Matrices'] = {
+            Show: new Option({
+                title: 'Show',
+                styles: ["btn btn-sm", "btn btn-sm btn-default"],
+                labels: ["No", "Yes"],
+                ids:    ["false", "true"],
+                default: 0,
+                type: "toggle",
+                callback: function() { coding.togglePane('Matrices', 1000); }
+            }),
+            Order: new Option({
+                title: "Order",
+                labels: ["Alphabetic", "Agreement", "Anonymous", "Cluster"],
+                ids:    ['alpha', 'agreement', 'anonymous', 'cluster'],
+                default: 2,
+                available: [0, 1, 2],
+                parent: '#matrices_header',
+                callback: coding.compileReport
+            })
+        };
         
-        // Types of disagreement        
-        options.tweets_coded = new Option({
-            title: 'Code',
-            labels: ['Any',
-                     'Primary Code',
-                     'Uncodable',
-                     'Unrelated',
-                     'Related',
-                     'Affirm',
-                     'Deny',
-                     'Neutral',
-                     'Uncertainty'],
-            ids:    ["Any", "Primary", "Uncodable", "Unrelated", 'Related', "Affirm", "Deny", "Neutral", "Uncertainty"],
-            default: 0,
-            type: "dropdown",
-            parent: '#tweets_header',
-            callback: coding.fillTweetList
-        });    
-        options.tweets_focus = new Option({
-            title: 'Focus',
-            labels: ['All',
-                     'Majority Coded',
-                     'Disagreement'],
-            ids:    ["All", "Majority", "Disagreement"],
-            default: 0,
-            type: "dropdown",
-            parent: '#tweets_header',
-            callback: coding.fillTweetList
-        });
-        
-        // Ordering Data    
-        options.coder_order = new Option({
-            title: "Order",
-            labels: ["Alphabetic", "Agreement", "Anonymous", "Cluster"],
-            ids:    ['alpha', 'agreement', 'anonymous', 'cluster'],
-            default: 2,
-            available: [0, 1, 2],
-            parent: '#matrices_header',
-            callback: coding.compileReport
-        });
-        options.tweet_order = new Option({
-            title: "Order",
-            labels: ['Tweet ID', 'Text', 'Majority Code', 'Disagreement'],
-            ids:    ['tweet_id', 'text', 'majority', 'disagreement'],
-            default: 3,
-            parent: '#tweets_header',
-            callback: coding.fillTweetList
-        });
-        
-        // Tweet Types Table
-        options.tweet_types_bars = new Option({
-            title: "Show Bars For",
-            labels: ['% of All', '% within each Tweet Type', '% within each Code', 'None'],
-            ids:    ['all', 'tweet_type', 'code', 'none'],
-            default: 0,
-            parent: '#tweet_types_header',
-            callback: coding.tweetTypeTable
-        });
-        
-        // NGram Display
-        options.ngrams_exclude_stopwords = new Option({
-            title: "Exclude Stopwords",
-            styles: ["btn btn-sm btn-default", "btn btn-sm"],
-            labels: ["Including Stopwords",
-                     "Excluding Stopwords"],
-            ids:    ['false', 'true'],
-            default: 1,
-            type: 'toggle',
-            parent: '#ngrams_header',
-            callback: coding.NGramList
-        });
-        options.ngrams_counts = new Option({
-            title: "Frequency",
-            labels: ['Binary', 'Total', 'Log Normal'],
-            ids:    ['bin', 'total', 'log'],
-            default: 0,
-            parent: '#ngrams_header',
-            callback: coding.countNGrams
-        });
-        options.ngrams_multiplier = new Option({
-            title: "Frequency",
-            labels: ['Raw', 'Fraction', 'Percent', 'TF-IDF Rumor', 'TF-IDF (log) Rumor'],
-            ids:    ['raw', 'fraction', 'percent', 'idf', 'log-idf'],
-            default: 0,
-            parent: '#ngrams_header',
-            callback: coding.NGramList
-        });
-        options.ngrams_topx = new Option({
-            title: "Top",
-            labels: ['10', '20', '100', '200', '1000'],
-            ids:    ['10', '20', '100', '200', '1000'],
-            default: 1,
-            parent: '#ngrams_header',
-            callback: coding.NGramList
-        });
-        options.ngrams_filter = new Option({
-            title: "Filter",
-            labels: ['None', 'Redundant Tweets'],
-            ids:    ['none', 'redun'],
-            default: 1,
-            parent: '#ngrams_header',
-            callback: coding.countNGrams
-        });
-        options.ngrams_coded = new Option({
-            title: "For Tweets Coded",
-            labels: ['Any', 'Uncodable', 'Unrelated', 'Related',
-                     'Affirm', 'Deny', 'Neutral',
-                     'Uncertainty'],
-            ids:    ['Any', 'Uncodable', 'Unrelated', 'Related',
-                     'Affirm', 'Deny', 'Neutral', 
-                     'Uncertainty'],
-            default: 0,
-            parent: '#ngrams_header',
-            callback: coding.countNGrams
-        });
-        options.ngrams_tables = new Option({
-            title: "Tables",
-            labels: ['n-grams', 'n-grams & co-occur', 'n-grams, co & tweets', 'n-grams, co & urls', 'All'],
-            ids:    ['n', 'nc', 'nct', 'ncu', 'nctu'],
-            default: 1,
-            parent: '#ngrams_header',
-            callback: coding.NGramList
-        });
-        
-        // subsection toggles
-        options.show_irr = new Option({
-            title: 'Show Interrator Reliability Statistics',
-            styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-menu-up'></span>",
-                     "<span class='glyphicon glyphicon-menu-down'></span>"],
-            ids:    ["false", "true"],
-            default: 1,
-            type: "toggle",
-            parent: '#irr_header',
-            callback: function() { coding.togglePane('irr', 1000); }
-        });
-        options.show_matrices = new Option({
-            title: 'Show Matrices',
-            styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-menu-up'></span>",
-                     "<span class='glyphicon glyphicon-menu-down'></span>"],
-            ids:    ["false", "true"],
-            default: 0,
-            type: "toggle",
-            parent: '#matrices_header',
-            callback: function() { coding.togglePane('matrices', 1000); }
-        });
-        options.show_tweets = new Option({
-            title: 'Show Tweets',
-            styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-menu-up'></span>",
-                     "<span class='glyphicon glyphicon-menu-down'></span>"],
-            ids:    ["false", "true"],
-            default: 0,
-            type: "toggle",
-            parent: '#tweets_header',
-            callback: function() { coding.togglePane('tweets', 1000); }
-        });
-        options.show_tweet_types = new Option({
-            title: 'Show Tweet Types',
-            styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-menu-up'></span>",
-                     "<span class='glyphicon glyphicon-menu-down'></span>"],
-            ids:    ["false", "true"],
-            default: 0,
-            type: "toggle",
-            parent: '#tweet_types_header',
-            callback: function() { coding.togglePane('tweet_types', 1000); }
-        });
-        options.show_ngrams = new Option({
-            title: 'Show N-Grams',
-            styles: ["btn btn-sm", "btn btn-sm btn-default"],
-            labels: ["<span class='glyphicon glyphicon-menu-up'></span>",
-                     "<span class='glyphicon glyphicon-menu-down'></span>"],
-            ids:    ["false", "true"],
-            default: 0,
-            type: "toggle",
-            parent: '#ngrams_header',
-            callback: function() { coding.togglePane('ngrams', 1000); }
-        });
-        
+        var tweet_codes = ["Any", "Primary", "Uncodable", "Unrelated", 'Related', "Affirm", "Deny", "Neutral", "Uncertainty"];
+        options['Tweets'] = {
+            Show: new Option({
+                title: 'Show',
+                styles: ["btn btn-sm", "btn btn-sm btn-default"],
+                labels: ["No", "Yes"],
+                ids:    ["false", "true"],
+                default: 0,
+                type: "toggle",
+                callback: function() { coding.togglePane('Tweets', 1000); }
+            }),
+            Code: new Option({
+                title: 'Code',
+                labels: tweet_codes,
+                ids:    tweet_codes,
+                default: 0,
+                type: "dropdown",
+                callback: coding.fillTweetList
+            }),
+            Focus: new Option({
+                title: 'Focus',
+                labels: ['All', 'Majority Coded', 'Disagreement'],
+                ids:    ["All", "Majority", "Disagreement"],
+                default: 0,
+                type: "dropdown",
+                callback: coding.fillTweetList
+            }),
+            Order: new Option({
+                title: "Order",
+                labels: ['Tweet ID', 'Text', 'Majority Code', 'Disagreement'],
+                ids:    ['tweet_id', 'text', 'majority', 'disagreement'],
+                default: 3,
+                callback: coding.fillTweetList
+            })
+        };
+        options['Tweet Types'] = {
+            Show: new Option({
+                title: 'Show',
+                styles: ["btn btn-sm", "btn btn-sm btn-default"],
+                labels: ["No", "Yes"],
+                ids:    ["false", "true"],
+                default: 0,
+                type: "toggle",
+                callback: function() { coding.togglePane('Tweet Types', 1000); }
+            }),
+            'More Information': new Option({
+                title: 'Get More Information (Takes Time)',
+                labels: ['Yes', 'No'], ids: ['true', 'false'],
+                default: 1,
+                type: 'dropdown',
+                callback: coding.getMoreInformation
+            }),
+            Bars: new Option({
+                title: "Show Bars For",
+                labels: ['% of All', '% within each Tweet Type', '% within each Code', 'None'],
+                ids:    ['all', 'tweet_type', 'code', 'none'],
+                default: 0,
+                callback: coding.tweetTypeTable
+            })
+        };
+        options['N-Grams'] = {
+            Show: new Option({
+                title: 'Show',
+                styles: ["btn btn-sm", "btn btn-sm btn-default"],
+                labels: ["No", "Yes"],
+                ids:    ["false", "true"],
+                default: 0,
+                type: "toggle",
+                callback: function() { coding.togglePane('N-Grams', 1000); }
+            }),
+            'Exclude Stopwords': new Option({
+                title: "Stopwords",
+                styles: ["btn btn-sm btn-default", "btn btn-sm"],
+                labels: ["Include",
+                         "Exclude"],
+                ids:    ['false', 'true'],
+                default: 1,
+                type: 'toggle',
+                parent: '#ngrams_header',
+                callback: coding.NGramList
+            }),
+//            Counts: new Option({
+//                title: "Frequency",
+//                labels: ['Binary', 'Total', 'Log Normal'],
+//                ids:    ['bin', 'total', 'log'],
+//                default: 0,
+//                parent: '#ngrams_header',
+//                callback: coding.countNGrams
+//            }),
+            Multiplier: new Option({
+                title: "Frequency",
+                labels: ['Raw', 'Fraction', 'Percent', 'TF-IDF Rumor', 'TF-IDF (log) Rumor'],
+                ids:    ['raw', 'fraction', 'percent', 'idf', 'log-idf'],
+                default: 0,
+                parent: '#ngrams_header',
+                callback: coding.NGramList
+            }),
+            TopX: new Option({
+                title: "Top",
+                labels: ['10', '20', '100', '200', '1000'],
+                ids:    ['10', '20', '100', '200', '1000'],
+                default: 1,
+                parent: '#ngrams_header',
+                callback: coding.NGramList
+            }),
+            Filter: new Option({
+                title: "Filter",
+                labels: ['None', 'Redundant Tweets'],
+                ids:    ['none', 'redun'],
+                default: 1,
+                parent: '#ngrams_header',
+                callback: coding.countNGrams
+            }),
+            Coded: new Option({
+                title: "For Tweets Coded",
+                labels: tweet_codes,
+                ids:    tweet_codes,
+                default: 0,
+                parent: '#ngrams_header',
+                callback: coding.countNGrams
+            }),
+            Tables: new Option({
+                title: "Tables",
+                labels: ['n-grams', 'n-grams & co-occur', 'n-grams, co & tweets', 'n-grams, co & urls', 'All'],
+                ids:    ['n', 'nc', 'nct', 'ncu', 'nctu'],
+                default: 1,
+                parent: '#ngrams_header',
+                callback: coding.NGramList
+            })
+        };
         
         // Start drawing
         options.init();
-        
-        // Change some of the appearances
-        d3.selectAll('.choice')
-            .style('vertical-align', 'top');
-        d3.selectAll('.btn-primary')
-            .classed('btn-default', true)
-            .classed('btn-primary', false);
         
         coding.chooseRumor();
     },
     chooseRumor: function() {
         coding.rumor = {};
         coding.rumors.forEach(function(rumor) {
-            if(options.rumor.is(rumor.ID))
+            if(options['Dataset']['Rumor'].is(rumor.ID))
                coding.rumor = rumor;
         });
         
-        options.period.available = [];
-        options.period.ids.forEach(function(period, i) {
+        var period_option = options['Dataset']['Period'];
+        period_option.available = [];
+        period_option.ids.forEach(function(period, i) {
             if(coding.rumor.periods.includes(period))
-                options.period.available.push(i);
+                period_option.available.push(i);
         });
-        if(options.period.available.includes(options.period.indexCur())) {
-            options.period.default = options.period.indexCur();
+        if(period_option.available.includes(period_option.indexCur())) {
+            period_option.default = period_option.indexCur();
         } else {
-            options.period.default = options.period.available[0];
+            period_option.default = period_option.available[0];
         }
-        options.buildDropdown('period');
-        options.period.click(options.period.default);
+        options.buildSidebarOption('Dataset', 'Period');
+        period_option.click(period_option.default);
     },
     getCodes: function() {
         var post = {
-            rumor_id: options.rumor.get(),
-            period: options.period.get()
+            rumor_id: options['Dataset']['Rumor'].get(),
+            period: options['Dataset']['Period'].get()
         };
 
         data.callPHP('coding/get', post, coding.parseCodes);
@@ -406,8 +401,8 @@ Coding.prototype = {
             return parseInt(coder_id);
         });
         available.sort(function(a, b) { return a - b; });
-        options.coder.available = available;
-        options.buildDropdown('coder');
+        options['Reliability']['Coder'].available = available;
+        options.buildSidebarOption('Reliability', 'Coder');
         
         // Compile the report
         coding.compileReport();
@@ -415,7 +410,7 @@ Coding.prototype = {
     compileReport: function() {
         
         // Get tweets for this report
-        var coder_id = options.coder.get();
+        var coder_id = options['Reliability']['Coder'].get();
         coding.tweets = {};
         coding.tweets_arr = [];
         coding.raw_codes.forEach(function(code) {
@@ -600,7 +595,7 @@ Coding.prototype = {
             var coders_available = d3.range(1, coding.n.coders + 1).filter(function(i) { return coder_tweets[i - 1] > 0; });
             
             // Order that list if necessary
-            if(options.coder_order.is('alpha')) {
+            if(options['Matrices']['Order'].is('alpha')) {
                 coders_available.sort(function(a, b) {
                     var name1 = coding.coders[a - 1].Name;
                     var name2 = coding.coders[b - 1].Name;
@@ -608,7 +603,7 @@ Coding.prototype = {
                     if(name1 < name2) return -1;
                     return 0;
                 });
-            } else if (options.coder_order.is('cluster')) {
+            } else if (options['Matrices']['Order'].is('cluster')) {
                 var distance = coders_available.map(function(i) {
                     return coders_available.map(function(j) {
                         return (coding.coders_x_coders_primary[i-1][j-1] / coding.coders_x_coders_possible[i-1][j-1]) || 1000;
@@ -628,7 +623,7 @@ Coding.prototype = {
                 coders_available.sort(function(a, b) { 
                     return first_component[b - 1] - first_component[a - 1];
                 });
-            } else if (options.coder_order.is('agreement')) {
+            } else if (options['Matrices']['Order'].is('agreement')) {
                 coders_available.sort(function(a, b) { 
                     return coder_agree_perc[b - 1] - coder_agree_perc[a - 1];
                 })
@@ -636,13 +631,13 @@ Coding.prototype = {
             coders_available.unshift(0); // Add All option
             
             // Update the dropdown
-            options.coder.available = coders_available;
-            if(options.coder.available.includes(options.coder.indexCur())) {
-                options.coder.default = options.coder.indexCur();
+            options['Reliability']['Coder'].available = coders_available;
+            if(options['Reliability']['Coder'].available.includes(options['Reliability']['Coder'].indexCur())) {
+                options['Reliability']['Coder'].default = options['Reliability']['Coder'].indexCur();
             } else {
-                options.coder.default = options.coder.available[0];
+                options['Reliability']['Coder'].default = options['Reliability']['Coder'].available[0];
             }
-            options.buildDropdown('coder');
+            options.buildSidebarOption('Reliability', 'Coder');
         }
 
         // Krippendorff's Alpha
@@ -719,14 +714,16 @@ Coding.prototype = {
         coding.IRRTable();
         coding.fillMatrices();
         coding.fillTweetList();
-        coding.getMoreInformation();
+        if(options['Tweet Types']['More Information'].is('true')) {
+            coding.getMoreInformation();
+        }
     },
     IRRTable: function() {
-        coding.togglePane('irr');
+        coding.togglePane('Reliability');
         
-        var coder_id = options.coder.get();
+        var coder_id = options['Reliability']['Coder'].get();
         
-        var results_div = d3.select("#irr");
+        var results_div = d3.select("#lReliability_body");
         results_div.selectAll("*").remove();
         
         var agreement_table = results_div.append("table")
@@ -830,9 +827,9 @@ Coding.prototype = {
             .attr('class', 'table_bar');
     },
     fillMatrices: function() {
-        coding.togglePane('matrices');
+        coding.togglePane('Matrices');
         
-        var div = d3.select('#matrices')
+        var div = d3.select('#lMatrices_body')
             .attr('class', 'row');
         div.selectAll('*').remove();
         
@@ -844,9 +841,9 @@ Coding.prototype = {
 //            .range(["black", "red", "yellow", "green", "blue"]);
         
         // Get short coder names
-        var coder_names = options.coder.labels.map(function(name, i) {
+        var coder_names = options['Reliability']['Coder'].labels.map(function(name, i) {
             if(i == 0) return '';
-            if(options.coder_order.is("anonymous"))
+            if(options['Matrices']['Order'].is("anonymous"))
                 return i + " ";
             
             return name.split(' ').map(function(name_part) {
@@ -855,17 +852,17 @@ Coding.prototype = {
         });
         
         /* Primary coder matrix */
-        var matrix = options.coder.available.map(function (i) {
-            var row = options.coder.available.map(function (j) {
+        var matrix = options['Reliability']['Coder'].available.map(function (i) {
+            var row = options['Reliability']['Coder'].available.map(function (j) {
                 if(i == 0) {
                     return { 
-                        FullName: options.coder.labels[j],
+                        FullName: options['Reliability']['Coder'].labels[j],
                         label: coder_names[j] 
                     };
                 }
                 if(j == 0) {
                     return { 
-                        FullName: options.coder.labels[i],
+                        FullName: options['Reliability']['Coder'].labels[i],
                         label: coder_names[i] 
                     };
                 }
@@ -950,17 +947,17 @@ Coding.prototype = {
             });
         
         /* Uncertainty coder matrix */
-        matrix = options.coder.available.map(function (i) {
-            var row = options.coder.available.map(function (j) {
+        matrix = options['Reliability']['Coder'].available.map(function (i) {
+            var row = options['Reliability']['Coder'].available.map(function (j) {
                 if(i == 0) {
                     return { 
-                        FullName: options.coder.labels[j],
+                        FullName: options['Reliability']['Coder'].labels[j],
                         label: coder_names[j] 
                     };
                 }
                 if(j == 0) {
                     return { 
-                        FullName: options.coder.labels[i],
+                        FullName: options['Reliability']['Coder'].labels[i],
                         label: coder_names[i] 
                     };
                 }
@@ -1004,8 +1001,7 @@ Coding.prototype = {
             .html('Coder Agreement on Uncertainty Codes<br ><small>When at least one Uncertainty code, same color scale</small>')
             .attr('class', 'col-sm-4')
             .append('div')
-            .style('text-align', 'center')
-            .style('display', 'inline-block');
+            .attr('class', 'matrix-table-div');
         
         uncertainty_div.append('span')
             .html('Coder coded uncertain<br />');
@@ -1078,11 +1074,14 @@ Coding.prototype = {
         code_x_code_div.append('span')
             .html('Majority Choose<br />');
         
-        code_x_code_div.append('span')
+        var codes_div_inner = code_x_code_div.append('div')
+            .attr('class', 'matrix-table-div');
+        
+        codes_div_inner.append('span')
             .attr('class', 'ylabel')
             .text('Coders Choose')
         
-        code_x_code_div.append('table')
+        codes_div_inner.append('table')
             .attr('id', 'codes_confusion_matrix')
             .selectAll('tr')
             .data(matrix)
@@ -1099,18 +1098,18 @@ Coding.prototype = {
 //            });
     },
     fillTweetList: function() {
-        coding.togglePane('tweets');
+        coding.togglePane('Tweets');
         
-        var coder_id = options.coder.get();
+        var coder_id = options['Reliability']['Coder'].get();
         coder_id = parseInt(coder_id) || 'all';
         var coder = {};
         if(coder_id != 'all') {
             coder = coding.coders[coder_id - 1];
         }
-        var tweets_coded = options.tweets_coded.get();
-        var tweets_focus = options.tweets_focus.get();
+        var tweets_coded = options['Tweets']['Code'].get();
+        var tweets_focus = options['Tweets']['Focus'].get();
         var tweets = coding.tweets_arr;
-        var period = options.period.get();
+        var period = options['Dataset']['Period'].get();
         
         // Filter out tweets by coder
         if(coder_id != 'all') {
@@ -1145,20 +1144,20 @@ Coding.prototype = {
         }
         
         // Order the tweets
-        if(options.tweet_order.is('text')) {
+        if(options['Tweets']['Order'].is('text')) {
             tweets.sort(function(a, b) {
                 if(a.Text > b.Text) return 1;
                 if(a.Text < b.Text) return -1;
                 return 0;
             });
-        } else if(options.tweet_order.is('majority')) {
+        } else if(options['Tweets']['Order'].is('majority')) {
             tweets.sort(function(a, b) {
                 if(a.Plurality['Primary'] == b.Plurality['Primary']) return a.Plurality['Count'] - b.Plurality['Count'];
                 if(a.Plurality['Primary'] > b.Plurality['Primary']) return 1;
                 if(a.Plurality['Primary'] < b.Plurality['Primary']) return -1;
                 return 0;
             });
-        } else if(options.tweet_order.is('disagreement')) {
+        } else if(options['Tweets']['Order'].is('disagreement')) {
             tweets.sort(function(a, b) {
                 return a.Plurality['Count'] - b.Plurality['Count'];
             });
@@ -1170,7 +1169,7 @@ Coding.prototype = {
         
         // Add the table
         d3.select('#tweet_table').remove();
-        var table = d3.select('#tweets')
+        var table = d3.select('#lTweets_body')
             .append('table')
             .attr('id', 'tweet_table')
             .attr('class', 'table table-hover');
@@ -1335,7 +1334,7 @@ Coding.prototype = {
             });
         });
         
-        if(!options.coder_order.is('anonymous')) {
+        if(!options['Matrices']['Order'].is('anonymous')) {
             var votes2 = {};
             voters.forEach(function(voter) {
                 var name = coding.coders[voter - 1].ShortName;
@@ -1348,20 +1347,19 @@ Coding.prototype = {
         coding.tooltip.on();
     },
     togglePane: function(pane, duration) {
-        if(options['show_' + pane].is("true")) {
-            d3.select('#' + pane)
+        if(options[pane].Show.is("true")) {
+            d3.select('#' + util.simplify(pane))
                 .transition(duration || 10)
-                .style('opacity', 1)
-                .style('transform', 'scaleY(1)')
-                .style('transform-origin', 'top')
-                .style('display', 'block');
-        
+                .style({
+                    opacity: 1,
+                    transform: 'scaleY(1)',
+                    display: 'block'
+                });
         } else {
-            d3.select('#' + pane)
+            d3.select('#' + util.simplify(pane))
                 .transition(duration || 10)
                 .style('opacity', 0)
                 .style('transform', 'scaleY(0)')
-                .style('transform-origin', 'top')
                 .each('end', function() {
                     d3.select(this).style('display', 'none')
                 });
@@ -1369,8 +1367,8 @@ Coding.prototype = {
     },
     getMoreInformation: function() {
         var post = {
-            rumor_id: options.rumor.get(),
-            period: options.period.get()
+            rumor_id: options['Dataset']['Rumor'].get(),
+            period: options['Dataset']['Period'].get()
         };
         
         // Wait otherwise some page elements may be stuck
@@ -1401,12 +1399,12 @@ Coding.prototype = {
         });
         
         coding.tweetTypeTable();
-        if(!options.ngrams_coded.is('Any'))
-            coding.countNGrams(options.ngrams_coded.get());
+        if(!options['N-Grams']['Coded'].is('Any'))
+            coding.countNGrams(options['N-Grams']['Coded'].get());
         coding.countNGrams('Any');
     },
     tweetTypeTable: function() {
-        coding.togglePane('tweet_types');
+        coding.togglePane('Tweet Types');
         
         var rows = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Uncertainty', 'Total'];
         var columns = ['Original', 'Retweet', 'Reply', 'Quote', 'Unknown', 'Total'];
@@ -1437,7 +1435,7 @@ Coding.prototype = {
         });
         
         // Add totals
-        var denom = options.tweet_types_bars.get();
+        var denom = options['Tweet Types']['Bars'].get();
         coding.code_type_counts[6][5].Value = d3.sum(coding.code_type_counts[6], function(d) { return d.Value; });
         coding.code_type_counts.forEach(function(row, i_code) {
             row.forEach(function(cell, i_type) {
@@ -1446,13 +1444,13 @@ Coding.prototype = {
         });
         
         // Format area
-        var results_div = d3.select("#tweet_types");
-        results_div.selectAll("*").remove();
+        var div = d3.select("#lTweet_Types_body");
+        div.selectAll("*").remove();
         
-        results_div.append('span')
+        div.append('span')
             .text('Computed using the Average tweet assignment for each tweet in lieu of adjudicated data.');
         
-        var table = results_div.append("table")
+        var table = div.append("table")
             .attr('id', 'agreement_table')
             .attr('class', 'table');
         
@@ -1508,7 +1506,7 @@ Coding.prototype = {
         
     },
     countNGrams: function(subset) {
-        subset = subset || options.ngrams_coded.get();
+        subset = subset || options['N-Grams']['Coded'].get();
         
         // Make structures
         coding.ngrams[subset] = {};
@@ -1549,7 +1547,7 @@ Coding.prototype = {
         }
         
         // Add up ngrams
-        var redundantTweetsOK = options.ngrams_filter.is('none');
+        var redundantTweetsOK = options['N-Grams']['Filter'].is('none');
         tweets.forEach(function(tweet) {
             tweet.TextNoURL = tweet.Text.replace(/http\S+/g, ' ');
 
@@ -1617,13 +1615,13 @@ Coding.prototype = {
         coding.NGramList();
     },
     NGramList: function() {
-        coding.togglePane('ngrams');
+        coding.togglePane('N-Grams');
         
-        var tf = options.ngrams_counts.get();
-        var idf = options.ngrams_multiplier.get();
-        var tables = options.ngrams_tables.get();
-        var ngrams = coding.ngrams[options.ngrams_coded.get()];
-        var div = d3.select('#ngrams');
+        var tf = 'total'; //options['N-Grams']['Counts'].get();
+        var idf = options['N-Grams']['Multiplier'].get();
+        var tables = options['N-Grams']['Tables'].get();
+        var ngrams = coding.ngrams[options['N-Grams']['Coded'].get()];
+        var div = d3.select('#lN_Grams_body');
         div.selectAll('*').remove();
 
         var labels = ['Unigrams', 'Bigrams', 'Trigrams'];
@@ -1631,14 +1629,14 @@ Coding.prototype = {
         if(tables.includes('t')) labels.push('Tweets');
         if(tables.includes('u')) labels.push('URLs');
         
-        var n = parseInt(options.ngrams_topx.get());
+        var n = parseInt(options['N-Grams']['TopX'].get());
         var counters = [ngrams.NGramCounter[0], ngrams.NGramCounter[1], ngrams.NGramCounter[2]];
         if(tables.includes('c')) counters.push(ngrams.CoOccurCounter);
         if(tables.includes('t')) counters.push(ngrams.TweetCounter);
         if(tables.includes('u')) counters.push(ngrams.URLCounter);
         
         var raw_lists = counters.map(function(counter, i_counter) {
-            if(options.ngrams_exclude_stopwords.is("true") && i_counter < 4) {
+            if(options['N-Grams']['Exclude Stopwords'].is("true") && i_counter < 4) {
                 return counter.top_no_stopwords(n);
             } else {
                 return counter.top(n);
@@ -1752,6 +1750,6 @@ function initialize() {
     options = new Options();
     data = new Data();
     
-    coding.getData();
+    coding.buildPage();
 }
 window.onload = initialize;

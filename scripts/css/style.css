@@ -20,6 +20,8 @@
     background: white;
     left: -170px;
     transition: left 500ms;
+    overflow: scroll;
+    height: 95%;
 }
 .sidebar:hover {
     left: 0px;
@@ -35,33 +37,17 @@
     position: absolute;
     transition: 500ms;
     background: white;
-    top: 50%;
     opacity: 1;
+    white-space: nowrap;
     
-    transform: translateY(-50%) rotate(90deg) translateY(85%);
-    transform-origin: left;
-    left: 200px;
-    
-/*
-    transform: translateY(-50%) rotate(90deg) translateY(-50%);
+    writing-mode: vertical-lr;
+    height: 100%;
+    vertical-align: middle;
+    text-align: center;
     right: 0px;
-*/
-    
-/*    transform: rotate(90deg);*/
-/*    transform-origin: top;*/
-/*    left: 175px;*/
 }
 .sidebar:hover .section-title {
     opacity: 0;
-/*
-    transform: none;
-    top: 0px;
-    left: 0px;
-    font-weight: bold;
-    font-size: 1.2em;
-    padding: 5px;
-    font-size: 18px;
-*/
 }
 
 #choices {
@@ -381,19 +367,25 @@ button:focus {
 #agreement_table tr:nth-child(even){
     background-color: #F7F7F7;
 }
-#matrices ylabel {
+.matrix-table-div {
+    text-align: center;
+    display: inline-block;
+    position: relative;
+}
+.ylabel {
     top: 50%;
     height: 100%;
-    transform: translate(-200%, -50%);
+    left: 0px;
+    transform: translate(-100%, -50%);
     text-orientation: sideways;
     writing-mode: vertical-lr;
     position: absolute;
 }
-#matrices table {
+#lMatrices table {
     table-layout: fixed;
     width: inherit;
 }
-#matrices td {
+#lMatrices td {
     font-size: 12px;
     width: 23px;
     height: 23px;
@@ -406,12 +398,12 @@ button:focus {
     border-left-style: none;
     border-width: 1px;
 }
-#matrices tr td:last-child {
+#lMatrices tr td:last-child {
     border-right-style: none;
     border-left-style: double;
     border-left-width: 3px;
 }
-#matrices table tr:first-child, #matrices tr td:first-child {
+#lMatrices table tr:first-child, #lMatrices tr td:first-child {
     font-weight: bold;
 }
 #codes_confusion_matrix td {

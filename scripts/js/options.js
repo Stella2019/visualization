@@ -339,12 +339,11 @@ Options.prototype = {
     init: function() {
         
         // Build options
-        if(!options.panels) {
-            options.buildTopMenu();
-        }
         if(!location.pathname.includes('coding.html') && !location.pathname.includes('status.html')) {
+            options.buildTopMenu();
             options.buildTimeWindow();
         }
+        options.buildSidebar();
         
         // Import the current state
         options.importState();
@@ -353,35 +352,30 @@ Options.prototype = {
         };
         
         // Style elements
-        options.record.forEach(function(option) {
-            if('styleFunc' in options[option]) {
-                options[option].styleFunc();
-            }
-        });
+        if(!location.pathname.includes('coding.html') && !location.pathname.includes('status.html')) {
+            options.record.forEach(function(option) {
+                if('styleFunc' in options[option]) {
+                    options[option].styleFunc();
+                }
+            });
+        }
         $(function () {
             $('[data-toggle="popover"]').popover()
         })
         
         // Record the state
-        options.recordState(null, true);
-        
-        options.buildSidebar();
+        options.recordState(true);
     },
     importState: function() {
         var state;
         try {
 //            state = JSON.parse(window.location.hash.slice(1));
 //            console.debug(state);
-            var loc = decodeURIComponent(window.location.hash);
-            var strstate = loc.slice(2);
+            var uristate = decodeURIComponent(window.location.hash);
+            var strstate = uristate.slice(1);
             if(strstate.length <= 0)
                 return;
-            var arrstate = strstate.split('&');
-            state = arrstate.reduce(function(s, d) {
-                var kv = d.split('=');
-                s[kv[0]] = kv[1].slice(1, kv[1].length -1);
-                return s;
-            }, {});
+            state = JSON.parse(strstate);
         } catch(err) {
             console.log(err);
             return;
@@ -389,39 +383,54 @@ Options.prototype = {
         
         // Figure out what options should be different
         var changed = [];
-        Object.keys(state).forEach(function(option) {
-            var value = state[option];
-            if(["time_min", "time_max"].indexOf(option) > -1) {
-                if(options.time_save.is("false"))
-                    return;
-                
-                value = new Date(value);
-            } else if(option in options && options[option].isnumeric) {
-                value = parseInt(value) || value;
-            }
+        Object.keys(state).forEach(function(panel_name) {
+            var panel = options[panel_name];
+            var panel_state = state[panel_name];
             
-            if(option in options && !options[option].is(value)) {
-                // Record this change
-                console.info("Import option " + option + 
-                            ": from [" + options[option].get() + "]" +
-                            " to [" + value + "]");
-                changed.push(option);
+            Object.keys(panel_state).forEach(function(option_name) {
+                var option = panel[option_name];
+                if(!option) return;
+                var option_value = panel_state[option_name];
+//                console.log(panel_name, panel_state, panel);
+//                console.log(option_name, option_value, option);
+                option.set(option_value);
+                changed.push(option_name);
                 
-                // Change the state entry
-                options[option].set(value);
-                options.state[option] = value;
-                
-                // Change the interface
-                if(options.initial_buttons.indexOf(option) > -1) {
-                    if(options[option].textfield) {
-                        options[option].update(value);
-                    } else {
-                        d3.select("#choose_" + option).select('.current')
-                            .text(options[option].getLabel());
-                    }
-                }
-            }
+                d3.select("#choose_" + panel_name + "_" + option_name).select('.current')
+                    .text(option.getLabel());
+            });
         });
+//        Object.keys(state).forEach(function(option) {
+//            if(["time_min", "time_max"].indexOf(option) > -1) {
+//                if(options.time_save.is("false"))
+//                    return;
+//                
+//                value = new Date(value);
+//            } else if(option in options && options[option].isnumeric) {
+//                value = parseInt(value) || value;
+//            }
+//            
+//            if(option in options && !options[option].is(value)) {
+//                // Record this change
+//                console.info("Import option " + option + 
+//                            ": from [" + options[option].get() + "]" +
+//                            " to [" + value + "]");
+//                changed.push(option);
+//                
+//                // Change the state entry
+//                options[option].set(value);
+//                
+//                // Change the interface
+//                if(options.initial_buttons.indexOf(option) > -1) {
+//                    if(options[option].textfield) {
+//                        options[option].update(value);
+//                    } else {
+//                        d3.select("#choose_" + option).select('.current')
+//                            .text(options[option].getLabel());
+//                    }
+//                }
+//            }
+//        });
         
         // If the program has been initialized
         if(changed.length > 0 && data && data.all && data.all[0]) {
@@ -435,31 +444,26 @@ Options.prototype = {
                 d3.select('#choose_collection_type').select('.current')
                     .text(options.collection_type.getLabel());
 
-                options.recordState('collection_type', true);
+                options.recordState(true);
 
                 options.chooseCollectionType();
             } else {
                 pipeline.start('Find Which Data is Shown'); // although we can do something else
             }
         } else if (changed.length > 0 && location.pathname.includes('coding.html')) {
-            options.rumor.callback();
+            options['Dataset']['Rumor'].callback();
         }
     },
-    recordState: function(changedItem, override) {
-        if(changedItem == undefined) {
-            options.state = options.record.reduce(function(state, option) {
-                state[option] = options[option].get();
-                return state;
-            }, {});
-        } else {
-            options.state[changedItem] = options[changedItem].get();
-        }
-
-//        strstate = '#' + JSON.stringify(this.state);
-        var arrstate = Object.keys(options.state).map(function(d) {
-                return d + '="' + options.state[d] + '"';
+    recordState: function(override) {
+        var state = {};
+        options.panels.forEach(function(panel_name) {
+            state[panel_name] = {};
+            var panel = options[panel_name];
+            Object.keys(panel).forEach(function(option_name) {
+                state[panel_name][option_name] = panel[option_name].get();
             });
-        var strstate = '#!' + arrstate.join('&');
+        });
+        strstate = '#' + JSON.stringify(state);
         
         if(override) {
             history.replaceState(null, null, strstate);
@@ -588,7 +592,7 @@ Options.prototype = {
                 var toggle = !(set.get() == "true");
                 set.set(toggle ? "true" : "false");
                 set.styleFunc();
-                options.recordState(option);
+                options.recordState();
             
                 set.callback();
             });
@@ -652,7 +656,7 @@ Options.prototype = {
             .attr("class", "text-center form-control")
             .on('keyup', function(d) {
                 set.set(this.value);
-                options.recordState(option);
+                options.recordState();
             
                 options[option].callback();
             });
@@ -798,7 +802,7 @@ Options.prototype = {
                 .text(set.labels[d]);
 
             set.set(set.ids[d]);
-            options.recordState(option);
+            options.recordState();
 
             set.callback();
         }
@@ -1007,7 +1011,7 @@ Options.prototype = {
         
         // Make the dropdown
         options.buildDropdown('collection');
-        options.recordState('collection', true);
+        options.recordState(true);
         
         // Generate Types of Collections
         var types = util.lunique(data.collections.map(function(collection) { return collection['Type']; }));
@@ -1025,7 +1029,7 @@ Options.prototype = {
         // Make the dropdown for collection types
 
         options.buildDropdown('collection_type');
-        options.recordState('collection_type', true);
+        options.recordState(true);
 
         // Add additional information for collections
         data.collections.map(options.addCollectionPopup);
@@ -1059,7 +1063,7 @@ Options.prototype = {
         
         // Make the dropdown
         options.buildDropdown('rumor');
-        options.recordState('rumor', true);
+        options.recordState(true);
         
         data.setRumor();
         
@@ -1124,7 +1128,7 @@ Options.prototype = {
             d3.select('#choose_collection').select('.current')
                 .text(options.collection.getLabel());
 
-            options.recordState('collection', true);
+            options.recordState(true);
 
             data.setCollection();
         }
@@ -1658,9 +1662,7 @@ Options.prototype = {
         // Set Text Fields
         options.load_time_min.set(util.formDate(options.load_time_min.date));
         options.load_time_max.set(util.formDate(options.load_time_max.date));
-        options.recordState('load_time_min', false);
-        options.recordState('load_time_max', false);
-        options.recordState('load_time_window', false);
+        options.recordState(false);
         
     },
     editLoadTimeWindow: function() {
@@ -1846,7 +1848,7 @@ Options.prototype = {
 
             var panel = options[panel_name];
             Object.keys(panel).forEach(function(option_name) {
-                options.buildSidebarOption(panel[option_name], panel_div);
+                options.buildSidebarOption(panel_name, option_name);
             })
             
             panel_div.append('div')
@@ -1854,26 +1856,41 @@ Options.prototype = {
                 .html(panel_name);
         });
     },
-    buildSidebarOption: function(option, panel_div) {
+    buildSidebarOption: function(panel_name, option_name) {
+        var panel, option;
+        try {
+            panel = options[panel_name];
+            option = panel[option_name];
+        } catch(e) {
+            console.log('Option ' + option_name + ' does not exist');
+            return;
+        }
+//        console.log(panel, option);
         
         // Make containers
-        var container = panel_div.append("div")
-            .attr("class", "choice")
-            .style("text-transform", "capitalize")
-            .append("div")
-                .attr("id", "choose_" + option.name)
-                .attr("class", "dropdown");
+        var container = d3.select('#choose_' + panel_name + '_' + option_name);
+        
+        // If it does not exist, create it
+        if(!container[0][0]) {
+            container = d3.select('#panel_' + util.simplify(panel_name)).append("div")
+                .attr("class", "choice")
+                .style("text-transform", "capitalize")
+                .append("div")
+                    .attr("id", "choose_" + panel_name + '_' + option_name)
+                    .attr("class", "dropdown");
+        }
         
         var list_open = container.select('button.dropdown-toggle')
         if(!list_open[0][0]) {
             container.append('div')
                 .html(option.title)
-                .style('margin-left', '5px');
+                .style('display', 'inline-block')
+                .style('margin-left', '5px')
+                .style('margin-right', '5px');
             
             list_open = container.append("button")
-                .style('margin-left', '20px')
                 .attr({type: "button",
-                    class: 'btn btn-sm btn-default dropdown-toggle',
+                    class: 'btn btn-xs btn-default dropdown-toggle',
                     'data-toggle': "dropdown",
                     'aria-haspopup': true,
                     'aria-expanded': false});
@@ -1909,18 +1926,24 @@ Options.prototype = {
         elements.exit().remove(); // Remove former columns
         elements.select('a'); // Propagate any data that needs to be
         
-        option.click = function(d) {
+        option.updateInInterface = function(d) {
             container.select('.current')
                 .text(option.labels[d]);
 
             option.set(option.ids[d]);
-            options.recordState(option.name);
+            options.recordState();
+        }
+        option.updateInInterface_id = function(d) {
+            option.updateInInterface(option.indexOf(d));
+        }
+        option.click = function(d) {
+            option.updateInInterface(d);
 
             option.callback();
         }
         
         list.selectAll('a')
-            .attr("id", function(d) { return option.name + "_" + option.ids[d]; })
+            .attr("id", function(d) { return option_name + "_" + option.ids[d]; })
             .html(function(d) {
                 return option.labels[d];
             })
@@ -1949,7 +1972,5 @@ Options.prototype = {
                     .attr('class', 'glyphicon glyphicon-pencil');
             }
         }
-        
-        options.state[option] = option.ids[option.default];
     }
 }
