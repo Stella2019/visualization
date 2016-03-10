@@ -87,7 +87,7 @@ Options.prototype = {
                 changed.push(option_name);
                 
                 d3.select("#choose_" + util.simplify(panel_name) + "_" + util.simplify(option_name)).select('.current')
-                    .text(option.getLabel());
+                    .html(option.getLabel());
             });
         });
 //        Object.keys(state).forEach(function(option) {
@@ -1471,7 +1471,38 @@ Options.prototype = {
     },
     buildSidebar: function() {
         var sidebar = d3.select('body').append('div')
-            .attr('class', 'sidebar');
+            .attr('class', 'sidebar sidebar-pinned');
+        
+        // Pin or Autohide
+        var pin_style = function(element) {
+            d3.select(element)
+                .attr('class', function(d) {
+                     return 'btn btn-xs ' + (d ? 'btn-default' : '');
+                })
+                .select('span')
+                .attr('class', function(d) {
+                     return 'glyphicon glyphicon-pushpin';// + (d ? 'ok-circle' : 'ban-circle');
+                })
+        };
+        
+        sidebar.append('button')
+            .data([false])
+            .attr({
+                id: 'toggle_sidebar',
+                class: 'btn btn-xs btn-default'
+            })
+            .style({
+                float: 'right',
+                'z-index': 20
+            })
+            .on('click', function(d) {
+                d3.select(this).data([!d]);
+                pin_style(this);
+            
+                d3.select('.sidebar').classed('sidebar-pinned', d);
+            })
+            .html("<span></span>"); // Can also incldue label
+        pin_style('#toggle_sidebar');
         
         // Pages
         var pages_panel = sidebar.append('div')
@@ -1556,6 +1587,7 @@ Options.prototype = {
         if(!container[0][0]) {
             container = d3.select('#panel_' + util.simplify(panel_name)).append("div")
                 .attr("class", "choice")
+                .style("display", option.hidden ? 'none' : 'inline-block')
                 .style("text-transform", "capitalize")
                 .append("div")
                     .attr("id", "choose_" + util.simplify(panel_name) + '_' + util.simplify(option_name))
@@ -1570,6 +1602,28 @@ Options.prototype = {
                 .style('margin-left', '5px')
                 .style('margin-right', '5px');
             
+            // Add an edit button if there is an edit function
+            if('edit' in option) {
+                var edit_button = container.select('button.edit-button')
+                if(!edit_button[0][0]) {
+                    container.classed('btn-group', true);
+
+                    list_open.style({
+                        'border-top-right-radius': '0px',
+                        'border-bottom-right-radius': '0px',
+                        'border-right': 'none'
+                    });
+
+                    edit_button = container.append('button')
+                        .attr('class', 'btn btn-xs btn-default edit-button')
+                        .on('click', option.edit)
+                        .style('float', 'right')
+                        .append('span')
+                        .attr('class', 'glyphicon glyphicon-pencil');
+                }
+            }
+            
+            // Add options dropdown
             list_open = container.append("button")
                 .attr({type: "button",
                     class: 'btn btn-xs btn-default dropdown-toggle',
@@ -1593,8 +1647,11 @@ Options.prototype = {
         if(!list[0][0]) {
             list = container.append('ul')
                 .style({
-                    'margin-left': '20px',
-                    'min-width': '0px'
+                    right: '0px',
+                    left: 'auto',
+                    'max-width': '100%',
+                    'min-width': '0%',
+                    cursor: 'pointer'
                 })
                 .attr({class: 'dropdown-menu'});
         }
@@ -1604,14 +1661,16 @@ Options.prototype = {
             .data(option.available);
         
         elements.enter()
-            .append("li").append("a");
+            .append("li")
+            .attr('class', 'sidebar-dropdown-option')
+            .append("a");
         
         elements.exit().remove(); // Remove former columns
         elements.select('a'); // Propagate any data that needs to be
         
         option.updateInInterface = function(d) {
             container.select('.current')
-                .text(option.labels[d]);
+                .html(option.labels[d]);
 
             option.set(option.ids[d]);
             options.recordState();
@@ -1634,32 +1693,6 @@ Options.prototype = {
 
         // Save the current value to the interface and the history
         container.select('.current')
-            .text(option.labels[option.default]);
-        
-        // Add an edit button if there is an edit function
-        if('edit' in option) {
-            var edit_button = container.select('button.edit-button')
-            if(!edit_button[0][0]) {
-                container.classed('btn-group', true);
-
-                list_open.style({
-                    'border-top-right-radius': '0px',
-                    'border-bottom-right-radius': '0px',
-                    'border-right': 'none'
-                });
-
-                edit_button = container.append('button')
-                    .attr('class', 'btn btn-xs btn-default edit-button')
-                    .on('click', option.edit)
-                    .style('float', 'right')
-                    .append('span')
-                    .attr('class', 'glyphicon glyphicon-pencil');
-            }
-        }
-        
-        // Make it invisible if it is hidden
-        if(option.hidden) {
-            container.style('display', 'none');
-        }
+            .html(option.labels[option.default]);
     }
 }

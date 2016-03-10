@@ -801,21 +801,21 @@ Display.prototype = {
             .text('Order by:');
 
         order_div.selectAll('button.tweet_modal_order')
-            .data(options['View']['Fetched Tweet Order'].available)
+            .data(options['Analysis']['Fetched Tweet Order'].available)
             .enter()
             .append('button')
             .attr('class', 'btn tweet_modal_order')
             .text(function(d) {
-                return options['View']['Fetched Tweet Order'].labels[d];
+                return options['Analysis']['Fetched Tweet Order'].labels[d];
             })
             .on('click', function(d) {
-                options['View']['Fetched Tweet Order'].click(d);
+                options['Analysis']['Fetched Tweet Order'].click(d);
 
                 var post = disp.getTweets_post;
-                if(options['View']['Fetched Tweet Order'].is('rand')) {
+                if(options['Analysis']['Fetched Tweet Order'].is('rand')) {
                     post.rand = true;
                     delete post.order_prevalence;
-                } else if(options['View']['Fetched Tweet Order'].is('prevalence')) {
+                } else if(options['Analysis']['Fetched Tweet Order'].is('prevalence')) {
                     post.order_prevalence = true;
                     delete post.rand;
                 } else {
@@ -893,7 +893,7 @@ Display.prototype = {
         
         d3.selectAll('.tweet_modal_order')
             .attr('class', function(d) {
-                if(d == options['View']['Fetched Tweet Order'].indexCur())
+                if(d == options['Analysis']['Fetched Tweet Order'].indexCur())
                     return 'btn btn-primary tweet_modal_order';
                 return 'btn btn-default tweet_modal_order';
             });

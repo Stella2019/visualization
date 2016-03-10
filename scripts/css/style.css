@@ -1,3 +1,8 @@
+/* Body */
+#body {
+    margin-left: 200px;
+}
+
 /* Header */
 
 #header {
@@ -13,17 +18,17 @@
 /* Options */
 .sidebar {
     position: fixed;
-    top: 10px;
     width: 200px;
-    border: solid 5px #eee;
-    border-left: none;
+    border-right: solid 5px #eee;
     background: white;
-    left: -170px;
+    top: 0px;
+    left: -175px;
     transition: left 500ms;
-    overflow: scroll;
-    height: 95%;
+    overflow-Y: scroll;
+    height: 100%;
+    padding: 5px;
 }
-.sidebar:hover {
+.sidebar:hover, .sidebar-pinned {
     left: 0px;
 }
 .sidebar .sidepanel {
@@ -37,18 +42,26 @@
     position: absolute;
     transition: 500ms;
     background: white;
-    opacity: 1;
     white-space: nowrap;
     z-index: 10;
+    width: 20px;
     
     writing-mode: vertical-lr;
     height: 100%;
     vertical-align: middle;
     text-align: center;
-    right: 0px;
+    right: -5px;
 }
-.sidebar:hover .section-title {
-    opacity: 0;
+.sidebar:hover .section-title, .sidebar-pinned .section-title {
+    width: 0px !important;
+}
+.sidebar-dropdown-option {
+    text-align: center;
+}
+.sidebar-dropdown-option a {
+    white-space: normal !important;
+    padding: 2px 8px !important;
+    font-size: 12px
 }
 
 #choices {
