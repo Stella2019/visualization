@@ -284,7 +284,6 @@ Coding.prototype = {
         options['N-Grams'] = {
             Show: new Option({
                 title: 'Show',
-                styles: ["btn btn-sm", "btn btn-sm btn-default"],
                 labels: ["No", "Yes"],
                 ids:    ["false", "true"],
                 default: 0,
@@ -362,17 +361,21 @@ Coding.prototype = {
             Document: new Option({
                 title: "Document",
                 labels: rumor_labels,
-                ids:    rumor_ids.map(function(d) { return 'Doc: ' + d; }),
+                ids:    rumor_ids,
                 available: rumor_available,
                 default: 0,
-                callback: coding.countNGrams
+                callback: function(d) { 
+                    coding.countNGrams(options['N-Grams']['DocumentSubset'].get(),
+                                       options['N-Grams']['Document'].get()) }
             }),
             DocumentSubset: new Option({
                 title: "In",
                 labels: subsets,
-                ids:    subsets.map(function(d) { return 'Doc' + d; }),
+                ids:    subsets,
                 default: 0,
-                callback: coding.countNGrams
+                callback: function(d) {
+                    coding.countNGrams(options['N-Grams']['DocumentSubset'].get(), 
+                                       options['N-Grams']['Document'].get()) }
             })
         };
         
@@ -413,6 +416,61 @@ Coding.prototype = {
         };
 
         data.callPHP('coding/get', post, coding.parseCodes);
+    },
+    getOtherDatasetTweets: function() {
+        var post = {
+            rumor_id: options['N-Grams']['Document'].get(),
+            period: options['Dataset']['Period'].get()
+        };
+        
+        data.callPHP('coding/get', post, coding.parseOtherDatasetTweets);
+    },
+    parseOtherDatasetTweets: function(file_data) {
+        var otherset_codes = [];
+        try {
+            otherset_codes = JSON.parse(file_data);
+        } catch(err) {
+            console.log(file_data);
+            return;
+        }
+        
+        coding.otherset_id = options['N-Grams']['Document'].get();
+        coding.otherset_tweets = {};
+        coding.otherset_tweets_arr = [];
+        otherset_codes.forEach(function(code) {
+            if(!(code.Tweet in coding.otherset_tweets)) {
+                var newTweet = {
+                    Text: code.Text,
+                    Tweet_ID: code.Tweet,
+                    Votes: {Count: 1}
+                };
+                coding.otherset_tweets[code.Tweet] = newTweet;
+                coding.otherset_tweets_arr.push(newTweet);
+            } else {
+                coding.otherset_tweets[code.Tweet].Votes.Count++;
+            }
+        });
+        
+//        // Add votes for each to the tweets
+//        otherset_codes.forEach(function(code) {
+//            if(code.Tweet in coding.otherset_tweets) {
+//                tweet = coding.otherset_tweets[code.Tweet];
+//                tweet.Votes.Coders.push(parseInt(code.Coder));
+//                tweet.Votes.Count++;
+//                tweet.Votes.Primary.push(code.Primary);
+//                if(code.Primary == 'No Code')
+//                    tweet.Votes['No Code'].push(parseInt(code.Coder));
+//                
+//                coding.code_list.any.forEach(function(c) {
+//                    if(code[c] == '1') {
+//                        tweet.Votes[c].push(parseInt(code.Coder));
+//                    }
+//                });
+//            }
+//        });
+        
+        // Count ngrams!
+        coding.countNGrams(false, coding.otherset_id);
     },
     parseCodes: function(file_data) {
         try {
@@ -1536,15 +1594,28 @@ Coding.prototype = {
             .attr('class', 'table_bar');
         
     },
-    countNGrams: function(subset) {
-        if(subset.includes('Doc')) {
-//            options['N-Grams']['Document'].updateInInterface(options['Dataset']['Rumor'].indexCur());
-        }
+    countNGrams: function(subset, document) {
+//        console.log('1', subset, document);
         subset = subset || options['N-Grams']['Subset'].get();
+        document = document || options['Dataset']['Rumor'].get();
+        var different_doc = document != options['Dataset']['Rumor'].get();
+//        console.log('2', subset, document, different_doc);
+        if(different_doc) {
+            subset = options['N-Grams']['DocumentSubset'].get();
+//            console.log('3', subset, document, coding.otherset_id);
+            
+            // If we haven't already loaded the data, load it
+            if(!('otherset_id' in coding) || coding.otherset_id != document) {
+//                console.log('4', subset, document, coding.otherset_id);
+                coding.getOtherDatasetTweets();
+                return; // wait for that to finish
+            }
+        }
         
         // Make structures
-        coding.ngrams[subset] = {};
-        var ngrams = coding.ngrams[subset];
+        var label = document + ': ' + subset;
+        coding.ngrams[label] = {};
+        var ngrams = coding.ngrams[label];
         
         ngrams.nTweets = 0;
         ngrams.CoOccurs = 0
@@ -1559,17 +1630,17 @@ Coding.prototype = {
         });
         
         // Document Frequency
-//        ngrams.TweetBinaryCounter = new Counter();
-//        ngrams.URLBinaCounter = new Counter();
+//        ngrams.TweetHasCounter = new Counter();
+//        ngrams.URLHasCounter = new Counter();
         ngrams.CoOccurHasCounter = new Counter();
         ngrams.NGramHasCounter = d3.range(3).map(function(d) {
             return new Counter();
         });
         
-        var tweets = coding.tweets_arr;
+        var tweets = different_doc ? coding.otherset_tweets_arr : coding.tweets_arr;
         if(subset != 'All') {
-            var codes = [subset.slice(7)];
-            if(subset == 'Coded: Related')
+            var codes = [subset.slice(subset.lastIndexOf(':') + 2)];
+            if(subset.includes(' Related'))
                     codes = ['Affirm', 'Deny', 'Neutral'];
 //            if(subset == 'Primary')
 //                    codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'];
@@ -1654,7 +1725,9 @@ Coding.prototype = {
         var tf_mod = options['N-Grams']['TF Modifier'].get();
         var idf = options['N-Grams']['IDF'].get();
         var tables = options['N-Grams']['Tables'].get();
-        var ngrams = coding.ngrams[options['N-Grams']['Subset'].get()];
+        var subset = options['N-Grams']['Subset'].get();
+        var set = options['Dataset']['Rumor'].get();
+        var ngrams = coding.ngrams[set + ": " + subset];
         var div = d3.select('#lN_Grams_body');
         div.selectAll('*').remove();
 
@@ -1681,9 +1754,13 @@ Coding.prototype = {
         // Add more fields
         var ngrams_document, counter_document;
         if(!options['N-Grams']['DF'].is('none')) {
+            var dsubset = options['N-Grams']['DocumentSubset'].get();
+            var dset = options['N-Grams']['Document'].get();
             var dhas = options['N-Grams']['DF'].is('has') ? 'Has' : '';
-            ngrams_document = coding.ngrams.All; // change this for rumors
+            
+            ngrams_document = coding.ngrams[dset + ': ' + dsubset]; // change this for rumors
             counters_document = ngrams_document['NGram' + dhas + 'Counter'].map(function(d) { return d; }); 
+            
             if(tables.includes('c')) counters_document.push(ngrams_document['CoOccur' + dhas + 'Counter']);
             if(tables.includes('t')) counters_document.push(ngrams_document.TweetCounter);
             if(tables.includes('u')) counters_document.push(ngrams_document.URLCounter);
@@ -1703,9 +1780,9 @@ Coding.prototype = {
                 }
                 if(ngrams_document) {
                     newEntry['Document Frequency'] = counters_document[ilist].has(entry.key) || 0;
-                    newEntry['IDF'] = options['N-Grams']['IDF'].is('inv') ? 1 / newEntry['Document Frequency'] :
-                                      options['N-Grams']['IDF'].is('ratio') ? ngrams_document.nTweets / newEntry['Document Frequency'] :
-                                      Math.log(ngrams_document.nTweets / newEntry['Document Frequency']);
+                    newEntry['IDF'] = options['N-Grams']['IDF'].is('inv') ? 1 / (newEntry['Document Frequency'] || 1) :
+                                      options['N-Grams']['IDF'].is('ratio') ? ngrams_document.nTweets / (newEntry['Document Frequency'] || 1) :
+                                      Math.log(ngrams_document.nTweets / (newEntry['Document Frequency'] || 1));
                     newEntry['TF-IDF'] = newEntry['Term Frequency'] * newEntry['IDF'];
                 }
                 return newEntry;
@@ -1723,6 +1800,8 @@ Coding.prototype = {
                         entry[key] = entry[key].toFixed(2)
                     } else if(entry[key] < 100) {
                         entry[key] = entry[key].toFixed(1)
+                    } else if(entry[key] >= 100) {
+                        entry[key] = entry[key].toFixed(0)
                     }
 //                    if(key.includes('log') ['Fraction', 'Log TF', 'IDF', 'Log IDF'].includes(key)) {
 //                        entry[key] = entry[key].toFixed(2)
@@ -1753,7 +1832,7 @@ Coding.prototype = {
                     .text(labels[i]);
                 header.append('th')
                     .attr('class', 'ngram_count_count')
-                    .text(idf.includes('idf') ? 'TF-IDF' : 'Freq');
+                    .text(ngrams_document == undefined ? 'Freq' : 'TF-IDF');
 
                 d3.select(this)
                     .selectAll('tr.ngram_count')
