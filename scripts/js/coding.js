@@ -1780,7 +1780,7 @@ Coding.prototype = {
                 }
                 if(ngrams_document) {
                     newEntry['Document Frequency'] = counters_document[ilist].has(entry.key) || 0;
-                    newEntry['IDF'] = options['N-Grams']['IDF'].is('inv') ? 1 / (newEntry['Document Frequency'] || 1) :
+                    newEntry['IDF'] = options['N-Grams']['IDF'].is('inv') ? 1 / (newEntry['Document Frequency'] || 0.5) :
                                       options['N-Grams']['IDF'].is('ratio') ? ngrams_document.nTweets / (newEntry['Document Frequency'] || 1) :
                                       Math.log(ngrams_document.nTweets / (newEntry['Document Frequency'] || 1));
                     newEntry['TF-IDF'] = newEntry['Term Frequency'] * newEntry['IDF'];
@@ -1830,9 +1830,18 @@ Coding.prototype = {
                 header.append('th')
                     .attr('class', 'ngram_count_label')
                     .text(labels[i]);
+            
                 header.append('th')
                     .attr('class', 'ngram_count_count')
-                    .text(ngrams_document == undefined ? 'Freq' : 'TF-IDF');
+                    .html('TF');
+                if(ngrams_document) {
+                    header.append('th')
+                        .attr('class', 'ngram_count_count')
+                        .html('DF');
+                    header.append('th')
+                        .attr('class', 'ngram_count_count')
+                        .html('TF-IDF');
+                }
 
                 d3.select(this)
                     .selectAll('tr.ngram_count')
@@ -1852,8 +1861,25 @@ Coding.prototype = {
             .append('td')
             .attr('class', 'ngram_count_count')
             .text(function(d) { 
-                return d[quantity];
+                return d['Term Frequency'];
             });
+        
+        if(ngrams_document) {
+            div.selectAll('.ngram_count')
+                .append('td')
+                .attr('class', 'ngram_count_count')
+                .text(function(d) { 
+                    return d['Document Frequency'];
+                });
+
+            div.selectAll('.ngram_count')
+                .append('td')
+                .attr('class', 'ngram_count_count')
+                .text(function(d) { 
+                    return d['TF-IDF'];
+                });
+        }
+        
         div.selectAll('td.ngram_count_label, td.ngram_count_count')
             .on('mouseover', function(d) {
                 coding.tooltip.setData(d);
