@@ -266,8 +266,9 @@ Coding.prototype = {
             'More Information': new Option({
                 title: 'Get More Information (Takes Time)',
                 labels: ['Yes', 'No'], ids: ['true', 'false'],
-                default: 1,
+                default: 0,
                 type: 'dropdown',
+                hidden: true,
                 callback: coding.getMoreInformation
             }),
             Bars: new Option({
@@ -278,6 +279,8 @@ Coding.prototype = {
                 callback: coding.tweetTypeTable
             })
         };
+        var subsets = tweet_codes.map(function(d) { return 'Coded: ' + d; });
+        subsets[0] = 'All';
         options['N-Grams'] = {
             Show: new Option({
                 title: 'Show',
@@ -288,6 +291,20 @@ Coding.prototype = {
                 type: "toggle",
                 callback: function() { coding.togglePane('N-Grams', 1000); }
             }),
+            TopX: new Option({
+                title: "Top",
+                labels: ['10', '20', '100', '200', '1000'],
+                ids:    ['10', '20', '100', '200', '1000'],
+                default: 1,
+                callback: coding.NGramList
+            }),
+            Filter: new Option({
+                title: "Filter",
+                labels: ['None', 'Redundant Tweets'],
+                ids:    ['none', 'redun'],
+                default: 1,
+                callback: coding.countNGrams
+            }),
             'Exclude Stopwords': new Option({
                 title: "Stopwords",
                 styles: ["btn btn-sm btn-default", "btn btn-sm"],
@@ -296,56 +313,66 @@ Coding.prototype = {
                 ids:    ['false', 'true'],
                 default: 1,
                 type: 'toggle',
-                parent: '#ngrams_header',
                 callback: coding.NGramList
-            }),
-//            Counts: new Option({
-//                title: "Frequency",
-//                labels: ['Binary', 'Total', 'Log Normal'],
-//                ids:    ['bin', 'total', 'log'],
-//                default: 0,
-//                parent: '#ngrams_header',
-//                callback: coding.countNGrams
-//            }),
-            Multiplier: new Option({
-                title: "Frequency",
-                labels: ['Raw', 'Fraction', 'Percent', 'TF-IDF Rumor', 'TF-IDF (log) Rumor'],
-                ids:    ['raw', 'fraction', 'percent', 'idf', 'log-idf'],
-                default: 0,
-                parent: '#ngrams_header',
-                callback: coding.NGramList
-            }),
-            TopX: new Option({
-                title: "Top",
-                labels: ['10', '20', '100', '200', '1000'],
-                ids:    ['10', '20', '100', '200', '1000'],
-                default: 1,
-                parent: '#ngrams_header',
-                callback: coding.NGramList
-            }),
-            Filter: new Option({
-                title: "Filter",
-                labels: ['None', 'Redundant Tweets'],
-                ids:    ['none', 'redun'],
-                default: 1,
-                parent: '#ngrams_header',
-                callback: coding.countNGrams
-            }),
-            Coded: new Option({
-                title: "For Tweets Coded",
-                labels: tweet_codes,
-                ids:    tweet_codes,
-                default: 0,
-                parent: '#ngrams_header',
-                callback: coding.countNGrams
             }),
             Tables: new Option({
                 title: "Tables",
                 labels: ['n-grams', 'n-grams & co-occur', 'n-grams, co & tweets', 'n-grams, co & urls', 'All'],
                 ids:    ['n', 'nc', 'nct', 'ncu', 'nctu'],
                 default: 1,
-                parent: '#ngrams_header',
                 callback: coding.NGramList
+            }),
+            TF: new Option({
+                title: "Term Frequency",
+                labels: ['&sum; Has', '&sum; Count'],
+                ids:    ['has', 'count'],
+                default: 0,
+                breakbefore: true,
+                callback: coding.NGramList
+            }),
+            'TF Modifier': new Option({
+                title: "TF Modifier",
+                labels: ['Raw', 'Fraction', 'Percent', 'Log'],
+                ids:    ['raw', 'fraction', 'percent', 'log'],
+                default: 0,
+                callback: coding.NGramList
+            }),
+            Subset: new Option({
+                title: "In",
+                labels: subsets,
+                ids:    subsets,
+                default: 0,
+                callback: coding.countNGrams
+            }),
+            DF: new Option({
+                title: "Doc Frequency",
+                labels: ['None', '&sum; Has', '&sum; Count'],
+                ids:    ['none', 'has', 'count'],
+                default: 0,
+                breakbefore: true,
+                callback: coding.NGramList
+            }),
+            'IDF': new Option({
+                title: "Inverse",
+                labels: ['1 / DF', '#Docs / DF', 'Log(#Docs / DF)'],
+                ids:    ['inv', 'ratio', 'log-ratio'],
+                default: 0,
+                callback: coding.NGramList
+            }),
+            Document: new Option({
+                title: "Document",
+                labels: rumor_labels,
+                ids:    rumor_ids.map(function(d) { return 'Doc: ' + d; }),
+                available: rumor_available,
+                default: 0,
+                callback: coding.countNGrams
+            }),
+            DocumentSubset: new Option({
+                title: "In",
+                labels: subsets,
+                ids:    subsets.map(function(d) { return 'Doc' + d; }),
+                default: 0,
+                callback: coding.countNGrams
             })
         };
         
@@ -361,6 +388,10 @@ Coding.prototype = {
                coding.rumor = rumor;
         });
         
+        // Set document counter
+        options['N-Grams']['Document'].updateInInterface(options['Dataset']['Rumor'].indexCur());
+        
+        // Set period
         var period_option = options['Dataset']['Period'];
         period_option.available = [];
         period_option.ids.forEach(function(period, i) {
@@ -1399,9 +1430,9 @@ Coding.prototype = {
         });
         
         coding.tweetTypeTable();
-        if(!options['N-Grams']['Coded'].is('Any'))
-            coding.countNGrams(options['N-Grams']['Coded'].get());
-        coding.countNGrams('Any');
+        if(!options['N-Grams']['Subset'].is('All'))
+            coding.countNGrams(options['N-Grams']['Subset'].get());
+        coding.countNGrams('All');
     },
     tweetTypeTable: function() {
         coding.togglePane('Tweet Types');
@@ -1506,7 +1537,10 @@ Coding.prototype = {
         
     },
     countNGrams: function(subset) {
-        subset = subset || options['N-Grams']['Coded'].get();
+        if(subset.includes('Doc')) {
+//            options['N-Grams']['Document'].updateInInterface(options['Dataset']['Rumor'].indexCur());
+        }
+        subset = subset || options['N-Grams']['Subset'].get();
         
         // Make structures
         coding.ngrams[subset] = {};
@@ -1527,15 +1561,15 @@ Coding.prototype = {
         // Document Frequency
 //        ngrams.TweetBinaryCounter = new Counter();
 //        ngrams.URLBinaCounter = new Counter();
-        ngrams.CoOccurBinCounter = new Counter();
-        ngrams.NGramBinCounter = d3.range(3).map(function(d) {
+        ngrams.CoOccurHasCounter = new Counter();
+        ngrams.NGramHasCounter = d3.range(3).map(function(d) {
             return new Counter();
         });
         
         var tweets = coding.tweets_arr;
-        if(subset != 'Any') {
-            var codes = [subset];
-            if(subset == 'Related')
+        if(subset != 'All') {
+            var codes = [subset.slice(7)];
+            if(subset == 'Coded: Related')
                     codes = ['Affirm', 'Deny', 'Neutral'];
 //            if(subset == 'Primary')
 //                    codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'];
@@ -1573,7 +1607,7 @@ Coding.prototype = {
                         if(!tweetgrams[0].has(gram)) {
                             tweetgrams[0].add(gram);
                             ngrams.nGrams[0] += 1;
-                            ngrams.NGramBinCounter[0].incr(gram);
+                            ngrams.NGramHasCounter[0].incr(gram);
                         }
                         if(words[wi + 1]) {
                             gram += " " + words[wi + 1];
@@ -1581,7 +1615,7 @@ Coding.prototype = {
                             if(!tweetgrams[1].has(gram)) {
                                 tweetgrams[1].add(gram);
                                 ngrams.nGrams[1] += 1;
-                                ngrams.NGramBinCounter[1].incr(gram);
+                                ngrams.NGramHasCounter[1].incr(gram);
                             }
                             if(words[wi + 2]) {
                                 gram += " " + words[wi + 2];
@@ -1589,7 +1623,7 @@ Coding.prototype = {
                                 if(!tweetgrams[2].has(gram)) {
                                     tweetgrams[2].add(gram);
                                     ngrams.nGrams[2] += 1;
-                                    ngrams.NGramBinCounter[2].incr(gram);
+                                    ngrams.NGramHasCounter[2].incr(gram);
                                 }
                             }
                         }
@@ -1603,7 +1637,7 @@ Coding.prototype = {
                                 if(!tweetgrams[3].has(gram)) {
                                     tweetgrams[3].add(gram);
                                     ngrams.CoOccurs += 1;
-                                    ngrams.CoOccurBinCounter.incr(gram);
+                                    ngrams.CoOccurHasCounter.incr(gram);
                                 }
                             }
                         }
@@ -1617,10 +1651,10 @@ Coding.prototype = {
     NGramList: function() {
         coding.togglePane('N-Grams');
         
-        var tf = 'total'; //options['N-Grams']['Counts'].get();
-        var idf = options['N-Grams']['Multiplier'].get();
+        var tf_mod = options['N-Grams']['TF Modifier'].get();
+        var idf = options['N-Grams']['IDF'].get();
         var tables = options['N-Grams']['Tables'].get();
-        var ngrams = coding.ngrams[options['N-Grams']['Coded'].get()];
+        var ngrams = coding.ngrams[options['N-Grams']['Subset'].get()];
         var div = d3.select('#lN_Grams_body');
         div.selectAll('*').remove();
 
@@ -1630,8 +1664,9 @@ Coding.prototype = {
         if(tables.includes('u')) labels.push('URLs');
         
         var n = parseInt(options['N-Grams']['TopX'].get());
-        var counters = [ngrams.NGramCounter[0], ngrams.NGramCounter[1], ngrams.NGramCounter[2]];
-        if(tables.includes('c')) counters.push(ngrams.CoOccurCounter);
+        var has = options['N-Grams']['TF'].is('has') ? 'Has' : '';
+        var counters = ngrams['NGram' + has + 'Counter'].map(function(d) { return d; }); 
+        if(tables.includes('c')) counters.push(ngrams['CoOccur' + has + 'Counter']);
         if(tables.includes('t')) counters.push(ngrams.TweetCounter);
         if(tables.includes('u')) counters.push(ngrams.URLCounter);
         
@@ -1644,30 +1679,34 @@ Coding.prototype = {
         });
         
         // Add more fields
-        var ngrams_all = coding.ngrams.Any;
-        var counters_all = [ngrams_all.NGramBinCounter[0], ngrams_all.NGramBinCounter[1], ngrams_all.NGramBinCounter[2]];
-        if(tables.includes('c')) counters_all.push(ngrams_all.CoOccurBinCounter);
-        if(tables.includes('t')) counters_all.push(ngrams_all.TweetCounter);
-        if(tables.includes('u')) counters_all.push(ngrams_all.URLCounter);
-        
-        var quantity = idf == 'raw' ? (tf == 'log' ? 'Log TF' : 'Term Frequency') :
-                       idf == 'fraction' ? 'Fraction' : idf == 'percent' ? 'Percent' : 'TF-IDF';
+        var ngrams_document, counter_document;
+        if(!options['N-Grams']['DF'].is('none')) {
+            var dhas = options['N-Grams']['DF'].is('has') ? 'Has' : '';
+            ngrams_document = coding.ngrams.All; // change this for rumors
+            counters_document = ngrams_document['NGram' + dhas + 'Counter'].map(function(d) { return d; }); 
+            if(tables.includes('c')) counters_document.push(ngrams_document['CoOccur' + dhas + 'Counter']);
+            if(tables.includes('t')) counters_document.push(ngrams_document.TweetCounter);
+            if(tables.includes('u')) counters_document.push(ngrams_document.URLCounter);
+        }
+        var quantity = ngrams_document == undefined ? 'Term Frequency' : 'TF-IDF';
 
         var lists = raw_lists.map(function(list, ilist) {
             list = list.map(function(entry) {
-                var newEntry = {
-                    Term: entry.key,
-                    'Term Frequency': entry.value,
-                    'Log TF': Math.log(1 + entry.value),
-                    Percent: entry.value / ngrams.nTweets * 100,
-                    Fraction: (entry.value / ngrams.nTweets || 0)
+                var newEntry = { Term: entry.key };
+                if(tf_mod != 'raw') {
+                    newEntry['Raw Count'] = entry.value;
+                    newEntry['Term Frequency'] = tf_mod == 'log' ? 1 + Math.log(entry.value) :
+                                             tf_mod == 'percent' ? entry.value / ngrams.nTweets * 100 :
+                                            tf_mod == 'fraction' ? (entry.value / ngrams.nTweets || 0) : 0;
+                } else {
+                    newEntry['Term Frequency'] = entry.value;
                 }
-                if(ngrams_all) {
-                    newEntry['Document Frequency'] = counters_all[ilist].has(entry.key) || 0;
-                    newEntry['IDF'] = ngrams_all.nTweets / newEntry['Document Frequency'];
-                    newEntry['Log IDF'] = Math.log(newEntry['IDF']);
-                    newEntry['TF-IDF'] = (tf == 'log'     ? newEntry['Log TF']  : newEntry['Term Frequency']) *
-                                         (idf == 'log-idf' ? newEntry['Log IDF'] : newEntry['IDF']);
+                if(ngrams_document) {
+                    newEntry['Document Frequency'] = counters_document[ilist].has(entry.key) || 0;
+                    newEntry['IDF'] = options['N-Grams']['IDF'].is('inv') ? 1 / newEntry['Document Frequency'] :
+                                      options['N-Grams']['IDF'].is('ratio') ? ngrams_document.nTweets / newEntry['Document Frequency'] :
+                                      Math.log(ngrams_document.nTweets / newEntry['Document Frequency']);
+                    newEntry['TF-IDF'] = newEntry['Term Frequency'] * newEntry['IDF'];
                 }
                 return newEntry;
             });
@@ -1678,11 +1717,18 @@ Coding.prototype = {
             // Convert values to strings with appropriate decimals
             list.forEach(function(entry) {
                 Object.keys(entry).forEach(function(key) {
-                    if(['Fraction', 'Log TF', 'IDF', 'Log IDF'].includes(key)) {
+                    if(Math.floor(entry[key]) == entry[key]) {
+                        // nothing
+                    } else if(entry[key] < 10) {
                         entry[key] = entry[key].toFixed(2)
-                    } else if(['Percent', 'TF-IDF'].includes(key)) {
+                    } else if(entry[key] < 100) {
                         entry[key] = entry[key].toFixed(1)
                     }
+//                    if(key.includes('log') ['Fraction', 'Log TF', 'IDF', 'Log IDF'].includes(key)) {
+//                        entry[key] = entry[key].toFixed(2)
+//                    } else if(['Percent', 'TF-IDF'].includes(key)) {
+//                        entry[key] = entry[key].toFixed(1)
+//                    }
                 }) 
             })
             
@@ -1728,8 +1774,6 @@ Coding.prototype = {
             .attr('class', 'ngram_count_count')
             .text(function(d) { 
                 return d[quantity];
-//                return isFinite(d[quantity]) && !Number.isInteger(d[quantity]) ?
-//                    (d[quantity] > 10 ? d[quantity].toFixed(1) : d[quantity].toFixed(2)) : d[quantity]; 
             });
         div.selectAll('td.ngram_count_label, td.ngram_count_count')
             .on('mouseover', function(d) {

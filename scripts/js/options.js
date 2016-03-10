@@ -1586,7 +1586,7 @@ Options.prototype = {
         // If it does not exist, create it
         if(!container[0][0]) {
             container = d3.select('#panel_' + util.simplify(panel_name)).append("div")
-                .attr("class", "choice")
+                .attr("class", "choice" + (option.breakbefore ? ' choice-break-before' : ''))
                 .style("display", option.hidden ? 'none' : 'inline-block')
                 .style("text-transform", "capitalize")
                 .append("div")

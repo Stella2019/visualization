@@ -74,6 +74,12 @@
     padding: 2px;
     width: 100%
 }
+.choice-break-before {
+    border-top: solid 1px #ddd;
+    margin-top: 5px;
+    padding-top: 5px;
+}
+
 .choice .dropdown {
     width: 100%;
 }
