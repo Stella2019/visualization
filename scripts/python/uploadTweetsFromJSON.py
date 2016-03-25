@@ -228,7 +228,7 @@ def checkKeywords():
     deleted_keywords = [];
     for mod in modifications:
         if('twitter_keywords' in mod):
-            deleted_words.extend(mod['twitter_keywords']['deletions'])
+            deleted_keywords.extend(mod['twitter_keywords']['deletions'])
     
     all_keywords = list(final_keywords)
     old_keywords = [];
@@ -271,6 +271,22 @@ def populateSubsets():
     for timezone in [-28800, 21600, -18000, 0, 3600]:
         subset['Feature'] = 'User.UTCOffset'
         subset['Match'] = str(timezone)
+        subsets.append(subset.copy())
+        
+    # English versus Non-English
+    for lang in ['en', '!en']:
+        subset['Feature'] = 'Lang'
+        subset['Match'] = lang
+        subsets.append(subset.copy())
+        
+    # Verified & Non Verified
+    for verified in [1, 0]:
+        subset['Feature'] = 'User.Verified'
+        subset['Match'] = str(verified)
+        subsets.append(subset.copy())
+    for verified in [1, 0]:
+        subset['Feature'] = 'Parent.User.Verified'
+        subset['Match'] = str(verified)
         subsets.append(subset.copy())
     
     # Save
@@ -538,15 +554,31 @@ def compareSubsets(data):
     for subset in subsets:
         if(subset['Feature'] in ['Text', 'ExpandedURL', 'ParentText']):
             text = data[subset['Feature']].lower().replace('#', ' ')
-            keywords = subset['Match'].replace('\\W', '\\W').split(' & ')
+            keywords = subset['Match'].split(' & ')
+            keywords_unfound = len(keywords)
             for keyword in keywords:
                 if(re.search(keyword, text)):
-                    matched_subsets.append(subset['ID'])
-                    break
+                    keywords_unfound -= 1
+            if(keywords_unfound == 0):
+                matched_subsets.append(subset['ID'])
         elif(subset['Feature'] == 'User.UTCOffset'):
             feat = data['UserUTCOffset']
             if(str(feat) == subset['Match']):
                 matched_subsets.append(subset['ID'])
+        elif(subset['Feature'] == 'User.Verified'):
+            feat = data['UserVerified']
+            if(str(feat) == subset['Match']):
+                matched_subsets.append(subset['ID'])
+        elif(subset['Feature'] == 'Lang'):
+            feat = data['Lang']
+            if((subset['Match'] == '!en' and not feat is 'en') or
+               (subset['Match'] ==  'en' and     feat is 'en')):
+                matched_subsets.append(subset['ID'])
+        elif(subset['Feature'] == 'Parent.User.Verified'):
+            if('Parent' in data and 'user' in data['Parent'] and 'verified' in data['Parent']['user']):
+                feat = 1 if data['Parent']['user']['verified'] else 0
+                if(str(feat) == subset['Match']):
+                    matched_subsets.append(subset['ID'])
        
     return matched_subsets
 
@@ -602,7 +634,7 @@ def parseTweetJSON(data):
 
     # Type specific changes
     if("quoted_status_id_str" in data and data['quoted_status_id_str'] is not None): 
-        tweet['Type'] = 'quote'
+        tweet['Type'] = 'reply'
         
         tweet['ParentID'] = data['quoted_status_id_str']
         if('quoted_status' in data):
@@ -629,23 +661,21 @@ def parseTweetJSON(data):
             tweet['ParentID'] = data['retweeted_status']['id']
         if('text' in data['retweeted_status']):
             tweet['ParentText'] = data['retweeted_status']['text']
-    else:
-        tweet['ExpandedURL'] = getExpandedURL(data)
         
     # Users
     if("user" in data):
         user = data['user']
-        tweet['UserVerified']       = 1                        if 'verified' in user and user['verified'] else 0
-        tweet['UserID']             = user['id_str']           if 'id_str'   in user else None
-        tweet['Username']           = user['name']             if 'name'     in user else None
-        tweet['Screenname']         = user['screen_name']      if 'screen_name' in user else None
-        tweet['UserLang']           = user['lang']             if 'lang'        in user else None
-        tweet['UserUTCOffset']      = user['utc_offset']       if 'utc_offset'  in user else None
-        tweet['UserTimezone']       = user['time_zone']        if 'time_zone'   in user else None
-        tweet['UserStatusesCount']  = user['statuses_count']   if 'statuses_count' in user else None
-        tweet['UserFollowersCount'] = user['followers_count']  if 'followers_count' in user else None
-        tweet['UserFriendsCount']   = user['friends_count']    if 'friends_count'   in user else None
-        tweet['UserListedCount']    = user['listed_count']     if 'listed_count'    in user else None
+        tweet['UserVerified']       = 1                        if 'verified'         in user and user['verified'] else 0
+        tweet['UserID']             = user['id_str']           if 'id_str'           in user else None
+        tweet['Username']           = user['name']             if 'name'             in user else None
+        tweet['Screenname']         = user['screen_name']      if 'screen_name'      in user else None
+        tweet['UserLang']           = user['lang']             if 'lang'             in user else None
+        tweet['UserUTCOffset']      = user['utc_offset']       if 'utc_offset'       in user else None
+        tweet['UserTimezone']       = user['time_zone']        if 'time_zone'        in user else None
+        tweet['UserStatusesCount']  = user['statuses_count']   if 'statuses_count'   in user else None
+        tweet['UserFollowersCount'] = user['followers_count']  if 'followers_count'  in user else None
+        tweet['UserFriendsCount']   = user['friends_count']    if 'friends_count'    in user else None
+        tweet['UserListedCount']    = user['listed_count']     if 'listed_count'     in user else None
         tweet['UserFavoritesCount'] = user['favourites_count'] if 'favourites_count' in user else None
         tweet['UserDescription']    = user['description']      if 'description'      in user else None
         tweet['UserLocation']       = user['location']         if 'location'         in user else None
