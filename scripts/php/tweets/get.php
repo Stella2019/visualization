@@ -15,12 +15,12 @@
     // Execute Query
     $query = "SELECT ";
         
-    $project = array("Tweet.ID", "Tweet.Text", "Tweet.Distinct", "Tweet.Type", "Tweet.Username", "Tweet.Timestamp", "Tweet.Origin");
+    $projection = array("Tweet.ID", "Tweet.Text", "Tweet.Distinct", "Tweet.Type", "Tweet.Username", "Tweet.Timestamp", "Tweet.Origin");
     if(isset($_POST["order_prevalence"])) {
-        $project[] = "Count(*) as Count";
+        $projection[] = "Count(*) as Count";
     }
 
-    $query .= join(", " , $project);
+    $query .= join(", " , $projection);
 
             
     $query .= " FROM Tweet " .

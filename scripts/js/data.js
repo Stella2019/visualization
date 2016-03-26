@@ -1,102 +1,5 @@
 /*global data, disp, legend, util, options, d3, console */
 
-function Stream(args) {
-    var self = this;
-
-    // Defaults
-    self.name = 'r' + Math.floor(Math.random() * 1000000 + 1);
-    self.url = "";
-    self.post = {};
-    self.time_res = 1; // 1 Hour
-    self.progress = {};
-    self.progress_div = '#timeseries_div';
-    self.progress_text = "Working";
-    self.progress_button = false;
-    self.chunk_index = 0;
-    self.time_min = options['Dataset']['Time Min'].date;
-    self.time_max = options['Dataset']['Time Max'].date;
-    self.failure_msg = 'Problem with data stream';
-    self.on_chunk_finish = function () {};
-    self.on_finish = function () {};
-    
-    // Save args  
-    Object.keys(args).forEach(function (item) {
-        this[item] = args[item];
-    }, this);
-}
-Stream.prototype = {
-    start: function () {
-        this.time_chunks = [];
-        var timestamp;
-        for (timestamp = new Date(this.time_min);
-                timestamp < this.time_max;
-                timestamp.setMinutes(timestamp.getMinutes() + 60 * this.time_res)) {
-            this.time_chunks.push(util.formatDate(timestamp));
-        }
-        this.time_chunks.push(util.formatDate(this.time_max));
-
-        // Start progress bar
-        this.progress = new Progress({
-            name:      this.name,
-            parent_id: this.progress_div,
-            full:      this.progress_button,
-            text:      this.progress_text,
-            steps:     this.time_chunks.length - 1
-        });
-        this.progress.start();
-
-        this.chunk();
-    },
-    chunk: function () {
-        // If we are at the max, end
-        if (this.chunk_index >= this.time_chunks.length - 1) {
-            // Load the new data
-            this.on_finish();
-
-            // End the progress bar and stop function
-            this.progress.end();
-            return;
-        } else if(this.chunk_index < 0) {
-            // End prematurely
-            this.progress.end();
-            return;
-        }
-
-        this.post.time_min = this.time_chunks[this.chunk_index];
-        this.post.time_max = this.time_chunks[this.chunk_index + 1];
-
-        data.callPHP(this.url, this.post,
-                     this.chunk_success.bind(this),
-                     this.chunk_failure.bind(this));
-    },
-    chunk_success: function (file_data) {
-        if (file_data.includes('<b>Notice</b>')) {
-            console.debug(file_data);
-
-            // Abort
-            this.chunk_failure();
-            return;
-        }
-
-        // Update the progress bar
-        this.progress.update(this.chunk_index + 1, this.progress_text);
-
-        this.on_chunk_finish(file_data);
-
-        // Start loading the next batch
-        this.chunk_index = this.chunk_index + 1;
-        this.chunk();
-    },
-    chunk_failure: function (a, b, c) {
-        console.log(a, b, c);
-        disp.alert(this.failure_msg);
-        this.progress.end();
-    },
-    stop: function() {
-        this.chunk_index = -100;
-    }
-};
-
 function Data() {
     var self = this;
     
@@ -190,86 +93,9 @@ function Data() {
     };
 }
 Data.prototype = {
-    loadCollections: function () {
-        // Collection selection
-        data.callPHP('collection/getEvents', {},
-                     data.parseCollectionsFile);
-    },
-    parseCollectionsFile: function (collections_file) {
-        // Add collections
-        collections_file = JSON.parse(collections_file);
-        collections_file.sort(util.compareCollections);
-        collections_file.reverse();
-        data.collections = collections_file;
-
-        
-        // Format collection data
-        data.collections.forEach(function (collection) {
-            // Keywords
-            collection.Keywords = collection.Keywords.trim().split(/,[ ]*/);
-            collection.OldKeywords = collection.OldKeywords.trim().split(/,[ ]*/);
-            if (collection.OldKeywords.length == 1 && collection.OldKeywords[0] == "")
-                collection.OldKeywords = [];
-            
-            // Name
-            if (!('DisplayName' in collection) || !collection['DisplayName'] || collection['DisplayName'] == "null")
-                collection.DisplayName = collection.Name;
-               
-            // Time
-            collection.StartTime = util.date(collection.StartTime);
-//            collection.StartTime.setMinutes(collection.StartTime.getMinutes()
-//                                           -collection.StartTime.getTimezoneOffset());
-            collection.Month = util.date2monthstr(collection.StartTime);
-            if (collection.StopTime) {
-                collection.StopTime = util.date(collection.StopTime);
-                if (collection.StartTime.getMonth() != collection.StopTime.getMonth() ) 
-                    collection.Month += ' to ' + util.date2monthstr(collection.StopTime);
-            } else {
-                collection.StopTime = "Ongoing";
-                collection.Month += '+';
-            }
-            collection.DisplayName += ' ' + collection.Month;
-        });
-
-        
-        // Make nicer collection names
-        data.collection_names = data.collections.map(function (collection) {
-            return collection.DisplayName;
-        });
-        
-        options.buildCollections();
-
-        // Initialize Legend
-        legend = new Legend();
-        legend.init();
-
-        data.setCollection();
-    },
-    setCollection: function () {
-        var collection_id = options['Dataset']['Event'].get();
-        
-        data.collection = data.collections.reduce(function (collection, candidate) {
-            if (collection.ID == collection_id)
-                return collection;
-            return candidate;
-        }, {});
-        
-        disp.setTitle();
-        
-        // Save times for the collection
-        data.time.collection_min = new Date(data.collection.StartTime);
-        if(data.collection.StopTime == "Ongoing") {
-            data.time.collection_max = new Date();
-        } else {
-            data.time.collection_max = new Date(data.collection.StopTime);
-        }
-        options.configureLoadTimeWindow();
-        
-        data.loadCollectionData();
-    },
-    loadCollectionData: function () {
-        // If there is no collection information, end, we cannot do this yet
-        if ($.isEmptyObject(data.collection)) {
+    loadEventTimeseries: function () {
+        // If there is no event information, end, we cannot do this yet
+        if ($.isEmptyObject(data.event)) {
             return;
         }
 
@@ -277,18 +103,17 @@ Data.prototype = {
         data.file = [];
         data.all = {};
         
-        // Load information about the rumors related to the collection
+        // Load information about the rumors related to the event
         data.loadRumors();
         
-//        data.startLoadingCollection();
         d3.select('#choose_Dataset_Event button')
             .attr('disabled', true);
         
-        // Send a signal to start loading the collection
+        // Send a signal to start loading the event
         var args = {
-            name: 'load_collection',
+            name: 'load_event_timeseries',
             url: 'timeseries/get',
-            post: {event_id: data.collection.ID},
+            post: {event_id: data.event.ID},
             time_min: new Date(options['Dataset']['Time Min'].date),
             time_max: new Date(options['Dataset']['Time Max'].date),
             time_res: 3,
@@ -309,8 +134,8 @@ Data.prototype = {
         data.streamTweetCounts.start();
     },
     loadRumors: function() {
-        data.callPHP('collection/getRumors',
-                     {event_id: data.collection.ID},
+        Connection.php('collection/getRumors',
+                     {event_id: data.event.ID},
                      data.parseRumorsFile);
     },
     parseRumorsFile: function(filedata) {
@@ -332,30 +157,10 @@ Data.prototype = {
         
         // No future callbacks from this
     },
-    loadDataFile: function(url_base, time_chunks, index) {
-        // If we are at the max, end
-        if(index >= time_chunks.length - 1) {
-            // Set the text to rendering
-            d3.select('#load_collection_progress')
-                .text('Rendering Chart');
-            
-            // Load the new data
-            setTimeout(function() {
-            
-                // End the progress bar and stop function
-                disp.endProgressBar('load_collection');
-                d3.select('#choose_Dataset_Event button')
-                    .attr('disabled', null);
-            }, 1000);
-                
-            return;
-        }
-    },
-    parseLoadedCollectionData: function() {
+    parseLoadedTimeseries: function() {
         // Format selections
         d3.select('#choose_Dataset_Event button')
             .attr('disabled', null);
-        
         
         // If there is no data, abort the pipeline
         if(data.file.length == 0) {
@@ -523,12 +328,10 @@ Data.prototype = {
         }
 
         // Find if the entry is in either keyword list
-        entry.isKeyword = data.collection
-            .Keywords.reduce(function(prev, keyword) {
+        entry.isKeyword = data.event.Keywords.reduce(function(prev, keyword) {
             return prev |= keyword.toLowerCase().replace('#', '') == entry.name.toLowerCase().replace('#', '');
         }, false);
-        entry.isOldKeyword = data.collection
-            .OldKeywords.reduce(function(prev, keyword) {
+        entry.isOldKeyword = data.event.OldKeywords.reduce(function(prev, keyword) {
             return prev |= keyword.toLowerCase().replace('#', '') == entry.name.toLowerCase().replace('#', '');
         }, false);
 
@@ -772,45 +575,28 @@ Data.prototype = {
             }
         } 
     },
-    updateCollection: function() {
+    updateEvent: function() {
         var fields = {};
         $("#edit_form").serializeArray().forEach(function(x) { fields[x.name] = x.value; });
         
-        data.callPHP('collection/update', fields, options.editWindowUpdated); // add a callback
-    },
-    callPHP: function(url, fields, callback, error_callback) {
-        if(!fields)
-            fields = {};
-        if(!callback)
-            callback = function() {};
-        if(!error_callback)
-            error_callback = function() {};
-        
-        $.ajax({
-            url: 'scripts/php/' + url + '.php',
-            type: "POST",
-            data: fields,
-            cache: false,
-            success: callback,
-            error: error_callback
-        });
+        Connection.php('collection/update', fields, options.editWindowUpdated); // add a callback
     },
     rmTweetCount: function(search_text, search_name) {
         var post = {
-            event_id: data.collection.ID,
+            event_id: data.event.ID,
             keyword: search_name,
         };
         if(search_text == 'rumor') {
             post.keyword = data.rumor.ID;
         }
         
-        data.callPHP('timeseries/rm', post, function() {
+        Connection.php('timeseries/rm', post, function() {
             data.genTweetCount(search_text, search_name);
         });
     },
     genTweetCount: function(search_text, search_name) {
         var post = {
-            event_id: data.collection.ID,
+            event_id: data.event.ID,
             search_name: search_name,
             search_text: search_text
         };
@@ -841,10 +627,10 @@ Data.prototype = {
             progress_div: progress_div,
             progress_button: true,
             progress_text: "Working",
-            on_finish: data.loadCollectionData
+            on_finish: data.loadEventTimeseries
         };
         
-        var stream = new Stream(args);
+        var stream = new Connection(args);
         
         // Wait to start it so graphical changes can propagate
         setTimeout(function() {
@@ -853,7 +639,7 @@ Data.prototype = {
     },
     getTweets: function(args) {
         var post = {
-            event_id: data.collection.ID
+            event_id: data.event.ID
         };
         var title = "";
 
@@ -928,7 +714,7 @@ Data.prototype = {
         title += " and " + util.formatDate(args.time_max);
         
         if('csv' in post) {
-            data.callPHP('tweets/get', post, data.handleTweets, function() { 
+            Connection.php('tweets/get', post, data.handleTweets, function() { 
                 disp.alert('Unable to retreive tweets', 'danger');
             });
         } else {
@@ -938,7 +724,7 @@ Data.prototype = {
     getRumor: function() {
         var post = {
             rumor_id: options['Dataset']['Rumor'].get(),
-            event_id: data.collection.ID,
+            event_id: data.event.ID,
             time_min: util.formatDate(data.time.min),
             time_max: util.formatDate(data.time.max)
         }
@@ -950,7 +736,7 @@ Data.prototype = {
         if(options['Dataset']['Rumor'].is('_none_'))
             return; // End this, there is no rumor to get
         
-        data.callPHP('collection/getRumor', post, function(d) {
+        Connection.php('collection/getRumor', post, function(d) {
             try {
                 data.rumor = JSON.parse(d)[0];
 //                delete data.rumor['StartTime'];
@@ -962,14 +748,14 @@ Data.prototype = {
     },
     getRumorCount: function() {
         var post = {
-            event_id: data.collection.ID,
+            event_id: data.event.ID,
             rumor_id: data.rumor.ID,
             time_min: util.formatDate(options['Dataset']['Time Min'].date),
             time_max: util.formatDate(options['Dataset']['Time Max'].date),
             total: ''
         };
         
-        data.callPHP('collection/countTweetIn', post, function(file_data) {
+        Connection.php('collection/countTweetIn', post, function(file_data) {
             var count = JSON.parse(file_data);
             document.getElementById("edit-window-tweetin-count")
                 .value = count[0]['count'];
@@ -983,7 +769,7 @@ Data.prototype = {
             name: 'genTweetInCollection',
             url: 'collection/genTweetIn',
             post: {
-                event_id: data.collection.ID,
+                event_id: data.event.ID,
                 rumor_id: data.rumor.ID,
                 search_text: data.rumor.Query
             },
@@ -1001,9 +787,9 @@ Data.prototype = {
         }
         
         // Delete the TweetInCollection
-        data.callPHP('collection/rmTweetIn', args.post, function() {
+        Connection.php('collection/rmTweetIn', args.post, function() {
             // Initialize and start Stream
-            var stream = new Stream(args);
+            var stream = new Connection(args);
             stream.start();
         }, function() {
             disp.alert('Problem deleting the last TweetInCollection records');
@@ -1079,7 +865,7 @@ Data.prototype = {
         })
         
         post = { 
-            event_id: data.collection.ID,
+            event_id: data.event.ID,
             limit: 100000
         };
         if(spec.substring(0, 2) == 'k_') {
@@ -1105,7 +891,7 @@ Data.prototype = {
         }
         ngrams.post = post;
         
-        var stream = new Stream({
+        var stream = new Connection({
             progress_text: "Fetching NGrams from Tweets",
             url: "tweets/getTextNoURL",
             post: post,
@@ -1186,7 +972,7 @@ Data.prototype = {
     },
     rmCodeCount: function(search_text, search_name) {
         var post = {
-            event_id: data.collection.ID,
+            event_id: data.event.ID,
             keyword: search_name,
         };
         if(search_text == 'rumor') {
@@ -1195,13 +981,13 @@ Data.prototype = {
                 .attr('disabled', '');
         }
         
-        data.callPHP('timeseries/rm', post, function() {
+        Connection.php('timeseries/rm', post, function() {
             data.genTweetCount(search_text, search_name);
         });
     },
     genCodeCount: function(search_text, search_name) {
         var post = {
-            event_id: data.collection.ID,
+            event_id: data.event.ID,
             search_name: search_name,
             search_text: search_text
         };
@@ -1234,10 +1020,10 @@ Data.prototype = {
             progress_div: progress_div,
             progress_button: true,
             progress_text: "Working",
-            on_finish: data.loadCollectionData
+            on_finish: data.loadEventTimeseries
         };
         
-        var stream = new Stream(args);
+        var stream = new Connection(args);
         stream.start();
     }
 }

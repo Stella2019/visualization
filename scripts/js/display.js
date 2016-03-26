@@ -1,51 +1,4 @@
-function Tooltip() {
-    this.div = {};
-    this.info = {};
-}
-Tooltip.prototype = {
-    init: function() {
-        this.div = d3.select('#body')
-            .append('div')
-            .attr('class', 'tooltip');
-    },
-    setData: function(new_data) {
-        if(JSON.stringify(this.data) != JSON.stringify(new_data)) {
-            // Clear & set new parameters
-            this.data = new_data;
-            this.div.selectAll('*').remove();
 
-            // Create table
-            var rows = this.div.append('table')
-                .selectAll('tr')
-                .data(Object.keys(new_data))
-                .enter()
-                .append('tr');
-
-            rows.append('th')
-                .html(function(d) { return d + ":"; });
-
-            rows.append('td')
-                .html(function(d) { return new_data[d]; });
-        }
-    },
-    on: function() {
-        this.div
-            .transition(200)
-            .style('opacity', 1);
-    },
-    move: function(x, y) {
-        this.div
-            .style({
-                left: x + 20 + "px",
-                top: y + "px"
-            });
-    },
-    off: function() {
-        this.div
-            .transition(200)
-            .style('opacity', 0);
-    }
-};
 function Progress(args) {
     // Grab parameters
     var valid_param = ['name', 'parent_id', 'full', 'text', 'steps', 'initial'];
@@ -766,11 +719,6 @@ Display.prototype = {
         
         alert_div.append('span')
             .html(text);
-    },
-    setTitle: function() {
-        d3.select('#chart-title')
-            .html('<small>' + data.collection.Type + ':</small> ' + 
-                  data.collection.DisplayName);
     },
     tweetsModal: function(post, title) {
 

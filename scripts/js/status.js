@@ -12,7 +12,7 @@ StatusReport.prototype = {
     getData: function() {
         var datasets = 2;
             
-        data.callPHP('collection/getEvents', {}, function(d) {
+        Connection.php('collection/getEvents', {}, function(d) {
             try {
                 SR.events_arr = JSON.parse(d);
             } catch(err) {
@@ -25,7 +25,7 @@ StatusReport.prototype = {
                 SR.configureData();
         });
 
-        data.callPHP('collection/getRumors', {}, function(d) {
+        Connection.php('collection/getRumors', {}, function(d) {
             try {
                 SR.rumors_arr = JSON.parse(d);
             } catch(err) {
@@ -101,7 +101,7 @@ StatusReport.prototype = {
         var fields = ['FirstTweet', 'LastTweet', 'FirstDatapoint', 'LastDatapoint'];
         
         // Get the number of tweets for each rumor
-        data.callPHP('count/get', {}, function(d) {
+        Connection.php('count/get', {}, function(d) {
             var counts;
             try {
                 counts = JSON.parse(d);
@@ -141,7 +141,7 @@ StatusReport.prototype = {
         var datasets = 3;
 
         // Get the number of tweets for each event
-//        data.callPHP('collection/getEventStatistics', {}, function(d) {
+//        Connection.php('collection/getEventStatistics', {}, function(d) {
 //            var eventTweets = JSON.parse(d);
 //            
 //            eventTweets.forEach(function(event) {
@@ -154,7 +154,7 @@ StatusReport.prototype = {
 //        });
         
         // Get the number of tweets for each rumor
-        data.callPHP('collection/getRumorStatistics', {}, function(d) {
+        Connection.php('collection/getRumorStatistics', {}, function(d) {
             var counts;
             try {
                 counts = JSON.parse(d);
@@ -174,7 +174,7 @@ StatusReport.prototype = {
                 SR.computeAggregates();
         });
         // Get the number of tweets for each rumor
-        data.callPHP('timeseries/getStatistics', {}, function(d) {
+        Connection.php('timeseries/getStatistics', {}, function(d) {
             var counts ;
             try {
                 counts = JSON.parse(d);
@@ -194,7 +194,7 @@ StatusReport.prototype = {
                 SR.computeAggregates();
         });
         // Get the number of tweets for each rumor
-        data.callPHP('coding/rumorPeriodCounts', {}, function(d) {
+        Connection.php('coding/rumorPeriodCounts', {}, function(d) {
             var counts ;
             try {
                 counts = JSON.parse(d);
@@ -663,7 +663,7 @@ StatusReport.prototype = {
 //            .html('Loading');
         
         // Start the recount
-        data.callPHP('count/compute', post, function(result) {
+        Connection.php('count/compute', post, function(result) {
             if(result.includes('Error')) {
                 loading.update(100, 'Error');
                 console.log(result);

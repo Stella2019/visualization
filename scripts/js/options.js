@@ -33,28 +33,27 @@ Options.prototype = {
     init: function() {
         
         // Build options
-//            options.buildTopMenu();
-        options.buildSidebar();
+        this.buildSidebar();
         if('TS' in window) { // it is a timeseries page
-            options.buildTimeWindow();
+            this.buildTimeWindow();
         }
         
         // Import the current state
-        options.importState();
+        this.importState();
         window.onpopstate = function() {
-            options.importState()
-        };
+            this.importState();
+        }.bind(this);
         
         // Style elements
         if('TS' in window) {
-            options['View']['Y Max Toggle'].style();
-            $(function () {
-                $('[data-toggle="popover"]').popover()
-            })
+            this['View']['Y Max Toggle'].style();
+//            $(function () {
+//                $('[data-toggle="popover"]').popover()
+//            })
         }
         
         // Record the state
-        options.recordState(true);
+        this.recordState(true);
     },
     importState: function() {
         var state;
@@ -74,7 +73,7 @@ Options.prototype = {
         // Figure out what options should be different
         var changed = [];
         Object.keys(state).forEach(function(panel_name) {
-            var panel = options[panel_name];
+            var panel = this[panel_name];
             var panel_state = state[panel_name];
             
             Object.keys(panel_state).forEach(function(option_name) {
@@ -89,7 +88,7 @@ Options.prototype = {
                 d3.select("#choose_" + util.simplify(panel_name) + "_" + util.simplify(option_name)).select('.current')
                     .html(option.getLabel());
             });
-        });
+        }.bind(this));
 //        Object.keys(state).forEach(function(option) {
 //            if(["time_min", "time_max"].indexOf(option) > -1) {
 //                if(options.time_save.is("false"))
@@ -146,13 +145,13 @@ Options.prototype = {
     },
     recordState: function(override) {
         var state = {};
-        options.panels.forEach(function(panel_name) {
+        this.panels.forEach(function(panel_name) {
             state[panel_name] = {};
-            var panel = options[panel_name];
+            var panel = this[panel_name];
             Object.keys(panel).forEach(function(option_name) {
                 state[panel_name][option_name] = panel[option_name].get();
             });
-        });
+        }, this);
         strstate = '#' + JSON.stringify(state);
         
         if(override) {
@@ -288,7 +287,8 @@ Options.prototype = {
             });
     },
     buildTextToggle: function(panel_name, option_name) {
-        var option = options[panel_name][option_name];
+        var ops = this;
+        var option = ops[panel_name][option_name];
         var choice_name = util.simplify(panel_name) + '_' + util.simplify(option_name);
         
         // Set container
@@ -328,24 +328,21 @@ Options.prototype = {
             available: [0, 1],
             default: 0,
             callback: function() {
-                options.recordState();
+                ops.recordState();
                 pipeline.start('Configure Plot Area');
-            },
-            style: function() {
-                var op_toggle = options[panel_name][option_name + " Toggle"];
-                d3.select('#input_' + choice_name)
-                    .attr('disabled', op_toggle.get() == "true" ? null : true);
-                d3.select('#choice_' + choice_name + '_toggle')
-                    .attr('class', 'btn btn-xs btn-default')
-                    .attr('data-content', function() {
-                        return op_toggle.tooltips[op_toggle.indexCur()];
-                    })
-                    .html(function() {
-                        return op_toggle.getLabel();
-                    });
             }
         });
-        options[panel_name][option_name + " Toggle"] = op_toggle;
+            
+        op_toggle['style'] = function() {
+            d3.select('#input_' + choice_name)
+                .attr('disabled', this.get() == "true" ? null : true);
+            d3.select('#choice_' + choice_name + '_toggle')
+                .attr('class', 'btn btn-xs btn-default')
+                .attr('data-content', this.tooltips[this.indexCur()])
+                .html(this.getLabel());
+        }.bind(op_toggle);
+        
+        ops[panel_name][option_name + " Toggle"] = op_toggle;
         
         container.append("input")
             .attr("id", "input_" + choice_name)
@@ -356,7 +353,7 @@ Options.prototype = {
             .attr("class", "text-center form-control input-xs")
             .on('keyup', function(d) {
                 option.set(this.value);
-                options.recordState(true);
+                ops.recordState(true);
             
                 option.callback();
             });
@@ -384,7 +381,7 @@ Options.prototype = {
                 .value = d;
 
             option.set(d);
-            options.recordState(true);
+            ops.recordState(true);
         };
     },
     buildTextConfirm: function(option) {
@@ -664,53 +661,6 @@ Options.prototype = {
         
 //        d3.selectAll('#ui-datepicker-div button').classed('btn btn-default', true);
     },
-    buildCollections: function() {
-        var event_op = options['Dataset']['Event'];
-        var event_type_op = options['Dataset']['Event Type'];
-        
-        // Generate Collections List
-        event_op['labels'] = data.collection_names;
-        event_op['ids'] = data.collections.map(function(collection) { return collection['ID']; });
-        event_op['available'] = util.range(data.collections.length);
-        
-        // Find the current collection
-        var cur = event_op.get();
-        event_op.default = data.collections.reduce(function(candidate, collection, i) {
-            if(collection['ID'] == cur)
-                return i;
-            return candidate;
-        }, 0);
-        event_op.set(event_op['ids'][event_op.default]);
-        
-        // Make the dropdown
-        options.buildSidebarOption('Dataset', 'Event');
-        options.recordState(true);
-        
-        // Generate Types of Collections
-        var types = util.lunique(data.collections.map(function(collection) { return collection['Type']; }));
-        types.unshift('All'); // Add 'All' to begining
-        
-        event_type_op['labels'] = types;
-        event_type_op['ids'] = types;
-        event_type_op['available'] = util.range(types.length);
-        
-        // Set the type to match the current collection
-        event_type_op.default = event_type_op['ids'].indexOf(
-            data.collections[event_op.default]['Type']);
-        event_type_op.set(types[event_type_op.default]);
-        
-        // Make the dropdown for collection types
-
-        options.buildSidebarOption('Dataset', 'Event Type');
-        options.recordState(true);
-
-        // Add additional information for collections
-        data.collections.map(options.addCollectionPopup);
-//        $('.collection_option').popover({html: true});
-        
-        // Limit the collection selections to the particular type
-        options.chooseCollectionType();
-    },
     buildRumors: function() {
         var rumor_names = data.rumors.map(function(rumor) {
             return rumor.Name;
@@ -743,71 +693,37 @@ Options.prototype = {
         
         options.buildNGrams();
     },
-    addCollectionPopup: function(collection) {
-        var content = '<dl class="dl-horizontal collection_popover">';
-        Object.keys(collection).map(function(key) {
-            content += "<dt>" + key + "</dt>";
-
-            if(collection[key] instanceof Date) {
-                var date = new Date(collection[key]);
-                content += "<dd>" + util.formatDate(date) + "&nbsp;</dd>";
-            } else if(collection[key] instanceof Array) {
-                var arr = collection[key].join(", ");
-                content += "<dd>" + arr + "&nbsp;</dd>";
-            } else {
-                content += "<dd>" + collection[key] + "&nbsp;</dd>";
-            }
-        });
-        content += "</dl>";
-
-//        d3.select('#collection_' + collection['ID'])
-//            .attr({
-//                'class': 'collection_option',
-//                'data-toggle': "popover",
-//                'data-trigger': "hover",
-//                'data-placement': "right",
-//                'data-content': content}
-//             );
-//        $('#collection_' + collection['ID']).popover({html: true});
-        
-        disp.newPopup('#collection_' + collection['ID'])
-            .set('content', content)
-            .set('placement', 'right');
-    },
-    chooseCollectionType: function() {
-        var curType = options['Dataset']['Event Type'].get();
-        var curCollection = options['Dataset']['Event'].get();
-        var firstValid = -1; 
-        
-        data.collections.map(function(collection, i) {
-            if(collection['Type'] == curType || 'All' == curType) {
-                d3.select('#collection_' + collection['ID'])
-                    .style('display', 'block');
-                
-                if(firstValid == -1)
-                    firstValid = i;
-            } else {
-                d3.select('#collection_' + collection['ID'])
-                    .style('display', 'none');
-                
-                if(collection['ID'] == curCollection)
-                    curCollection = 'invalid';
-            }
-        });
-        
-        // If the current collection does not match this type, then make a new one
-        if(curCollection == 'invalid') {
-            options['Dataset']['Event'].set(options['Dataset']['Event'].ids[firstValid]);
-                        
-            d3.select('#choose_collection').select('.current')
-                .text(options['Dataset']['Event'].getLabel());
-
-            options.recordState(true);
-
-            data.setCollection();
-        }
-            
-    },
+//    addCollectionPopup: function(collection) {
+//        var content = '<dl class="dl-horizontal collection_popover">';
+//        Object.keys(collection).map(function(key) {
+//            content += "<dt>" + key + "</dt>";
+//
+//            if(collection[key] instanceof Date) {
+//                var date = new Date(collection[key]);
+//                content += "<dd>" + util.formatDate(date) + "&nbsp;</dd>";
+//            } else if(collection[key] instanceof Array) {
+//                var arr = collection[key].join(", ");
+//                content += "<dd>" + arr + "&nbsp;</dd>";
+//            } else {
+//                content += "<dd>" + collection[key] + "&nbsp;</dd>";
+//            }
+//        });
+//        content += "</dl>";
+//
+////        d3.select('#collection_' + collection['ID'])
+////            .attr({
+////                'class': 'collection_option',
+////                'data-toggle': "popover",
+////                'data-trigger': "hover",
+////                'data-placement': "right",
+////                'data-content': content}
+////             );
+////        $('#collection_' + collection['ID']).popover({html: true});
+//        
+//        disp.newPopup('#collection_' + collection['ID'])
+//            .set('content', content)
+//            .set('placement', 'right');
+//    },
     editWindow: function(option) {
 //        var set = options[option];
 //        var id = set.get();
@@ -1543,9 +1459,9 @@ Options.prototype = {
             .html('Pages')
         
         // Add all other sidebar items
-        if(!options.panels) return;
+        if(!this.panels) return;
         
-        options.panels.forEach(function(panel_name) {
+        this.panels.forEach(function(panel_name) {
             var panel_div = sidebar.append('div')
                 .attr('id', 'panel_' + util.simplify(panel_name))
                 .attr('class', 'sidepanel');
@@ -1553,20 +1469,20 @@ Options.prototype = {
             panel_div.append('h4')
                 .html(panel_name);
 
-            var panel = options[panel_name];
+            var panel = this[panel_name];
             Object.keys(panel).forEach(function(option_name) {
-                options.buildSidebarOption(panel_name, option_name);
-            })
+                this.buildSidebarOption(panel_name, option_name);
+            }, this)
             
             panel_div.append('div')
                 .attr('class', 'section-title')
                 .html(panel_name);
-        });
+        }, this);
     },
     buildSidebarOption: function(panel_name, option_name) {
         var panel, option;
         try {
-            panel = options[panel_name];
+            panel = this[panel_name];
             option = panel[option_name];
         } catch(e) {
             console.log('Option ' + option_name + ' does not exist');
@@ -1576,7 +1492,7 @@ Options.prototype = {
         // Rendering alternatives
         if(option.no_render) return;
         if(option.type && option.type == 'textfieldautoman') {
-            options.buildTextToggle(panel_name, option_name);
+            this.buildTextToggle(panel_name, option_name);
             return;
         }
         
@@ -1673,8 +1589,8 @@ Options.prototype = {
                 .html(option.labels[d]);
 
             option.set(option.ids[d]);
-            options.recordState();
-        }
+            this.recordState();
+        }.bind(this);
         option.updateInInterface_id = function(d) {
             option.updateInInterface(option.indexOf(d));
         }

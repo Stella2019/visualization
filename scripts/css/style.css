@@ -312,6 +312,7 @@ button:focus {
 }
 .tooltip td, .tooltip th {
     padding: 5px 5px 0px 5px;
+    max-width: 300px;
 }
 
 

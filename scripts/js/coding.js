@@ -64,7 +64,7 @@ Coding.prototype = {
     getData: function() {
         var progress = 0;
         
-        data.callPHP('coding/getCoders', {}, function(d) {
+        Connection.php('coding/getCoders', {}, function(d) {
             try {
                 coding.coders = JSON.parse(d);
             } catch(err) {
@@ -76,7 +76,7 @@ Coding.prototype = {
                 coding.buildOptions();
         });
             
-        data.callPHP('collection/getEvents', {}, function(file_data) {
+        Connection.php('collection/getEvents', {}, function(file_data) {
             try {
                 coding.events = JSON.parse(file_data);
             } catch(err) {
@@ -88,7 +88,7 @@ Coding.prototype = {
                 coding.buildOptions();
         });
 
-        data.callPHP('collection/getRumors', {}, function(file_data) {
+        Connection.php('collection/getRumors', {}, function(file_data) {
             try {
                 coding.rumors = JSON.parse(file_data);
             } catch(err) {
@@ -101,7 +101,7 @@ Coding.prototype = {
         });
 
         // Get the number of codes for each rumor
-        data.callPHP('coding/rumorPeriodCounts', {}, function(file_data) {
+        Connection.php('coding/rumorPeriodCounts', {}, function(file_data) {
             try {
                 coding.rumor_period_counts = JSON.parse(file_data);
             } catch(err) {
@@ -415,7 +415,7 @@ Coding.prototype = {
             period: options['Dataset']['Period'].get()
         };
 
-        data.callPHP('coding/get', post, coding.parseCodes);
+        Connection.php('coding/get', post, coding.parseCodes);
     },
     getOtherDatasetTweets: function() {
         var post = {
@@ -423,7 +423,7 @@ Coding.prototype = {
             period: options['Dataset']['Period'].get()
         };
         
-        data.callPHP('coding/get', post, coding.parseOtherDatasetTweets);
+        Connection.php('coding/get', post, coding.parseOtherDatasetTweets);
     },
     parseOtherDatasetTweets: function(file_data) {
         var otherset_codes = [];
@@ -1463,7 +1463,7 @@ Coding.prototype = {
         // Wait otherwise some page elements may be stuck
         setTimeout(function() {
             
-             data.callPHP('coding/getTweets', post, coding.parseTweetInformation);
+             Connection.php('coding/getTweets', post, coding.parseTweetInformation);
         }, 1000);
        
     },

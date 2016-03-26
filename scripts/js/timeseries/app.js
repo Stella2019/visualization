@@ -1,15 +1,133 @@
 // Structure that will be used throughout the other data
 var options, legend, disp, data, pipeline, TS;
 
-function Timeseries () {
+function Pipeline() {
+    this.progress = null;
+    this.current_stage = -1;
     
+    this.stages = [{ // parseCSVData / Load Collection
+        name: 'Parse Loaded Collection Data',
+        callback: data.parseLoadedTimeseries
+    },{
+        name: 'Reset Plot Area',
+        callback: disp.resetPlotArea
+    },{
+        name: 'Initialize Series Data',
+        callback: data.initializeSeries
+    },{ // Prepare Data
+        name: 'Find Which Data is Shown',
+        callback: data.recalculateShown
+    },{
+        name: 'Calculate Timeseries',
+        callback: data.getCategorySubtotals
+    },{
+        name: 'Order Timeseries',
+        callback: data.orderSeries
+    },{
+        name: 'Prepare Timeseries Data for Chart',
+        callback: data.makeChartTimeseries
+    },{
+        name: 'Ready Context Chart',
+        callback: disp.contextChart
+    },{
+        name: 'Set Focus Axis Labels',
+        callback: disp.setFocusAxisLabels
+    },{
+        name: 'Set Colors',
+        callback: disp.setColors
+    },{ // Display
+        name: 'Configure Plot Area',
+        callback: disp.configurePlotArea
+    },{
+        name: 'Build Timeseries Paths',
+        callback: disp.buildTimeseries
+    },{
+        name: 'Draw Timeseries',
+        callback: disp.drawTimeseries
+    }];
+}
+Pipeline.prototype = {
+    start: function(stage) {
+        if(this.current_stage > 0) {
+            // Need to interrupt the past pipeline? or just keep on going?
+        }
+        
+        // Get what stage we are at
+        if(stage) {
+            this.current_stage = this.stages.reduce(function(cur, cand, i) {
+                if(cand.name == stage)
+                    return i;
+                return cur;
+            }, 0)
+        } else {
+            this.current_stage = 0;
+        }
+        
+        // Make a new progress bar
+        if(this.progress) {
+            this.progress.end();
+        }
+        this.progress = new Progress({
+            name: 'pipeline',
+            steps: this.stages.length
+        });
+        this.progress.start();
+        this.progress.bar_div.classed("progress-bar-info", true);
+        
+        // Start the next stage
+        this.nextStage();
+    },
+    nextStage: function() {
+        if(this.current_stage < 0) {
+            this.abort();
+            return;
+        } else if(this.current_stage >= this.stages.length) {
+            this.finish();
+            return;
+        }
+        
+        var stage = this.stages[this.current_stage];
+        this.progress.update(this.current_stage + 1, stage.name);
+        
+        // Call the function of this stage
+        setTimeout(function() { // Pause for a bit to let the progress bar update
+            var start = new Date().getTime();
+            stage.callback();
+            var stop = new Date().getTime();
+            
+            // Go to the next stage
+            this.current_stage = this.current_stage + 1;
+            this.nextStage();
+        }.bind(this), 5);
+    },
+    abort: function() {
+        this.progress.end();
+        this.current_stage = -2;
+    },
+    finish: function() {
+        this.progress.end();
+        this.current_stage = 0;
+    }
+};
+
+function Timeseries () {
+    this.disp = new TimeseriesDisplay(this);
+    this.model = new TimeseriesModel(this);
+    this.ops = new Options();
+    this.tooltip = new Tooltip();
 }
 Timeseries.prototype = {
-    setOptions: function() {
-        options = new Options();
-        options.panels = ['Dataset', 'View', 'Series', 'Analysis'];
+    setTriggers: function() {
+        triggers.on("timeseries:new_events", this.populateEventOptions.bind(this));
         
-        options['Dataset'] = {
+        this.disp.setTriggers();
+        this.model.setTriggers();
+    },
+    setOptions: function() {
+        this.ops.panels = ['Dataset', 'View', 'Series', 'Analysis'];
+        var options = this.ops;
+        
+        this.ops['Dataset'] = {
             'Event Type': new Option({
                 title: "Type",
                 labels: ["All", "Other Type"],
@@ -70,7 +188,7 @@ Timeseries.prototype = {
                 custom_entries_allowed: true
             })
         };
-        options['View'] = {
+        this.ops['View'] = {
             'Plot Type': new Option({
                 title: "Plot Type",
                 labels: ["Stacked", "Overlap", "Lines", "Stream", "Separate", "100%"],
@@ -182,7 +300,7 @@ Timeseries.prototype = {
                 callback: function() { disp.setFocusTime('input_field'); }
             })
         };
-        options['Series'] = {
+        this.ops['Series'] = {
             'Chart Category': new Option({
                 title: 'Show in Chart',
                 labels: ["Tweet Types", "Distinctiveness", "Found Ins", "Keywords"],
@@ -235,7 +353,7 @@ Timeseries.prototype = {
 //                callback: function() { pipeline.start('Find Which Data is Shown'); }
 //            })
         };     
-        options['Analysis'] = {
+        this.ops['Analysis'] = {
             'Fetched Tweet Order': new Option({
                 title: 'Fetched Tweets Order',
                 labels: ["Prevalence", "Time", "Random"],
@@ -262,22 +380,108 @@ Timeseries.prototype = {
             })
         };
         
-        options.updateCollectionCallback = function() { data.loadRumors(); };
-        options.init();
-    }
+        this.ops.updateCollectionCallback = function() { data.loadRumors(); };
+        this.ops.init();
+    },
+    populateEventOptions: function() {
+        var event_op = this.ops['Dataset']['Event'];
+        var event_type_op = this.ops['Dataset']['Event Type'];
+        
+        // Generate Collections List
+        event_op['labels'] = this.model.event_names;
+        event_op['ids'] = this.model.events_arr.map(function(event) { return event['ID']; });
+        event_op['available'] = util.range(this.model.events_arr.length);
+        
+        // Find the current collection
+        var cur = event_op.get();
+        event_op.default = this.model.events_arr.reduce(function(candidate, event, i) {
+            if(event['ID'] == cur)
+                return i;
+            return candidate;
+        }, 0);
+        event_op.set(event_op['ids'][event_op.default]);
+        
+        // Make the dropdown
+        this.ops.buildSidebarOption('Dataset', 'Event');
+        this.ops.recordState(true);
+        
+        // Generate Types of Collections
+        var types = util.lunique(this.model.events_arr.map(function(event) { return event['Type']; }));
+        types.unshift('All'); // Add 'All' to begining
+        
+        event_type_op['labels'] = types;
+        event_type_op['ids'] = types;
+        event_type_op['available'] = util.range(types.length);
+        
+        // Set the type to match the current collection
+        event_type_op.default = event_type_op['ids'].indexOf(this.model.events_arr[event_op.default]['Type']);
+        event_type_op.set(types[event_type_op.default]);
+        
+        // Make the dropdown for collection types
+        this.ops.buildSidebarOption('Dataset', 'Event Type');
+        this.ops.recordState(true);
+
+        // Add additional information for collections
+        this.model.events_arr.forEach(function(event) {
+            var id = '#Event_' + event['ID'];
+            this.tooltip.attach(id, function(d) {
+                return this.model.events_arr[d];
+            }.bind(this));
+        }, this);
+        
+        // Limit the collection selections to the particular type
+        this.chooseEventType();
+    },
+    chooseEventType: function() {
+        var event_op = this.ops['Dataset']['Event'];
+        var curType = this.ops['Dataset']['Event Type'].get();
+        var curEvent = event_op.get();
+        var firstValid = -1; 
+        
+        this.model.events_arr.map(function(event, i) {
+            if(event['Type'] == curType || 'All' == curType) {
+                d3.select('#Event_' + event['ID'])
+                    .style('display', 'block');
+                
+                if(firstValid == -1)
+                    firstValid = i;
+            } else {
+                d3.select('#Event_' + event['ID'])
+                    .style('display', 'none');
+                
+                if(event['ID'] == curEvent)
+                    curEvent = 'invalid';
+            }
+        });
+        
+        // If the current collection does not match this type, then make a new one
+        if(curEvent == 'invalid') {
+            event_op.set(event_op.ids[firstValid]);
+                        
+            d3.select('#choose_Event').select('.current')
+                .text(event_op.getLabel());
+
+            this.ops.recordState(true);
+
+            this.model.setEvent();
+        }
+    },
 };
 
 function initialize() {
     TS = new Timeseries();
+    
+    TS.setTriggers();
+    
+    TS.disp.buildPage();
+    TS.tooltip.init();
     TS.setOptions();
     
-    disp = new Display();
-    disp.init();
-
-    data = new Data();
-    pipeline = new Pipeline();
-
-    data.loadCollections();
+    // Start loading data
+    TS.model.loadEvents();
+    
+//    pipeline = new Pipeline();
+//    data.loadEventTimeseries();
 }
 
 window.onload = initialize;
