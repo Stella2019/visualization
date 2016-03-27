@@ -1,11 +1,10 @@
-function Legend() {
-    var self = this;
-    self.container = [];
-    self.mouseOverToggle = false;
-    self.mouseOverToggleState = true;
+function TimeseriesLegend() {
+    this.container = [];
+    this.mouseOverToggle = false;
+    this.mouseOverToggleState = true;
     
     // Key Data
-    self.key_data = [
+    this.key_data = [
         {term: "&nbsp;", label: "Capture Term", id: 'capture', has: false},
         {term: "&#x271d;", label: "Removed Capture Term", id: 'removed', has: false},
         {term: "*", label: "Term Added Later", id: 'added', has: false},
@@ -13,17 +12,29 @@ function Legend() {
         {term: "<svg height=10 width=10><line x1=0 y1=10 x2=10 y2=0 class='total_line' /></svg>",
             label: "Tweet Volume", id: 'total_line', has: false}
     ];
-    self.key_data_byID = self.key_data.reduce(function(all, cur) {
+    this.key_data_byID = this.key_data.reduce(function(all, cur) {
         all[cur.id] = cur;
         return all;
     }, {});
-    self.key_data_byLabel = self.key_data.reduce(function(all, cur) {
+    this.key_data_byLabel = this.key_data.reduce(function(all, cur) {
         all[cur.label] = cur;
         return all;
     }, {});
+    
+    this.init();
 }
-Legend.prototype = {
+TimeseriesLegend.prototype = {
     init: function() {
+        this.setTriggers();
+    },
+    setTriggers: function() {
+        triggers.on('page_built', this.buildLegend.bind(this));
+    },
+    buildLegend: function() {
+        d3.select('body').append('div')
+            .attr('id', 'legend');
+    },
+    init2: function() {
         this.container = d3.select('#legend')
             .on('mouseout', this.endToggle);
         

@@ -23,14 +23,15 @@ Option.prototype = {
     indexCur: function () { return this.indexOf(this.cur); }
 };
 
-function Options() {
-    var self = this;
+function Options(app) {
+    this.app = app;
     
-    self.timefields = ['time_min', 'time_max'];
-    self.state = {};
+    this.timefields = ['time_min', 'time_max'];
+    this.state = {};
 };
 Options.prototype = {
     init: function() {
+        this.setTriggers();
         
         // Build options
         this.buildSidebar();
@@ -54,6 +55,9 @@ Options.prototype = {
         
         // Record the state
         this.recordState(true);
+    },
+    setTriggers: function() {
+        triggers.on('edit_window:updated', this.editWindowUpdated.bind(this));
     },
     importState: function() {
         var state;
@@ -83,7 +87,7 @@ Options.prototype = {
 //                console.log(panel_name, panel_state, panel);
 //                console.log(option_name, option_value, option);
                 option.set(option_value);
-                changed.push(option_name);
+                changed.push(panel_name + '__' + option_name);
                 
                 d3.select("#choose_" + util.simplify(panel_name) + "_" + util.simplify(option_name)).select('.current')
                     .html(option.getLabel());
@@ -122,10 +126,11 @@ Options.prototype = {
 //        });
         
         // If the program has been initialized
-        if(changed.length > 0 && data && data.all && data.all[0]) {
+        if(changed.length > 0) { //&& data && data.all && data.all[0]
             // Render changes
+            return; // TODO
 
-            if(changed.indexOf("collection") > -1) {
+            if(changed.includes('event')) {
                 data.setCollection();
                 
                 options['Dataset']['Event Type'].set(data.collection['Type']);
@@ -693,42 +698,11 @@ Options.prototype = {
         
         options.buildNGrams();
     },
-//    addCollectionPopup: function(collection) {
-//        var content = '<dl class="dl-horizontal collection_popover">';
-//        Object.keys(collection).map(function(key) {
-//            content += "<dt>" + key + "</dt>";
-//
-//            if(collection[key] instanceof Date) {
-//                var date = new Date(collection[key]);
-//                content += "<dd>" + util.formatDate(date) + "&nbsp;</dd>";
-//            } else if(collection[key] instanceof Array) {
-//                var arr = collection[key].join(", ");
-//                content += "<dd>" + arr + "&nbsp;</dd>";
-//            } else {
-//                content += "<dd>" + collection[key] + "&nbsp;</dd>";
-//            }
-//        });
-//        content += "</dl>";
-//
-////        d3.select('#collection_' + collection['ID'])
-////            .attr({
-////                'class': 'collection_option',
-////                'data-toggle': "popover",
-////                'data-trigger': "hover",
-////                'data-placement': "right",
-////                'data-content': content}
-////             );
-////        $('#collection_' + collection['ID']).popover({html: true});
-//        
-//        disp.newPopup('#collection_' + collection['ID'])
-//            .set('content', content)
-//            .set('placement', 'right');
-//    },
     editWindow: function(option) {
 //        var set = options[option];
 //        var id = set.get();
         
-        var info = data[option];
+        var info = this.app.model[option];
         if(!info || !('ID' in info)) {
             disp.alert('No information.', 'warning');
             
@@ -870,17 +844,17 @@ Options.prototype = {
                 class: 'btn btn-default'
             })
             .text('Update')
-            .on('click', data.updateCollection);
+            .on('click', triggers.emitter('update_collection'));
         
 //        disp.newPopup('#edit-window-save')
 //            .set('content', 'Otherwise won\'t save changes');
         
         if(option == 'rumor') {
-            options.editWindowRumorOptions();
+            this.editWindowRumorOptions();
         }
         
         form.selectAll('input')
-            .on('input', options.editWindowChanged);
+            .on('input', this.editWindowChanged);
         
         $('#modal').modal();
     },
@@ -1217,173 +1191,6 @@ Options.prototype = {
         options['Analysis']['N-Gram Compare'].available = d3.range(ids.length);
         options.buildSidebarOption('Analysis', 'N-Gram Compare');
         
-    },
-    configureLoadTimeWindow: function() {
-        var window = options['Dataset']['Time Window'].get();
-        var time_min_op = options['Dataset']['Time Min'];
-        var time_max_op = options['Dataset']['Time Max'];
-        
-        if(window == '1d') {
-            time_min_op.date = new Date(data.time.collection_min);
-            time_max_op.date = new Date(data.time.collection_min);
-            time_max_op.date.setHours(time_max_op.date.getHours() + 24);
-        } else if(window == '3d') {
-            time_min_op.date = new Date(data.time.collection_min);
-            time_max_op.date = new Date(data.time.collection_min);
-            time_max_op.date.setHours(time_max_op.date.getHours() + 24 * 3);
-        } else if(window == 'all') {
-            time_min_op.date = new Date(data.time.collection_min);
-            options['Dataset']['Time Max'].date = new Date(data.time.collection_max);
-        } else { // Custom
-//            data.time.selected_min = new Date(options.data_time.custom_min);
-//            data.time.selected_max = new Date(options.data_time.custom_max);
-        }
-        
-        // Outer Bounds
-        if(time_min_op.date < data.time.collection_min) {
-            time_min_op.date = new Date(data.time.collection_min);
-        }
-        if(time_max_op.date > data.time.collection_max) {
-            time_max_op.date = new Date(data.time.collection_max);
-        }
-        // Inner Bound
-        if(time_max_op.date < time_min_op.date) {
-            time_max_op.date = new Date(time_min_op.date);
-        }
-            
-        // Set Text Fields
-        time_min_op.set(util.formDate(time_min_op.date));
-        time_max_op.set(util.formDate(time_max_op.date));
-        options.recordState(false);
-        
-    },
-    editLoadTimeWindow: function() {
-        options['Dataset']['Time Min'].custom = new Date(options['Dataset']['Time Min'].date);
-        options['Dataset']['Time Max'].custom = new Date(options['Dataset']['Time Max'].date);
-        
-        // Set Modal Title
-        d3.select('#modal .modal-title')
-            .html('Set Time Window');
-
-        // Clear any data still in the modal
-        d3.select('#modal .modal-options')
-            .selectAll('*').remove();
-        var modal_body = d3.select('#modal .modal-body');
-        modal_body.selectAll('*').remove();
-        
-        // Append form
-        var form = modal_body.append('form')
-            .attr({
-                id: 'edit_form',
-                method: 'post',
-                class: 'form-horizontal'
-            })
-            .on('submit', function() {
-                event.preventDefault();
-                return false; 
-            });
-        
-        var divs = form.selectAll('div.form-group')
-            .data([{
-                    label: 'From',
-                    time: options['Dataset']['Time Min'].custom,
-                    min: data.time.collection_min,
-                    max: data.time.collection_max
-                },{
-                    label: 'To',
-                    time: options['Dataset']['Time Max'].custom,
-                    min: data.time.collection_min,
-                    max: data.time.collection_max
-                }])
-            .enter()
-            .append('div')
-            .attr('class', 'form-group');
-        
-        divs.append('label')
-            .attr('for', function(d) { return 'edit_load_time_' + d.label; })
-            .attr('class', 'col-sm-3 control-label')
-            .text(function(d) { return d.label });
-        
-        var entries = divs.append('div')
-            .attr('class', 'col-sm-9 edit-box edit-box-date input-group')
-            .style('width', '1px');
-        
-        
-        entries.append('div')
-            .attr('class', 'input-group-btn')
-            .append('button')
-            .attr('class', 'btn btn-default')
-            .html('<span class="glyphicon glyphicon-step-backward"></span>')
-            .on('click', function(d) {
-                if(d.label == 'From') {
-                    options['Dataset']['Time Min'].custom = new Date(data.time.collection_min);
-                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options['Dataset']['Time Min'].custom);
-                } else { // To
-                    options['Dataset']['Time Max'].custom = new Date(options['Dataset']['Time Min'].custom);
-                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options['Dataset']['Time Max'].custom);
-                }
-            });
-        
-        entries.append('input')
-            .attr({
-                class: 'form-control',
-                type: 'datetime-local',
-                id: function(d) { return 'edit_load_time_' + d.label; },
-                value: function(d) { return util.formDate(d.time); },
-                min: function(d) { return util.formDate(d.min); },
-                max: function(d) { return util.formDate(d.max); }
-            })
-            .on('change', function(d) {
-                var date = new Date(document.getElementById('edit_load_time_' + d.label).value);
-                date.setHours(date.getHours() + 8);
-                if(d.label == 'From') {
-                    options['Dataset']['Time Min'].custom = date;
-                } else { // To
-                    options['Dataset']['Time Max'].custom = date;
-                }
-            });
-        
-        entries.append('div')
-            .attr('class', 'input-group-btn')
-            .append('button')
-            .attr('class', 'btn btn-default')
-            .html('<span class="glyphicon glyphicon-step-forward"></span>')
-            .on('click', function(d) {
-                if(d.label == 'From') {
-                    options['Dataset']['Time Min'].custom = new Date(options['Dataset']['Time Max'].custom);
-                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options['Dataset']['Time Min'].custom);
-                } else { // To
-                    options['Dataset']['Time Max'].custom = new Date(data.time.collection_max);
-                    document.getElementById('edit_load_time_' + d.label).value = util.formDate(options['Dataset']['Time Max'].custom);
-                }
-            });
-        
-        // Accept Button
-        var ops = d3.select('#modal .modal-options')
-        ops.selectAll('*').remove();
-        
-        ops.append('button')
-            .attr({
-//                id: 'edit-window-tweetin',
-                class: 'btn btn-primary edit-window-routine'
-            })
-            .on('click', function(d) {
-                // Set values
-                options['Dataset']['Time Window'].set('custom');
-                options['Dataset']['Time Min'].date = options['Dataset']['Time Min'].custom;
-                options['Dataset']['Time Max'].date = options['Dataset']['Time Max'].custom;
-                
-                // Close modal
-                $('#modal').modal(false);
-                
-                // Functions
-                options.configureLoadTimeWindow();
-                data.loadCollectionData(); 
-            })
-            .text('Update');
-        
-        
-        $('#modal').modal(true);
     },
     buildSidebar: function() {
         var sidebar = d3.select('body').append('div')

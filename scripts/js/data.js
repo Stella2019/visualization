@@ -575,12 +575,6 @@ Data.prototype = {
             }
         } 
     },
-    updateEvent: function() {
-        var fields = {};
-        $("#edit_form").serializeArray().forEach(function(x) { fields[x.name] = x.value; });
-        
-        Connection.php('collection/update', fields, options.editWindowUpdated); // add a callback
-    },
     rmTweetCount: function(search_text, search_name) {
         var post = {
             event_id: data.event.ID,

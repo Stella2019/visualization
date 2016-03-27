@@ -1,5 +1,5 @@
 // Structure that will be used throughout the other data
-var options, legend, disp, data, pipeline, TS;
+var options, legend, pipeline, TS;
 
 function Pipeline() {
     this.progress = null;
@@ -111,18 +111,19 @@ Pipeline.prototype = {
 };
 
 function Timeseries () {
-    this.disp = new TimeseriesDisplay(this);
     this.model = new TimeseriesModel(this);
-    this.ops = new Options();
+    this.view = new TimeseriesView(this); // may be considered redundant
+    this.chart = new TimeseriesChart(this);
+//    this.chart_context = new TimeseriesChart(this);
+    this.ui = new TimeseriesUI(this);
+    this.legend = new TimeseriesLegend(this);
+    
+    this.ops = new Options(this);
+    
     this.tooltip = new Tooltip();
+    this.modal = new Modal();
 }
 Timeseries.prototype = {
-    setTriggers: function() {
-        triggers.on("timeseries:new_events", this.populateEventOptions.bind(this));
-        
-        this.disp.setTriggers();
-        this.model.setTriggers();
-    },
     setOptions: function() {
         this.ops.panels = ['Dataset', 'View', 'Series', 'Analysis'];
         var options = this.ops;
@@ -134,7 +135,7 @@ Timeseries.prototype = {
                 ids:    ["All", "Other Type"],
                 default: 0,
                 custom_entries_allowed: true,
-                callback: function() { options.chooseCollectionType(); }
+                callback: triggers.emitter('new_event_type')
             }),
             Event: new Option({
                 title: "Event",
@@ -142,8 +143,8 @@ Timeseries.prototype = {
                 ids:    ["none"],
                 default: 0,
                 custom_entries_allowed: true,
-                callback: function() { data.setCollection(); },
-                edit: function() { options.editWindow('collection');  }
+                callback: triggers.emitter('new_event'),
+                edit: function() { options.editWindow('event');  }
             }),
             Rumor: new Option({
                 title: 'Rumor',
@@ -159,15 +160,8 @@ Timeseries.prototype = {
                 labels: ["First Day", "First 3 Days", "Whole Collection", "Custom",],
                 ids:    ['1d', '3d', 'all', 'custom'],
                 default: 0,
-                callback: function() { 
-                    if(options['Dataset']['Time Window'].is('custom')) {
-                        options.editLoadTimeWindow();
-                    } else {
-                        options.configureLoadTimeWindow();
-                        data.loadCollectionData();
-                    }
-                },
-                edit: function() { options.editLoadTimeWindow(); }
+                callback: triggers.emitter('choose:time_window'),
+                edit: triggers.emitter('edit:time_window')
             }),
             'Time Min': new Option({
                 title: "Time Min",
@@ -253,32 +247,10 @@ Timeseries.prototype = {
                 default: 0,
                 type: "toggle",
                 callback: function() { 
-                    disp.alert('Sorry this is broken right now');
-                    pipeline.start('Configure Plot Area');
+                    triggers.emit('alert', 'Sorry this feature is broken right now.');
+//                    pipeline.start('Configure Plot Area'); TODO
                 }
             }),
-//            'Time Saving': new Option({
-//                title: "Save Time State",
-//                labels: ["No", 'Yes'],
-//                ids:    ["false", "true"],
-//                default: 0,
-//                type: "toggle",
-//                parent: '#choices_time_right_buttons',
-//                callback: function() { 
-//                    var saving = !(options.time_save.is("true"));
-//                    if(saving) {
-//                        if(options.record.indexOf('time_min') == -1)
-//                            options.record.push('time_min');
-//                        if(options.record.indexOf('time_max') == -1)
-//                            options.record.push('time_max');
-//                    } else {
-//                        if(options.record.indexOf('time_min') > -1)
-//                            options.record.splice(options.record.indexOf('time_min'), 1);
-//                        if(options.record.indexOf('time_max')>  -1)
-//                            options.record.splice(options.record.indexOf('time_max'), 1);
-//                    }
-//                }
-//            }),
             'Time Min': new Option({
                 title: "Begin",
                 labels: ["2000-01-01 00:00"],
@@ -382,98 +354,13 @@ Timeseries.prototype = {
         
         this.ops.updateCollectionCallback = function() { data.loadRumors(); };
         this.ops.init();
-    },
-    populateEventOptions: function() {
-        var event_op = this.ops['Dataset']['Event'];
-        var event_type_op = this.ops['Dataset']['Event Type'];
-        
-        // Generate Collections List
-        event_op['labels'] = this.model.event_names;
-        event_op['ids'] = this.model.events_arr.map(function(event) { return event['ID']; });
-        event_op['available'] = util.range(this.model.events_arr.length);
-        
-        // Find the current collection
-        var cur = event_op.get();
-        event_op.default = this.model.events_arr.reduce(function(candidate, event, i) {
-            if(event['ID'] == cur)
-                return i;
-            return candidate;
-        }, 0);
-        event_op.set(event_op['ids'][event_op.default]);
-        
-        // Make the dropdown
-        this.ops.buildSidebarOption('Dataset', 'Event');
-        this.ops.recordState(true);
-        
-        // Generate Types of Collections
-        var types = util.lunique(this.model.events_arr.map(function(event) { return event['Type']; }));
-        types.unshift('All'); // Add 'All' to begining
-        
-        event_type_op['labels'] = types;
-        event_type_op['ids'] = types;
-        event_type_op['available'] = util.range(types.length);
-        
-        // Set the type to match the current collection
-        event_type_op.default = event_type_op['ids'].indexOf(this.model.events_arr[event_op.default]['Type']);
-        event_type_op.set(types[event_type_op.default]);
-        
-        // Make the dropdown for collection types
-        this.ops.buildSidebarOption('Dataset', 'Event Type');
-        this.ops.recordState(true);
-
-        // Add additional information for collections
-        this.model.events_arr.forEach(function(event) {
-            var id = '#Event_' + event['ID'];
-            this.tooltip.attach(id, function(d) {
-                return this.model.events_arr[d];
-            }.bind(this));
-        }, this);
-        
-        // Limit the collection selections to the particular type
-        this.chooseEventType();
-    },
-    chooseEventType: function() {
-        var event_op = this.ops['Dataset']['Event'];
-        var curType = this.ops['Dataset']['Event Type'].get();
-        var curEvent = event_op.get();
-        var firstValid = -1; 
-        
-        this.model.events_arr.map(function(event, i) {
-            if(event['Type'] == curType || 'All' == curType) {
-                d3.select('#Event_' + event['ID'])
-                    .style('display', 'block');
-                
-                if(firstValid == -1)
-                    firstValid = i;
-            } else {
-                d3.select('#Event_' + event['ID'])
-                    .style('display', 'none');
-                
-                if(event['ID'] == curEvent)
-                    curEvent = 'invalid';
-            }
-        });
-        
-        // If the current collection does not match this type, then make a new one
-        if(curEvent == 'invalid') {
-            event_op.set(event_op.ids[firstValid]);
-                        
-            d3.select('#choose_Event').select('.current')
-                .text(event_op.getLabel());
-
-            this.ops.recordState(true);
-
-            this.model.setEvent();
-        }
-    },
+    }
 };
 
 function initialize() {
     TS = new Timeseries();
     
-    TS.setTriggers();
-    
-    TS.disp.buildPage();
+    TS.view.buildPage();
     TS.tooltip.init();
     TS.setOptions();
     

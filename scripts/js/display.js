@@ -673,53 +673,6 @@ Display.prototype = {
             .classed('hidden', options['View']['Total Line'].is("false"));
     //    container.style('display', options['View']['Total Line'].is("true") ? 'block' : 'none');
     },
-    alert: function(text, style_class, parent) {
-        if(!style_class)
-            style_class = 'warning';
-        if(!parent)
-            parent = '#body';
-        
-        var style = {
-            position: 'absolute',
-            top: '50%',
-            transform: 'translate(0%, -50%)',
-            left: '20%',
-            width: '60%',
-            'z-index': 4
-        }
-        
-        var alert_shadow = d3.select(parent).append('div')
-            .attr('class', 'alert_outer')
-            .style({
-                'width': '100%',
-                'height': '100%',
-                'position': 'absolute',
-                'top': 0,
-                'left': 0
-            })
-            .on('click', function() {
-                d3.select('.alert_outer').remove();
-            });
-        
-        var alert_div = alert_shadow.append('div')
-            .attr({
-                'class': 'alert alert-' + style_class + ' alert-dismissible',
-                'role': 'alert'
-            })
-            .style(style);
-        
-        alert_div.append('button')
-            .attr({'type': 'button',
-                   'class': 'close', 
-                   'data-dismiss': 'alert',
-                   'aria-label': 'Close'})
-            .append('span')
-            .attr('aria-hidden', 'true')
-            .html('&times;');
-        
-        alert_div.append('span')
-            .html(text);
-    },
     tweetsModal: function(post, title) {
 
         var title_div = d3.select('#modal .modal-title').html('');

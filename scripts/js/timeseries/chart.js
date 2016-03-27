@@ -1,53 +1,67 @@
-function Chart() {
-    // internals
-    var self = this;
+function TimeseriesChart(app, type) {
+    this.app = app;
     
     // Size
-    plot_area = disp.plot_area; // maybe not
-    self.placement = 1; // use this to move charts around
-    self.top    = 10;
-    self.right  = 10;
-    self.bottom = 100;
-    self.left   = 75;
-    self.width  = plot_area.width  - self.left - self.right;
-    self.height = plot_area.height - self.top  - self.bottom;
+    this.page = {};
+    this.getPageBounds();
+    
+    this.placement = 1; // use this to move charts around
+    this.top    = 10;
+    this.right  = 10;
+    this.bottom = 100;
+    this.left   = 75;
+    this.width  = this.page.width  - this.left - this.right;
+    this.height = this.page.height - this.top  - this.bottom;
     
     // Scales
-    self.x = d3.time.scale();
-    self.y = d3.scale.linear();
-    self.y2 = d3.scale_linear();
+    this.x = d3.time.scale();
+    this.y = d3.scale.linear();
+    this.y2 = d3.scale.linear();
     
     // Axes
-    self.xAxis = d3.svg.axis()
-        .scale(self.x)
+    this.xAxis = d3.svg.axis()
+        .scale(this.x)
         .orient('bottom');
-    self.yAxis = d3.svg.axis()
-        .scale(self.y)
+    this.yAxis = d3.svg.axis()
+        .scale(this.y)
         .orient('left');
-    self.yAxis2 = d3.svg.axis()
-        .scale(self.y2)
+    this.yAxis2 = d3.svg.axis()
+        .scale(this.y2)
         .orient('right');
     
     // Getters
-    self.dataTimestamp_2_x = function(d) { return self.x(d.timestamp); };
-    self.dataValue_2_y = function(d) { return self.y(d.value); };
+    this.dataTimestamp_2_x = function(d) { return this.x(d.timestamp); };
+    this.dataValue_2_y     = function(d) { return this.y(d.value);     };
     
     // Area
-    self.area = d3.svg.area()
-        .x(self.dataTimestamp_2_x);
-    self.area2 = d3.svg.area()
-        .x(self.dataTimestamp_2_x);
+    this.area = d3.svg.area()
+        .x(this.dataTimestamp_2_x);
+    this.area2 = d3.svg.area()
+        .x(this.dataTimestamp_2_x);
     
     // Other potential attributes
-    self.brush = [];
-    self.svg = [];
+    this.brush = [];
+    this.svg = [];
+    
+    this.init();
 }
 
-Chart.prototype = {
+TimeseriesChart.prototype = {
     init: function() {
+        this.setTriggers();
+    },
+    setTriggers: function() {
+        triggers.on('page_built2', this.build.bind(this));
+        triggers.on('resized', this.build.bind(this));
+    },
+    build: function() {
         this.adjustSize();
         this.updateOptionalAttributes();
         // disp.setColorScale
+    },
+    getPageBounds: function() {
+        this.page.height = parseInt(d3.select('body').style('height').replace('px', ''));
+        this.page.width  = parseInt(d3.select('body').style('width').replace('px', ''));
     },
     adjustSize: function(args) {
         
@@ -92,6 +106,4 @@ Chart.prototype = {
             .x(this.x)
             .on("brush", function() { disp.setFocusTime('brush'); } );
     }
-    
-    // functions
 };

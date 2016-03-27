@@ -8,10 +8,30 @@ function TimeseriesModel (app) {
     this.event_names = [];
     
     this.event = {};
+    this.time = {
+        name: "Time",
+        event_min: new Date(),
+        event_max: new Date(),
+        min: new Date(), // of possible data
+        max: new Date(), // of possible data
+        stamps: [],
+        stamps_nested: [],
+        stamps_nested_int: [],
+        nested_min: new Date(),
+        nested_max: new Date(),
+        data_index: 4
+    };
+    
+    this.init();
 }
 TimeseriesModel.prototype = {
+    init: function() {
+        this.setTriggers();
+    },
     setTriggers: function() {
         triggers.on('new_event', this.setEvent.bind(this));
+        triggers.on('edit_window:updated', this.updateCollection.bind(this));
+        triggers.on('event:load_timeseries', this.loadEventTimeseries.bind(this));
     },
     loadEvents: function () {
         // Event selection
@@ -63,7 +83,7 @@ TimeseriesModel.prototype = {
             return event.DisplayName;
         });
         
-        triggers.emit("new_events");
+        triggers.emit('new_events');
         
 //        options.buildEvents();
 //
@@ -72,25 +92,36 @@ TimeseriesModel.prototype = {
 //        legend.init();
 //
 //        data.setEvent();
-        this.setEvent();
+//        triggers.emit('new_event', this.event);
     },
     setEvent: function () {
         var event_id = this.app.ops['Dataset']['Event'].get();
         this.event = this.events[parseInt(event_id)];
-        triggers.emit("new_event", this.event);
+//        triggers.emit("new_event", this.event);
         
         // Save times for the collection
-        global_min_id = this.event.FirstTweet || 0;
-        global_max_id = this.event.LastTweet || 1e20;
+        this.time.event_min = new Date(this.event.StartTime);
+        if(this.event.StopTime == "Ongoing") {
+            this.time.event_max = new Date();
+        } else {
+            this.time.event_max = new Date(this.event.StopTime);
+        }
         
-//        data.time.event_min = new Date(data.event.StartTime);
-//        if(data.event.StopTime == "Ongoing") {
-//            data.time.event_max = new Date();
-//        } else {
-//            data.time.event_max = new Date(data.event.StopTime);
-//        }
-        options.configureLoadTimeWindow(); // TODO
+        global_min_id = this.event.FirstTweet || util.timestamp2TwitterID(this.time.event_min);
+        global_max_id = this.event.LastTweet  || util.timestamp2TwitterID(this.time.event_max);
         
-        data.loadEventTimeseries();
+        triggers.emit('global_time_set');
+        
+        triggers.emit('event_updated', this.event);
+//        data.loadEventTimeseries(); // TODO
     },
+    updateCollection: function() {
+        var fields = {};
+        $("#edit_form").serializeArray().forEach(function(x) { fields[x.name] = x.value; });
+        
+        Connection.php('collection/update', fields, triggers.emitter('edit_window_updated')); // add a callback
+    },
+    loadEventTimeseries: function() {
+        console.log('TODO');
+    }
 };
