@@ -1,0 +1,210 @@
+/* Body */
+#body {
+    margin-left: 200px;
+}
+
+/* Header */
+
+#header {
+    padding: 5px;
+}
+#chart-title {
+    font-size: x-large;
+}
+#header .choice {
+    float: right;
+}
+
+
+
+/* Options */
+.sidebar {
+    position: fixed;
+    width: 200px;
+    border-right: solid 5px #eee;
+    background: white;
+    top: 0px;
+    left: -175px;
+    transition: left 500ms;
+    overflow-Y: scroll;
+    height: 100%;
+    padding: 5px;
+}
+.sidebar:hover, .sidebar-pinned {
+    left: 0px;
+}
+.sidebar .sidepanel {
+    position: relative;
+}
+.sidebar h4 {
+    padding: 5px;
+    border-bottom: 1px solid #e5e5e5;
+}
+.sidebar .section-title {
+    position: absolute;
+    transition: 500ms;
+    background: white;
+    white-space: nowrap;
+    z-index: 10;
+    width: 20px;
+    
+    writing-mode: vertical-lr;
+    height: 100%;
+    vertical-align: middle;
+    text-align: center;
+    right: -5px;
+}
+.sidebar:hover .section-title, .sidebar-pinned .section-title {
+    width: 0px !important;
+}
+.sidebar-dropdown-option {
+    text-align: center;
+}
+.sidebar-dropdown-option a {
+    white-space: normal !important;
+    padding: 2px 8px !important;
+    font-size: 12px
+}
+
+#choices {
+    max-height: 150px;
+/*    overflow: scroll;*/
+}
+
+.choice {
+    display: inline-block;
+    padding: 2px;
+    width: 100%
+}
+.choice-break-before {
+    border-top: solid 1px #ddd;
+    margin-top: 5px;
+    padding-top: 5px;
+}
+
+.choice .dropdown {
+    width: 100%;
+}
+.choice .btn {
+    max-width: 100%;
+    white-space: normal;
+    float: right;
+}
+
+.input-group-addon.primary {
+    color: rgb(255, 255, 255);
+    background-color: rgb(50, 118, 177);
+    border-color: rgb(40, 94, 142);
+}
+.popover {
+    width: auto;
+    min-width: 150px;
+    text-align: center;
+}
+#choose_collection .popover {
+    min-width: 350px;
+}
+dl.collection_popover {
+    margin-bottom: 0px !important;
+}
+.collection_popover dt {
+    width: 70px;
+}
+.collection_popover dd {
+    margin-left: 85px;
+    text-align: left;
+    min-width: 200px !important;
+    max-height: 120px;
+    overflow: hidden;
+/*    text-overflow: ellipsis; */ /* Won't work with wrapped content */
+}
+
+button:focus {
+    outline: none !important;
+}
+
+
+/* Modals */
+.badge a {
+    color: white;
+}
+.modal-options {
+    display: inline-block;
+    position: relative;
+    margin: 0px 5px;
+}
+.edit-box {
+    padding-right: 30px;
+}
+.edit-box-query td {
+    padding: 3px;
+}
+.edit-box-query .selectType {
+    width: 80px;
+}
+.modal-options div { /* Why are there two? */
+    display: inline-table;
+    text-align: left;
+}
+.modal-options div {
+    display: inline-block;
+    margin-right: 5px;
+    margin-bottom: 5px;
+    position: relative;
+}
+
+.ngram_table_container {
+    display: inline-block;
+    width: 33%;
+    max-height: 400px;
+    vertical-align: top;
+    padding: 0px 7px;
+    overflow-y: scroll;
+}
+.ngram_table {
+    width: 100%;
+}
+.ngram_table tr:nth-child(even) {
+    background: #EEE;
+}
+.ngram_count td {
+    padding: 1px 3px;
+}
+.ngram_count_label {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+.ngram_count_count {
+    text-align: right;
+    white-space: nowrap;
+}
+
+
+/* Other */
+.input-xs {
+    height: 22px;
+    padding: 5px 5px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-radius: 3px;
+}
+
+
+.tooltip {
+    position: fixed;
+    background: white;
+    border-width: 1px;
+    border-style: ridge;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 20;
+    text-transform: capitalize;
+    padding-bottom: 5px;
+}
+.tooltip td, .tooltip th {
+    padding: 5px 5px 0px 5px;
+    max-width: 300px;
+}
+    

@@ -1,0 +1,52 @@
+#status_table {
+    font-size: .9em;
+}
+.cell-count {
+    position: relative;
+    text-align: right;
+}
+.glyphicon-hiddenclick {
+    float: right;
+    opacity: 0;
+    cursor: pointer;
+}
+td:hover .glyphicon-hiddenclick {
+    opacity: 0.6;
+}
+th:hover .glyphicon-hiddenclick {
+    opacity: 0.6;
+}
+.glyphicon-hiddenclick:hover {
+    opacity: 1 !important;
+}
+.glyphicon-hoverclick {
+    cursor: pointer;
+    opacity: 0.6;
+}
+.glyphicon-hoverclick:hover {
+    opacity: 1;
+}
+.col-sortable {
+    cursor: pointer;
+}
+.col-sortable .glyphicon-hoverclick {
+    float: right;
+}
+
+.row_type {
+    background-color: #eee;
+}
+.row_type .cell-label {
+    padding-left: 10px;
+    font-weight: bold;
+}
+.row_event {
+    background-color: aliceblue;
+}
+.row_event .cell-label {
+    padding-left: 20px;
+}
+.row_subset .cell-label {
+    font-style: italic;
+    padding-left: 30px;
+}

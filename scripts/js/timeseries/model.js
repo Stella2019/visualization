@@ -52,8 +52,8 @@ TimeseriesModel.prototype = {
         // Format collection data
         this.events_arr.forEach(function (event) {
             // Keywords
-            event.Keywords = event.Keywords.trim().split(/,[ ]*/);
-            event.OldKeywords = event.OldKeywords.trim().split(/,[ ]*/);
+            event.Keywords = event['Keywords'] ? event.Keywords.trim().split(/,[ ]*/) : [];
+            event.OldKeywords = event['OldKeywords'] ? event.OldKeywords.trim().split(/,[ ]*/) : [];
             if (event.OldKeywords.length == 1 && event.OldKeywords[0] == "")
                 event.OldKeywords = [];
             
@@ -62,7 +62,7 @@ TimeseriesModel.prototype = {
                 event.DisplayName = event.Name;
                
             // Time
-            event.StartTime = util.date(event.StartTime);
+            event.StartTime = event.StartTime ? util.date(event.StartTime) : new Date();
 //            collection.StartTime.setMinutes(collection.StartTime.getMinutes()
 //                                           -collection.StartTime.getTimezoneOffset());
             event.Month = util.date2monthstr(event.StartTime);

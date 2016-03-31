@@ -1,20 +1,31 @@
-var SR, options, data;
-
 function StatusReport() {
+    this.connection = new Connection();
+    this.ops = new Options(this);
+    this.tooltip = new Tooltip;
+    
     this.events = {};
     this.events_arr = [];
-    this.rumors = {};
-    this.rumors_arr = [];
+    this.subsets = {};
+    this.subsets_arr = [];
     this.event_types = {};
     this.event_types_arr = [];
 }
 StatusReport.prototype = {
+    init: function() {
+        this.setTriggers();
+        this.getData();
+        this.tooltip.init();
+    },
+    setTriggers: function() {
+        triggers.on('sort_elements', function() { this.clickSort(false, 'maintain_direction'); }.bind(this));
+        triggers.on('update_all_counts', this.updateTableCounts.bind(this));
+    },
     getData: function() {
         var datasets = 2;
             
-        Connection.php('collection/getEvents', {}, function(d) {
+        this.connection.php('collection/getEvent', {}, function(d) {
             try {
-                SR.events_arr = JSON.parse(d);
+                this.events_arr = JSON.parse(d);
             } catch(err) {
                 console.log(d);
                 return;
@@ -22,12 +33,12 @@ StatusReport.prototype = {
             
             datasets--;
             if(datasets == 0)
-                SR.configureData();
-        });
+                this.configureData();
+        }.bind(this));
 
-        Connection.php('collection/getRumors', {}, function(d) {
+        this.connection.php('collection/getSubset', {}, function(d) {
             try {
-                SR.rumors_arr = JSON.parse(d);
+                this.subsets_arr = JSON.parse(d);
             } catch(err) {
                 console.log(d);
                 return;
@@ -35,219 +46,122 @@ StatusReport.prototype = {
             
             datasets--;
             if(datasets == 0)
-                SR.configureData();
-        });
+                this.configureData();
+        }.bind(this));
     },
     configureData: function() {
         // Clear any old data
         this.events = {};
-        this.rumors = {};
+        this.subsets = {};
         this.event_types = {};
         this.event_types_arr = [];
+        var quantities = ['Tweets', 'DistinctTweets', 
+                      'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
+                      'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
+                      'FirstTweet', 'LastTweet'];
         
         // Link all of the data
-        SR.events_arr.forEach(function(event) {
+        this.events_arr.forEach(function(event) {
             // Add fields
             event.ID = parseInt(event.ID);
-            event.rumors = [];
+            event.subsets = [];
             event.Label = event.DisplayName || event.Name;
             event.Level = 1;
-            event.Tweets = 0;
-            event.Datapoints = 0;
+            quantities.forEach(function (quantity) {
+                event[quantity] = parseInt(event[quantity]) || 0;
+            });
             
             // Add to event type list (or make new event type list)
             var type = event.Type;
-            if(type in SR.event_types) {
-                SR.event_types[type].events.push(event);
+            if(type in this.event_types) {
+                this.event_types[type].events.push(event);
             } else {
                 var new_event_type = {
                     Level: 0,
                     Label: type,
                     events: [event]
                 }
-                SR.event_types[type] = new_event_type;
-                SR.event_types_arr.push(new_event_type);
+                this.event_types[type] = new_event_type;
+                this.event_types_arr.push(new_event_type);
             }
-            event['Event Type'] = SR.event_types[type];
+            event['Event Type'] = this.event_types[type];
+            event['Event'] = event; // weird but makes things easier
+            
             
             // Add to indiced object
-            SR.events[event.ID] = event;
-        });
-        SR.rumors_arr.forEach(function(rumor) {
+            this.events[event.ID] = event;
+        }, this);
+        this.subsets_arr.forEach(function(subset) {
             // Add fields
-            rumor.ID = parseInt(rumor.ID);
-            rumor.Label = rumor.Name;
-            rumor.Level = 2;
-            rumor.Tweets = 0;
-            rumor.Codes = 0;
+            subset.ID = parseInt(subset.ID);
+            subset.Label = subset.Feature + ": " + subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
+            subset.Level = 2;
+            subset.Event_ID = subset.Event;
+            quantities.forEach(function (quantity) {
+                subset[quantity] = parseInt(subset[quantity]) || 0;
+            });
             
-            rumor.Event = SR.events[rumor.Event_ID];
-            if(rumor.Event.rumors) {
-                rumor.Event.rumors.push(rumor);
+            subset.Event = this.events[subset.Event_ID];
+            if(subset.Event.subsets) {
+                subset.Event.subsets.push(subset);
             } else {
-                rumor.Event.rumors = [rumor];
+                subset.Event.subsets = [subset];
             }
-            rumor['Event Type'] = rumor.Event['Event Type'];
+            subset['Event Type'] = subset.Event['Event Type'];
             
             // Add to indiced object
-            SR.rumors[rumor.ID] = rumor;
-        });
+            this.subsets[subset.ID] = subset;
+        }, this);
         
-        setTimeout(SR.loadMoreData, 100);
-        SR.buildDropdowns();
-    },
-    loadMoreData: function() {
-        var ints = ['Tweets', 'DistinctTweets', 'CodedTweets', 'AdjudTweets', 'Datapoints'];
-        var fields = ['FirstTweet', 'LastTweet', 'FirstDatapoint', 'LastDatapoint'];
-        
-        // Get the number of tweets for each rumor
-        Connection.php('count/get', {}, function(d) {
-            var counts;
-            try {
-                counts = JSON.parse(d);
-            } catch(err) {
-                console.log(d);
-                return;
-            }
-            
-            counts.forEach(function(count) {
-                var collection = 'events';
-                if(count.Type == 'Rumor') {
-                    collection = 'rumors';
-                }
-                if(!SR[collection][count.ID]) {
-//                    console.log('Invalid Collection ' + count.Type + ' ' + count.ID);
-                    return;
-                }
-                
-                ints.forEach(function(field) {
-                    if(field in count) {
-                        SR[collection][count.ID][field] = parseInt(count[field]);
-                    }
-                });
-                fields.forEach(function(field) {
-                    if(field in count) {
-                        SR[collection][count.ID][field] = count[field];
-                    }
-                });
-            });
-            
-            SR.computeAggregates();
-        });
-        
-        return;
-        
-        // Get additional data
-        var datasets = 3;
-
-        // Get the number of tweets for each event
-//        Connection.php('collection/getEventStatistics', {}, function(d) {
-//            var eventTweets = JSON.parse(d);
-//            
-//            eventTweets.forEach(function(event) {
-//                SR.events[event.ID].nTweets = event.nTweets;
-//            });
-//            
-//            datasets--;
-//            if(datasets == 0)
-//                SR.buildTable();
-//        });
-        
-        // Get the number of tweets for each rumor
-        Connection.php('collection/getRumorStatistics', {}, function(d) {
-            var counts;
-            try {
-                counts = JSON.parse(d);
-            } catch(err) {
-                console.log(d);
-                return;
-            }
-            
-            counts.forEach(function(row) {
-                SR.rumors[row.ID].Tweets = row.Tweets;
-                SR.rumors[row.ID].First = row.First;
-                SR.rumors[row.ID].Last  = row.Last;
-            });
-            
-//            datasets--;
-//            if(datasets == 0)
-                SR.computeAggregates();
-        });
-        // Get the number of tweets for each rumor
-        Connection.php('timeseries/getStatistics', {}, function(d) {
-            var counts ;
-            try {
-                counts = JSON.parse(d);
-            } catch(err) {
-                console.log(d);
-                return;
-            }
-            
-            counts.forEach(function(row) {
-                SR.events[row.ID].Datapoints = row.Count;
-                SR.events[row.ID].First = row.First;
-                SR.events[row.ID].Last  = row.Last;
-            });
-            
-//            datasets--;
-//            if(datasets == 0)
-                SR.computeAggregates();
-        });
-        // Get the number of tweets for each rumor
-        Connection.php('coding/rumorPeriodCounts', {}, function(d) {
-            var counts ;
-            try {
-                counts = JSON.parse(d);
-            } catch(err) {
-                console.log(d);
-                return;
-            }
-            
-            counts.forEach(function(rumorperiod) {
-                if(rumorperiod.Period == 0)
-                    SR.rumors[rumorperiod.Rumor].CodedTweets = rumorperiod.Count;
-            });
-            
-//            datasets--;
-//            if(datasets == 0)
-                SR.computeAggregates();
-        });
+        this.buildDropdowns();
     },
     computeAggregates: function() {
-        SR.events_arr.forEach(function(e) {
+//        this.events_arr.forEach(function(e) {
 //            e.Tweets         = e.Tweets         || d3.sum(e.rumors, function(r) { return r.Tweets         || 0; });
 //            e.DistinctTweets = e.DistinctTweets || d3.sum(e.rumors, function(r) { return r.DistinctTweets || 0; });
-            e.CodedTweets    = e.CodedTweets    || d3.sum(e.rumors, function(r) { return r.CodedTweets    || 0; });
-            e.AdjudTweets    = e.AdjudTweets    || d3.sum(e.rumors, function(r) { return r.AdjudTweets    || 0; });
+//            e.CodedTweets    = e.CodedTweets    || d3.sum(e.rumors, function(r) { return r.CodedTweets    || 0; });
+//            e.AdjudTweets    = e.AdjudTweets    || d3.sum(e.rumors, function(r) { return r.AdjudTweets    || 0; });
 //            e.Datapoints     = e.Datapoints     || d3.sum(e.rumors, function(r) { return r.Datapoints     || 0; });
+//        });
+        
+        this.event_types_arr.forEach(function(d) {
+            d.Tweets            = d3.sum(d.events, function(e) { return e.Tweets            || 0; });
+            d.DistinctTweets    = d3.sum(d.events, function(e) { return e.DistinctTweets    || 0; });
+            d.Originals         = d3.sum(d.events, function(e) { return e.Originals         || 0; });
+            d.DistinctOriginals = d3.sum(d.events, function(e) { return e.DistinctOriginals || 0; });
+            d.Retweets          = d3.sum(d.events, function(e) { return e.Retweets          || 0; });
+            d.DistinctRetweets  = d3.sum(d.events, function(e) { return e.DistinctRetweets  || 0; });
+            d.Replies           = d3.sum(d.events, function(e) { return e.Replies           || 0; });
+            d.DistinctReplies   = d3.sum(d.events, function(e) { return e.DistinctReplies   || 0; });
+            d.Quotes            = d3.sum(d.events, function(e) { return e.Quotes            || 0; });
+            d.DistinctQuotes    = d3.sum(d.events, function(e) { return e.DistinctQuotes    || 0; });
+//            d.CodedTweets       = d3.sum(d.events, function(e) { return e.CodedTweets    || 0; });
+//            d.AdjudTweets       = d3.sum(d.events, function(e) { return e.AdjudTweets    || 0; });
+//            d.Datapoints        = d3.sum(d.events, function(e) { return e.Datapoints     || 0; });
+            d.FirstTweet_Min    = d3.min(d.events, function(e) { return e.FirstTweet        || 0; });
+            d.FirstTweet_Max    = d3.max(d.events, function(e) { return e.FirstTweet        || 0; });
+            d.LastTweet_Min     = d3.min(d.events, function(e) { return e.LastTweet         || 0; });
+            d.LastTweet_Max     = d3.max(d.events, function(e) { return e.LastTweet         || 0; });
+            d.ID_Min            = d3.min(d.events, function(e) { return parseInt(e.ID)      || 0; });
+            d.ID_Max            = d3.max(d.events, function(e) { return parseInt(e.ID)      || 0; });
         });
         
-        SR.event_types_arr.forEach(function(d) {
-            d.Tweets         = d3.sum(d.events, function(e) { return e.Tweets         || 0; });
-            d.DistinctTweets = d3.sum(d.events, function(e) { return e.DistinctTweets || 0; });
-            d.CodedTweets    = d3.sum(d.events, function(e) { return e.CodedTweets    || 0; });
-            d.AdjudTweets    = d3.sum(d.events, function(e) { return e.AdjudTweets    || 0; });
-            d.Datapoints     = d3.sum(d.events, function(e) { return e.Datapoints     || 0; });
-            d.FirstTweet_Min = d3.min(d.events, function(e) { return e.FirstTweet     || 0; });
-            d.FirstTweet_Max = d3.max(d.events, function(e) { return e.FirstTweet     || 0; });
-            d.ID_Min         = d3.min(d.events, function(e) { return parseInt(e.ID)   || 0; });
-            d.ID_Max         = d3.max(d.events, function(e) { return parseInt(e.ID)   || 0; });
-        });
-        
-        SR.updateTableCounts();
+        this.updateTableCounts();
     },
     buildDropdowns: function() {
-        options.updateCollectionCallback = SR.getData;
+        this.ops.updateCollectionCallback = this.getData;
         
-        var orders = ['ID', 'Collection', 'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Adjud Tweets', 'Datapoints', 'First Tweet'];
-        options['View'] = {
+        var orders = ['ID', 'Collection', 'Tweets', 'Distinct Tweets', 
+                      'Originals', 'Retweets', 'Replies', 'Quotes', 
+                      'First Tweet', 'Last Tweet'];
+        this.ops['View'] = {
             empties: new Option({
                 title: 'Show Rows with No Tweets',
                 labels: ['Yes', 'No'],
                 ids:    ["true", "false"],
                 default: 1,
                 type: "dropdown",
-                callback: SR.setVisibility
+                callback: this.setVisibility.bind(this)
             }), 
             hierarchical: new Option({
                 title: 'Maintain Hierarchy',
@@ -255,7 +169,7 @@ StatusReport.prototype = {
                 ids:    ["true", "false"],
                 default: 0,
                 type: "dropdown",
-                callback: function() { SR.clickSort(false, 'maintain_direction'); }
+                callback: triggers.emitter('sort_elements')
             }),
 //            levels: new Option({
 //                title: 'Show',
@@ -268,7 +182,7 @@ StatusReport.prototype = {
 //                default: 0,
 //                type: "dropdown",
 //                parent: '#status_table_header',
-//                callback: SR.buildTable
+//                callback: this.buildTable
 //            }),
             order: new Option({
                 title: 'Order',
@@ -276,7 +190,7 @@ StatusReport.prototype = {
                 ids:    orders,
                 default: 0,
                 type: "dropdown",
-                callback: function() { SR.clickSort(false, 'maintain_direction'); }
+                callback: triggers.emitter('sort_elements')
             }),
             ascending: new Option({
                 title: 'Ascending',
@@ -284,21 +198,39 @@ StatusReport.prototype = {
                 ids:    ['true', 'false'],
                 default: 0,
                 type: "dropdown",
-                callback: function() { SR.clickSort(false, 'maintain_direction'); }
+                callback: triggers.emitter('sort_elements')
             })
         };
-        options.panels = ['View'];
+        this.ops['Counts'] = {
+            Distinct: new Option({
+                title: 'Distinct?',
+                labels: ['Show All', 'Only Distinct'],
+                ids:    ['', 'Distinct'],
+                default: 0,
+                type: "dropdown",
+                callback: triggers.emitter('update_all_counts')
+            }),
+            Relative: new Option({
+                title: 'Relative to',
+                labels: ['-', 'Event', 'Event\'s Types', 'Whole Subset', 'Distinct/Repeat'],
+                ids:    ['raw', 'event', 'type', 'subset', 'distinct'],
+                default: 0,
+                type: "dropdown",
+                callback: triggers.emitter('update_all_counts')
+            })
+        };
+        this.ops.panels = ['View', 'Counts'];
         
         // Start drawing
-        options.init();
+        this.ops.init();
         
         //status....
-        SR.buildTable();
+        this.buildTable();
     },
     buildTable: function() {
         var columns = ['ID', 'Collection',
-                       'Tweets', 'Distinct Tweets', 'Coded Tweets', 'Adjud Tweets', 'Datapoints',
-                       'First Tweet', //'Last Tweet', 
+                       'Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes', 
+                       'First Tweet', 'Last Tweet', 
                        'Open'];// <span class="glyphicon glyphicon-new-window"></span>
         
         d3.select('#table-container').selectAll('*').remove();
@@ -317,17 +249,17 @@ StatusReport.prototype = {
                 if(d == 'Open') return null;
                 return 'col-sortable col-' + util.simplify(d); 
             })
-            .html(function(d) { return d; });
+            .html(function(d) { return d.replace('Distinct ', ''); });
         
         table.selectAll('.col-sortable')
-            .on('click', SR.clickSort)
+            .on('click', this.clickSort.bind(this))
             .append('span')
             .attr('class', 'glyphicon glyphicon-sort glyphicon-hiddenclick');
         
         var table_body = table.append('tbody');
         
         // Add table rows
-        SR.event_types_arr.forEach(function(event_type) {
+        this.event_types_arr.forEach(function(event_type) {
             table_body.append('tr')
                 .data([event_type])
                 .attr('class', 'row_type');
@@ -337,10 +269,10 @@ StatusReport.prototype = {
                     .data([event])
                     .attr('class', function(d) { return 'row_event row_event_' + d.ID; });
                 
-                event.rumors.forEach(function(rumor) {
+                event.subsets.forEach(function(rumor) {
                     table_body.append('tr')
                         .data([rumor])
-                        .attr('class', function(d) { return 'row_rumor row_rumor_' + d.ID; });
+                        .attr('class', function(d) { return 'row_subset row_subset_' + d.ID; });
                 });
             });
         })
@@ -362,56 +294,46 @@ StatusReport.prototype = {
 //            .html(function(d) { return d.Level > 0 ? 'ID: ' + d.ID : ''; });
         
         // Counts
-        table_body.selectAll('tr')
-            .append('td')
-            .attr('class', 'cell-tweets cell-count');
-        table_body.selectAll('tr')
-            .append('td')
-            .attr('class', 'cell-distincttweets cell-count');
-        table_body.selectAll('tr')
-            .append('td')
-            .attr('class', 'cell-codedtweets cell-count');
-        table_body.selectAll('tr')
-            .append('td')
-            .attr('class', 'cell-adjudtweets cell-count');
-        table_body.selectAll('tr')
-            .append('td')
-            .attr('class', 'cell-datapoints cell-count');
+        ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
+            table_body.selectAll('tr')
+                .append('td')
+                .attr('class', 'cell-' + type + ' cell-count');
+        });
         
         // Times
         table_body.selectAll('tr')
             .append('td')
             .attr('class', 'cell-firstdate');
-//        table_body.selectAll('tr')
-//            .append('td')
-//            .attr('class', 'cell-lastdate');
+        table_body.selectAll('tr')
+            .append('td')
+            .attr('class', 'cell-lastdate');
         
         // Buttons
         table_body.selectAll('tr')
             .append('td')
             .attr('class', 'cell_options')
         
-        table_body.selectAll('tr.row_event td.cell_options, tr.row_rumor td.cell_options')
+        table_body.selectAll('tr.row_event td.cell_options, tr.row_subset td.cell_options')
             .append('span')
             .attr('class', 'glyphicon glyphicon-edit glyphicon-hoverclick')
-            .on('click', SR.edit);
+            .on('click', this.edit);
 
         table_body.selectAll('tr.row_event td.cell_options')
             .append('span')
             .attr('class', 'glyphicon glyphicon-signal glyphicon-hoverclick')
             .style('margin-left', '5px')
-            .on('click', SR.openTimeseries);
+            .on('click', this.openTimeseries);
         
-        table_body.selectAll('tr.row_rumor td.cell_options')
-            .append('span')
-//            .attr('class', 'btn btn-xs btn-default')
-            .text('Codes')
-            .attr('class', 'glyphicon-hoverclick')
-            .style('margin-left', '5px')
-            .on('click', SR.openCodingReport);
+//        table_body.selectAll('tr.row_rumor td.cell_options')
+//            .append('span')
+////            .attr('class', 'btn btn-xs btn-default')
+//            .text('Codes')
+//            .attr('class', 'glyphicon-hoverclick')
+//            .style('margin-left', '5px')
+//            .on('click', this.openCodingReport);
         
         // Set the counts
-        SR.updateTableCounts();
+        triggers.emit('update_all_counts');
     },
     formatThousands: function(value) {
 //        var unit = '';
@@ -452,61 +374,72 @@ StatusReport.prototype = {
         
         table_body.selectAll('tr')
             .style('display', 'table-row');
-        if(options['View']['empties'].is('false')) {
+        if(this.ops['View']['empties'].is('false')) {
             d3.selectAll('tr.row-zero')
                 .style('display', 'none');
         }
     },
-    updateTableCounts: function() {
-        var table_body = d3.select('tbody');
+    updateTableCounts: function(selector) {
+        selector = selector || 'tbody';
+        var table_body = d3.select(selector);
+        var distinct = this.ops['Counts']['Distinct'].get();
+        var relative = this.ops['Counts']['Relative'].get();
         
         // Update the text of rows with the counts
-        table_body.selectAll('td.cell-tweets')
-            .html(function(d) { return 'Tweets' in d ? SR.formatThousands(d.Tweets) : ''; });
-        table_body.selectAll('td.cell-distincttweets')
-            .html(function(d) { return 'DistinctTweets' in d ? SR.formatThousands(d.DistinctTweets) : ''; });
-        table_body.selectAll('td.cell-codedtweets')
-            .html(function(d) { return 'CodedTweets' in d ? SR.formatThousands(d.CodedTweets) : ''; });
-        table_body.selectAll('td.cell-adjudtweets')
-            .html(function(d) { return 'AdjudTweets' in d ? SR.formatThousands(d.AdjudTweets) : ''; });
-        table_body.selectAll('td.cell-datapoints')
-            .html(function(d) { return 'Datapoints' in d ? SR.formatMinutes(d.Datapoints) : ''; });
+        
+        ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
+            var quantity = distinct + type;
+            table_body.selectAll('td.cell-' + type)
+                .html(function(d) {
+                    var value = d[quantity];
+                    if(!value)
+                        return '';
+                    if(relative == 'raw')
+                        return this.formatThousands(value);
+                    var denom = relative == 'event' ? d['Event']['Tweets'] : 
+                                relative == 'type' ? d['Event'][quantity] : 
+                                relative == 'subset' ? d['Tweets'] : 
+                                relative == 'distinct' ? d[type] : -1;
+                    return (value / denom * 100).toFixed(1) + '%';
+//                    return quantity in d ? this.formatThousands(d[quantity]) : '';
+                }.bind(this));
+        }, this);
         
         // Append the refresh button
-        table_body.selectAll('td.cell-count')
+        table_body.selectAll('td.cell-count.cell-Tweets')
             .append('span')
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
-            .on('click', SR.recount);
+            .on('click', this.recount.bind(this));
         
         // Set visibility of zero/non-zero rows
         table_body.selectAll('tr')
             .classed('row-zero', function(d) { return !(d.Tweets || d.Datapoints || d.CodedTweets) ; });
-        SR.setVisibility();  
+        this.setVisibility();  
         
         // Dates
         table_body.selectAll('td.cell-firstdate')
-            .html(function(d) { return 'FirstTweet' in d && d.FirstTweet ? d.FirstTweet.slice(0,-3) || '-' : ''; });
-//        table_body.selectAll('td.cell-lastdate')
-//            .html(function(d) { return 'LastTweet' in d && d.LastTweet ? d.LastTweet.slice(0,-3) || '-' : ''; });
+            .html(function(d) { return 'FirstTweet' in d && d.FirstTweet ? d.FirstTweet || '-' : ''; });
+        table_body.selectAll('td.cell-lastdate')
+            .html(function(d) { return 'LastTweet' in d && d.LastTweet ? d.LastTweet || '-' : ''; });
         
-        SR.clickSort(false, 'maintain_direction');
+        triggers.emit('sort_elements');
     },
     edit: function(d) {
         if(d.Level == 1) { // Event
-            data.collection = d;
-            options.editWindow('collection');
+            this.app.model = {event: d}
+            this.ops.editWindow('collection');
         } else if(d.Level == 2) { // Event
-            data.rumor = d;
-            options.editWindow('rumor');
+            this.app.model = {subset: d}
+            this.ops.editWindow('subset');
         }
     },
     clickSort: function(order, option) {
         var table_body = d3.select('tbody');
-        if(!order) order = options['View']['order'].get();
+        if(!order) order = this.ops['View']['order'].get();
         var header = d3.select('.col-' + util.simplify(order));
         var clicked = header.data()[0];
-        var order = options['View']['order'].get();
-        var ascending = options['View']['ascending'].get();
+        var order = this.ops['View']['order'].get();
+        var ascending = this.ops['View']['ascending'].get();
         
         if(clicked) {
             d3.selectAll('.col-sortable span')
@@ -516,20 +449,24 @@ StatusReport.prototype = {
         // If it is clicked on what it is currently doing, flip it
         if(clicked == order && option != 'maintain_direction') {
             ascending = ascending == "true" ? "false" : "true";
-            options['View']['ascending'].updateInInterface_id(ascending);
+            this.ops['View']['ascending'].updateInInterface_id(ascending);
         } else if (clicked) { // Otherwise it's a new order
             order = clicked;
-            options['View']['order'].updateInInterface_id(order);
+            this.ops['View']['order'].updateInInterface_id(order);
             if(option != 'maintain_direction') {
                 ascending = order == 'Collection' ? 'true' : 'false';
-                options['View']['ascending'].updateInInterface_id(ascending);   
+                this.ops['View']['ascending'].updateInInterface_id(ascending);   
             }
         }
         
         // Sort the columns
-        if(options['View']['hierarchical'].is('true')) {
+        if(this.ops['View']['hierarchical'].is('true')) {
             var quantity = order.replace(' ', '');
             if(quantity == 'Collection') quantity = 'Label';
+            if(['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].includes(quantity) 
+              && this.ops['Counts']['Distinct'].is('Distinct')) {
+                quantity = 'Distinct' + quantity;
+            }
             var ascending_minmax = ascending == 'true' ? 'Min' : 'Max';
             var ascending_bin = ascending == 'true' ? 1 : -1;
             
@@ -566,7 +503,7 @@ StatusReport.prototype = {
                 if(a.Level == 1 && b.Level > 1) return -1;
                 if(a.Level > 1 && b.Level == 1) return 1;
 
-                // Compare Rumors
+                // Compare Subsets
                 if(!A2 && !B2) return 0;
                 if(!A2) return 1;
                 if(!B2) return -1;
@@ -593,22 +530,26 @@ StatusReport.prototype = {
                 });
             } else if(order == 'Collection') {
                 table_body.selectAll('tr').sort(function(a, b) {
-                    var A = a.label;
-                    var B = b.label;
+                    var A = a.Label;
+                    var B = b.Label;
 
                     return ascending_bin * d3.ascending(B, A);
                 });
             } else {
-                var ordr = order.replace(' ', '');
+                var quantity = order.replace(' ', '');
+                if(['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].includes(quantity) 
+                  && this.ops['Counts']['Distinct'].is('Distinct')) {
+                    quantity = 'Distinct' + quantity;
+                }
                 table_body.selectAll('tr').sort(function(a, b) {
-                    var A = a[ordr];
-                    var B = b[ordr];
+                    var A = a[quantity];
+                    var B = b[quantity];
 
                     if(a.Level == 0) {
-                        A = A || a[ordr + '_' + ascending_minmax];
+                        A = A || a[quantity + '_' + ascending_minmax];
                     }
                     if(b.Level == 0) {
-                        B = B || b[ordr + '_' + ascending_minmax];
+                        B = B || b[quantity + '_' + ascending_minmax];
                     }
 
                     if(!A && !B) return 0;
@@ -636,72 +577,59 @@ StatusReport.prototype = {
     },
     recount: function(d) {
         // Prepare statement
-        var cell = d3.select(this.parentNode);
-        var quantity_class = cell.attr('class').split(' ')[0];
-        var quantity = quantity_class.includes('coded') ? 'CodedTweets' : 
-                   quantity_class.includes('adjud') ? 'AdjudTweets' : 
-                   quantity_class.includes('distinct') ? 'DistinctTweets' : 
-                   quantity_class.includes('datapoint') ? 'Datapoints' : 'Tweets';
         var post = {
-            Collection: d.Level == 1 ? 'Event' : 'Rumor',
-            Quantity: quantity,
+            Collection: d.Level == 1 ? 'event' : 'subset',
             ID: d.ID
         }
+        var row = '.row_' + (d.Level == 1 ? 'event' : 'subset') + '_' + d.ID;
         
         // Start loading sign
-        var loading = new Progress({
+        var prog_bar = new Progress({
             'initial': 100,
-            'parent_id': '.row_' + (d.Level == 1 ? 'event' : 'rumor') + '_' + d.ID + ' .' + quantity_class,
+            'parent_id': row + ' .cell-Tweets',
             full: true, 
             text: ' '
         });
-        loading.start();
-//        div.classed('cell-counting', true)
-//            .html();
-//        var loading = div.append('div')
-//            .attr('class', 'loading-count')
-//            .html('Loading');
+        prog_bar.start();
         
         // Start the recount
-        Connection.php('count/compute', post, function(result) {
+        this.connection.php('collection/recount', post, function(result) {
             if(result.includes('Error')) {
-                loading.update(100, 'Error');
+                prog_bar.update(100, 'Error');
                 console.log(result);
                 return;
             }
             
-            // Update value
-            var val = JSON.parse(result)[0].Count;
-            d[quantity] = val;
-            if(quantity == 'Datapoint') {
-                cell.html(SR.formatMinutes(val));
-            } else {
-                cell.html(SR.formatThousands(val));
-            }
-            cell.append('span')
-                .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
-                .on('click', SR.recount);
+            // Update values
+            result = JSON.parse(result)[0];
             
+            var quantities = ['Tweets', 'DistinctTweets', 
+                          'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
+                          'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
+                          'FirstTweet', 'LastTweet'];
+            quantities.forEach(function (quantity) {
+                d[quantity] = parseInt(result[quantity]) || 0;
+            });
             
+            this.updateTableCounts(row);
+
             // Remove loading sign
-            loading.end();
-        })
+            prog_bar.end();
+        }.bind(this));
     },
     openTimeseries: function(d) {
-        var state = JSON.stringify({collection: d.ID});
+        var state = JSON.stringify({event: d.ID});
         window.open('index.html#' + state);
     },
     openCodingReport: function(d) {
-        var state = JSON.stringify({rumor: d.ID});
+        var state = JSON.stringify({subset: d.ID});
         window.open('coding.html#' + state);
     }
 };
 
 function initialize() {
     SR = new StatusReport();
-    options = new Options();
-    data = new Data();
     
-    SR.getData();
+    SR.init();
 }
 window.onload = initialize;

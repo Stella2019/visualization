@@ -60,8 +60,10 @@ TimeseriesChart.prototype = {
         // disp.setColorScale
     },
     getPageBounds: function() {
+        //document.documentElement.clientHeight
+        //document.documentElement.clientWidth
         this.page.height = parseInt(d3.select('body').style('height').replace('px', ''));
-        this.page.width  = parseInt(d3.select('body').style('width').replace('px', ''));
+        this.page.width  = parseInt(d3.select('body').style('width'));
     },
     adjustSize: function(args) {
         
