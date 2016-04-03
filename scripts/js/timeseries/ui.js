@@ -65,7 +65,21 @@ TimeseriesUI.prototype = {
         this.app.model.events_arr.forEach(function(event) {
             var id = '#Event_' + event['ID'];
             this.app.tooltip.attach(id, function(d) {
-                return this.app.model.events_arr[d];
+                var event = this.app.model.events_arr[d];
+                event = JSON.parse(JSON.stringify(event));
+                
+                ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(quantity) {
+                    event[quantity + ' <small>(Distinct)</small>'] = util.formatThousands(event[quantity]);
+                    if(event['Distinct' + quantity]) {
+                        event[quantity + ' <small>(Distinct)</small>'] += 
+                            ' <small style="left: 200px; position: absolute">(' +
+                            util.formatThousands(event['Distinct' + quantity]) + ')</small>'; 
+                    }
+                    delete event[quantity];
+                    delete event['Distinct' + quantity];
+                });
+                
+                return event;
             }.bind(this));
         }, this);
         

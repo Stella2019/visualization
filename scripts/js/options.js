@@ -1236,11 +1236,14 @@ Options.prototype = {
             .html('Pages')
         
         var pages = [{
+            label: "Index",
+            url: "index.html"
+        },{
             label: "Overview",
             url: "status.html"
         },{
             label: "Timeseries",
-            url: "index.html"
+            url: "timeseries.html"
         },{
             label: "Coding",
             url: "coding.html"

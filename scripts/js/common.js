@@ -56,7 +56,17 @@ var util = {
     },
     timestamp2TwitterID: function(date) {
         return util.lshift(date.getTime() - 1288834974657, 22);
-    }
+    },
+    formatThousands: function(value) {
+        var res = '';
+        for (var i = Math.floor(Math.log10(value)); i >= 0; i--) {
+            res += Math.floor(value / Math.pow(10, i));
+            if(i % 3 == 0 && i != 0)
+                res += ' ';
+            value = value % Math.pow(10, i);
+        }
+        return res;
+    },
 }
 
 function Counter() {
@@ -363,7 +373,7 @@ Tooltip.prototype = {
             .style('opacity', 0);
     },
     attach: function(id, data_transform) {
-        d3.select(id)
+        d3.selectAll(id)
             .on('mouseover', function(d) {
                 this.setData(data_transform(d))
                 this.on();

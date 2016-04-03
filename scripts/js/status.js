@@ -18,7 +18,9 @@ StatusReport.prototype = {
     },
     setTriggers: function() {
         triggers.on('sort_elements', function() { this.clickSort(false, 'maintain_direction'); }.bind(this));
+        triggers.on('new_counts', this.computeAggregates.bind(this));
         triggers.on('update_all_counts', this.updateTableCounts.bind(this));
+        triggers.on('refresh_visibility', this.setVisibility.bind(this));
     },
     getData: function() {
         var datasets = 2;
@@ -87,7 +89,6 @@ StatusReport.prototype = {
             event['Event Type'] = this.event_types[type];
             event['Event'] = event; // weird but makes things easier
             
-            
             // Add to indiced object
             this.events[event.ID] = event;
         }, this);
@@ -125,28 +126,30 @@ StatusReport.prototype = {
 //        });
         
         this.event_types_arr.forEach(function(d) {
-            d.Tweets            = d3.sum(d.events, function(e) { return e.Tweets            || 0; });
-            d.DistinctTweets    = d3.sum(d.events, function(e) { return e.DistinctTweets    || 0; });
-            d.Originals         = d3.sum(d.events, function(e) { return e.Originals         || 0; });
-            d.DistinctOriginals = d3.sum(d.events, function(e) { return e.DistinctOriginals || 0; });
-            d.Retweets          = d3.sum(d.events, function(e) { return e.Retweets          || 0; });
-            d.DistinctRetweets  = d3.sum(d.events, function(e) { return e.DistinctRetweets  || 0; });
-            d.Replies           = d3.sum(d.events, function(e) { return e.Replies           || 0; });
-            d.DistinctReplies   = d3.sum(d.events, function(e) { return e.DistinctReplies   || 0; });
-            d.Quotes            = d3.sum(d.events, function(e) { return e.Quotes            || 0; });
-            d.DistinctQuotes    = d3.sum(d.events, function(e) { return e.DistinctQuotes    || 0; });
+            ['Tweets', 'DistinctTweets', 
+              'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
+              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes'].forEach(function(count) {
+                d[count] = d3.sum(d.events, function(e) { return e[count] || 0; });
+            });
+            
 //            d.CodedTweets       = d3.sum(d.events, function(e) { return e.CodedTweets    || 0; });
 //            d.AdjudTweets       = d3.sum(d.events, function(e) { return e.AdjudTweets    || 0; });
 //            d.Datapoints        = d3.sum(d.events, function(e) { return e.Datapoints     || 0; });
-            d.FirstTweet_Min    = d3.min(d.events, function(e) { return e.FirstTweet        || 0; });
+            d.FirstTweet_Min    = d3.min(d.events, function(e) { return e.FirstTweet        || 1e20; });
             d.FirstTweet_Max    = d3.max(d.events, function(e) { return e.FirstTweet        || 0; });
-            d.LastTweet_Min     = d3.min(d.events, function(e) { return e.LastTweet         || 0; });
+            d.LastTweet_Min     = d3.min(d.events, function(e) { return e.LastTweet         || 1e20; });
             d.LastTweet_Max     = d3.max(d.events, function(e) { return e.LastTweet         || 0; });
+            
+            d.FirstTweet        = d.FirstTweet_Min;
+            d.LastTweet         = d.LastTweet_Max;
             d.ID_Min            = d3.min(d.events, function(e) { return parseInt(e.ID)      || 0; });
             d.ID_Max            = d3.max(d.events, function(e) { return parseInt(e.ID)      || 0; });
+            
+            // Self
+            d['Event Type'] = d;
         });
         
-        this.updateTableCounts();
+        triggers.emit('update_all_counts');
     },
     buildDropdowns: function() {
         this.ops.updateCollectionCallback = this.getData;
@@ -155,14 +158,6 @@ StatusReport.prototype = {
                       'Originals', 'Retweets', 'Replies', 'Quotes', 
                       'First Tweet', 'Last Tweet'];
         this.ops['View'] = {
-            empties: new Option({
-                title: 'Show Rows with No Tweets',
-                labels: ['Yes', 'No'],
-                ids:    ["true", "false"],
-                default: 1,
-                type: "dropdown",
-                callback: this.setVisibility.bind(this)
-            }), 
             hierarchical: new Option({
                 title: 'Maintain Hierarchy',
                 labels: ['Yes', 'No'],
@@ -171,19 +166,6 @@ StatusReport.prototype = {
                 type: "dropdown",
                 callback: triggers.emitter('sort_elements')
             }),
-//            levels: new Option({
-//                title: 'Show',
-//                labels: ['All Levels',
-//                         'Event Types & Events',
-//                         'Events',
-//                         'Events & Rumors',
-//                         'Rumors'],
-//                ids:    ["all", "etr", "e", "er", "r"],
-//                default: 0,
-//                type: "dropdown",
-//                parent: '#status_table_header',
-//                callback: this.buildTable
-//            }),
             order: new Option({
                 title: 'Order',
                 labels: orders,
@@ -212,14 +194,56 @@ StatusReport.prototype = {
             }),
             Relative: new Option({
                 title: 'Relative to',
-                labels: ['-', 'Event', 'Event\'s Types', 'Whole Subset', 'Distinct/Repeat'],
+                labels: ['-', 'Event', 'Event\'s Types', 'Subset', 'Distinct/Not'],
                 ids:    ['raw', 'event', 'type', 'subset', 'distinct'],
+                default: 0,
+                type: "dropdown",
+                callback: triggers.emitter('update_all_counts')
+            }),
+            'Date Format': new Option({
+                title: 'Date Format',
+                labels: ['Tweet ID', 'Date'],
+                ids:    ['id', 'date'],
                 default: 0,
                 type: "dropdown",
                 callback: triggers.emitter('update_all_counts')
             })
         };
-        this.ops.panels = ['View', 'Counts'];
+        this.ops['Show'] = {
+            Empties: new Option({
+                title: 'Empty Rows',
+                labels: ['Show', 'Hide'],
+                ids:    ['table-row', 'none'],
+                default: 1,
+                type: "dropdown",
+                callback: triggers.emitter('refresh_visibility')
+            }), 
+            'Event Types': new Option({
+                title: 'Event Types',
+                labels: ['Show', 'Hide'],
+                ids:    ['table-row', 'none'],
+                default: 0,
+                type: "dropdown",
+                callback: triggers.emitter('refresh_visibility')
+            }),
+            Events: new Option({
+                title: 'Events',
+                labels: ['Show', 'Hide'],
+                ids:    ['table-row', 'none'],
+                default: 0,
+                type: "dropdown",
+                callback: triggers.emitter('refresh_visibility')
+            }),
+            Subsets: new Option({
+                title: 'Subsets',
+                labels: ['Show', 'Hide'],
+                ids:    ['table-row', 'none'],
+                default: 0,
+                type: "dropdown",
+                callback: triggers.emitter('refresh_visibility')
+            })
+        }
+        this.ops.panels = ['View', 'Counts', 'Show'];
         
         // Start drawing
         this.ops.init();
@@ -293,12 +317,69 @@ StatusReport.prototype = {
 //            .attr('class', 'glyphicon-hiddenclick')
 //            .html(function(d) { return d.Level > 0 ? 'ID: ' + d.ID : ''; });
         
+        
+        this.tooltip.attach('.cell-label', function(set) {
+            if(set['Level'] == 0) {
+                return {
+                    ID: set['ID'],
+                    Label: set['Label'],
+                    Events: set['Events'] ? set['Events'].map(function(event) { return event['Label']; }) : null
+                }
+            } else if(set['Level' == 1]) {
+                return {
+                    ID: set['ID'],
+                    Label: set['Label'],
+                    'Event Type': set['Event Type']['Label']
+                }
+            } else {
+                return {
+                    ID: set['ID'],
+                    Feature: set['Feature'],
+                    Match: set['Match'],
+                    Event: set['Event']['Label'],
+                    'Event Type': set['Event Type']['Label']
+                }
+            }
+        });
+        
+        
         // Counts
         ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
             table_body.selectAll('tr')
                 .append('td')
                 .attr('class', 'cell-' + type + ' cell-count');
-        });
+            
+            // Tooltip with summary starts
+            this.tooltip.attach('.cell-' + type, function(set) {
+                var value = set[type];
+                var info = {};
+                if(value == undefined)
+                    return info;
+
+                var event = set['Event'] || set;
+                info[type] = util.formatThousands(value);
+                if(set.Level == 2 || type != 'Tweets') {
+                    info['% of Event'] = (value / event['Tweets'] * 100).toFixed(1) + '%';
+                }
+                if(set.Level == 2 && type != 'Tweets') {
+                    info['% of Type'] = (value / event[type] * 100).toFixed(1) + '%';
+                    info['% of Subset'] = (value / set['Tweets'] * 100).toFixed(1) + '%';
+                }
+                
+                var distinct = set['Distinct' + type];
+                info['Distinct ' + type] = util.formatThousands(distinct);
+                info['% Distinct'] = (distinct / value * 100).toFixed(1) + '%';
+                if(set.Level == 2 || type != 'Tweets') {
+                    info['% D of Event'] = (distinct / event['Tweets'] * 100).toFixed(1) + '%';
+                }
+                if(set.Level == 2 && type != 'Tweets') {
+                    info['% D of Type '] = (distinct / event['Distinct' + type] * 100).toFixed(1) + '%';
+                    info['% D of Subset'] = (distinct / set['Tweets'] * 100).toFixed(1) + '%';
+                }
+
+                return info;
+            });
+        }, this);
         
         // Times
         table_body.selectAll('tr')
@@ -333,33 +414,7 @@ StatusReport.prototype = {
 //            .on('click', this.openCodingReport);
         
         // Set the counts
-        triggers.emit('update_all_counts');
-    },
-    formatThousands: function(value) {
-//        var unit = '';
-//        if(value > 1e9) {
-//            value /= 1e9;
-//            unit = ' G';
-//        }
-//        if(value > 1e6) {
-//            value /= 1e6;
-//            unit = ' M';
-//        }
-//        if(value > 1e3) {
-//            value /= 1e3;
-//            unit = ' K';
-//        }
-//        return value.toFixed(value < 10 && value > 0 ? 1 : 0) + unit;
-        
-        var res = '';
-        for (var i = Math.floor(Math.log10(value)); i >= 0; i--) {
-//            console.log(value, res, value / Math.pow(10, i), i);
-            res += Math.floor(value / Math.pow(10, i));
-            if(i % 3 == 0)
-                res += ' ';
-            value = value % Math.pow(10, i);
-        }
-        return res + '&nbsp;';
+        triggers.emit('new_counts');
     },
     formatMinutes: function(value) {
         var days = Math.floor(value / 60 / 24);
@@ -374,16 +429,31 @@ StatusReport.prototype = {
         
         table_body.selectAll('tr')
             .style('display', 'table-row');
-        if(this.ops['View']['empties'].is('false')) {
-            d3.selectAll('tr.row-zero')
+        if(this.ops['Show']['Empties'].is('none')) {
+            table_body.selectAll('tr.row-zero')
                 .style('display', 'none');
         }
+        if(this.ops['Show']['Event Types'].is('none')) {
+            table_body.selectAll('tr.row_type')
+                .style('display', 'none');
+        }
+        if(this.ops['Show']['Events'].is('none')) {
+            table_body.selectAll('tr.row_event')
+                .style('display', 'none');
+        }
+        if(this.ops['Show']['Subsets'].is('none')) {
+            table_body.selectAll('tr.row_subset')
+                .style('display', 'none');
+        }
+        
+        triggers.emit('sort_elements');
     },
     updateTableCounts: function(selector) {
         selector = selector || 'tbody';
         var table_body = d3.select(selector);
         var distinct = this.ops['Counts']['Distinct'].get();
         var relative = this.ops['Counts']['Relative'].get();
+        var date_format = this.ops['Counts']['Date Format'].get();
         
         // Update the text of rows with the counts
         
@@ -394,16 +464,18 @@ StatusReport.prototype = {
                     var value = d[quantity];
                     if(!value)
                         return '';
-                    if(relative == 'raw')
-                        return this.formatThousands(value);
-                    var denom = relative == 'event' ? d['Event']['Tweets'] : 
-                                relative == 'type' ? d['Event'][quantity] : 
-                                relative == 'subset' ? d['Tweets'] : 
-                                relative == 'distinct' ? d[type] : -1;
+                    if(relative == 'raw') {
+                        d[type + 'Display'] = value;
+                        return util.formatThousands(value);
+                    }
+                    var denom = relative == 'event'    ? (d['Level'] == 2 ? d['Event']['Tweets'] : d['Tweets']) : 
+                                relative == 'type'     ? (d['Level'] == 2 ? d['Event'][quantity] : d[quantity]) : 
+                                relative == 'subset'   ? d['Tweets'] : 
+                                relative == 'distinct' ? d[type] : 1;
+                    d[type + 'Display'] = value / denom;
                     return (value / denom * 100).toFixed(1) + '%';
-//                    return quantity in d ? this.formatThousands(d[quantity]) : '';
-                }.bind(this));
-        }, this);
+                });
+        });
         
         // Append the refresh button
         table_body.selectAll('td.cell-count.cell-Tweets')
@@ -414,15 +486,33 @@ StatusReport.prototype = {
         // Set visibility of zero/non-zero rows
         table_body.selectAll('tr')
             .classed('row-zero', function(d) { return !(d.Tweets || d.Datapoints || d.CodedTweets) ; });
-        this.setVisibility();  
         
         // Dates
         table_body.selectAll('td.cell-firstdate')
-            .html(function(d) { return 'FirstTweet' in d && d.FirstTweet ? d.FirstTweet || '-' : ''; });
+            .html(function(d) {
+                if(!('FirstTweet') in d || d['FirstTweet'] == 0 || d['FirstTweet'] == 1e20) return '';
+                if(date_format == 'date') {
+                    var date = d.FirstTweet;
+                    date = util.twitterID2Timestamp(date);
+                    return util.formatDate(date);
+                }
+                return d.FirstTweet;
+            });
         table_body.selectAll('td.cell-lastdate')
-            .html(function(d) { return 'LastTweet' in d && d.LastTweet ? d.LastTweet || '-' : ''; });
+            .html(function(d) { 
+                if(!('LastTweet') in d || d['LastTweet'] == 0 || d['LastTweet'] == 1e20) return '';
+                if(date_format == 'date') {
+                    var date = d.LastTweet;
+                    if(d.Level == 0)
+                        console.log(d);
+                    date = util.twitterID2Timestamp(date);
+                    return util.formatDate(date);
+                }
+                return d.LastTweet;
+//                return 'LastTweet' in d && d.LastTweet ? d.LastTweet || '-' : ''; 
+            });
         
-        triggers.emit('sort_elements');
+        triggers.emit('refresh_visibility');
     },
     edit: function(d) {
         if(d.Level == 1) { // Event
@@ -463,66 +553,76 @@ StatusReport.prototype = {
         if(this.ops['View']['hierarchical'].is('true')) {
             var quantity = order.replace(' ', '');
             if(quantity == 'Collection') quantity = 'Label';
-            if(['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].includes(quantity) 
-              && this.ops['Counts']['Distinct'].is('Distinct')) {
-                quantity = 'Distinct' + quantity;
+            if(['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].includes(quantity)) {
+                quantity = quantity + 'Display';
             }
-            var ascending_minmax = ascending == 'true' ? 'Min' : 'Max';
+//            var ascending_minmax = ascending == 'true' ? 'Min' : 'Max';
             var ascending_bin = ascending == 'true' ? 1 : -1;
+            var showing_event_types = this.ops['Show']['Event Types'].is('table-row');
+            var showing_events = this.ops['Show']['Events'].is('table-row');
             
             table_body.selectAll('tr').sort(function(a, b) {
-                // Get possible values
-                var A2 = a.Level == 2 ? a[quantity] : null;
-                var B2 = b.Level == 2 ? b[quantity] : null;
-                var A1 = a.Level == 2 ? a.Event[quantity] : a.Level == 1 ? a[quantity] : null;
-                var B1 = b.Level == 2 ? b.Event[quantity] : b.Level == 1 ? b[quantity] : null;
-                var Atype = a.Level == 0 ? a : a['Event Type'];
-                var Btype = b.Level == 0 ? b : b['Event Type'];
-                var A0 = Atype[quantity] || Atype[quantity + '_' + ascending_minmax];
-                var B0 = Btype[quantity] || Btype[quantity + '_' + ascending_minmax];
-//                    console.log(A0, A1, A2, a.Level, a.Label);
-//                    console.log(B0, B1, B2, b.Level, b.Label);
-
+                var lA = a['Level'];
+                var lB = b['Level'];
+                
                 // Compare Event Types
-                if(!A0 && !B0) return 0;
-                if(!A0) return 1;
-                if(!B0) return -1;
-                if(A0 < B0) return -1 * ascending_bin;
-                if(A0 > B0) return 1 * ascending_bin;
-//                if(a.Level == 0 && b.Level == 0) return 0;
-                if(a.Level == 0 && b.Level > 0) return -1;
-                if(a.Level > 0 && b.Level == 0) return 1;
-
+                if(showing_event_types) {
+                    var A = a['Event Type'][quantity];
+                    var B = b['Event Type'][quantity];
+    //                if(lA == 0 && lB == 0 && !A && !B) return 0;
+                    if(!A) return  1;
+                    if(!B) return -1;
+                    if(A < B) return -1 * ascending_bin;
+                    if(A > B) return  1 * ascending_bin;
+                    if(lA == 0 && lB == 0) return  a['ID_Min'] - b['ID_Min'];
+                    if(lA == 0 && lB >  0) return -1;
+                    if(lA >  0 && lB == 0) return  1;
+                } else {
+                    if(lA == 0 && lB == 0) return  a['ID_Min'] - b['ID_Min'];
+                    if(lA == 0 && lB >  0) return  1;
+                    if(lA >  0 && lB == 0) return -1;
+                }
+                
                 // Compare Events
-                if(!A1 && !B1) return 0;
-                if(!A1) return 1;
-                if(!B1) return -1;
-                if(A1 < B1) return -1 * ascending_bin;
-                if(A1 > B1) return 1 * ascending_bin;
-//                if(a.Level == 0 && b.Level == 0) return 0;
-                if(a.Level == 1 && b.Level > 1) return -1;
-                if(a.Level > 1 && b.Level == 1) return 1;
-
+                if(showing_events) {
+                    A = a['Event'][quantity];
+                    B = b['Event'][quantity];
+    //                if(lA == 1 && lB == 1 && !A && !B) return 0;
+                    if(!A) return  1;
+                    if(!B) return -1;
+                    if(A < B) return -1 * ascending_bin;
+                    if(A > B) return  1 * ascending_bin;
+                    if(lA == 1 && lB == 1) return  a['ID'] - b['ID'];
+                    if(lA == 1 && lB >  1) return -1;
+                    if(lA >  1 && lB == 1) return  1;
+                } else {
+                    if(lA == 1 && lB == 1) return  a['ID'] - b['ID'];
+                    if(lA == 1 && lB >  1) return  1;
+                    if(lA >  1 && lB == 1) return -1;
+                }
+                
                 // Compare Subsets
-                if(!A2 && !B2) return 0;
-                if(!A2) return 1;
-                if(!B2) return -1;
-                if(A2 < B2) return -1 * ascending_bin;
-                if(A2 > B2) return 1 * ascending_bin;
+                A = a[quantity];
+                B = b[quantity];
+                if(lA == 2 && lB == 2 && !A && !B) return 0;
+                if(!A) return  1;
+                if(!B) return -1;
+                if(A < B) return -1 * ascending_bin;
+                if(A > B) return  1 * ascending_bin;
 
                 return 0;
             });
         } else {
-            var ascending_minmax = ascending == 'true' ? 'Max' : 'Min';
+//            var ascending_minmax = ascending == 'true' ? 'Max' : 'Min';
             var ascending_bin = ascending == 'true' ? 1 : -1;
             if(order == 'ID') {
                 table_body.selectAll('tr').sort(function(a, b) {
                     var A = parseInt(a.ID); var B = parseInt(b.ID);
                     if(a.Level == 0) {
-                        A = A || a['ID_' + ascending_minmax];
+                        A = A || a['ID']; //_' + ascending_minmax];
                     }
                     if(b.Level == 0) {
-                        B = B || b['ID_' + ascending_minmax];
+                        B = B || b['ID']; //_' + ascending_minmax];
                     }
 
                     var cmp = A - B;
@@ -537,19 +637,18 @@ StatusReport.prototype = {
                 });
             } else {
                 var quantity = order.replace(' ', '');
-                if(['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].includes(quantity) 
-                  && this.ops['Counts']['Distinct'].is('Distinct')) {
-                    quantity = 'Distinct' + quantity;
+                if(['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].includes(quantity)) {
+                    quantity = quantity + 'Display';
                 }
                 table_body.selectAll('tr').sort(function(a, b) {
-                    var A = a[quantity];
-                    var B = b[quantity];
+                    var A = parseFloat(a[quantity]);
+                    var B = parseFloat(b[quantity]);
 
                     if(a.Level == 0) {
-                        A = A || a[quantity + '_' + ascending_minmax];
+                        A = A || parseFloat(a[quantity]); // + '_' + ascending_minmax]);
                     }
                     if(b.Level == 0) {
-                        B = B || b[quantity + '_' + ascending_minmax];
+                        B = B || parseFloat(b[quantity]); // + '_' + ascending_minmax]);
                     }
 
                     if(!A && !B) return 0;
@@ -624,6 +723,25 @@ StatusReport.prototype = {
     openCodingReport: function(d) {
         var state = JSON.stringify({subset: d.ID});
         window.open('coding.html#' + state);
+    },
+    setInfo: function(set) {
+        var distinct = this.ops['Counts']['Distinct'].get();
+        console.log(this);
+        var type = 'Tweets';
+        var value = set[distinct + type];
+        var info = {};
+        if(value == undefined)
+            return info;
+        
+        var event = set['Event'] || set;
+        info[(distinct ? distinct  + ' ' : '') + type] = util.formatThousands(value);
+        info['% of Event'             ] = (value / event['Tweets'] * 100).toFixed(1) + '%';
+        info['% of Type in Event'     ] = (value / event[distinct + type] * 100).toFixed(1) + '%';
+        info['% of Subset'            ] = (value / set['Tweets'] * 100).toFixed(1) + '%';
+        info['% of Distinct + Repeats'] = (value / set[type] * 100).toFixed(1) + '%';
+
+        console.log(info);
+        return info;
     }
 };
 
