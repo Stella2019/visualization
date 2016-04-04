@@ -67,6 +67,14 @@ var util = {
         }
         return res;
     },
+    formatMinutes: function(value) {
+        var days = Math.floor(value / 60 / 24);
+        var hours = Math.floor(value / 60) % 24;
+        var minutes = value % 60;
+        if(days) return days + 'd ' + (hours < 10 ? '0' : '') + hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm&nbsp;';
+        if(hours) return hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm&nbsp;';
+        return minutes + 'm&nbsp;';
+    },
 }
 
 function Counter() {

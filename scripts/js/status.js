@@ -9,6 +9,11 @@ function StatusReport() {
     this.subsets_arr = [];
     this.event_types = {};
     this.event_types_arr = [];
+    
+    this.quantities = ['Tweets', 'DistinctTweets', 
+                       'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
+                       'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
+                       'FirstTweet', 'LastTweet', 'Datapoints'];
 }
 StatusReport.prototype = {
     init: function() {
@@ -57,10 +62,6 @@ StatusReport.prototype = {
         this.subsets = {};
         this.event_types = {};
         this.event_types_arr = [];
-        var quantities = ['Tweets', 'DistinctTweets', 
-                      'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
-                      'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
-                      'FirstTweet', 'LastTweet'];
         
         // Link all of the data
         this.events_arr.forEach(function(event) {
@@ -69,7 +70,7 @@ StatusReport.prototype = {
             event.subsets = [];
             event.Label = event.DisplayName || event.Name;
             event.Level = 1;
-            quantities.forEach(function (quantity) {
+            this.quantities.forEach(function (quantity) {
                 event[quantity] = parseInt(event[quantity]) || 0;
             });
             
@@ -98,7 +99,7 @@ StatusReport.prototype = {
             subset.Label = subset.Feature + ": " + subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
             subset.Level = 2;
             subset.Event_ID = subset.Event;
-            quantities.forEach(function (quantity) {
+            this.quantities.forEach(function (quantity) {
                 subset[quantity] = parseInt(subset[quantity]) || 0;
             });
             
@@ -128,7 +129,7 @@ StatusReport.prototype = {
         this.event_types_arr.forEach(function(d) {
             ['Tweets', 'DistinctTweets', 
               'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
-              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes'].forEach(function(count) {
+              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 'Datapoints'].forEach(function(count) {
                 d[count] = d3.sum(d.events, function(e) { return e[count] || 0; });
             });
             
@@ -154,9 +155,9 @@ StatusReport.prototype = {
     buildDropdowns: function() {
         this.ops.updateCollectionCallback = this.getData;
         
-        var orders = ['ID', 'Collection', 'Tweets', 'Distinct Tweets', 
+        var orders = ['ID', 'Collection', 'Tweets', 
                       'Originals', 'Retweets', 'Replies', 'Quotes', 
-                      'First Tweet', 'Last Tweet'];
+                      'First Tweet', 'Last Tweet', 'Datapoints'];
         this.ops['View'] = {
             hierarchical: new Option({
                 title: 'Maintain Hierarchy',
@@ -201,9 +202,17 @@ StatusReport.prototype = {
                 callback: triggers.emitter('update_all_counts')
             }),
             'Date Format': new Option({
-                title: 'Date Format',
+                title: 'First/Last Tweet',
                 labels: ['Tweet ID', 'Date'],
                 ids:    ['id', 'date'],
+                default: 1,
+                type: "dropdown",
+                callback: triggers.emitter('update_all_counts')
+            }),
+            'Datapoints Format': new Option({
+                title: 'Datapoints',
+                labels: ['Count', 'Minutes'],
+                ids:    ['count', 'minutes'],
                 default: 0,
                 type: "dropdown",
                 callback: triggers.emitter('update_all_counts')
@@ -254,7 +263,7 @@ StatusReport.prototype = {
     buildTable: function() {
         var columns = ['ID', 'Collection',
                        'Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes', 
-                       'First Tweet', 'Last Tweet', 
+                       'First Tweet', 'Last Tweet', 'Datapoints', 
                        'Open'];// <span class="glyphicon glyphicon-new-window"></span>
         
         d3.select('#table-container').selectAll('*').remove();
@@ -389,6 +398,10 @@ StatusReport.prototype = {
             .append('td')
             .attr('class', 'cell-lastdate');
         
+        table_body.selectAll('tr')
+            .append('td')
+            .attr('class', 'cell-datapoints');
+        
         // Buttons
         table_body.selectAll('tr')
             .append('td')
@@ -415,14 +428,6 @@ StatusReport.prototype = {
         
         // Set the counts
         triggers.emit('new_counts');
-    },
-    formatMinutes: function(value) {
-        var days = Math.floor(value / 60 / 24);
-        var hours = Math.floor(value / 60) % 24;
-        var minutes = value % 60;
-        if(days) return days + 'd ' + (hours < 10 ? '0' : '') + hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm&nbsp;';
-        if(hours) return hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm&nbsp;';
-        return minutes + 'm&nbsp;';
     },
     setVisibility: function() {
         var table_body = d3.select('tbody');
@@ -454,6 +459,7 @@ StatusReport.prototype = {
         var distinct = this.ops['Counts']['Distinct'].get();
         var relative = this.ops['Counts']['Relative'].get();
         var date_format = this.ops['Counts']['Date Format'].get();
+        var datapoints_format = this.ops['Counts']['Datapoints Format'].get();
         
         // Update the text of rows with the counts
         
@@ -511,6 +517,15 @@ StatusReport.prototype = {
                 return d.LastTweet;
 //                return 'LastTweet' in d && d.LastTweet ? d.LastTweet || '-' : ''; 
             });
+        
+        // Datapoints
+        table_body.selectAll('td.cell-datapoints')
+            .html(function(d) {
+                var value = d.Datapoints;
+                if(!value) return '';
+                if(datapoints_format == 'minutes') return util.formatMinutes(value);
+                return value;
+            })
         
         triggers.emit('refresh_visibility');
     },
@@ -702,11 +717,7 @@ StatusReport.prototype = {
             // Update values
             result = JSON.parse(result)[0];
             
-            var quantities = ['Tweets', 'DistinctTweets', 
-                          'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
-                          'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
-                          'FirstTweet', 'LastTweet'];
-            quantities.forEach(function (quantity) {
+            this.quantities.forEach(function (quantity) {
                 d[quantity] = parseInt(result[quantity]) || 0;
             });
             
