@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import json, os, re, csv, sys, socket
+import json, os, re, csv, sys, socket, time
 import argparse, unicodedata
 from pprint import pprint
 from datetime import datetime, timedelta
@@ -15,6 +15,10 @@ collection = {'name': None}
 subsets = []
 stripTweetText = TwitterTextRemover()
 distinct_set = set()
+timing = {'parseMetadata': 0,
+          'parseSubsets': 0,
+          'N': 0,
+          'uploadTweet': 0}
 
 # Queries
 queries = {
@@ -36,20 +40,21 @@ queries = {
                 "VALUES (%(ID)s, %(UserID)s, %(Username)s, %(Screenname)s, %(UserCreatedAt)s, "
                 "    %(UserDescription)s, %(UserLocation)s, %(UserUTCOffset)s, %(UserTimezone)s, %(UserLang)s, "
                 "    %(UserStatusesCount)s, %(UserFollowersCount)s, %(UserFriendsCount)s, "
-                "    %(UserListedCount)s, %(UserFavouritesCount)s, %(UserVerified)s) "),
+                "    %(UserListedCount)s, %(UserFavouritesCount)s, %(UserVerified)s) "
+                "ON DUPLICATE KEY UPDATE "
+                "    FavouritesCount = %(UserFavouritesCount)s "),
     'add_event': ("INSERT INTO Event "
                 "(ID, Name, Description, Keywords, OldKeywords, StartTime, StopTime, Server) "
                 "VALUES (%(ID)s, %(Name)s, %(Description)s, %(Keywords)s, %(OldKeywords)s, "
                 "    %(StartTime)s, %(StopTime)s, %(Server)s) "
                 "ON DUPLICATE KEY UPDATE `Keywords`=%(Keywords)s, `OldKeywords`=%(OldKeywords)s, "
                 "    `StartTime`=%(StartTime)s, `StopTime`=%(StopTime)s, `Server`=%(Server)s "),
-    'add_inevent': ("INSERT INTO InEvent "
-                  "(Tweet, Event, Backfill) "
-                  "VALUES (%(Tweet)s, %(Event)s, %(Backfill)s) "
-                  "ON DUPLICATE KEY UPDATE Backfill=LEAST(Backfill, %(Backfill)s)"),
+    'add_inevent': ("INSERT IGNORE INTO InEvent "
+                  "(Tweet, Event, `Distinct`, Type) "
+                  "VALUES (%(Tweet)s, %(Event)s, %(Distinct)s, %(Type)s) "),
     'add_insubset': ("INSERT IGNORE INTO InSubset "
-                   "(Tweet, Subset) "
-                   "VALUES (%(Tweet)s, %(Subset)s) ")
+                   "(Tweet, Subset, `Distinct`, Type) "
+                   "VALUES (%(Tweet)s, %(Subset)s, %(Distinct)s, %(Type)s) ")
 }
 
 def main():
@@ -101,8 +106,8 @@ def parseFile(filename):
         version = int(filename[-7:-5]) + 1
         filename_with_content = filename[:-8] + '.json'
     
-#    collection_name = filename_with_content[0:-18].rsplit('/',1)[-1]
-    collection_name = filename_with_content[0:-18].rsplit('\\',1)[-1]
+    collection_name = filename_with_content[0:-18].rsplit('/',1)[-1]
+#    collection_name = filename_with_content[0:-18].rsplit('\\',1)[-1]
     timestamp_str = filename_with_content[-18:-5]
     timestamp = datetime.strptime(timestamp_str, '%Y%m%d_%H%M')
     if(options.minimum_date):
@@ -129,16 +134,24 @@ def parseFile(filename):
     cursor = serverStorage.cursor()
 
     # Load this time period's JSON file
-    with open(filename) as data_file: 
+    with open(filename, 'r') as data_file: 
         for line in data_file:
             if len(line) > 5:
                 tweet = parseTweetJSON(line)
                 
-                if('Parent' in tweet):
-                    parent = parseTweetJSON(tweet['Parent'])
-                    uploadTweet(cursor, parent, 1)
-            
+#                if('Parent' in tweet):
+#                    parent = parseTweetJSON(tweet['Parent'])
+#                    uploadTweet(cursor, parent, 1)
+                
+                global timing
+                start = time.time()
                 uploadTweet(cursor, tweet, 0)
+                end = time.time()
+                timing['uploadTweet'] += end - start
+                
+                if(timing['N'] % 1000 == 0):
+                    print('Time report (' + str(timing['N']) + '): ' + str(timing['uploadTweet']   / timing['N']))
+                
         
         if(not options.test):
             serverStorage.commit()
@@ -169,20 +182,19 @@ def uploadTweet(cursor, tweet, backfill=0):
     cursor.execute(queries['add_tweetuser'], tweet)
 
     # Also add to event
-    tweetInEvent = {
+    tweetIn = {
         'Tweet': tweet['ID'],
         'Event': collection['id'],
-        'Backfill': backfill
+        'Backfill': backfill,
+        'Distinct': tweet['Distinct'],
+        'Type': tweet['Type']
     }
-    cursor.execute(queries['add_inevent'], tweetInEvent)
+    cursor.execute(queries['add_inevent'], tweetIn)
     
     # Add tweet to relevant subsets
     for subset in matched_subsets:
-        tweetInEvent = {
-            'Tweet': tweet['ID'],
-            'Subset': subset,
-        }
-        cursor.execute(queries['add_insubset'], tweetInEvent)
+        tweetIn['Subset'] = subset
+        cursor.execute(queries['add_insubset'], tweetIn)
         
 def verifyCollection(collection_name):
     if collection['name'] == None:
@@ -268,13 +280,13 @@ def populateSubsets():
         subsets.append(subset.copy())
         
     # Major Timezones (Western US, Central US, Eastern US, UTC, Western Europe)
-    for timezone in [-28800, 21600, -18000, 0, 3600]:
+    for timezone in [-28800, -21600, -18000, 0, 3600]:
         subset['Feature'] = 'User.UTCOffset'
         subset['Match'] = str(timezone)
         subsets.append(subset.copy())
         
     # English versus Non-English
-    for lang in ['en', '!en']:
+    for lang in ['en', 'es', 'fr', '!en & !fr & !es']:
         subset['Feature'] = 'Lang'
         subset['Match'] = lang
         subsets.append(subset.copy())
@@ -570,9 +582,12 @@ def compareSubsets(data):
             if(str(feat) == subset['Match']):
                 matched_subsets.append(subset['ID'])
         elif(subset['Feature'] == 'Lang'):
+#            print(subset['Feature'] + ": " + subset['Match'] + ' = "' + data['Lang'] + '"')
             feat = data['Lang']
-            if((subset['Match'] == '!en' and not feat is 'en') or
-               (subset['Match'] ==  'en' and     feat is 'en')):
+            if((subset['Match'] == '!en & !fr & !es' and not (feat == 'en') and not (feat == 'es') and not (feat == 'fr')) or
+               (subset['Match'] ==  'en' and     feat == 'en') or
+               (subset['Match'] ==  'es' and     feat == 'es') or
+               (subset['Match'] ==  'fr' and     feat == 'fr')):
                 matched_subsets.append(subset['ID'])
         elif(subset['Feature'] == 'Parent.User.Verified'):
             if('Parent' in data and 'user' in data['Parent'] and 'verified' in data['Parent']['user']):
@@ -583,6 +598,8 @@ def compareSubsets(data):
     return matched_subsets
 
 def parseTweetJSON(data):
+    start = time.time()
+    
     if(type(data) is str):
         data = json.loads(data)
     text = data['text']
@@ -634,10 +651,11 @@ def parseTweetJSON(data):
 
     # Type specific changes
     if("quoted_status_id_str" in data and data['quoted_status_id_str'] is not None): 
-        tweet['Type'] = 'reply'
+        tweet['Type'] = 'quote'
         
         tweet['ParentID'] = data['quoted_status_id_str']
         if('quoted_status' in data):
+            tweet['Parent'] = data['quoted_status']
             if(tweet['ExpandedURL'] is None):
                 tweet['ExpandedURL'] = getExpandedURL(data['quoted_status'])
                 
@@ -676,12 +694,13 @@ def parseTweetJSON(data):
         tweet['UserFollowersCount'] = user['followers_count']  if 'followers_count'  in user else None
         tweet['UserFriendsCount']   = user['friends_count']    if 'friends_count'    in user else None
         tweet['UserListedCount']    = user['listed_count']     if 'listed_count'     in user else None
-        tweet['UserFavoritesCount'] = user['favourites_count'] if 'favourites_count' in user else None
+        tweet['UserFavouritesCount'] = user['favourites_count'] if 'favourites_count' in user else None
         tweet['UserDescription']    = user['description']      if 'description'      in user else None
         tweet['UserLocation']       = user['location']         if 'location'         in user else None
         
         if('created_at' in user):
-            created_at = datetime.strptime(user['created_at'], '%a %b %d %H:%M:%S %z %Y') # Not guaranteed to save timezone info
+            created_at = user['created_at'].replace(' +0000 ', ' ') # hack to remove the timezones
+            created_at = datetime.strptime(created_at, '%a %b %d %H:%M:%S %Y')
             created_at = datetime.strftime(created_at, '%Y-%m-%d %H:%M:%S')
             tweet['UserCreatedAt'] = created_at
         
@@ -697,7 +716,14 @@ def parseTweetJSON(data):
             
 
     # Search for keywords
+    subsettime = time.time()
     tweet['Subsets'] = compareSubsets(tweet)
+    end = time.time()
+    
+    global timing
+    timing['parseMetadata'] += subsettime - start
+    timing['parseSubsets'] += end - subsettime
+    timing['N'] += 1
     
     return tweet
 
