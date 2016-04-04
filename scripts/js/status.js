@@ -743,7 +743,7 @@ StatusReport.prototype = {
             tweet_min: d.FirstTweet,
             tweet_max: d.LastTweet,
             progress_div: row + ' .cell-datapoints',
-            progress_text: 'Computing',
+            progress_text: ' ',
             progress_full: true,
             on_chunk_finish: function(result) {
                 if(result.includes('Error')) {
@@ -753,7 +753,13 @@ StatusReport.prototype = {
                 }
 
                 // Update values
-                result = JSON.parse(result)[0];
+                try {
+                    result = JSON.parse(result)[0];
+                } catch (exception) {
+                    console.log(result);
+                    return;
+                }
+                
                 d['Datapoints'] = parseInt(result['Datapoints']);
                 
                 triggers.emit('update_counts', row);
