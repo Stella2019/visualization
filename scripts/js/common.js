@@ -197,41 +197,40 @@ Counter.prototype = {
 };
 
 function Connection(args) {
-    var self = this;
     var permitted_args = ['name', 'url', 'post', 'time_res',
-                          'progress_div', 'progress_button', 'progress_text', 'progress_button',
-                          'id_min', 'id_max',
+                          'progress_div', 'progress_text', 'progress_full',
+                          'tweet_min', 'tweet_max',
                           'failure_msg',
                           'on_chunk_finish', 'on_finish']
 
     // Save args  
     if(args) {
         Object.keys(args).forEach(function (item) {
-            if(item in permitted_args) {
+            if(permitted_args.includes(item)) {
                 this[item] = args[item];
             }
         }, this);
     }
     
     // Defaults
-    self.name            = self.name            || 'r' + Math.floor(Math.random() * 1000000 + 1);
-    self.url             = self.url             || "";
-    self.post            = self.post            || {};
-    self.time_res        = self.time_res        || 1; // 1 Hour
+    this.name            = this.name            || 'r' + Math.floor(Math.random() * 1000000 + 1);
+    this.url             = this.url             || "";
+    this.post            = this.post            || {};
+    this.time_res        = this.time_res        || 1; // 1 Hour
     
-    self.progress        = {};
-    self.progress_div    = self.progress_div    || '#timeseries_div';
-    self.progress_text   = self.progress_text   || "Working";
-    self.progress_button = self.progress_button || false;
+    this.progress        = {};
+    this.progress_div    = this.progress_div    || '#timeseries_div';
+    this.progress_text   = this.progress_text   || "Working";
+    this.progress_full   = this.progress_full   || false;
     
-    self.id_chunks       = [];
-    self.chunk_index     = 0;
-    self.id_min          = self.id_min          || global_min_id; // TODO
-    self.id_max          = self.id_max          || global_max_id; // TODO
+    this.tweet_chunks    = [];
+    this.chunk_index     = 0;
+    this.tweet_min       = this.tweet_min          || 0; // TODO
+    this.tweet_max       = this.tweet_max          || 1e20; // TODO
     
-    self.failure_msg     = self.failure_msg     || 'Problem with data stream';
-    self.on_chunk_finish = self.on_chunk_finish || function () {};
-    self.on_finish       = self.on_finish       || function () {};
+    this.failure_msg     = this.failure_msg     || 'Problem with data stream';
+    this.on_chunk_finish = this.on_chunk_finish || function () {};
+    this.on_finish       = this.on_finish       || function () {};
     
 }
 Connection.prototype = {
@@ -253,21 +252,22 @@ Connection.prototype = {
         });
     },
     startStream: function () {
-        this.id_chunks = [];
+        this.tweet_chunks = [];
         this.chunk_index = 0;
-        for(var id = this.id_min; id < this.id_max;
-            id += this.time_res * 60 * 60 * 1000) {
-            this.id_chunks.push(id);
+        var tweet_min = this.tweet_min - (this.tweet_min % util.lshift(60 * 1000, 22)) + 22410166272; // Round to the nearest minute
+        for(var tweet = tweet_min; tweet <= this.tweet_max;
+            tweet += util.lshift(this.time_res * 60 * 60 * 1000, 22)) {
+            this.tweet_chunks.push(tweet);
         }
-        this.id_chunks.push(this.id_max);
+        this.tweet_chunks.push(this.tweet_max);
 
         // Start progress bar
         this.progress = new Progress({
             name:      this.name,
             parent_id: this.progress_div,
-            full:      this.progress_button,
+            full:      this.progress_full,
             text:      this.progress_text,
-            steps:     this.id_chunks.length - 1
+            steps:     this.tweet_chunks.length - 1
         });
         this.progress.start();
 
@@ -275,7 +275,7 @@ Connection.prototype = {
     },
     startChunk: function () {
         // If we are at the max, end
-        if (this.chunk_index >= this.id_chunks.length - 1) {
+        if (this.chunk_index >= this.tweet_chunks.length - 1) {
             // Load the new data
             this.on_finish();
 
@@ -288,15 +288,15 @@ Connection.prototype = {
             return;
         }
 
-        this.post.id_min = this.id_chunks[this.chunk_index];
-        this.post.id_max = this.id_chunks[this.chunk_index + 1];
+        this.post.tweet_min = this.tweet_chunks[this.chunk_index];
+        this.post.tweet_max = this.tweet_chunks[this.chunk_index + 1];
 
         this.php(this.url, this.post,
                      this.chunk_success.bind(this),
                      this.chunk_failure.bind(this));
     },
     chunk_success: function (file_data) {
-        if (file_data.includes('<b>Notice</b>')) {
+        if (file_data.includes('<b>Notice</b>') || file_data.includes('<b>Error</b>')) {
             console.debug(file_data);
 
             // Abort

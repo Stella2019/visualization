@@ -24,7 +24,7 @@ StatusReport.prototype = {
     setTriggers: function() {
         triggers.on('sort_elements', function() { this.clickSort(false, 'maintain_direction'); }.bind(this));
         triggers.on('new_counts', this.computeAggregates.bind(this));
-        triggers.on('update_all_counts', this.updateTableCounts.bind(this));
+        triggers.on('update_counts', this.updateTableCounts.bind(this));
         triggers.on('refresh_visibility', this.setVisibility.bind(this));
     },
     getData: function() {
@@ -150,7 +150,7 @@ StatusReport.prototype = {
             d['Event Type'] = d;
         });
         
-        triggers.emit('update_all_counts');
+        triggers.emit('update_counts');
     },
     buildDropdowns: function() {
         this.ops.updateCollectionCallback = this.getData;
@@ -191,7 +191,7 @@ StatusReport.prototype = {
                 ids:    ['', 'Distinct'],
                 default: 0,
                 type: "dropdown",
-                callback: triggers.emitter('update_all_counts')
+                callback: triggers.emitter('update_counts')
             }),
             Relative: new Option({
                 title: 'Relative to',
@@ -199,7 +199,7 @@ StatusReport.prototype = {
                 ids:    ['raw', 'event', 'type', 'subset', 'distinct'],
                 default: 0,
                 type: "dropdown",
-                callback: triggers.emitter('update_all_counts')
+                callback: triggers.emitter('update_counts')
             }),
             'Date Format': new Option({
                 title: 'First/Last Tweet',
@@ -207,7 +207,7 @@ StatusReport.prototype = {
                 ids:    ['id', 'date'],
                 default: 1,
                 type: "dropdown",
-                callback: triggers.emitter('update_all_counts')
+                callback: triggers.emitter('update_counts')
             }),
             'Datapoints Format': new Option({
                 title: 'Datapoints',
@@ -215,7 +215,7 @@ StatusReport.prototype = {
                 ids:    ['count', 'minutes'],
                 default: 0,
                 type: "dropdown",
-                callback: triggers.emitter('update_all_counts')
+                callback: triggers.emitter('update_counts')
             })
         };
         this.ops['Show'] = {
@@ -356,7 +356,8 @@ StatusReport.prototype = {
         ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
             table_body.selectAll('tr')
                 .append('td')
-                .attr('class', 'cell-' + type + ' cell-count');
+                .attr('class', 'cell-' + type + ' cell-count')
+                .append('span').attr('class', 'value');
             
             // Tooltip with summary starts
             this.tooltip.attach('.cell-' + type, function(set) {
@@ -390,6 +391,12 @@ StatusReport.prototype = {
             });
         }, this);
         
+        // Append the recalculate button
+        table_body.selectAll('td.cell-count.cell-Tweets')
+            .append('span')
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
+            .on('click', this.recount.bind(this));
+        
         // Times
         table_body.selectAll('tr')
             .append('td')
@@ -398,9 +405,13 @@ StatusReport.prototype = {
             .append('td')
             .attr('class', 'cell-lastdate');
         
-        table_body.selectAll('tr')
+        var datapoint_cells = table_body.selectAll('tr')
             .append('td')
-            .attr('class', 'cell-datapoints');
+            .attr('class', 'cell-datapoints cell-count');
+        datapoint_cells.append('span').attr('class', 'value');
+        datapoint_cells.append('span')
+            .attr('class', 'glyphicon glyphicon-time glyphicon-hiddenclick')
+            .on('click', this.computeTimeseries.bind(this));;
         
         // Buttons
         table_body.selectAll('tr')
@@ -465,29 +476,23 @@ StatusReport.prototype = {
         
         ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
             var quantity = distinct + type;
-            table_body.selectAll('td.cell-' + type)
+            table_body.selectAll('td.cell-' + type + ' .value')
                 .html(function(d) {
                     var value = d[quantity];
                     if(!value)
                         return '';
                     if(relative == 'raw') {
                         d[type + 'Display'] = value;
-                        return util.formatThousands(value);
+                        return util.formatThousands(value) + '&nbsp;';
                     }
                     var denom = relative == 'event'    ? (d['Level'] == 2 ? d['Event']['Tweets'] : d['Tweets']) : 
                                 relative == 'type'     ? (d['Level'] == 2 ? d['Event'][quantity] : d[quantity]) : 
                                 relative == 'subset'   ? d['Tweets'] : 
                                 relative == 'distinct' ? d[type] : 1;
                     d[type + 'Display'] = value / denom;
-                    return (value / denom * 100).toFixed(1) + '%';
+                    return (value / denom * 100).toFixed(1) + '%&nbsp;';
                 });
         });
-        
-        // Append the refresh button
-        table_body.selectAll('td.cell-count.cell-Tweets')
-            .append('span')
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
-            .on('click', this.recount.bind(this));
         
         // Set visibility of zero/non-zero rows
         table_body.selectAll('tr')
@@ -509,8 +514,8 @@ StatusReport.prototype = {
                 if(!('LastTweet') in d || d['LastTweet'] == 0 || d['LastTweet'] == 1e20) return '';
                 if(date_format == 'date') {
                     var date = d.LastTweet;
-                    if(d.Level == 0)
-                        console.log(d);
+//                    if(d.Level == 0)
+//                        console.log(d);
                     date = util.twitterID2Timestamp(date);
                     return util.formatDate(date);
                 }
@@ -519,13 +524,13 @@ StatusReport.prototype = {
             });
         
         // Datapoints
-        table_body.selectAll('td.cell-datapoints')
+        table_body.selectAll('td.cell-datapoints .value')
             .html(function(d) {
                 var value = d.Datapoints;
                 if(!value) return '';
                 if(datapoints_format == 'minutes') return util.formatMinutes(value);
                 return value;
-            })
+            });
         
         triggers.emit('refresh_visibility');
     },
@@ -721,11 +726,43 @@ StatusReport.prototype = {
                 d[quantity] = parseInt(result[quantity]) || 0;
             });
             
-            this.updateTableCounts(row);
+            triggers.emit('update_counts', row);
 
             // Remove loading sign
             prog_bar.end();
         }.bind(this));
+    },
+    computeTimeseries: function(d) {
+        var row = '.row_' + (d.Level == 1 ? 'event' : 'subset') + '_' + d.ID;
+        var args = {
+            url: 'timeseries/compute',
+            post: {
+                Collection: d.Level == 1 ? 'event' : 'subset',
+                ID: d.ID
+            },
+            tweet_min: d.FirstTweet,
+            tweet_max: d.LastTweet,
+            progress_div: row + ' .cell-datapoints',
+            progress_text: 'Computing',
+            progress_full: true,
+            on_chunk_finish: function(result) {
+                if(result.includes('Error')) {
+//                    this.progress.update(100, 'Error');
+                    console.log(result);
+                    return;
+                }
+
+                // Update values
+                result = JSON.parse(result)[0];
+                d['Datapoints'] = parseInt(result['Datapoints']);
+                
+                triggers.emit('update_counts', row);
+                
+            }
+        }
+        
+        var conn = new Connection(args);
+        conn.startStream();
     },
     openTimeseries: function(d) {
         var state = JSON.stringify({event: d.ID});
