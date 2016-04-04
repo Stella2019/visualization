@@ -71,9 +71,20 @@ var util = {
         var days = Math.floor(value / 60 / 24);
         var hours = Math.floor(value / 60) % 24;
         var minutes = value % 60;
-        if(days) return days + 'd ' + (hours < 10 ? '0' : '') + hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm&nbsp;';
-        if(hours) return hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm&nbsp;';
-        return minutes + 'm&nbsp;';
+        if(days) return days + 'd ' + (hours < 10 ? '0' : '') + hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm';
+        if(hours) return hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm';
+        return minutes + 'm';
+    },
+    deformatMinutes: function(minutes) {
+        return minutes.split(' ').reduce(function(res, cur) {
+            if(cur.slice(-1) == 'd')
+                return res + parseInt(cur.slice(0, -1)) * 24 * 60;
+            if(cur.slice(-1) == 'h')
+                return res + parseInt(cur.slice(0, -1)) * 60;
+            if(cur.slice(-1) == 'm')
+                return res + parseInt(cur.slice(0, -1));
+            return 0;
+        }, 0);
     },
 }
 

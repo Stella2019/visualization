@@ -524,13 +524,51 @@ StatusReport.prototype = {
             });
         
         // Datapoints
-        table_body.selectAll('td.cell-datapoints .value')
-            .html(function(d) {
-                var value = d.Datapoints;
-                if(!value) return '';
-                if(datapoints_format == 'minutes') return util.formatMinutes(value);
-                return value;
-            });
+        if(datapoints_format == 'minutes') {
+            table_body.selectAll('td.cell-datapoints .value')
+                .html(function(d) {
+                    var value = d.Datapoints;
+                    if(!value) return '';
+                    if(datapoints_format == 'minutes') return util.formatMinutes(value);
+                    return value;
+                });
+        } else {
+            table_body.selectAll("td.cell-datapoints .value")
+                .transition()
+                .duration(1000)
+                .tween("text", function (d) {
+                    var start = this.textContent;
+                    if(typeof(start) == 'string' && start.includes('m'))
+                        start = 0;
+                    var i = d3.interpolate(start || 0, d.Datapoints || 0);
+
+                    return function (t) {
+                        this.textContent = Math.round(i(t));
+                    };
+                });
+        }
+        
+//        table_body.selectAll("td.cell-datapoints .value")
+//            .transition()
+//            .duration(1000)
+//            .tween("text", function (d) {
+//                var start = this.textContent;
+//                if(typeof(start) == 'string' && start.includes('m'))
+//                    start = util.deformat(start);
+//                var i = d3.interpolate(start || 0, d.Datapoints || 0);
+//
+//                return function (t) {
+//                    var start = this.textContent;
+//                    if(typeof(start) == 'string' && start.includes('m'))
+//                        start = util.deformat(start);
+//                    if(datapoints_format == 'minutes') {
+//                        this.textContent = util.formatMinutes(i(util.deformat(t)));
+//                    } else {
+//                        this.textContent = Math.round(i(t));
+//                    }
+//                };
+//            });
+//        
         
         triggers.emit('refresh_visibility');
     },
