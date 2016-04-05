@@ -757,7 +757,7 @@ StatusReport.prototype = {
         this.connection.php('collection/recount', post, function(result) {
             if(result.includes('Error')) {
                 prog_bar.update(100, 'Error');
-                console.log(result);
+                console.error(result);
                 return;
             }
             
@@ -765,7 +765,8 @@ StatusReport.prototype = {
             try {
                 result = JSON.parse(result)[0];
             } catch (exception) {
-                console.log(result);
+                prog_bar.update(100, 'Error');
+                console.error(result);
                 return;
             }
             
@@ -795,7 +796,7 @@ StatusReport.prototype = {
             on_chunk_finish: function(result) {
                 if(result.includes('Error')) {
 //                    this.progress.update(100, 'Error');
-                    console.log(result);
+                    console.error(result);
                     return;
                 }
 
@@ -803,7 +804,7 @@ StatusReport.prototype = {
                 try {
                     result = JSON.parse(result)[0];
                 } catch (exception) {
-                    console.log(result);
+                    console.error(result);
                     return;
                 }
                 

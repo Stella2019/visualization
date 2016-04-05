@@ -1,6 +1,10 @@
 #status_table {
     font-size: .9em;
 }
+
+#status_table td, #status_table, th {
+    white-space: nowrap;
+}
 .cell-count {
     position: relative;
     text-align: right;
