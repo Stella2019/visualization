@@ -10,6 +10,7 @@ TimeseriesUI.prototype = {
     },
     setTriggers: function() {
         triggers.on("new_events", this.populateEventOptions.bind(this));
+//        triggers.on("new_subsets", this.populateSubsetOptions.bind(this));
         triggers.on("new_event_type", this.chooseEventType.bind(this));
         triggers.on('global_time_set', this.configureLoadTimeWindow.bind(this));
         triggers.on('edit:time_window', this.editLoadTimeWindow.bind(this));
@@ -288,4 +289,37 @@ TimeseriesUI.prototype = {
         
         triggers.emit('modal:open');
     },
+//    populateSubsetOptions: function(subsets) {
+//        var subset_names = subsets.map(function(subset) {
+//            return subset.Feature + ': ' + subset.Match;
+//        });
+//        
+//        // Generate Collections List
+//        subset_op = this.app.ops['Dataset']['Subset'];
+//        subset_op['labels'] = rumor_names;
+//        subset_op['labels'].unshift('None');
+//        subset_op['labels'].push('- New -');
+//        subset_op['ids'] = subsets.map(function(subset) { return subset['ID']; });
+//        subset_op['ids'].unshift('_none_');
+//        subset_op['ids'].push('_new_');
+//        subset_op['available'] = util.range(subset_op['labels'].length);
+//        
+//        // Find the current collection
+//        var cur = subset_op.get();
+//        subset_op.default = subsets.reduce(function(candidate, subset, i) {
+//            if(subset['ID'] == cur)
+//                return i;
+//            return candidate;
+//        }, 0);
+//        subset_op.set(subset_op['ids'][subset_op.default]);
+//        
+//        // Make the dropdown
+//        this.ops.buildSidebarOption('Dataset', 'Subset');
+//        this.ops.recordState(true);
+//        
+//        triggers.emit('new_subset');
+////        data.setRumor();
+//        
+////        options.buildNGrams();
+//    },
 };

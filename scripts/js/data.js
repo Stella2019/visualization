@@ -133,30 +133,6 @@ Data.prototype = {
         data.streamTweetCounts = new Stream(args);
         data.streamTweetCounts.start();
     },
-    loadRumors: function() {
-        Connection.php('collection/getRumors',
-                     {event_id: data.event.ID},
-                     data.parseRumorsFile);
-    },
-    parseRumorsFile: function(filedata) {
-        filedata = JSON.parse(filedata);
-        
-        data.rumors = filedata;
-        
-        // Populate the list of options
-        options.buildRumors();
-    },
-    setRumor: function() {
-        var rumor_id = options['Dataset']['Rumor'].get();
-        
-        data.rumor = data.rumors.reduce(function(rumor, candidate) {
-            if(rumor.ID == rumor_id)
-                return rumor;
-            return candidate
-        }, {});
-        
-        // No future callbacks from this
-    },
     parseLoadedTimeseries: function() {
         // Format selections
         d3.select('#choose_Dataset_Event button')

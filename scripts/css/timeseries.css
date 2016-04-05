@@ -42,13 +42,15 @@
 }
 
 /* Legend */
-#legend {
-    min-width: 200px;
-    position: absolute;
+.legend {
+    width: 200px;
+    position: fixed;
     display: inline-block;
     padding: 5px;
-    border: solid #ddd;
-    border-radius: 5px;
+    border-left: solid 5px #eee;
+    top: 0px;
+    height: 100%;
+    right: 0px;
 }
 .legend_section {
     margin-bottom: 10px;

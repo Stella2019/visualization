@@ -158,33 +158,7 @@ StatusReport.prototype = {
         var orders = ['ID', 'Collection', 'Tweets', 
                       'Originals', 'Retweets', 'Replies', 'Quotes', 
                       'First Tweet', 'Last Tweet', 'Datapoints'];
-        this.ops['View'] = {
-            hierarchical: new Option({
-                title: 'Maintain Hierarchy',
-                labels: ['Yes', 'No'],
-                ids:    ["true", "false"],
-                default: 0,
-                type: "dropdown",
-                callback: triggers.emitter('sort_elements')
-            }),
-            order: new Option({
-                title: 'Order',
-                labels: orders,
-                ids:    orders,
-                default: 0,
-                type: "dropdown",
-                callback: triggers.emitter('sort_elements')
-            }),
-            ascending: new Option({
-                title: 'Ascending',
-                labels: ['Ascending', 'Descending'],
-                ids:    ['true', 'false'],
-                default: 0,
-                type: "dropdown",
-                callback: triggers.emitter('sort_elements')
-            })
-        };
-        this.ops['Counts'] = {
+        this.ops['Columns'] = {
             Distinct: new Option({
                 title: 'Distinct?',
                 labels: ['Show All', 'Only Distinct'],
@@ -218,7 +192,31 @@ StatusReport.prototype = {
                 callback: triggers.emitter('update_counts')
             })
         };
-        this.ops['Show'] = {
+        this.ops['Rows'] = {
+            Hierarchical: new Option({
+                title: 'Maintain Hierarchy',
+                labels: ['Yes', 'No'],
+                ids:    ["true", "false"],
+                default: 0,
+                type: "dropdown",
+                callback: triggers.emitter('sort_elements')
+            }),
+            Order: new Option({
+                title: 'Order',
+                labels: orders,
+                ids:    orders,
+                default: 0,
+                type: "dropdown",
+                callback: triggers.emitter('sort_elements')
+            }),
+            Ascending: new Option({
+                title: 'Ascending',
+                labels: ['Ascending', 'Descending'],
+                ids:    ['true', 'false'],
+                default: 0,
+                type: "dropdown",
+                callback: triggers.emitter('sort_elements')
+            }),
             Empties: new Option({
                 title: 'Empty Rows',
                 labels: ['Show', 'Hide'],
@@ -252,7 +250,7 @@ StatusReport.prototype = {
                 callback: triggers.emitter('refresh_visibility')
             })
         }
-        this.ops.panels = ['View', 'Counts', 'Show'];
+        this.ops.panels = ['Rows', 'Columns'];
         
         // Start drawing
         this.ops.init();
@@ -409,6 +407,7 @@ StatusReport.prototype = {
             .append('td')
             .attr('class', 'cell-datapoints cell-count');
         datapoint_cells.append('span').attr('class', 'value');
+        datapoint_cells.append('span').html('&nbsp;');
         datapoint_cells.append('span')
             .attr('class', 'glyphicon glyphicon-time glyphicon-hiddenclick')
             .on('click', this.computeTimeseries.bind(this));;
@@ -445,19 +444,19 @@ StatusReport.prototype = {
         
         table_body.selectAll('tr')
             .style('display', 'table-row');
-        if(this.ops['Show']['Empties'].is('none')) {
+        if(this.ops['Rows']['Empties'].is('none')) {
             table_body.selectAll('tr.row-zero')
                 .style('display', 'none');
         }
-        if(this.ops['Show']['Event Types'].is('none')) {
+        if(this.ops['Rows']['Event Types'].is('none')) {
             table_body.selectAll('tr.row_type')
                 .style('display', 'none');
         }
-        if(this.ops['Show']['Events'].is('none')) {
+        if(this.ops['Rows']['Events'].is('none')) {
             table_body.selectAll('tr.row_event')
                 .style('display', 'none');
         }
-        if(this.ops['Show']['Subsets'].is('none')) {
+        if(this.ops['Rows']['Subsets'].is('none')) {
             table_body.selectAll('tr.row_subset')
                 .style('display', 'none');
         }
@@ -467,10 +466,10 @@ StatusReport.prototype = {
     updateTableCounts: function(selector) {
         selector = selector || 'tbody';
         var table_body = d3.select(selector);
-        var distinct = this.ops['Counts']['Distinct'].get();
-        var relative = this.ops['Counts']['Relative'].get();
-        var date_format = this.ops['Counts']['Date Format'].get();
-        var datapoints_format = this.ops['Counts']['Datapoints Format'].get();
+        var distinct = this.ops['Columns']['Distinct'].get();
+        var relative = this.ops['Columns']['Relative'].get();
+        var date_format = this.ops['Columns']['Date Format'].get();
+        var datapoints_format = this.ops['Columns']['Datapoints Format'].get();
         
         // Update the text of rows with the counts
         
@@ -583,11 +582,11 @@ StatusReport.prototype = {
     },
     clickSort: function(order, option) {
         var table_body = d3.select('tbody');
-        if(!order) order = this.ops['View']['order'].get();
+        if(!order) order = this.ops['Rows']['Order'].get();
         var header = d3.select('.col-' + util.simplify(order));
         var clicked = header.data()[0];
-        var order = this.ops['View']['order'].get();
-        var ascending = this.ops['View']['ascending'].get();
+        var order = this.ops['Rows']['Order'].get();
+        var ascending = this.ops['Rows']['Ascending'].get();
         
         if(clicked) {
             d3.selectAll('.col-sortable span')
@@ -597,18 +596,18 @@ StatusReport.prototype = {
         // If it is clicked on what it is currently doing, flip it
         if(clicked == order && option != 'maintain_direction') {
             ascending = ascending == "true" ? "false" : "true";
-            this.ops['View']['ascending'].updateInInterface_id(ascending);
+            this.ops['Rows']['Ascending'].updateInInterface_id(ascending);
         } else if (clicked) { // Otherwise it's a new order
             order = clicked;
-            this.ops['View']['order'].updateInInterface_id(order);
+            this.ops['Rows']['Order'].updateInInterface_id(order);
             if(option != 'maintain_direction') {
                 ascending = order == 'Collection' ? 'true' : 'false';
-                this.ops['View']['ascending'].updateInInterface_id(ascending);   
+                this.ops['Rows']['Ascending'].updateInInterface_id(ascending);   
             }
         }
         
         // Sort the columns
-        if(this.ops['View']['hierarchical'].is('true')) {
+        if(this.ops['Rows']['Hierarchical'].is('true')) {
             var quantity = order.replace(' ', '');
             if(quantity == 'Collection') quantity = 'Label';
             if(['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].includes(quantity)) {
@@ -616,8 +615,9 @@ StatusReport.prototype = {
             }
 //            var ascending_minmax = ascending == 'true' ? 'Min' : 'Max';
             var ascending_bin = ascending == 'true' ? 1 : -1;
-            var showing_event_types = this.ops['Show']['Event Types'].is('table-row');
-            var showing_events = this.ops['Show']['Events'].is('table-row');
+            var showing_event_types = this.ops['Rows']['Event Types'].is('table-row');
+            var showing_events = this.ops['Rows']['Events'].is('table-row');
+            var showing_events = this.ops['Rows']['Events'].is('table-row');
             
             table_body.selectAll('tr').sort(function(a, b) {
                 var lA = a['Level'];
@@ -667,6 +667,10 @@ StatusReport.prototype = {
                 if(!B) return -1;
                 if(A < B) return -1 * ascending_bin;
                 if(A > B) return  1 * ascending_bin;
+                
+                if(lA == lB) return  a['ID'] - b['ID'];
+                if(lA <  lB) return  1;
+                if(lA >  lB) return -1;
 
                 return 0;
             });
@@ -817,7 +821,7 @@ StatusReport.prototype = {
         window.open('coding.html#' + state);
     },
     setInfo: function(set) {
-        var distinct = this.ops['Counts']['Distinct'].get();
+        var distinct = this.ops['Columns']['Distinct'].get();
         console.log(this);
         var type = 'Tweets';
         var value = set[distinct + type];

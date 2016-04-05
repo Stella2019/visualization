@@ -666,38 +666,6 @@ Options.prototype = {
         
 //        d3.selectAll('#ui-datepicker-div button').classed('btn btn-default', true);
     },
-    buildRumors: function() {
-        var rumor_names = data.rumors.map(function(rumor) {
-            return rumor.Name;
-        });
-        
-        // Generate Collections List
-        rumor_op = options['Dataset']['Rumor'];
-        rumor_op['labels'] = rumor_names;
-        rumor_op['labels'].unshift('None');
-        rumor_op['labels'].push('- New -');
-        rumor_op['ids'] = data.rumors.map(function(rumor) { return rumor['ID']; });
-        rumor_op['ids'].unshift('_none_');
-        rumor_op['ids'].push('_new_');
-        rumor_op['available'] = util.range(rumor_op['labels'].length);
-        
-        // Find the current collection
-        var cur = rumor_op.get();
-        rumor_op.default = data.rumors.reduce(function(candidate, rumor, i) {
-            if(rumor['ID'] == cur)
-                return i;
-            return candidate;
-        }, 0);
-        rumor_op.set(rumor_op['ids'][rumor_op.default]);
-        
-        // Make the dropdown
-        options.buildSidebarOption('Dataset', 'Rumor');
-        options.recordState(true);
-        
-        data.setRumor();
-        
-        options.buildNGrams();
-    },
     editWindow: function(option) {
 //        var set = options[option];
 //        var id = set.get();

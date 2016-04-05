@@ -146,15 +146,15 @@ Timeseries.prototype = {
                 callback: triggers.emitter('new_event'),
                 edit: function() { options.editWindow('event');  }
             }),
-            Rumor: new Option({
-                title: 'Rumor',
-                labels: ["- None -", "- New -"],
-                ids:    ["_none_", "_new_"],
-                default: 0,
-                type: "dropdown",
-                callback: function() { data.getRumor(); },
-                edit: function() { options.editWindow('rumor'); }
-            }),
+//            Rumor: new Option({
+//                title: 'Rumor',
+//                labels: ["- None -", "- New -"],
+//                ids:    ["_none_", "_new_"],
+//                default: 0,
+//                type: "dropdown",
+//                callback: function() { data.getRumor(); },
+//                edit: function() { options.editWindow('rumor'); }
+//            }),
             'Time Window': new Option({
                 title: "Time",
                 labels: ["First Day", "First 3 Days", "Whole Collection", "Custom",],
@@ -334,22 +334,22 @@ Timeseries.prototype = {
                 type: "dropdown",
                 callback: function() { /* nothing */ }
             }),
-            'N-Gram View': new Option({
-                title: 'Fetch NGrams',
-                labels: ["Whole Event"],
-                ids:    ["e_event"],
-                default: 0,
-                type: "dropdown",
-                callback: function() { data.calculateNGrams('ngram_view'); }
-            }),
-            'N-Gram Compare': new Option({
-                title: 'compare w/',
-                labels: ['-', 'Whole Event'],
-                ids:    ['', 'e_event'],
-                default: 0,
-                type: "dropdown",
-                callback: function() { data.calculateNGrams('ngram_cmp'); }
-            })
+//            'N-Gram View': new Option({
+//                title: 'Fetch NGrams',
+//                labels: ["Whole Event"],
+//                ids:    ["e_event"],
+//                default: 0,
+//                type: "dropdown",
+//                callback: function() { data.calculateNGrams('ngram_view'); }
+//            }),
+//            'N-Gram Compare': new Option({
+//                title: 'compare w/',
+//                labels: ['-', 'Whole Event'],
+//                ids:    ['', 'e_event'],
+//                default: 0,
+//                type: "dropdown",
+//                callback: function() { data.calculateNGrams('ngram_cmp'); }
+//            })
         };
         
         this.ops.updateCollectionCallback = function() { data.loadRumors(); };

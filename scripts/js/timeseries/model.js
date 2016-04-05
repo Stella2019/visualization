@@ -7,6 +7,9 @@ function TimeseriesModel (app) {
     this.events_arr = [];
     this.event_names = [];
     
+    this.subsets = {};
+    this.subsets_arr = [];
+    
     this.event = {};
     this.time = {
         name: "Time",
@@ -32,11 +35,17 @@ TimeseriesModel.prototype = {
         triggers.on('new_event', this.setEvent.bind(this));
         triggers.on('edit_window:updated', this.updateCollection.bind(this));
         triggers.on('event:load_timeseries', this.loadEventTimeseries.bind(this));
+        triggers.on('event_updated', this.loadSubsets.bind(this));
     },
     loadEvents: function () {
         // Event selection
         this.connection.php('collection/getEvent', {},
                      this.parseEventsFile.bind(this));
+    },
+    loadSubsets: function () {
+        // Event selection
+        this.connection.php('collection/getSubset', {event: this.event.ID},
+                     this.parseSubsetsFile.bind(this));
     },
     parseEventsFile: function (data) {
         // Add events (collections)
@@ -123,5 +132,34 @@ TimeseriesModel.prototype = {
     },
     loadEventTimeseries: function() {
         console.log('TODO');
-    }
+    },
+    parseSubsetsFile: function(filedata) {
+        try {
+            filedata = JSON.parse(filedata);
+        } catch (exception) {
+            console.log(filedata);
+            return;
+        }
+        
+        this.subsets_arr = filedata;
+        this.subsets_arr.forEach(function(subset) {
+            this.subsets[subset.ID] = subset;
+        }, this);
+        
+        triggers.emit('new_subsets', filedata);
+        
+        // Populate the list of options
+//        options.buildRumors();
+    },
+//    setRumor: function() {
+//        var rumor_id = options['Dataset']['Rumor'].get();
+//        
+//        data.rumor = data.rumors.reduce(function(rumor, candidate) {
+//            if(rumor.ID == rumor_id)
+//                return rumor;
+//            return candidate
+//        }, {});
+//        
+//        // No future callbacks from this
+//    },
 };

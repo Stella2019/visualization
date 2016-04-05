@@ -29,10 +29,53 @@ TimeseriesLegend.prototype = {
     },
     setTriggers: function() {
         triggers.on('page_built', this.buildLegend.bind(this));
+        triggers.on('new_subsets', this.populateLegend.bind(this));
     },
     buildLegend: function() {
-        d3.select('body').append('div')
-            .attr('id', 'legend');
+        this.container = d3.select('body').append('div')
+            .attr('class', 'legend');
+    },
+    populateLegend: function(subsets) {
+        // Destroy old legend
+        this.container.selectAll('*').remove();
+        
+        var features = [];
+        var features_subsets = {};
+        
+        subsets.forEach(function(subset) {
+            if(!features.includes(subset.Feature)) {
+                features.push(subset.Feature);
+                features_subsets[subset.Feature] = [subset];
+            } else {
+                features_subsets[subset.Feature].push(subset);
+            }
+        });
+        
+        features.forEach(function(feature) {
+            var section = this.container.append('div');
+            
+            section.append('h4')
+                .html(feature);
+            
+            var list_div = section.append('div')
+                .attr('class', 'legend_series_list');
+            
+            var entries = list_div
+                .selectAll('div.legend_entry')
+                .data(features_subsets[feature]);
+            
+            var new_entries = entries.enter().append('div')
+                .attr('id', function(d) {
+                    return 'legend_' + d.ID;
+                })
+                .attr('class', function(d) {
+                    return 'legend_entry ' + d.ID;
+                })
+                .html(function(d) { return d.Match; });
+//                .on('mouseover', legend.hoverLegendEntry)
+//                .on('mousemove', legend.hoverLegendEntryMove)
+//                .on('mouseout', legend.hoverLegendEntryEnd);
+        }, this);
     },
     init2: function() {
         this.container = d3.select('#legend')
