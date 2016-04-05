@@ -1,5 +1,6 @@
-function TimeseriesChart(app, type) {
+function TimeseriesChart(app, id) {
     this.app = app;
+    this.id = id;
     
     // Size
     this.page = {};
@@ -8,15 +9,15 @@ function TimeseriesChart(app, type) {
     this.placement = 1; // use this to move charts around
     this.top    = 10;
     this.right  = 10;
-    this.bottom = 100;
-    this.left   = 75;
+    this.bottom = 10;
+    this.left   = 10;
     this.width  = this.page.width  - this.left - this.right;
     this.height = this.page.height - this.top  - this.bottom;
     
     // Scales
     this.x = d3.time.scale();
     this.y = d3.scale.linear();
-    this.y2 = d3.scale.linear();
+//    this.y2 = d3.scale.linear();
     
     // Axes
     this.xAxis = d3.svg.axis()
@@ -25,9 +26,9 @@ function TimeseriesChart(app, type) {
     this.yAxis = d3.svg.axis()
         .scale(this.y)
         .orient('left');
-    this.yAxis2 = d3.svg.axis()
-        .scale(this.y2)
-        .orient('right');
+//    this.yAxis2 = d3.svg.axis()
+//        .scale(this.y2)
+//        .orient('right');
     
     // Getters
     this.dataTimestamp_2_x = function(d) { return this.x(d.timestamp); };
@@ -36,8 +37,8 @@ function TimeseriesChart(app, type) {
     // Area
     this.area = d3.svg.area()
         .x(this.dataTimestamp_2_x);
-    this.area2 = d3.svg.area()
-        .x(this.dataTimestamp_2_x);
+//    this.area2 = d3.svg.area()
+//        .x(this.dataTimestamp_2_x);
     
     // Other potential attributes
     this.brush = [];
@@ -52,35 +53,17 @@ TimeseriesChart.prototype = {
     },
     setTriggers: function() {
         triggers.on('page_built2', this.build.bind(this));
-        triggers.on('resized', this.build.bind(this));
+        triggers.on('resized', this.adjustSize.bind(this));
     },
     build: function() {
+        this.svg = d3.select(this.id);
+        this.buildElements();
         this.adjustSize();
         this.updateOptionalAttributes();
         // disp.setColorScale
     },
-    getPageBounds: function() {
-        //document.documentElement.clientHeight
-        //document.documentElement.clientWidth
-        this.page.height = parseInt(d3.select('body').style('height').replace('px', ''));
-        this.page.width  = parseInt(d3.select('body').style('width'));
-    },
-    adjustSize: function(args) {
-        
-        
-        this.x.range([0, this.width]);
-        this.y.range([this.height, 0]);
-        this.y2.range([this.height, 0]);
-        
-        this.xAxis.tickSize(-this.height)
-        
-        this.area.y0(this.height)
-    },
-    updateOptionalAttributes: function() {
-        this.area.interpolate(options.shape.get());
-    },
-    addToDocument: function() {
-        this.svg = disp.plot_area.svg.append("g")
+    buildElements: function() {
+        this.svg.append("g")
             .attr("class", "focus")
             .attr("transform", "translate(" + this.left + "," + this.top + ")");
         
@@ -100,6 +83,26 @@ TimeseriesChart.prototype = {
             .style('stroke', 'black')
             .style('fill-opacity', '0.2')
             .style('stroke-opacity', '0.6');
+    },
+    getPageBounds: function() {
+        //document.documentElement.clientHeight
+        //document.documentElement.clientWidth
+        this.page.height = parseInt(d3.select('body').style('height').replace('px', ''));
+        this.page.width  = parseInt(d3.select('body').style('width'));
+    },
+    adjustSize: function(args) {
+        this.getPageBounds();
+        
+        this.x.range([0, this.width]);
+        this.y.range([this.height, 0]);
+        this.y2.range([this.height, 0]);
+        
+        this.xAxis.tickSize(-this.height)
+        
+        this.area.y0(this.height)
+    },
+    updateOptionalAttributes: function() {
+        this.area.interpolate(options.shape.get());
     },
     setContext: function () {
         this.area.y1(this.dataValue_2_y);

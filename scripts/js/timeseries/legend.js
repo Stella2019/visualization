@@ -71,7 +71,7 @@ TimeseriesLegend.prototype = {
                 .attr('class', function(d) {
                     return 'legend_entry ' + d.ID;
                 })
-                .html(function(d) { return d.Match; });
+                .html(function(d) { return d.DisplayMatch; });
 //                .on('mouseover', legend.hoverLegendEntry)
 //                .on('mousemove', legend.hoverLegendEntryMove)
 //                .on('mouseout', legend.hoverLegendEntryEnd);

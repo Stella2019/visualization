@@ -143,6 +143,8 @@ TimeseriesModel.prototype = {
         
         this.subsets_arr = filedata;
         this.subsets_arr.forEach(function(subset) {
+            subset.DisplayMatch = subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
+            
             this.subsets[subset.ID] = subset;
         }, this);
         

@@ -15,29 +15,30 @@ TimeseriesView.prototype = {
     buildPage: function() {
         var body = d3.select('body')
             .append('div')
-            .attr('class', 'container')
-            .attr('id', 'body')
-            .style('padding-right', '200px');
+            .attr('id', 'body');
         
         body.append('div')
-            .attr('id', 'header')
-            .attr('class', 'text-center')
+            .attr('class', 'header')
             .append('span')
             .attr('id', 'chart-title')
-            .html('Twitter Capture Visualization');
+            .html('Twitter Collection Timeseries Visualization');
         
-        var chart_area = body.append('div')
-            .attr('id', 'charts')
-            .style('width', '1000px');
-        
-        chart_area.append('div')
-            .attr('id', 'timeseries_div')
+        body.append('div')
+            .attr('id', 'timeseries-container')
+            .attr('class', 'chart-container')
             .append('svg')
-            .attr('id', 'timeseries');
+            .attr('id', 'timeseries')
+            .attr('class', 'chart');
         
-        chart_area.append('div')
-            .attr('id', 'chart-bottom')
-            .attr('class', 'text-center')
+        body.append('div')
+            .attr('id', 'context-container')
+            .attr('class', 'chart-container')
+            .append('svg')
+            .attr('id', 'context')
+            .attr('class', 'chart');
+        
+        body.append('div')
+            .attr('class', 'ui-bottom footer')
             .append('div')
             .style('padding', '10px')
             .html('Tweet volume over the whole collection period. Manually enter or brush over to focus on time.');

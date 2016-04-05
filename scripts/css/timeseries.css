@@ -1,10 +1,41 @@
-
-
-/* Chart Display */
-#timeseries_div, #legend {
-    display: inline-block;
+/* Chart bounds */
+html {
+    height: 100%;
+}
+body {
+    height: 100%;
+}
+#body {
+    display: flex;
+    flex-flow: column;
+    height: 100%;
+    position: relative;
+    margin-left: 200px;
+    margin-right: 200px;
+    padding: 15px;
+}
+.header {
+    flex: 0 1 auto;
+    text-align: center;
+}
+#timeseries-container {
+    flex: 1 1 200px;
     position: relative;
 }
+#context-container {
+    flex: .25 1 120px;
+    position: relative;
+}
+.chart {
+    width: 100%;
+    height: 100%;
+}
+.footer {
+    flex: 0 1 auto;
+    text-align: center;
+}
+
+/* Chart Display */
 .axis path,
 .axis line {
     fill: none;
@@ -45,12 +76,12 @@
 .legend {
     width: 200px;
     position: fixed;
-    display: inline-block;
     padding: 5px;
     border-left: solid 5px #eee;
     top: 0px;
     height: 100%;
     right: 0px;
+    overflow-y: scroll;
 }
 .legend_section {
     margin-bottom: 10px;

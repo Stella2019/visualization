@@ -553,7 +553,7 @@ Options.prototype = {
     },
     buildTimeWindow: function() {
  
-        var container = d3.select("#chart-bottom").append("div")
+        var container = d3.select(".ui-bottom").append("div")
             .style({width: '500px', display: 'inline-table'})
             .attr("class", "text-center input-group input-group-sm");
 //            .html("<strong>Time Window:</strong> ");
@@ -1232,9 +1232,9 @@ Options.prototype = {
             .attr('target', '_blank')
             .html(function(d) { return d.label; });
         
-        pages_panel.append('div')
-            .attr('class', 'section-title')
-            .html('Pages')
+//        pages_panel.append('div')
+//            .attr('class', 'section-title')
+//            .html('Pages')
         
         // Add all other sidebar items
         if(!this.panels) return;
@@ -1252,9 +1252,9 @@ Options.prototype = {
                 this.buildSidebarOption(panel_name, option_name);
             }, this)
             
-            panel_div.append('div')
-                .attr('class', 'section-title')
-                .html(panel_name);
+//            panel_div.append('div')
+//                .attr('class', 'section-title')
+//                .html(panel_name);
         }, this);
     },
     buildSidebarOption: function(panel_name, option_name) {
