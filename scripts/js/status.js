@@ -205,7 +205,7 @@ StatusReport.prototype = {
                 title: 'Order',
                 labels: orders,
                 ids:    orders,
-                default: 0,
+                default: 1,
                 type: "dropdown",
                 callback: triggers.emitter('sort_elements')
             }),
@@ -762,7 +762,12 @@ StatusReport.prototype = {
             }
             
             // Update values
-            result = JSON.parse(result)[0];
+            try {
+                result = JSON.parse(result)[0];
+            } catch (exception) {
+                console.log(result);
+                return;
+            }
             
             this.quantities.forEach(function (quantity) {
                 d[quantity] = parseInt(result[quantity]) || 0;
