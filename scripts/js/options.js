@@ -57,7 +57,8 @@ Options.prototype = {
         this.recordState(true);
     },
     setTriggers: function() {
-        triggers.on('edit_window:updated', this.editWindowUpdated.bind(this));
+//        triggers.on('edit_window:open', this.editWindow.bind(this));
+//        triggers.on('edit_window:updated', this.editWindowUpdated.bind(this));
     },
     importState: function() {
         var state;
@@ -1207,14 +1208,17 @@ Options.prototype = {
             label: "Index",
             url: "index.html"
         },{
-            label: "Overview",
+            label: "Collection Overview",
             url: "status.html"
         },{
-            label: "Timeseries",
+            label: "<span class='text-warning'>Timeseries</span> (in progress)",
             url: "timeseries.html"
         },{
-            label: "Coding",
+            label: "<span class='text-danger'>Coding</span> (not working)",
             url: "coding.html"
+        },{
+            label: "<span class='text-warning'>Features</span> (in progress)",
+            url: "features.html"
         }]
             
         pages_panel.append('ul')

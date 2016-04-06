@@ -340,7 +340,7 @@ function Tooltip() {
 }
 Tooltip.prototype = {
     init: function() {
-        this.div = d3.select('#body')
+        this.div = d3.select('body')
             .append('div')
             .attr('class', 'tooltip');
     },
@@ -433,6 +433,60 @@ triggers = {
         return function(d) { this.emit(eventName, d); }.bind(this);
     }
 };
+// Add first trigger
+triggers.on('alert', function(ops) {
+    // Manage options
+    if(typeof(ops) == 'string'){
+        ops = {text: ops};
+    }
+    if(!ops['style_class']) {
+        ops['style_class'] = 'warning';
+    }
+    if(!ops['parent']) {
+        ops['parent'] = 'body';
+    }
+
+    var style = {
+        position: 'absolute',
+        top: '50%',
+        transform: 'translate(0%, -50%)',
+        left: '20%',
+        width: '60%',
+        'z-index': 4
+    }
+
+    var alert_shadow = d3.select(ops['parent']).append('div')
+        .attr('class', 'alert_outer')
+        .style({
+            'width': '100%',
+            'height': '100%',
+            'position': 'absolute',
+            'top': 0,
+            'left': 0
+        })
+        .on('click', function() {
+            d3.select('.alert_outer').remove();
+        });
+
+    var alert_div = alert_shadow.append('div')
+        .attr({
+            'class': 'alert alert-' + ops['style_class'] + ' alert-dismissible',
+            'role': 'alert'
+        })
+        .style(style);
+
+    alert_div.append('button')
+        .attr({'type': 'button',
+               'class': 'close', 
+               'data-dismiss': 'alert',
+               'aria-label': 'Close'})
+        .append('span')
+        .attr('aria-hidden', 'true')
+        .html('&times;');
+
+    alert_div.append('span')
+        .html(ops['text']);
+});
 
 function Progress(args) {
     // Grab parameters

@@ -15,7 +15,7 @@ Modal.prototype = {
         this.setTriggers();
     },
     setTriggers: function() {
-        triggers.on('page_built', this.buildModal.bind(this));
+        triggers.on('modal:build', this.buildModal.bind(this));
         triggers.on('modal:reset', this.reset.bind(this));
         triggers.on('modal:open', this.open.bind(this));
         triggers.on('modal:close', this.close.bind(this));
