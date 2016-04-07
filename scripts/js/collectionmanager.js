@@ -3,6 +3,7 @@ function CollectionManager(app, args) {
     args = args || {};
     this.name = args.name || 'Dataset';
     this.flag_subset_menu = args.flag_subset_menu || false;
+    this.flag_sidebar = args.flag_sidebar || true;
     this.ops = {};
     
     this.event_names;
@@ -17,6 +18,18 @@ function CollectionManager(app, args) {
     this.subset;
     
     this.init();
+    
+    this.edit_window_fields = {
+        omitted: ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes',
+                 'DistinctTweets', 'DistinctOriginals', 'DistinctRetweets', 'DistinctReplies', 'DistinctQuotes',
+                 'TweetsDisplay', 'OriginalsDisplay', 'RetweetsDisplay', 'RepliesDisplay', 'QuotesDisplay',
+                 'Level', 'Datapoints', 'Label', 'FirstTweet', 'LastTweet',
+                 'Month', 'DisplayMatch'],
+        text: ['DisplayName', 'Rumor', 'Superset', 'Feature', 'Match', 'Notes', 'Level', 'Type', 'Description', 'Active'],
+        date: ['StartTime', 'StopTime'],
+        textarea: ['Description', 'Definition'],
+        query: ['Query']
+    }
 }
 CollectionManager.prototype = {
     init: function() {
@@ -26,18 +39,21 @@ CollectionManager.prototype = {
         triggers.on('collectionManager:build', this.build.bind(this));
         
         // Dataset changes
-        triggers.on('events:load', this.loadEvents.bind(this));
-        triggers.on('events:updated', this.populateEventOptions.bind(this));
-        triggers.on('event_type:set', this.chooseEventType.bind(this));
-        triggers.on('event:set', this.setEvent.bind(this));
-        if(this.flag_subset_menu) {
+        if(this.flag_sidebar) {
+            triggers.on('events:load', this.loadEvents.bind(this));
+            triggers.on('events:updated', this.populateEventOptions.bind(this));
+            triggers.on('event_type:set', this.chooseEventType.bind(this));
+            triggers.on('event:set', this.setEvent.bind(this));
             triggers.on('event:updated', this.loadSubsets.bind(this));
-            triggers.on('subsets:updated', this.populateSubsetOptions.bind(this));
-            triggers.on('subset:set', this.setSubset.bind(this));
+            if(this.flag_subset_menu) {
+                triggers.on('subsets:updated', this.populateSubsetOptions.bind(this));
+                triggers.on('subset:set', this.setSubset.bind(this));
+            }
         }
-        
+
         // Editing Windows
         triggers.on('edit_window:open', this.editWindow.bind(this));
+        triggers.on('edit_window:update', this.updateCollection.bind(this));
         triggers.on('edit_window:updated', this.updateCollection.bind(this));
         triggers.on('time_window:edit', this.editLoadTimeWindow.bind(this));
         triggers.on('time_window:choose', function() {
@@ -48,7 +64,7 @@ CollectionManager.prototype = {
 //                triggers.emit('event:load_timeseries');
             }
         }.bind(this));
-        triggers.on('time_window:set', this.configureLoadTimeWindow.bind(this));        
+        triggers.on('time_window:set', this.configureLoadTimeWindow.bind(this));  
     },
     build: function() {
         this.setOptions();
@@ -145,8 +161,12 @@ CollectionManager.prototype = {
                 event.OldKeywords = [];
             
             // Name
-            if (!('DisplayName' in event) || !event['DisplayName'] || event['DisplayName'] == "null")
-                event.DisplayName = event.Name;
+            if (!('DisplayName' in event) || !event['DisplayName'] || event['DisplayName'] == "null") {
+                event.Label = event.Name;
+                event.DisplayName = '';
+            } else {
+                event.Label = event.DisplayName;
+            }
                
             // Time
             event.StartTime = event.StartTime ? util.date(event.StartTime) : new Date();
@@ -161,13 +181,13 @@ CollectionManager.prototype = {
                 event.StopTime = "Ongoing";
                 event.Month += '+';
             }
-            event.DisplayName += ' ' + event.Month;
+            event.Label += ' ' + event.Month;
         });
 
         
         // Make nicer event names
         this.event_names = this.events_arr.map(function (event) {
-            return event.DisplayName;
+            return event.Label;
         });
         
         triggers.emit('events:updated');
@@ -192,12 +212,15 @@ CollectionManager.prototype = {
     setSubset: function() {
         var subset_id = this.ops['Subset'].get();
         this.subset = this.subsets[parseInt(subset_id)];
+        
+        
+        triggers.emit('subset:updated', this.subset);
     },
     updateCollection: function() {
         var fields = {};
         $("#edit_form").serializeArray().forEach(function(x) { fields[x.name] = x.value; });
         
-        Connection.php('collection/update', fields, triggers.emitter('edit_window:updated')); // add a callback
+        this.app.connection.php('collection/update', fields, triggers.emitter('events:load')); // add a callback
     },
     loadSubsets: function () {
         // Event selection
@@ -225,7 +248,7 @@ CollectionManager.prototype = {
                     hours.toFixed(0) + ':' +
                     (hours * 6 % 6).toFixed(0) + (hours * 60 % 10).toFixed(0);
             }
-            subset.DisplayName = subset.Feature + ': ' + subset.DisplayMatch;
+            subset.Label = subset.Feature + ': ' + subset.DisplayMatch;
             
             this.subsets[subset.ID] = subset;
         }, this);
@@ -298,7 +321,7 @@ CollectionManager.prototype = {
     },
     populateSubsetOptions: function() {
         var subset_names = this.subsets_arr.map(function(subset) {
-            return subset.DisplayName;
+            return subset.Label;
         });
         
         // Generate Collections List
@@ -564,7 +587,7 @@ CollectionManager.prototype = {
         // Set modal
         var modal = this.app.modal;
         triggers.emit('modal:reset');
-        triggers.emit('modal:title', '<strong>Configure ' + option + ':</strong> ' + info.DisplayName);
+        triggers.emit('modal:title', '<small>Configure ' + option + ':</small> ' + (info.Label));
         
         // Append form
         var form = modal.body.append('form')
@@ -578,7 +601,15 @@ CollectionManager.prototype = {
                 return false; 
             });
         
-        var keys = Object.keys(info);
+        var keys = [];
+        Object.keys(info).forEach(function(key) {
+            var value = info[key];
+            if (!this.edit_window_fields.omitted.includes(key) && 
+               (typeof(value) == 'string' || typeof(value) == 'number' || value instanceof Date) ) {
+                keys.push(key);
+            }
+        }, this);
+        
         var divs = form.selectAll('div.form-group')
             .data(keys)
             .enter()
@@ -596,30 +627,19 @@ CollectionManager.prototype = {
                     return d.replace(/([A-Z])/g, " $1");
             });
         
-        var nonEditable = ['Keywords', 'OldKeywords', 'Server', 'Month'];
-        var identifier = ['ID', 'Event_ID'];
-        if(option == 'collection')
-            identifier.push('Name');
-        
-        var dateFields = ['StartTime', 'StopTime'];
-        var textareaFields = ['Description', 'Definition'];
-        var queryFields = ['Query'];
-        
         divs.append('div')
             .attr('class', function(d) { 
-                if(identifier.includes(d))
-                    return 'col-sm-9 edit-box edit-box-id';
-                else if(nonEditable.includes(d))
-                    return 'col-sm-9 edit-box edit-box-static';
-                else if(dateFields.includes(d))
-                    return 'col-sm-9 edit-box edit-box-date';
-                else if(textareaFields.includes(d))
-                    return 'col-sm-9 edit-box edit-box-textarea';
-                else if(queryFields.includes(d))
-                    return 'col-sm-9 edit-box edit-box-query';
-                else
+                if(this.edit_window_fields.text.includes(d))
                     return 'col-sm-9 edit-box edit-box-textfield';
-            });
+                else if(this.edit_window_fields.date.includes(d))
+                    return 'col-sm-9 edit-box edit-box-date';
+                else if(this.edit_window_fields.textarea.includes(d))
+                    return 'col-sm-9 edit-box edit-box-textarea';
+                else if(this.edit_window_fields.query.includes(d))
+                    return 'col-sm-9 edit-box edit-box-query';
+                else // Non editable
+                    return 'col-sm-9 edit-box edit-box-static';
+            }.bind(this));
         
         form.selectAll('.edit-box-id')
             .append('input')
@@ -681,10 +701,8 @@ CollectionManager.prototype = {
                 class: 'hidden'
             });
         
-        // Add Lower Buttons        
-        var bottom_row = d3.select('#modal .modal-options')
-        
-        bottom_row.append('div')
+        // Add Lower Buttons
+        modal.options.append('div')
             .append('button')
             .attr({
                 id: 'edit-window-save',
@@ -697,13 +715,121 @@ CollectionManager.prototype = {
 //            .set('content', 'Otherwise won\'t save changes');
         
         if(option == 'rumor') {
-            this.editWindowRumorOptions();
+            this.editWindowRumorOptions(modal);
         }
         
         form.selectAll('input')
             .on('input', this.editWindowChanged);
         
         triggers.emit('modal:open');
+    },
+    editWindowRumorOptions: function(modal) {
+        // TODO fix
+        var option = 'rumor';
+        
+        var tweet_count = modal.options.append('div')
+            .attr('id', 'edit-window-tweetin-div')
+            .attr('class', 'input-group')
+            .style('display', 'inline-table');
+            
+        tweet_count.append('span')
+            .attr('class', 'input-group-addon')
+            .text('Count:')
+            .style('width', 'auto');
+
+        tweet_count.append('input')
+            .attr('id', 'edit-window-tweetin-count')
+            .attr('class', 'text-center form-control')
+            .attr('readonly', '')
+            .style('width', '80px')
+            .attr('value', 0);
+        
+        data.getRumorCount();
+
+        tweet_count.append('div')
+            .attr('class', 'input-group-btn')
+            .style('margin', '0px')
+            .append('button')
+            .data([option])
+            .attr({
+                id: 'edit-window-tweetin',
+                class: 'btn btn-primary edit-window-routine'
+            })
+            .on('click', data.genTweetInCollection)
+            .append('span')
+            .attr('class', 'glyphicon glyphicon-refresh');
+        
+        modal.options.append('div')
+            .attr('id', 'edit-window-gencount-div')
+            .append('button')
+            .data([option])
+            .attr({
+                id: 'edit-window-gencount',
+                class: 'btn btn-primary edit-window-routine'
+            })
+            .on('click', data.rmTweetCount)
+            .text('Count Tweets');
+//            .append('span')
+//            .attr('class', 'glyphicon glyphicon-signal');
+        
+//        modal.options.append('div')
+//            .attr('id', 'edit-window-gencodecount-div')
+//            .append('button')
+//            .data([option])
+//            .attr({
+//                id: 'edit-window-gencodecount',
+//                class: 'btn btn-primary edit-window-routine'
+//            })
+//            .on('click', data.rmCodeCount)
+//            .text('Count Codes');
+//            .append('span')
+//            .attr('class', 'glyphicon glyphicon-signal');
+
+        modal.options.append('div')
+            .attr('id', 'edit-window-fetch100-div')
+            .append('button')
+            .data([option + " 100"])
+            .attr({
+                id: 'edit-window-fetch100',
+                class: 'btn btn-primary edit-window-routine'
+            })
+            .on('click', function() {
+                data.getTweets({
+                    limit: 300,
+                    distinct: 1,
+                    rand: '',
+                    rumor_id: data.rumor.ID,
+                    csv: ''
+                });
+            })
+            .html('<span class="glyphicon glyphicon-download-alt"></span> 100 Rand');
+
+        modal.options.append('div')
+            .attr('id', 'edit-window-fetchall-div')
+            .append('button')
+            .data([option + " all"])
+            .attr({
+                id: 'edit-window-fetchall',
+                class: 'btn btn-primary edit-window-routine'
+            })
+            .on('click', function() {
+                data.getTweets({
+                    limit: 10000,
+                    distinct: 1,
+                    rumor_id: data.rumor.ID,
+                    csv: ''
+                });
+            })
+            .html('<span class="glyphicon glyphicon-download-alt"></span> All');
+    },
+    editWindowChanged: function() {
+        // Indicate that the collection is to be updated
+        d3.select('#edit-window-save')
+            .attr('class', 'btn btn-primary');
+        
+        // Disable Match/Fetch buttons
+        d3.selectAll('.edit-window-routine')
+            .attr('disabled', '');
     },
     editWindowUpdated: function() {
         // Reload the rumor list

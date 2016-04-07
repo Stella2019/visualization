@@ -1,7 +1,9 @@
 function StatusReport() {
     this.connection = new Connection();
     this.ops = new Options(this);
-    this.tooltip = new Tooltip;
+    this.dataset = new CollectionManager(this, {name: 'dataset', flag_sidebar: true});
+    this.tooltip = new Tooltip();
+    this.modal = new Modal();
     
     this.events = {};
     this.events_arr = [];
@@ -255,6 +257,9 @@ StatusReport.prototype = {
         // Start drawing
         this.ops.init();
         
+        // Also make the modal
+        triggers.emit('modal:build');
+        
         //status....
         this.buildTable();
     },
@@ -420,7 +425,7 @@ StatusReport.prototype = {
         table_body.selectAll('tr.row_event td.cell_options, tr.row_subset td.cell_options')
             .append('span')
             .attr('class', 'glyphicon glyphicon-edit glyphicon-hoverclick')
-            .on('click', this.edit);
+            .on('click', this.edit.bind(this));
 
         table_body.selectAll('tr.row_event td.cell_options')
             .append('span')
@@ -573,11 +578,11 @@ StatusReport.prototype = {
     },
     edit: function(d) {
         if(d.Level == 1) { // Event
-            this.app.model = {event: d}
-            this.ops.editWindow('collection');
+            this.dataset.event = d;
+            triggers.emit('edit_window:open', 'event');
         } else if(d.Level == 2) { // Event
-            this.app.model = {subset: d}
-            this.ops.editWindow('subset');
+            this.dataset.subset = d;
+            triggers.emit('edit_window:open', 'subset');
         }
     },
     clickSort: function(order, option) {

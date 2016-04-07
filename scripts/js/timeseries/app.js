@@ -111,77 +111,24 @@ Pipeline.prototype = {
 };
 
 function Timeseries () {
+    this.ops = new Options(this);
+    this.modal = new Modal(this);
+    this.tooltip = new Tooltip();
+    this.connection = new Connection();
+    
+    this.dataset = new CollectionManager(this);
     this.model = new TimeseriesModel(this);
     this.view = new TimeseriesView(this); // may be considered redundant
     this.chart = new TimeseriesChart(this, '#timeseries');
     this.context = new TimeseriesChart(this, '#context');
-    this.ui = new TimeseriesUI(this);
     this.legend = new TimeseriesLegend(this);
-    
-    this.ops = new Options(this);
-    
-    this.tooltip = new Tooltip();
-    this.modal = new Modal();
 }
 Timeseries.prototype = {
     setOptions: function() {
         this.ops.panels = ['Dataset', 'View', 'Series', 'Analysis'];
         var options = this.ops;
         
-        this.ops['Dataset'] = {
-            'Event Type': new Option({
-                title: "Type",
-                labels: ["All", "Other Type"],
-                ids:    ["All", "Other Type"],
-                default: 0,
-                custom_entries_allowed: true,
-                callback: triggers.emitter('new_event_type')
-            }),
-            Event: new Option({
-                title: "Event",
-                labels: ["none"],
-                ids:    ["none"],
-                default: 0,
-                custom_entries_allowed: true,
-                callback: triggers.emitter('new_event'),
-                edit: function() { options.editWindow('event');  }
-            }),
-//            Rumor: new Option({
-//                title: 'Rumor',
-//                labels: ["- None -", "- New -"],
-//                ids:    ["_none_", "_new_"],
-//                default: 0,
-//                type: "dropdown",
-//                callback: function() { data.getRumor(); },
-//                edit: function() { options.editWindow('rumor'); }
-//            }),
-            'Time Window': new Option({
-                title: "Time",
-                labels: ["First Day", "First 3 Days", "Whole Collection", "Custom",],
-                ids:    ['1d', '3d', 'all', 'custom'],
-                default: 0,
-                callback: triggers.emitter('choose:time_window'),
-                edit: triggers.emitter('edit:time_window')
-            }),
-            'Time Min': new Option({
-                title: "Time Min",
-                labels: [''],
-                ids: [''],
-                date: new Date(),
-                default: 0,
-                hidden: true,
-                custom_entries_allowed: true
-            }),
-            'Time Max': new Option({
-                title: "Time Max",
-                labels: [''],
-                ids: [''],
-                date: new Date(),
-                default: 0,
-                hidden: true,
-                custom_entries_allowed: true
-            })
-        };
+        this.ops['Dataset'] = { };
         this.ops['View'] = {
             'Plot Type': new Option({
                 title: "Plot Type",
@@ -383,7 +330,8 @@ function initialize() {
     TS.setOptions();
     
     // Start loading data
-    TS.model.loadEvents();
+    triggers.emit('modal:build');
+    triggers.emit('collectionManager:build');
     
 //    pipeline = new Pipeline();
 //    data.loadEventTimeseries();

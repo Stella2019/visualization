@@ -1,6 +1,7 @@
 function Modal(app) {
     this.app = app;
     
+    this.id = 'modal_r' + Math.floor(Math.random() * 1000000 + 1);
     this.container = {};
     this.header = {};
     this.body = {};
@@ -21,12 +22,12 @@ Modal.prototype = {
         triggers.on('modal:close', this.close.bind(this));
         triggers.on('modal:title', this.setTitle.bind(this));
     },
-    buildModal: function() {
+    buildModal: function() {        
         this.container = d3.select('body')
             .append('div')
             .attr({
                 class: 'modal fade',
-                id: 'modal',
+                id: this.id,
                 tabindex: '-1',
                 role: 'dialog',
                 'aria-labelledby': 'modal'
@@ -54,7 +55,7 @@ Modal.prototype = {
             .attr('aria-hidden', 'true')
             .html('&times;');
         
-        this.header.append('h4')
+         this.title = this.header.append('h4')
             .attr({
                 class: 'modal-title',
                 id: 'modalLabel'
@@ -79,17 +80,18 @@ Modal.prototype = {
             .html('Close');
     },
     reset: function() {
+        this.title.html('');
         this.body.selectAll('*').remove();
         this.options.selectAll('*').remove();
     },
     open: function() {
-        $('#modal').modal(true);
+        $('#' + this.id).modal(true);
     },
     close: function() {
         // TODO
     },
     setTitle: function(data) {
-        this.header.html(data);
+        this.title.html(data);
     }
 };
 

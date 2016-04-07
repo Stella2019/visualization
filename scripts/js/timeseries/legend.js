@@ -1,4 +1,5 @@
-function TimeseriesLegend() {
+function TimeseriesLegend(app) {
+    this.app = app;
     this.container = [];
     this.mouseOverToggle = false;
     this.mouseOverToggleState = true;
@@ -29,20 +30,20 @@ TimeseriesLegend.prototype = {
     },
     setTriggers: function() {
         triggers.on('page_built', this.buildLegend.bind(this));
-        triggers.on('new_subsets', this.populateLegend.bind(this));
+        triggers.on('subsets:updated', this.populateLegend.bind(this));
     },
     buildLegend: function() {
         this.container = d3.select('body').append('div')
             .attr('class', 'legend');
     },
-    populateLegend: function(subsets) {
+    populateLegend: function() {
         // Destroy old legend
         this.container.selectAll('*').remove();
         
         var features = [];
         var features_subsets = {};
         
-        subsets.forEach(function(subset) {
+        this.app.dataset.subsets_arr.forEach(function(subset) {
             if(!features.includes(subset.Feature)) {
                 features.push(subset.Feature);
                 features_subsets[subset.Feature] = [subset];

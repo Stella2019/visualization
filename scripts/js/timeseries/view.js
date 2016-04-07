@@ -48,6 +48,6 @@ TimeseriesView.prototype = {
     setTitle: function(event) {
          d3.select('#chart-title')
             .html('<small>' + event.Type + ':</small> ' + 
-                  event.DisplayName);
+                  event.Label);
     }
 }
