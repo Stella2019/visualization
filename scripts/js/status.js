@@ -298,6 +298,7 @@ StatusReport.prototype = {
             .data(columns)
             .enter()
             .append('th')
+            .append('div')
             .attr('class', function(d) {
                 if(d == 'Open') return null;
                 return 'col-sortable col-' + util.simplify(d); 
@@ -337,6 +338,7 @@ StatusReport.prototype = {
         
         table_body.selectAll('tr')
             .append('td')
+            .append('div')
             .attr('class', 'cell-label')
             .append('span')
             .attr('class', 'value')
@@ -381,6 +383,7 @@ StatusReport.prototype = {
         ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
             table_body.selectAll('tr')
                 .append('td')
+            .append('div')
                 .attr('class', 'cell-' + type + ' cell-count')
                 .append('span').attr('class', 'value');
             
@@ -433,6 +436,7 @@ StatusReport.prototype = {
         
         var datapoint_cells = table_body.selectAll('tr')
             .append('td')
+            .append('div')
             .attr('class', 'cell-datapoints cell-count');
         datapoint_cells.append('span').attr('class', 'value');
         
@@ -447,18 +451,18 @@ StatusReport.prototype = {
             .append('td')
             .attr('class', 'cell_options')
         
-        table_body.selectAll('tr.row_event td.cell_options, tr.row_subset td.cell_options')
+        table_body.selectAll('.row_event .cell_options, .row_subset .cell_options')
             .append('span')
             .attr('class', 'glyphicon glyphicon-edit glyphicon-hoverclick')
             .on('click', this.edit.bind(this));
 
-        table_body.selectAll('tr.row_event td.cell_options')
+        table_body.selectAll('.row_event .cell_options')
             .append('span')
             .attr('class', 'glyphicon glyphicon-signal glyphicon-hoverclick')
             .style('margin-left', '5px')
             .on('click', this.openTimeseries);
         
-//        table_body.selectAll('tr.row_rumor td.cell_options')
+//        table_body.selectAll('.row_rumor .cell_options')
 //            .append('span')
 ////            .attr('class', 'btn btn-xs btn-default')
 //            .text('Codes')
@@ -536,21 +540,21 @@ StatusReport.prototype = {
         
         ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
             var quantity = distinct + type;
-            table_body.selectAll('td.cell-' + type + ' .value')
+            table_body.selectAll('.cell-' + type + ' .value')
                 .html(function(d) {
                     var value = d[quantity];
                     if(!value)
                         return '';
                     if(relative == 'raw') {
                         d[type + 'Display'] = value;
-                        return util.formatThousands(value) + '&nbsp;';
+                        return util.formatThousands(value);
                     }
                     var denom = relative == 'event'    ? (d['Level'] == 2 ? d['Event']['Tweets'] : d['Tweets']) : 
                                 relative == 'type'     ? (d['Level'] == 2 ? d['Event'][quantity] : d[quantity]) : 
                                 relative == 'subset'   ? d['Tweets'] : 
                                 relative == 'distinct' ? d[type] : 1;
                     d[type + 'Display'] = value / denom;
-                    return (value / denom * 100).toFixed(1) + '%&nbsp;';
+                    return (value / denom * 100).toFixed(1);
                 });
         });
         
@@ -559,7 +563,7 @@ StatusReport.prototype = {
             .classed('row-zero', function(d) { return !(d.Tweets || d.Datapoints || d.CodedTweets) ; });
         
         // Dates
-        table_body.selectAll('td.cell-firstdate')
+        table_body.selectAll('.cell-firstdate')
             .html(function(d) {
                 if(!('FirstTweet') in d || d['FirstTweet'] == 0 || d['FirstTweet'] == 1e20) return '';
                 if(date_format == 'date') {
@@ -569,7 +573,7 @@ StatusReport.prototype = {
                 }
                 return d.FirstTweet;
             });
-        table_body.selectAll('td.cell-lastdate')
+        table_body.selectAll('.cell-lastdate')
             .html(function(d) { 
                 if(!('LastTweet') in d || d['LastTweet'] == 0 || d['LastTweet'] == 1e20) return '';
                 if(date_format == 'date') {
@@ -585,15 +589,15 @@ StatusReport.prototype = {
         
         // Datapoints
         if(datapoints_format == 'minutes') {
-            table_body.selectAll('td.cell-datapoints .value')
+            table_body.selectAll('.cell-datapoints .value')
                 .html(function(d) {
                     var value = d.Datapoints;
                     if(!value) return '';
-                    if(datapoints_format == 'minutes') return util.formatMinutes(value) + '&nbsp;';
-                    return value + '&nbsp;';
+                    if(datapoints_format == 'minutes') return util.formatMinutes(value);
+                    return value;
                 });
         } else {
-            table_body.selectAll("td.cell-datapoints .value")
+            table_body.selectAll(".cell-datapoints .value")
                 .transition()
                 .duration(1000)
                 .tween("text", function (d) {
@@ -603,12 +607,12 @@ StatusReport.prototype = {
                     var i = d3.interpolate(start || 0, d.Datapoints || 0);
 
                     return function (t) {
-                        this.textContent = Math.round(i(t)) + '&nbsp;';
+                        this.textContent = Math.round(i(t));
                     };
                 });
         }
         
-//        table_body.selectAll("td.cell-datapoints .value")
+//        table_body.selectAll(".cell-datapoints .value")
 //            .transition()
 //            .duration(1000)
 //            .tween("text", function (d) {
