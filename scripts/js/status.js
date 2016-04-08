@@ -507,9 +507,11 @@ StatusReport.prototype = {
             .classed('glyphicon-chevron-down', !show_children);
         
         // Add/remove not shown class to subsets as appropriate
+        var show_empties = this.ops['Rows']['Empties'].is('table-row');
         d.children.forEach(function(child) {
+            var show_child = show_children && (show_empties || !child.row.classed('row-zero'));
             child.row.classed('not_shown', !show_children)
-                .style('display', show_children ? 'table-row' : 'none');
+                .style('display', show_child ? 'table-row' : 'none');
             if('children' in child)
                 this.setVisibility_children(child, show_children ? 'perserve' : false);
         }, this)
@@ -602,12 +604,29 @@ StatusReport.prototype = {
                 .duration(1000)
                 .tween("text", function (d) {
                     var start = this.textContent;
-                    if(typeof(start) == 'string' && start.includes('m'))
-                        start = 0;
-                    var i = d3.interpolate(start || 0, d.Datapoints || 0);
+                    if(typeof(start) == 'string') {
+                        if(start.includes('m')) {
+                            start = util.deformatMinutes(start);
+                        } else {
+                            start = parseInt(start.replace(/ /g, ''));
+                        }
+                    }
+                    var interpol = d3.interpolate(start || 0, d.Datapoints || 0);
 
-                    return function (t) {
-                        this.textContent = Math.round(i(t));
+                    return function (value) {
+                        if(typeof(value) == 'string') {
+                            if(value.includes('m')) {
+                                value = util.deformatMinutes(value);
+                            } else {
+                                value = parseInt(value.replace(/ /g, ''));
+                            }
+                        }
+                        value = Math.round(interpol(value));
+                        if(datapoints_format == 'minutes') {
+                            this.textContent = util.formatMinutes(value);
+                        } else {
+                            this.textContent = util.formatThousands(value);
+                        }
                     };
                 });
         }

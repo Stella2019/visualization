@@ -10,6 +10,7 @@ td div, th div {
 }
 .cell-count {
     text-align: right;
+    position: relative;
 }
 .cell-count .value {
     margin-left: auto;
