@@ -11,6 +11,12 @@ td div, th div {
 .cell-count {
     text-align: right;
 }
+.cell-count .value {
+    margin-left: auto;
+}
+.cell-count .glyphicon {
+    margin-left: 0;
+}
 .glyphicon-hidden {
     padding-left: 5px;
     margin-left: auto;
