@@ -35,7 +35,25 @@ body {
     text-align: center;
 }
 
-/* Chart Display */
+/* Chart Elements */
+.y_label {
+    transform: rotate(-90deg);
+    text-anchor: middle;
+}
+.column_highlight {
+    display: none;
+    fill: black;
+    stroke: black;
+    fill-opacity: 0.2;
+    stroke-opacity: 0.6;
+}
+.brush .extent {
+    stroke: #fff;
+    fill-opacity: .125;
+    shape-rendering: crispEdges;
+}
+
+/* Chart Series */
 .axis path,
 .axis line {
     fill: none;
@@ -64,12 +82,6 @@ body {
     stroke: black;
     stroke-opacity: 1.0;
     stroke-width: 3px;
-}
-
-.brush .extent {
-  stroke: #fff;
-  fill-opacity: .125;
-  shape-rendering: crispEdges;
 }
 
 /* Legend */

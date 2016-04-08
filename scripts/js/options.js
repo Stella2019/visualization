@@ -3,10 +3,14 @@ function Option(args) {
         this[item] = args[item];
     }, this);
     
-    this.cur = this.ids[this.default];
+    if(!('render' in this))
+        this.render = true;
     if(!this.available) {
         this.available = d3.range(this.ids.length);
     }
+    if(!('default' in this))
+        this.default = this.available[0];
+    this.cur = this.ids[this.default];
 }
 Option.prototype = {
     get: function () { return this.cur; },
@@ -992,7 +996,7 @@ Options.prototype = {
         }
         
         // Rendering alternatives
-        if(option.no_render) return;
+        if(!option.render) return;
         if(option.type && option.type == 'textfieldautoman') {
             this.buildTextToggle(panel_name, option_name);
             return;

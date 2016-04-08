@@ -119,8 +119,8 @@ function Timeseries () {
     this.dataset = new CollectionManager(this);
     this.model = new TimeseriesModel(this);
     this.view = new TimeseriesView(this); // may be considered redundant
-    this.chart = new TimeseriesChart(this, '#timeseries');
-    this.context = new TimeseriesChart(this, '#context');
+    this.chart = new TimeseriesChart(this, 'timeseries');
+    this.context = new TimeseriesChart(this, 'context');
     this.legend = new TimeseriesLegend(this);
 }
 Timeseries.prototype = {
@@ -153,9 +153,10 @@ Timeseries.prototype = {
                 labels: ["Linear",  "Basis",        "Step"],
                 ids:    ["linear",  "basis-open",   "step-before"],
                 default: 2,
-                callback: function () { 
-                    pipeline.start('Ready Context Chart');
-                }
+                callback: triggers.emitter('chart:shape:set')
+//                function () { 
+//                    pipeline.start('Ready Context Chart');
+//                }
             }),
             'Y Scale': new Option({
                 title: "Y Scale",
@@ -205,7 +206,7 @@ Timeseries.prototype = {
                 default: 0,
                 custom_entries_allowed: true,
                 parent: '#chart-bottom',
-                no_render: true,
+                render: false,
                 callback: function() { disp.setFocusTime('input_field'); }
             }),
             'Time Max': new Option({
@@ -215,7 +216,7 @@ Timeseries.prototype = {
                 default: 0,
                 custom_entries_allowed: true,
                 parent: '#chart-bottom',
-                no_render: true,
+                render: false,
                 callback: function() { disp.setFocusTime('input_field'); }
             })
         };
@@ -325,9 +326,9 @@ Timeseries.prototype = {
 function initialize() {
     TS = new Timeseries();
     
+    TS.setOptions();
     TS.view.buildPage();
     TS.tooltip.init();
-    TS.setOptions();
     
     // Start loading data
     triggers.emit('modal:build');

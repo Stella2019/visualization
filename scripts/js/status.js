@@ -117,18 +117,36 @@ StatusReport.prototype = {
             this.subsets[subset.ID] = subset;
         }, this);
         
-        this.buildDropdowns();
+        // Add children columns
+        this.events_arr.forEach(function(e) {
+            e.children = e.subsets;
+        });
+        this.event_types_arr.sort(function(a, b) {
+            if (a.Label < b.Label) return -1;
+            if (a.Label > b.Label) return 1;
+            return 0;
+        });
+        this.event_types_arr.forEach(function(d, i) {
+            d.ID = i;
+            d.children = d.events;
+        });
+        
+        this.buildOptions();
     },
     computeAggregates: function() {
-//        this.events_arr.forEach(function(e) {
+        this.events_arr.forEach(function(e) {
+            e.children = e.subsets;
+            
 //            e.Tweets         = e.Tweets         || d3.sum(e.rumors, function(r) { return r.Tweets         || 0; });
 //            e.DistinctTweets = e.DistinctTweets || d3.sum(e.rumors, function(r) { return r.DistinctTweets || 0; });
 //            e.CodedTweets    = e.CodedTweets    || d3.sum(e.rumors, function(r) { return r.CodedTweets    || 0; });
 //            e.AdjudTweets    = e.AdjudTweets    || d3.sum(e.rumors, function(r) { return r.AdjudTweets    || 0; });
 //            e.Datapoints     = e.Datapoints     || d3.sum(e.rumors, function(r) { return r.Datapoints     || 0; });
-//        });
+        });
         
         this.event_types_arr.forEach(function(d) {
+            d.children = d.events;
+            
             ['Tweets', 'DistinctTweets', 
               'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
               'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 'Datapoints'].forEach(function(count) {
@@ -137,7 +155,6 @@ StatusReport.prototype = {
             
 //            d.CodedTweets       = d3.sum(d.events, function(e) { return e.CodedTweets    || 0; });
 //            d.AdjudTweets       = d3.sum(d.events, function(e) { return e.AdjudTweets    || 0; });
-//            d.Datapoints        = d3.sum(d.events, function(e) { return e.Datapoints     || 0; });
             d.FirstTweet_Min    = d3.min(d.events, function(e) { return e.FirstTweet        || 1e20; });
             d.FirstTweet_Max    = d3.max(d.events, function(e) { return e.FirstTweet        || 0; });
             d.LastTweet_Min     = d3.min(d.events, function(e) { return e.LastTweet         || 1e20; });
@@ -154,7 +171,7 @@ StatusReport.prototype = {
         
         triggers.emit('update_counts');
     },
-    buildDropdowns: function() {
+    buildOptions: function() {
         this.ops.updateCollectionCallback = this.getData;
         
         var orders = ['ID', 'Collection', 'Tweets', 
@@ -226,35 +243,35 @@ StatusReport.prototype = {
                 default: 1,
                 type: "dropdown",
                 callback: triggers.emitter('refresh_visibility')
-            }), 
-            'Event Types': new Option({
-                title: 'Event Types',
-                labels: ['Show', 'Hide'],
-                ids:    ['table-row', 'none'],
-                default: 0,
-                type: "dropdown",
+            }),
+            'Level 0 Showing Children': new Option({
+                title: 'Event Types Showing Events',
+                labels: ['List'],
+                ids:    [[]],
+                render: false,
+                custom_entries_allowed: true,
                 callback: triggers.emitter('refresh_visibility')
             }),
-            Events: new Option({
-                title: 'Events',
-                labels: ['Show', 'Hide'],
-                ids:    ['table-row', 'none'],
-                default: 0,
-                type: "dropdown",
+            'Level 1 Showing Children': new Option({
+                title: 'Events Showing Features',
+                labels: ['List'],
+                ids:    [[]],
+                render: false,
+                custom_entries_allowed: true,
                 callback: triggers.emitter('refresh_visibility')
             }),
-            Subsets: new Option({
-                title: 'Subsets',
-                labels: ['Show', 'Hide'],
-                ids:    ['table-row', 'none'],
-                default: 0,
-                type: "dropdown",
+            'Level 2 Showing Children': new Option({
+                title: 'Features Showing Matches',
+                labels: ['List'],
+                ids:    [[]],
+                render: false,
+                custom_entries_allowed: true,
                 callback: triggers.emitter('refresh_visibility')
             })
         }
         this.ops.panels = ['Rows', 'Columns'];
         
-        // Start drawing
+        // Start drawing options
         this.ops.init();
         
         // Also make the modal
@@ -296,18 +313,18 @@ StatusReport.prototype = {
         
         // Add table rows
         this.event_types_arr.forEach(function(event_type) {
-            table_body.append('tr')
+            event_type.row = table_body.append('tr')
                 .data([event_type])
                 .attr('class', 'row_type');
             
             event_type.events.forEach(function(event) {
-                table_body.append('tr')
+                event.row = table_body.append('tr')
                     .data([event])
                     .attr('class', function(d) { return 'row_event row_event_' + d.ID; });
                 
-                event.subsets.forEach(function(rumor) {
-                    table_body.append('tr')
-                        .data([rumor])
+                event.subsets.forEach(function(subset) {
+                    subset.row = table_body.append('tr')
+                        .data([subset])
                         .attr('class', function(d) { return 'row_subset row_subset_' + d.ID; });
                 });
             });
@@ -317,17 +334,22 @@ StatusReport.prototype = {
         table_body.selectAll('tr')
             .append('td')
             .html(function(d) { return d.Level > 0 ? d.ID : ''; })
-//            .style('font-weight', function(d) { return d.Level == 1 ? 'bold' : 'normal' });
         
         table_body.selectAll('tr')
             .append('td')
-            .html(function(d) { return d.Label; })
-//            .style('padding-left', function(d) { return 10 + d.Level * 20 + 'px';})
-//            .style('font-weight', function(d) { return d.Level == 1 ? 'bold' : 'normal' })
-            .attr('class', 'cell-label');
-//            .append('span')
-//            .attr('class', 'glyphicon-hiddenclick')
-//            .html(function(d) { return d.Level > 0 ? 'ID: ' + d.ID : ''; });
+            .attr('class', 'cell-label')
+            .append('span')
+            .attr('class', 'value')
+            .html(function(d) { return d.Label; });
+        
+        table_body.selectAll('.row_event .cell-label, .row_type .cell-label')
+            .on('click', this.setVisibility_children.bind(this))
+            .append('small')
+            .attr('class', 'glyphicon-hiddenclick')
+            .html(function(d) { 
+                return d.children.length + ' ' + 
+                    (d.Level == 0 ? 'events' : (d.Level == 1 ? 'subsets' : 'matches')); 
+            });
         
         
         this.tooltip.attach('.cell-label', function(set) {
@@ -395,12 +417,13 @@ StatusReport.prototype = {
         }, this);
         
         // Append the recalculate button
-        table_body.selectAll('td.cell-count.cell-Tweets')
-            .append('span')
+        table_body.selectAll('.row_type .cell-Tweets').append('span') // hidden one to help alignment
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
+        table_body.selectAll('.row_event .cell-Tweets, .row_subset .cell-Tweets').append('span')
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
             .on('click', this.recount.bind(this));
         
-        // Times
+        // Times (use glyphicon-time or glyphicon-refresh)
         table_body.selectAll('tr')
             .append('td')
             .attr('class', 'cell-firstdate');
@@ -412,10 +435,12 @@ StatusReport.prototype = {
             .append('td')
             .attr('class', 'cell-datapoints cell-count');
         datapoint_cells.append('span').attr('class', 'value');
-        datapoint_cells.append('span').html('&nbsp;');
-        datapoint_cells.append('span')
-            .attr('class', 'glyphicon glyphicon-time glyphicon-hiddenclick')
-            .on('click', this.computeTimeseries.bind(this));;
+        
+        table_body.selectAll('.row_type .cell-datapoints').append('span') // hidden one to help alignment
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
+        table_body.selectAll('.row_event .cell-datapoints, .row_subset .cell-datapoints').append('span')
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
+            .on('click', this.computeTimeseries.bind(this));
         
         // Buttons
         table_body.selectAll('tr')
@@ -441,8 +466,49 @@ StatusReport.prototype = {
 //            .style('margin-left', '5px')
 //            .on('click', this.openCodingReport);
         
+        // Set initial visibility
+        this.event_types_arr.forEach(function(d) { 
+            this.setVisibility_children(d, 'perserve'); 
+        }.bind(this), this);
+        
         // Set the counts
         triggers.emit('new_counts');
+    },
+    setVisibility_children: function(d, show_children) {
+        var list_op = this.ops['Rows']['Level ' + d.Level + ' Showing Children'];
+        var list = list_op.get();
+        
+        // Toggle showing children or not
+        if(show_children == undefined || typeof(show_children) == 'number') { // Not hard-coded, so just toggle
+            show_children = !list.includes(d.ID);
+        } else if (show_children == 'perserve') { // Only occurs during first initialization
+            show_children = list.includes(d.ID) ? 'perserve' : false;
+        }
+
+        // Set the option
+        if(show_children) {
+            if(!list.includes(d.ID))
+                list.push(d.ID);
+        } else {
+            list = list.filter(function(set) {
+                return set != d.ID;
+            });
+        }
+        list_op.set(list);
+        this.ops.recordState(false);
+
+        // Set the chevron to point the right direction
+        d.row.select('.cell-label .glyphicon')
+            .classed('glyphicon-chevron-left', show_children)
+            .classed('glyphicon-chevron-down', !show_children);
+        
+        // Add/remove not shown class to subsets as appropriate
+        d.children.forEach(function(child) {
+            child.row.classed('not_shown', !show_children)
+                .style('display', show_children ? 'table-row' : 'none');
+            if('children' in child)
+                this.setVisibility_children(child, show_children ? 'perserve' : false);
+        }, this)
     },
     setVisibility: function() {
         var table_body = d3.select('tbody');
@@ -453,18 +519,8 @@ StatusReport.prototype = {
             table_body.selectAll('tr.row-zero')
                 .style('display', 'none');
         }
-        if(this.ops['Rows']['Event Types'].is('none')) {
-            table_body.selectAll('tr.row_type')
-                .style('display', 'none');
-        }
-        if(this.ops['Rows']['Events'].is('none')) {
-            table_body.selectAll('tr.row_event')
-                .style('display', 'none');
-        }
-        if(this.ops['Rows']['Subsets'].is('none')) {
-            table_body.selectAll('tr.row_subset')
-                .style('display', 'none');
-        }
+        table_body.selectAll('tr.not_shown')
+            .style('display', 'none');
         
         triggers.emit('sort_elements');
     },
@@ -533,8 +589,8 @@ StatusReport.prototype = {
                 .html(function(d) {
                     var value = d.Datapoints;
                     if(!value) return '';
-                    if(datapoints_format == 'minutes') return util.formatMinutes(value);
-                    return value;
+                    if(datapoints_format == 'minutes') return util.formatMinutes(value) + '&nbsp;';
+                    return value + '&nbsp;';
                 });
         } else {
             table_body.selectAll("td.cell-datapoints .value")
@@ -547,7 +603,7 @@ StatusReport.prototype = {
                     var i = d3.interpolate(start || 0, d.Datapoints || 0);
 
                     return function (t) {
-                        this.textContent = Math.round(i(t));
+                        this.textContent = Math.round(i(t)) + '&nbsp;';
                     };
                 });
         }
@@ -620,9 +676,10 @@ StatusReport.prototype = {
             }
 //            var ascending_minmax = ascending == 'true' ? 'Min' : 'Max';
             var ascending_bin = ascending == 'true' ? 1 : -1;
-            var showing_event_types = this.ops['Rows']['Event Types'].is('table-row');
-            var showing_events = this.ops['Rows']['Events'].is('table-row');
-            var showing_events = this.ops['Rows']['Events'].is('table-row');
+//            var showing_event_types = this.ops['Rows']['Event Types'].is('table-row');
+//            var showing_events = this.ops['Rows']['Events'].is('table-row');
+            var showing_event_types = true;
+            var showing_events = true;
             
             table_body.selectAll('tr').sort(function(a, b) {
                 var lA = a['Level'];
@@ -667,7 +724,7 @@ StatusReport.prototype = {
                 // Compare Subsets
                 A = a[quantity];
                 B = b[quantity];
-                if(lA == 2 && lB == 2 && !A && !B) return 0;
+//                if(lA == 2 && lB == 2 && !A && !B) return 0;
                 if(!A) return  1;
                 if(!B) return -1;
                 if(A < B) return -1 * ascending_bin;
@@ -825,7 +882,7 @@ StatusReport.prototype = {
     },
     openTimeseries: function(d) {
         var state = JSON.stringify({event: d.ID});
-        window.open('index.html#' + state);
+        window.open('timeseries.html#' + state);
     },
     openCodingReport: function(d) {
         var state = JSON.stringify({subset: d.ID});

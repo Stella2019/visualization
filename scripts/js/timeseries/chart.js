@@ -3,21 +3,18 @@ function TimeseriesChart(app, id) {
     this.id = id;
     
     // Size
-    this.page = {};
-    this.getPageBounds();
-    
-    this.placement = 1; // use this to move charts around
-    this.top    = 10;
-    this.right  = 10;
-    this.bottom = 10;
-    this.left   = 10;
-    this.width  = this.page.width  - this.left - this.right;
-    this.height = this.page.height - this.top  - this.bottom;
+    this.canvas_height = 300;
+    this.canvas_width = 400;
+    this.top    = 20;
+    this.right  = 20;
+    this.bottom = 20;
+    this.left   = 20;
+    this.width  = this.canvas_width  - this.left - this.right;
+    this.height = this.canvas_height - this.top  - this.bottom;
     
     // Scales
-    this.x = d3.time.scale();
-    this.y = d3.scale.linear();
-//    this.y2 = d3.scale.linear();
+    this.x = d3.time.scale().range([0, this.width]);
+    this.y = d3.scale.linear().range([this.height, 0]);
     
     // Axes
     this.xAxis = d3.svg.axis()
@@ -26,9 +23,6 @@ function TimeseriesChart(app, id) {
     this.yAxis = d3.svg.axis()
         .scale(this.y)
         .orient('left');
-//    this.yAxis2 = d3.svg.axis()
-//        .scale(this.y2)
-//        .orient('right');
     
     // Getters
     this.dataTimestamp_2_x = function(d) { return this.x(d.timestamp); };
@@ -37,12 +31,13 @@ function TimeseriesChart(app, id) {
     // Area
     this.area = d3.svg.area()
         .x(this.dataTimestamp_2_x);
-//    this.area2 = d3.svg.area()
-//        .x(this.dataTimestamp_2_x);
     
-    // Other potential attributes
+    // Other attributes filled during execution
     this.brush = [];
     this.svg = [];
+    this.container = [];
+    this.y_label = [];
+    this.column_hover = [];
     
     this.init();
 }
@@ -52,14 +47,20 @@ TimeseriesChart.prototype = {
         this.setTriggers();
     },
     setTriggers: function() {
-        triggers.on('page_built2', this.build.bind(this));
+        triggers.on('page_built', this.build.bind(this));
         triggers.on('resized', this.adjustSize.bind(this));
+        triggers.on('chart:shape:set', this.setShape.bind(this));
     },
     build: function() {
-        this.svg = d3.select(this.id);
+        this.container = d3.select('#' + this.id + '-container');
+        this.svg = d3.select('#' + this.id);
         this.buildElements();
         this.adjustSize();
-        this.updateOptionalAttributes();
+        this.setShape();
+        
+        if(this.id == 'context') {
+            this.setContext();
+        }
         // disp.setColorScale
     },
     buildElements: function() {
@@ -67,42 +68,54 @@ TimeseriesChart.prototype = {
             .attr("class", "focus")
             .attr("transform", "translate(" + this.left + "," + this.top + ")");
         
-        this.svg.append("text")
-            .attr('id', 'y_label')
-            .attr("transform", "rotate(-90)")
-            .attr("y", 0 - this.left)
-            .attr("x", 0 - (this.height / 2))
-            .attr("dy", "1em")
-            .style("text-anchor", "middle")
-            .text("Count of <Subset> Tweets Every <Resolution>");
+//        this.y_label = this.svg.append("text")
+//            .attr('class', 'y_label')
+//            .attr("y", 0 - this.left)
+//            .attr("x", 0 - (this.height / 2))
+//            .attr("dy", "1em")
+//            .text("Count of <Subset> Tweets Every <Resolution>");
 
-        this.svg.append("path")
-            .attr('class', 'column_hover')
-            .style('display', 'none')
-            .style('fill', 'black')
-            .style('stroke', 'black')
-            .style('fill-opacity', '0.2')
-            .style('stroke-opacity', '0.6');
-    },
-    getPageBounds: function() {
-        //document.documentElement.clientHeight
-        //document.documentElement.clientWidth
-        this.page.height = parseInt(d3.select('body').style('height').replace('px', ''));
-        this.page.width  = parseInt(d3.select('body').style('width'));
+        this.column_highlight = this.svg.append("path")
+            .attr('class', 'column_highlight');
+        
+        this.xAxis_element = this.svg.append('g').attr('class', 'xAxis');
+        this.xAxis_element.attr('class','x axis')
+            .attr('transform', 'translate(0,' + this.height + ')')
+            .transition().duration(1000)
+            .call(this.xAxis); 
     },
     adjustSize: function(args) {
-        this.getPageBounds();
+        // Recompute width and height
+        this.canvas_width  = parseInt(this.container.style('width'));
+        this.canvas_height = parseInt(this.container.style('height'));
+        this.svg.style({
+            height: this.canvas_height, 
+            width: this.canvas_width, 
+        })
+        this.width  = this.canvas_width  - this.left - this.right;
+        this.height = this.canvas_height - this.top  - this.bottom;
         
+        // Change Ranges
         this.x.range([0, this.width]);
         this.y.range([this.height, 0]);
-        this.y2.range([this.height, 0]);
-        
-        this.xAxis.tickSize(-this.height)
-        
+        this.xAxis.scale(this.x).tickSize(-this.height)
         this.area.y0(this.height)
+        
+        // Update elements
+//        this.y_label.attr("y", 0)//- this.left)
+//            .attr("x", 0 - (this.height / 2));
+        this.xAxis_element
+            .attr('transform', 'translate(0,' + this.height + ')')
+            .call(this.xAxis);
+        
+        // Update renders
+        // TODO
     },
-    updateOptionalAttributes: function() {
-        this.area.interpolate(options.shape.get());
+//    updateOptionalAttributes: function() {
+//        this.area.interpolate(this.ops.shape.get());
+//    },
+    setShape: function() {
+        this.area.interpolate(this.app.ops['View']['Shape'].get());
     },
     setContext: function () {
         this.area.y1(this.dataValue_2_y);
@@ -110,5 +123,33 @@ TimeseriesChart.prototype = {
         this.brush = d3.svg.brush()
             .x(this.x)
             .on("brush", function() { disp.setFocusTime('brush'); } );
-    }
+    },
+    setYScale: function() {
+        var focus = this.focus;
+        
+        if(options['View']['Y Scale'].is("linear")) {
+            focus.y = d3.scale.linear()
+                .range([focus.height, 0]);
+            focus.y_total_line = d3.scale.linear()
+                .range([focus.height, 0]);
+            focus.yAxis.scale(focus.y)
+                .tickFormat(null);
+        } else if(options['View']['Y Scale'].is("pow")) {
+            focus.y = d3.scale.sqrt()
+                .range([focus.height, 0]);
+            focus.y_total_line = d3.scale.sqrt()
+                .range([focus.height, 0]);
+            focus.yAxis.scale(focus.y)
+                .tickFormat(null);
+        } else if(options['View']['Y Scale'].is("log")) {
+            focus.y = d3.scale.log()
+                .clamp(true)
+                .range([focus.height, 0]);
+            focus.y_total_line = d3.scale.log()
+                .clamp(true)
+                .range([focus.height, 0]);
+            focus.yAxis.scale(focus.y)
+                .tickFormat(focus.y.tickFormat(10, ",.0f"));
+        }
+    },
 };

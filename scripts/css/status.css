@@ -9,6 +9,13 @@
     position: relative;
     text-align: right;
 }
+.value, .glyphicon-hiddenclick {
+    white-space: normal;
+}
+.glyphicon-hidden {
+    float: right;
+    opacity: 0;
+}
 .glyphicon-hiddenclick {
     float: right;
     opacity: 0;
@@ -39,18 +46,26 @@ th:hover .glyphicon-hiddenclick {
 
 .row_type {
     background-color: #eee;
+    border-top: solid 2px #ddd;
 }
-.row_type .cell-label {
+.row_type .cell-label .value {
     padding-left: 10px;
     font-weight: bold;
 }
 .row_event {
     background-color: aliceblue;
+    border-top: solid 2px #def;
 }
-.row_event .cell-label {
+.row_event .cell-label .value {
     padding-left: 20px;
 }
-.row_subset .cell-label {
+.row_type .cell-label, .row_event .cell-label {
+    cursor: pointer;
+}
+.row_subset .cell-label .value {
     font-style: italic;
     padding-left: 30px;
+}
+.row_match {
+    border-top: solid 2px #fff;
 }

@@ -3,7 +3,7 @@
     
     $query = "";
 
-    if($_POST["type"] == 'collection') {
+    if($_POST["type"] == 'event') {
         $query .= " UPDATE Event";
         $query .= " SET";
             
@@ -18,8 +18,6 @@
             array_push($changed, " `StartTime`='" . $_POST["StartTime"] . "'");
         if(isset($_POST["StopTime"]) and !empty($_POST["StopTime"]))
             array_push($changed, " `StopTime`='" . $_POST["StopTime"] . "'");
-        if(isset($_POST["TweetsCollected"]) and !empty($_POST["TweetsCollected"]))
-            array_push($changed, " `TweetsCollected`=" . $_POST["TweetsCollected"] . "'");
         
         $query .= join(',', $changed);
     } else if($_POST["type"] == 'rumor') {
@@ -43,10 +41,12 @@
     
     $query .= " WHERE ID=" . $_POST["id"];
 
+    echo $query;
+
     $result = $mysqli->query($query);
     if (!$result) {
-        printf("Error: %s <br>", $mysqli->error);
+        printf("\n Error: %s <br>", $mysqli->error);
     } else {
-        print("Success!");
+        print("\n Success!");
     }
 ?>

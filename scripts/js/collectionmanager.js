@@ -24,8 +24,9 @@ function CollectionManager(app, args) {
                  'DistinctTweets', 'DistinctOriginals', 'DistinctRetweets', 'DistinctReplies', 'DistinctQuotes',
                  'TweetsDisplay', 'OriginalsDisplay', 'RetweetsDisplay', 'RepliesDisplay', 'QuotesDisplay',
                  'Level', 'Datapoints', 'Label', 'FirstTweet', 'LastTweet',
-                 'Month', 'DisplayMatch'],
-        text: ['DisplayName', 'Rumor', 'Superset', 'Feature', 'Match', 'Notes', 'Level', 'Type', 'Description', 'Active'],
+                 'Month', 'DisplayMatch', 'type'],
+        id: ['ID', 'Event', 'Rumor'],
+        text: ['DisplayName', 'Superset', 'Feature', 'Match', 'Notes', 'Level', 'Type', 'Description', 'Active'],
         date: ['StartTime', 'StopTime'],
         textarea: ['Description', 'Definition'],
         query: ['Query']
@@ -55,6 +56,7 @@ CollectionManager.prototype = {
         triggers.on('edit_window:open', this.editWindow.bind(this));
         triggers.on('edit_window:update', this.updateCollection.bind(this));
         triggers.on('edit_window:updated', this.updateCollection.bind(this));
+        triggers.on('edit_window:verify update', this.verifyCollectionUpdate.bind(this));
         triggers.on('time_window:edit', this.editLoadTimeWindow.bind(this));
         triggers.on('time_window:choose', function() {
             if(this.ops['Time Window'].is('custom')) {
@@ -218,9 +220,16 @@ CollectionManager.prototype = {
     },
     updateCollection: function() {
         var fields = {};
-        $("#edit_form").serializeArray().forEach(function(x) { fields[x.name] = x.value; });
+        $("#edit_form").serializeArray().forEach(function(x) { console.log(x); fields[x.name] = x.value; });
         
-        this.app.connection.php('collection/update', fields, triggers.emitter('events:load')); // add a callback
+        this.app.connection.php('collection/update', fields, triggers.emitter('edit_window:verify update')); // add a callback
+    },
+    verifyCollectionUpdate: function(message) {
+        if(message.includes['Success']) {
+            triggers.emit('events:load');
+        } else {
+            console.log(message);
+        }
     },
     loadSubsets: function () {
         // Event selection
@@ -629,7 +638,9 @@ CollectionManager.prototype = {
         
         divs.append('div')
             .attr('class', function(d) { 
-                if(this.edit_window_fields.text.includes(d))
+                if(this.edit_window_fields.id.includes(d))
+                    return 'col-sm-9 edit-box edit-box-id';
+                else if(this.edit_window_fields.text.includes(d))
                     return 'col-sm-9 edit-box edit-box-textfield';
                 else if(this.edit_window_fields.date.includes(d))
                     return 'col-sm-9 edit-box edit-box-date';
