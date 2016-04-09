@@ -54,8 +54,8 @@ CollectionManager.prototype = {
 
         // Editing Windows
         triggers.on('edit_window:open', this.editWindow.bind(this));
+        triggers.on('edit_window:changed', this.editWindowChanged.bind(this));
         triggers.on('edit_window:update', this.updateCollection.bind(this));
-        triggers.on('edit_window:updated', this.updateCollection.bind(this));
         triggers.on('edit_window:verify update', this.verifyCollectionUpdate.bind(this));
         triggers.on('time_window:edit', this.editLoadTimeWindow.bind(this));
         triggers.on('time_window:choose', function() {
@@ -225,10 +225,18 @@ CollectionManager.prototype = {
         this.app.connection.php('collection/update', fields, triggers.emitter('edit_window:verify update')); // add a callback
     },
     verifyCollectionUpdate: function(message) {
-        if(message.includes['Success']) {
+        if(message.includes('Success')) {
             triggers.emit('events:load');
+            
+            // Turn update to normal
+            d3.select('#edit-window-save')
+                .attr('class', 'btn btn-default');
+
+            // Unlock Match/Fetch buttons
+            d3.selectAll('.edit-window-routine')
+                .attr('disabled', null);
         } else {
-            console.log(message);
+            console.error(message);
         }
     },
     loadSubsets: function () {
@@ -684,7 +692,7 @@ CollectionManager.prototype = {
                 placeholder: function(d) { return info[d]; }
             });
         
-        form.selectAll('.edit-box-date')
+        form.selectAll('.edit-box-date') // TODO fix problem with display
             .append('input')
             .attr({
                 class: 'form-control',
@@ -698,7 +706,7 @@ CollectionManager.prototype = {
             });
         
         if(keys.includes('Query'))
-            options.queryEditCreate(form, info);
+            this.queryEditCreate(form, info);
         
         form.selectAll('.edit-box-static')
             .append('p')
@@ -720,7 +728,7 @@ CollectionManager.prototype = {
                 class: 'btn btn-default'
             })
             .text('Update')
-            .on('click', triggers.emitter('edit_window:updated'));
+            .on('click', triggers.emitter('edit_window:update'));
         
 //        disp.newPopup('#edit-window-save')
 //            .set('content', 'Otherwise won\'t save changes');
@@ -730,7 +738,7 @@ CollectionManager.prototype = {
         }
         
         form.selectAll('input')
-            .on('input', this.editWindowChanged);
+            .on('input', triggers.emitter('edit_window:changed'));
         
         triggers.emit('modal:open');
     },
@@ -837,21 +845,9 @@ CollectionManager.prototype = {
         // Indicate that the collection is to be updated
         d3.select('#edit-window-save')
             .attr('class', 'btn btn-primary');
-        
+
         // Disable Match/Fetch buttons
         d3.selectAll('.edit-window-routine')
             .attr('disabled', '');
-    },
-    editWindowUpdated: function() {
-        // Reload the rumor list
-//        options.updateCollectionCallback();
-        
-        // Turn update to normal
-        d3.select('#edit-window-save')
-            .attr('class', 'btn btn-default');
-
-        // Unlock Match/Fetch buttons
-        d3.selectAll('.edit-window-routine')
-            .attr('disabled', null);
     },
 };

@@ -1,7 +1,7 @@
 function StatusReport() {
     this.connection = new Connection();
     this.ops = new Options(this);
-    this.dataset = new CollectionManager(this, {name: 'dataset', flag_sidebar: true});
+    this.dataset = new CollectionManager(this, {name: 'dataset', flag_sidebar: false});
     this.tooltip = new Tooltip();
     this.modal = new Modal();
     
@@ -36,7 +36,7 @@ StatusReport.prototype = {
             try {
                 this.events_arr = JSON.parse(d);
             } catch(err) {
-                console.log(d);
+                console.error(d);
                 return;
             }
             
@@ -49,7 +49,7 @@ StatusReport.prototype = {
             try {
                 this.subsets_arr = JSON.parse(d);
             } catch(err) {
-                console.log(d);
+                console.error(d);
                 return;
             }
             
@@ -64,12 +64,12 @@ StatusReport.prototype = {
         this.subsets = {};
         this.event_types = {};
         this.event_types_arr = [];
+        this.featuresets_arr = [];
         
         // Link all of the data
         this.events_arr.forEach(function(event) {
             // Add fields
             event.ID = parseInt(event.ID);
-            event.subsets = [];
             event.Label = event.DisplayName || event.Name;
             event.Level = 1;
             this.quantities.forEach(function (quantity) {
@@ -92,35 +92,59 @@ StatusReport.prototype = {
             event['Event Type'] = this.event_types[type];
             event['Event'] = event; // weird but makes things easier
             
+            event.featuresets = {};
+            event.featuresets_arr = [];
+            
             // Add to indiced object
             this.events[event.ID] = event;
         }, this);
+        
         this.subsets_arr.forEach(function(subset) {
             // Add fields
             subset.ID = parseInt(subset.ID);
-            subset.Label = subset.Feature + ": " + subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
-            subset.Level = 2;
-            subset.Event_ID = subset.Event;
+            subset.Label = subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
+            subset.Level = 3;
             this.quantities.forEach(function (quantity) {
                 subset[quantity] = parseInt(subset[quantity]) || 0;
             });
             
-            subset.Event = this.events[subset.Event_ID];
-            if(subset.Event.subsets) {
-                subset.Event.subsets.push(subset);
+            // Add direct subset to Event
+            subset.Event_ID = subset.Event;
+            var event = this.events[subset.Event_ID];
+            if(event.subsets) {
+                event.subsets.push(subset);
             } else {
-                subset.Event.subsets = [subset];
+                event.subsets = [subset];
             }
-            subset['Event Type'] = subset.Event['Event Type'];
+            subset.Event = event;
+            
+            // Add to higher event type
+            subset['Event Type'] = event['Event Type'];
+            
+            // Add to event's featuresets
+            if(subset.Feature in event.featuresets) {
+                event.featuresets[subset.Feature].subsets.push(subset);
+            } else {
+                var new_feature_set = {
+                    Level: 2,
+                    Label: subset.Feature,
+                    Event: event,
+                    'Event Type': event['Event Type'],
+                    subsets: [subset]
+                }
+                new_feature_set['Feature Set'] = new_feature_set;
+                event.featuresets[subset.Feature] = new_feature_set;
+                event.featuresets_arr.push(new_feature_set);
+                this.featuresets_arr.push(new_feature_set);
+                
+            }
+            subset['Feature Set'] = event.featuresets[subset.Feature];
             
             // Add to indiced object
             this.subsets[subset.ID] = subset;
         }, this);
         
         // Add children columns
-        this.events_arr.forEach(function(e) {
-            e.children = e.subsets;
-        });
         this.event_types_arr.sort(function(a, b) {
             if (a.Label < b.Label) return -1;
             if (a.Label > b.Label) return 1;
@@ -131,17 +155,61 @@ StatusReport.prototype = {
             d.children = d.events;
         });
         
+        this.events_arr.forEach(function(e) {
+            e.children = e.featuresets_arr;
+            
+            e.featuresets_arr.sort(function(a, b) {
+                if (a.Label < b.Label) return -1;
+                if (a.Label > b.Label) return 1;
+                return 0;
+            });
+            e.featuresets_arr.forEach(function(d, i) {
+                d.ID = d.Event.ID * 100 + i;
+                d.children = d.subsets;
+            });
+        });
+        
         this.buildOptions();
     },
     computeAggregates: function() {
         this.events_arr.forEach(function(e) {
-            e.children = e.subsets;
+//            e.children = e.subsets;
+            e.children = e.featuresets_arr;
+            
+//            e.featuresets_arr.forEach(function(d) {
+//                d.children = d.subsets;
+//            });
             
 //            e.Tweets         = e.Tweets         || d3.sum(e.rumors, function(r) { return r.Tweets         || 0; });
 //            e.DistinctTweets = e.DistinctTweets || d3.sum(e.rumors, function(r) { return r.DistinctTweets || 0; });
 //            e.CodedTweets    = e.CodedTweets    || d3.sum(e.rumors, function(r) { return r.CodedTweets    || 0; });
 //            e.AdjudTweets    = e.AdjudTweets    || d3.sum(e.rumors, function(r) { return r.AdjudTweets    || 0; });
 //            e.Datapoints     = e.Datapoints     || d3.sum(e.rumors, function(r) { return r.Datapoints     || 0; });
+        });
+        
+        this.featuresets_arr.forEach(function(d) {
+            d.children = d.subsets;
+            
+            ['Tweets', 'DistinctTweets', 
+              'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
+              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 'Datapoints'].forEach(function(count) {
+                d[count] = d3.sum(d.children, function(e) { return e[count] || 0; });
+            });
+            
+//            d.CodedTweets       = d3.sum(d.events, function(e) { return e.CodedTweets    || 0; });
+//            d.AdjudTweets       = d3.sum(d.events, function(e) { return e.AdjudTweets    || 0; });
+            d.FirstTweet_Min    = d3.min(d.children, function(e) { return e.FirstTweet        || 1e20; });
+            d.FirstTweet_Max    = d3.max(d.children, function(e) { return e.FirstTweet        || 0; });
+            d.LastTweet_Min     = d3.min(d.children, function(e) { return e.LastTweet         || 1e20; });
+            d.LastTweet_Max     = d3.max(d.children, function(e) { return e.LastTweet         || 0; });
+            
+            d.FirstTweet        = d.FirstTweet_Min;
+            d.LastTweet         = d.LastTweet_Max;
+            d.ID_Min            = d3.min(d.children, function(e) { return parseInt(e.ID)      || 0; });
+            d.ID_Max            = d3.max(d.children, function(e) { return parseInt(e.ID)      || 0; });
+            
+            // Self
+            d['Feature Set'] = d;
         });
         
         this.event_types_arr.forEach(function(d) {
@@ -188,8 +256,8 @@ StatusReport.prototype = {
             }),
             Relative: new Option({
                 title: 'Relative to',
-                labels: ['-', 'Event', 'Event\'s Types', 'Subset', 'Distinct/Not'],
-                ids:    ['raw', 'event', 'type', 'subset', 'distinct'],
+                labels: ['-', 'Event', 'Event\'s Types', 'Feature', 'Match', 'Distinct/Not'],
+                ids:    ['raw', 'event', 'type', 'feature', 'match', 'distinct'],
                 default: 0,
                 type: "dropdown",
                 callback: triggers.emitter('update_counts')
@@ -323,10 +391,16 @@ StatusReport.prototype = {
                     .data([event])
                     .attr('class', function(d) { return 'row_event row_event_' + d.ID; });
                 
-                event.subsets.forEach(function(subset) {
-                    subset.row = table_body.append('tr')
-                        .data([subset])
-                        .attr('class', function(d) { return 'row_subset row_subset_' + d.ID; });
+                event.featuresets_arr.forEach(function(featureset) {
+                    featureset.row = table_body.append('tr')
+                        .data([featureset])
+                        .attr('class', function(d) { return 'row_feature'; });
+                    
+                    featureset.subsets.forEach(function(subset) {
+                        subset.row = table_body.append('tr')
+                            .data([subset])
+                            .attr('class', function(d) { return 'row_subset row_subset_' + d.ID; });
+                    });
                 });
             });
         })
@@ -334,7 +408,7 @@ StatusReport.prototype = {
         // ID & Label
         table_body.selectAll('tr')
             .append('td')
-            .html(function(d) { return d.Level > 0 ? d.ID : ''; })
+            .html(function(d) { return d.Level % 2 == 1 ? d.ID : ''; })
         
         table_body.selectAll('tr')
             .append('td')
@@ -344,13 +418,13 @@ StatusReport.prototype = {
             .attr('class', 'value')
             .html(function(d) { return d.Label; });
         
-        table_body.selectAll('.row_event .cell-label, .row_type .cell-label')
+        table_body.selectAll('.row_feature .cell-label, .row_event .cell-label, .row_type .cell-label')
             .on('click', this.setVisibility_children.bind(this))
             .append('small')
             .attr('class', 'glyphicon-hiddenclick')
             .html(function(d) { 
                 return d.children.length + ' ' + 
-                    (d.Level == 0 ? 'events' : (d.Level == 1 ? 'subsets' : 'matches')); 
+                    (d.Level == 0 ? 'events' : (d.Level == 1 ? 'features' : 'matches')); 
             });
         
         
@@ -358,20 +432,27 @@ StatusReport.prototype = {
             if(set['Level'] == 0) {
                 return {
                     ID: set['ID'],
-                    Label: set['Label'],
-                    Events: set['Events'] ? set['Events'].map(function(event) { return event['Label']; }) : null
+                    'Event Type': set['Label'],
+                    Events: set['events'] ? set['events'].map(function(event) { return event['Label']; }) : null
                 }
-            } else if(set['Level' == 1]) {
+            } else if(set['Level'] == 1) {
                 return {
                     ID: set['ID'],
-                    Label: set['Label'],
+                    Event: set['Label'],
+                    'Event Type': set['Event Type']['Label']
+                }
+            } else if(set['Level'] == 2) {
+                return {
+                    ID: set['ID'],
+                    Feature: set['Label'],
+                    Event: set['Event']['Label'],
                     'Event Type': set['Event Type']['Label']
                 }
             } else {
                 return {
                     ID: set['ID'],
-                    Feature: set['Feature'],
                     Match: set['Match'],
+                    Feature: set['Feature'],
                     Event: set['Event']['Label'],
                     'Event Type': set['Event Type']['Label']
                 }
@@ -395,24 +476,31 @@ StatusReport.prototype = {
                     return info;
 
                 var event = set['Event'] || set;
+                var feature = set['Feature Set'] || set;
                 info[type] = util.formatThousands(value);
-                if(set.Level == 2 || type != 'Tweets') {
+                if(set.Level >= 2 || type != 'Tweets') {
                     info['% of Event'] = (value / event['Tweets'] * 100).toFixed(1) + '%';
                 }
-                if(set.Level == 2 && type != 'Tweets') {
+                if(set.Level >= 2 && type != 'Tweets') {
                     info['% of Type'] = (value / event[type] * 100).toFixed(1) + '%';
-                    info['% of Subset'] = (value / set['Tweets'] * 100).toFixed(1) + '%';
+                    info['% of Feature'] = (value / feature['Tweets'] * 100).toFixed(1) + '%';
+                    if(set.Level >= 3) {
+                        info['% of Subset'] = (value / set['Tweets'] * 100).toFixed(1) + '%';
+                    }
                 }
                 
                 var distinct = set['Distinct' + type];
                 info['Distinct ' + type] = util.formatThousands(distinct);
                 info['% Distinct'] = (distinct / value * 100).toFixed(1) + '%';
-                if(set.Level == 2 || type != 'Tweets') {
+                if(set.Level >= 2 || type != 'Tweets') {
                     info['% D of Event'] = (distinct / event['Tweets'] * 100).toFixed(1) + '%';
                 }
-                if(set.Level == 2 && type != 'Tweets') {
+                if(set.Level >= 2 && type != 'Tweets') {
                     info['% D of Type '] = (distinct / event['Distinct' + type] * 100).toFixed(1) + '%';
-                    info['% D of Subset'] = (distinct / set['Tweets'] * 100).toFixed(1) + '%';
+                    info['% D of Feature'] = (value / feature['Tweets'] * 100).toFixed(1) + '%';
+                    if(set.Level >= 3) {
+                        info['% D of Subset'] = (value / set['Tweets'] * 100).toFixed(1) + '%';
+                    }
                 }
 
                 return info;
@@ -420,7 +508,7 @@ StatusReport.prototype = {
         }, this);
         
         // Append the recalculate button
-        table_body.selectAll('.row_type .cell-Tweets').append('span') // hidden one to help alignment
+        table_body.selectAll('.row_type .cell-Tweets, .row_feature .cell-Tweets').append('span') // hidden one to help alignment
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
         table_body.selectAll('.row_event .cell-Tweets, .row_subset .cell-Tweets').append('span')
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
@@ -440,7 +528,7 @@ StatusReport.prototype = {
             .attr('class', 'cell-datapoints cell-count');
         datapoint_cells.append('span').attr('class', 'value');
         
-        table_body.selectAll('.row_type .cell-datapoints').append('span') // hidden one to help alignment
+        table_body.selectAll('.row_type .cell-datapoints, .row_feature .cell-datapoints').append('span') // hidden one to help alignment
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
         table_body.selectAll('.row_event .cell-datapoints, .row_subset .cell-datapoints').append('span')
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
@@ -502,9 +590,9 @@ StatusReport.prototype = {
         this.ops.recordState(false);
 
         // Set the chevron to point the right direction
-        d.row.select('.cell-label .glyphicon')
-            .classed('glyphicon-chevron-left', show_children)
-            .classed('glyphicon-chevron-down', !show_children);
+//        d.row.select('.cell-label .glyphicon')
+//            .classed('glyphicon-chevron-left', show_children)
+//            .classed('glyphicon-chevron-down', !show_children);
         
         // Add/remove not shown class to subsets as appropriate
         var show_empties = this.ops['Rows']['Empties'].is('table-row');
@@ -551,8 +639,9 @@ StatusReport.prototype = {
                         d[type + 'Display'] = value;
                         return util.formatThousands(value);
                     }
-                    var denom = relative == 'event'    ? (d['Level'] == 2 ? d['Event']['Tweets'] : d['Tweets']) : 
-                                relative == 'type'     ? (d['Level'] == 2 ? d['Event'][quantity] : d[quantity]) : 
+                    var denom = relative == 'event'    ? (d['Level'] >= 2 ? d['Event']['Tweets'] : d['Tweets']) : 
+                                relative == 'type'     ? (d['Level'] >= 2 ? d['Event'][quantity] : d[quantity]) : 
+                                relative == 'feature'  ? (d['Level'] >= 3 ? d['Feature Set'][quantity] : d[quantity]): 
                                 relative == 'subset'   ? d['Tweets'] : 
                                 relative == 'distinct' ? d[type] : 1;
                     d[type + 'Display'] = value / denom;
@@ -580,8 +669,6 @@ StatusReport.prototype = {
                 if(!('LastTweet') in d || d['LastTweet'] == 0 || d['LastTweet'] == 1e20) return '';
                 if(date_format == 'date') {
                     var date = d.LastTweet;
-//                    if(d.Level == 0)
-//                        console.log(d);
                     date = util.twitterID2Timestamp(date);
                     return util.formatDate(date);
                 }
@@ -590,68 +677,36 @@ StatusReport.prototype = {
             });
         
         // Datapoints
-        if(datapoints_format == 'minutes') {
-            table_body.selectAll('.cell-datapoints .value')
-                .html(function(d) {
-                    var value = d.Datapoints;
-                    if(!value) return '';
-                    if(datapoints_format == 'minutes') return util.formatMinutes(value);
-                    return value;
-                });
-        } else {
-            table_body.selectAll(".cell-datapoints .value")
-                .transition()
-                .duration(1000)
-                .tween("text", function (d) {
-                    var start = this.textContent;
-                    if(typeof(start) == 'string') {
-                        if(start.includes('m')) {
-                            start = util.deformatMinutes(start);
+        table_body.selectAll(".cell-datapoints .value")
+            .transition()
+            .duration(1000)
+            .tween("text", function (d) {
+                var start = this.textContent;
+                if(typeof(start) == 'string') {
+                    if(start.includes('m')) {
+                        start = util.deformatMinutes(start);
+                    } else {
+                        start = parseInt(start.replace(/ /g, ''));
+                    }
+                }
+                var interpol = d3.interpolate(start || 0, d.Datapoints || 0);
+
+                return function (value) {
+                    if(typeof(value) == 'string') {
+                        if(value.includes('m')) {
+                            value = util.deformatMinutes(value);
                         } else {
-                            start = parseInt(start.replace(/ /g, ''));
+                            value = parseInt(value.replace(/ /g, ''));
                         }
                     }
-                    var interpol = d3.interpolate(start || 0, d.Datapoints || 0);
-
-                    return function (value) {
-                        if(typeof(value) == 'string') {
-                            if(value.includes('m')) {
-                                value = util.deformatMinutes(value);
-                            } else {
-                                value = parseInt(value.replace(/ /g, ''));
-                            }
-                        }
-                        value = Math.round(interpol(value));
-                        if(datapoints_format == 'minutes') {
-                            this.textContent = util.formatMinutes(value);
-                        } else {
-                            this.textContent = util.formatThousands(value);
-                        }
-                    };
-                });
-        }
-        
-//        table_body.selectAll(".cell-datapoints .value")
-//            .transition()
-//            .duration(1000)
-//            .tween("text", function (d) {
-//                var start = this.textContent;
-//                if(typeof(start) == 'string' && start.includes('m'))
-//                    start = util.deformat(start);
-//                var i = d3.interpolate(start || 0, d.Datapoints || 0);
-//
-//                return function (t) {
-//                    var start = this.textContent;
-//                    if(typeof(start) == 'string' && start.includes('m'))
-//                        start = util.deformat(start);
-//                    if(datapoints_format == 'minutes') {
-//                        this.textContent = util.formatMinutes(i(util.deformat(t)));
-//                    } else {
-//                        this.textContent = Math.round(i(t));
-//                    }
-//                };
-//            });
-//        
+                    value = Math.round(interpol(value));
+                    if(datapoints_format == 'minutes') {
+                        this.textContent = util.formatMinutes(value);
+                    } else {
+                        this.textContent = util.formatThousands(value);
+                    }
+                };
+            });
         
         triggers.emit('refresh_visibility');
     },
@@ -659,7 +714,7 @@ StatusReport.prototype = {
         if(d.Level == 1) { // Event
             this.dataset.event = d;
             triggers.emit('edit_window:open', 'event');
-        } else if(d.Level == 2) { // Event
+        } else if(d.Level == 3) { // Subset
             this.dataset.subset = d;
             triggers.emit('edit_window:open', 'subset');
         }
@@ -699,50 +754,46 @@ StatusReport.prototype = {
             }
 //            var ascending_minmax = ascending == 'true' ? 'Min' : 'Max';
             var ascending_bin = ascending == 'true' ? 1 : -1;
-//            var showing_event_types = this.ops['Rows']['Event Types'].is('table-row');
-//            var showing_events = this.ops['Rows']['Events'].is('table-row');
-            var showing_event_types = true;
-            var showing_events = true;
             
             table_body.selectAll('tr').sort(function(a, b) {
                 var lA = a['Level'];
                 var lB = b['Level'];
                 
                 // Compare Event Types
-                if(showing_event_types) {
-                    var A = a['Event Type'][quantity];
-                    var B = b['Event Type'][quantity];
-    //                if(lA == 0 && lB == 0 && !A && !B) return 0;
-                    if(!A) return  1;
-                    if(!B) return -1;
-                    if(A < B) return -1 * ascending_bin;
-                    if(A > B) return  1 * ascending_bin;
-                    if(lA == 0 && lB == 0) return  a['ID_Min'] - b['ID_Min'];
-                    if(lA == 0 && lB >  0) return -1;
-                    if(lA >  0 && lB == 0) return  1;
-                } else {
-                    if(lA == 0 && lB == 0) return  a['ID_Min'] - b['ID_Min'];
-                    if(lA == 0 && lB >  0) return  1;
-                    if(lA >  0 && lB == 0) return -1;
-                }
+                var A = a['Event Type'][quantity];
+                var B = b['Event Type'][quantity];
+//                if(lA == 0 && lB == 0 && !A && !B) return 0;
+                if(!A) return  1;
+                if(!B) return -1;
+                if(A < B) return -1 * ascending_bin;
+                if(A > B) return  1 * ascending_bin;
+                if(lA == 0 && lB == 0) return  a['ID_Min'] - b['ID_Min'];
+                if(lA == 0 && lB >  0) return -1;
+                if(lA >  0 && lB == 0) return  1;
                 
                 // Compare Events
-                if(showing_events) {
-                    A = a['Event'][quantity];
-                    B = b['Event'][quantity];
-    //                if(lA == 1 && lB == 1 && !A && !B) return 0;
-                    if(!A) return  1;
-                    if(!B) return -1;
-                    if(A < B) return -1 * ascending_bin;
-                    if(A > B) return  1 * ascending_bin;
-                    if(lA == 1 && lB == 1) return  a['ID'] - b['ID'];
-                    if(lA == 1 && lB >  1) return -1;
-                    if(lA >  1 && lB == 1) return  1;
-                } else {
-                    if(lA == 1 && lB == 1) return  a['ID'] - b['ID'];
-                    if(lA == 1 && lB >  1) return  1;
-                    if(lA >  1 && lB == 1) return -1;
-                }
+                A = a['Event'][quantity];
+                B = b['Event'][quantity];
+//                if(lA == 1 && lB == 1 && !A && !B) return 0;
+                if(!A) return  1;
+                if(!B) return -1;
+                if(A < B) return -1 * ascending_bin;
+                if(A > B) return  1 * ascending_bin;
+                if(lA == 1 && lB == 1) return  a['ID'] - b['ID'];
+                if(lA == 1 && lB >  1) return -1;
+                if(lA >  1 && lB == 1) return  1;
+                
+                // Compare Feature Sets
+                A = a['Feature Set'][quantity];
+                B = b['Feature Set'][quantity];
+//                if(lA == 2 && lB == 2 && !A && !B) return 0;
+                if(!A) return  1;
+                if(!B) return -1;
+                if(A < B) return -1 * ascending_bin;
+                if(A > B) return  1 * ascending_bin;
+                if(lA == 2 && lB == 2) return  a['ID'] - b['ID'];
+                if(lA == 2 && lB >  2) return -1;
+                if(lA >  2 && lB == 2) return  1;
                 
                 // Compare Subsets
                 A = a[quantity];

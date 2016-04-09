@@ -71,10 +71,13 @@ th:hover .glyphicon-hiddenclick {
 .row_type .cell-label, .row_event .cell-label {
     cursor: pointer;
 }
-.row_subset .cell-label .value {
+.row_feature .cell-label .value {
     font-style: italic;
     padding-left: 30px;
 }
-.row_match {
+.row_subset {
     border-top: solid 2px #fff;
+}
+.row_subset .cell-label .value {
+    padding-left: 40px;
 }
