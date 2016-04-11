@@ -805,8 +805,8 @@ StatusReport.prototype = {
                 if(A > B) return  1 * ascending_bin;
                 
                 if(lA == lB) return  a['ID'] - b['ID'];
-                if(lA <  lB) return  1;
-                if(lA >  lB) return -1;
+                if(lA <  lB) return -1;
+                if(lA >  lB) return  1;
 
                 return 0;
             });
@@ -924,8 +924,9 @@ StatusReport.prototype = {
                 Collection: d.Level == 1 ? 'event' : 'subset',
                 ID: d.ID
             },
-            tweet_min: d.FirstTweet,
-            tweet_max: d.LastTweet,
+            quantity: 'tweet',
+            min: d.FirstTweet,
+            max: d.LastTweet,
             progress_div: row + ' .cell-datapoints',
             progress_text: ' ',
             progress_full: true,

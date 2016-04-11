@@ -210,7 +210,7 @@ Counter.prototype = {
 function Connection(args) {
     var permitted_args = ['name', 'url', 'post', 'time_res',
                           'progress_div', 'progress_text', 'progress_full',
-                          'tweet_min', 'tweet_max',
+                          'quantity', 'min', 'max',
                           'failure_msg',
                           'on_chunk_finish', 'on_finish']
 
@@ -230,18 +230,30 @@ function Connection(args) {
     this.time_res        = this.time_res        || 1; // 1 Hour
     
     this.progress        = {};
-    this.progress_div    = this.progress_div    || '#timeseries_div';
+    this.progress_div    = this.progress_div    || '#timeseries-container';
     this.progress_text   = this.progress_text   || "Working";
     this.progress_full   = this.progress_full   || false;
     
-    this.tweet_chunks    = [];
+    this.quantity        = this.quantity        || 'tweet';
+    this.chunks          = [];
     this.chunk_index     = 0;
-    this.tweet_min       = this.tweet_min          || 0; // TODO
-    this.tweet_max       = this.tweet_max          || 1e20; // TODO
+    this.min             = this.min             || 0;
+    this.max             = this.max             || new Date();
     
     this.failure_msg     = this.failure_msg     || 'Problem with data stream';
     this.on_chunk_finish = this.on_chunk_finish || function () {};
     this.on_finish       = this.on_finish       || function () {};
+    
+    // Convert min & max to dates if they are inputted as tweets
+    if(typeof(this.min) == 'number') {
+        this.min = util.twitterID2Timestamp(this.min);
+    }
+    this.min.setMinutes(0); // Round to the nearest minute
+    this.min.setSeconds(0); 
+    this.min.setMilliseconds(0); 
+    if(typeof(this.max) == 'number') {
+        this.max = util.twitterID2Timestamp(this.max);
+    }
     
 }
 Connection.prototype = {
@@ -263,14 +275,27 @@ Connection.prototype = {
         });
     },
     startStream: function () {
-        this.tweet_chunks = [];
+        this.chunks = [];
         this.chunk_index = 0;
-        var tweet_min = this.tweet_min - (this.tweet_min % util.lshift(60 * 1000, 22)) + 22410166272; // Round to the nearest minute
-        for(var tweet = tweet_min; tweet <= this.tweet_max;
-            tweet += util.lshift(this.time_res * 60 * 60 * 1000, 22)) {
-            this.tweet_chunks.push(tweet);
+        
+        // Populate timestamps
+        for(var cur = new Date(this.min); 
+            cur < this.max;
+            cur.setMinutes(cur.getMinutes() + 60 * this.time_res)) {
+            
+            if(this.quantity == 'tweet') {
+                this.chunks.push(util.timestamp2TwitterID(cur));
+            } else {
+                this.chunks.push(util.formatDate(cur));
+            }
         }
-        this.tweet_chunks.push(this.tweet_max);
+        
+        // Add last bound (the max)
+        if(this.quantity == 'tweet') {
+            this.chunks.push(util.timestamp2TwitterID(this.max));
+        } else {
+            this.chunks.push(util.formatDate(this.max));
+        }
 
         // Start progress bar
         this.progress = new Progress({
@@ -278,7 +303,7 @@ Connection.prototype = {
             parent_id: this.progress_div,
             full:      this.progress_full,
             text:      this.progress_text,
-            steps:     this.tweet_chunks.length - 1
+            steps:     this.chunks.length - 1
         });
         this.progress.start();
 
@@ -286,7 +311,7 @@ Connection.prototype = {
     },
     startChunk: function () {
         // If we are at the max, end
-        if (this.chunk_index >= this.tweet_chunks.length - 1) {
+        if (this.chunk_index >= this.chunks.length - 1) {
             // Load the new data
             this.on_finish();
 
@@ -299,8 +324,8 @@ Connection.prototype = {
             return;
         }
 
-        this.post.tweet_min = this.tweet_chunks[this.chunk_index];
-        this.post.tweet_max = this.tweet_chunks[this.chunk_index + 1];
+        this.post[this.quantity + '_min'] = this.chunks[this.chunk_index];
+        this.post[this.quantity + '_max'] = this.chunks[this.chunk_index + 1];
 
         this.php(this.url, this.post,
                      this.chunk_success.bind(this),
@@ -326,7 +351,7 @@ Connection.prototype = {
     },
     chunk_failure: function (a, b, c) {
         console.log(a, b, c);
-        disp.alert(this.failure_msg);
+        triggers.emit('alert', this.failure_msg);
         this.progress.end();
     },
     stop: function() {
@@ -429,7 +454,9 @@ triggers = {
             });
         }
     },
-    emitter: function(eventName) {
+    emitter: function(eventName, parameter) {
+        if(parameter)
+            return function() { this.emit(eventName, parameter); }.bind(this);
         return function(d) { this.emit(eventName, d); }.bind(this);
     }
 };

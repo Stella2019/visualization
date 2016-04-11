@@ -19,11 +19,11 @@ body {
     text-align: center;
 }
 #timeseries-container {
-    flex: 1 1 200px;
+    flex: 3 1 200px;
     position: relative;
 }
 #context-container {
-    flex: .25 1 120px;
+    flex: 1 1 120px;
     position: relative;
 }
 .chart {

@@ -116,7 +116,7 @@ function Timeseries () {
     this.tooltip = new Tooltip();
     this.connection = new Connection();
     
-    this.dataset = new CollectionManager(this);
+    this.collection = new CollectionManager(this);
     this.model = new TimeseriesModel(this);
     this.view = new TimeseriesView(this); // may be considered redundant
     this.chart = new TimeseriesChart(this, 'timeseries');
@@ -153,19 +153,20 @@ Timeseries.prototype = {
                 labels: ["Linear",  "Basis",        "Step"],
                 ids:    ["linear",  "basis-open",   "step-before"],
                 default: 2,
-                callback: triggers.emitter('chart:shape:set')
+                callback: triggers.emitter('chart:shape')
 //                function () { 
 //                    pipeline.start('Ready Context Chart');
 //                }
             }),
             'Y Scale': new Option({
                 title: "Y Scale",
-                labels: ["Linear",  "Power", "Log", "Preserve"],
-                ids:    ["linear",  "pow",   "log", "preserve"],
+                labels: ["Linear",  "Power", "Log"],
+                ids:    ["linear",  "pow",   "log"],
                 default: 0,
-                callback: function () {
-                    pipeline.start('Configure Plot Area')
-                }
+                callback: triggers.emitter('chart:y-scale')
+//                callback: function () {
+//                    pipeline.start('Configure Plot Area')
+//                }
             }),
             'Y Max': new Option({
                 title: "Y Max",
@@ -320,7 +321,7 @@ Timeseries.prototype = {
         
         this.ops.updateCollectionCallback = function() { data.loadRumors(); };
         this.ops.init();
-    }
+    },
 };
 
 function initialize() {

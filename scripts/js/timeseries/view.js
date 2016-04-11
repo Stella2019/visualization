@@ -10,7 +10,8 @@ TimeseriesView.prototype = {
     },
     setTriggers: function() {
         triggers.on('event_updated', this.setTitle);
-        triggers.on('alert', this.alert);
+//        triggers.on('page:resize', );
+        $(window).on('resize', this.setChartHeights);
     },
     buildPage: function() {
         var body = d3.select('body')
@@ -40,7 +41,6 @@ TimeseriesView.prototype = {
         body.append('div')
             .attr('class', 'ui-bottom footer')
             .append('div')
-            .style('padding', '10px')
             .html('Tweet volume over the whole collection period. Manually enter or brush over to focus on time.');
         
         triggers.emit('page_built');
@@ -49,5 +49,28 @@ TimeseriesView.prototype = {
          d3.select('#chart-title')
             .html('<small>' + event.Type + ':</small> ' + 
                   event.Label);
+    },
+    setChartHeights: function(event) {
+        // Get constraints
+        var page = window.innerHeight;
+        var header = parseInt(d3.select('.header').style('height'));
+        var footer = parseInt(d3.select('.footer').style('height'));
+        
+        // Minimum heights
+        var focus = 200;
+        var context = 120;
+        
+        // Fill extra space
+        // -10 because of page margins I haven't been able to resolve
+        // -30 for the padding on the top & bottom
+        var extra_space = page - header - footer - focus - context - 10 - 30;
+        if(extra_space > 0) {
+            var extra_focus = Math.floor(extra_space * 0.75);
+            focus += extra_focus;
+            context += extra_space - extra_focus;
+        }
+        
+        // Send an event
+        triggers.emit('chart:resize', [focus, context]);
     }
 }

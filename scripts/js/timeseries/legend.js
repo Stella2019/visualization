@@ -43,7 +43,7 @@ TimeseriesLegend.prototype = {
         var features = [];
         var features_subsets = {};
         
-        this.app.dataset.subsets_arr.forEach(function(subset) {
+        this.app.collection.subsets_arr.forEach(function(subset) {
             if(!features.includes(subset.Feature)) {
                 features.push(subset.Feature);
                 features_subsets[subset.Feature] = [subset];
