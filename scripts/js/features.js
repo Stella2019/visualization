@@ -20,14 +20,18 @@ function FeatureDistribution() {
 //        }
 //    }
 //    this.counters_arr = Object.keys(counters).map(function(key) { return this.counters[key]; }, this);
-
-    this.counters = ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount', 'UserVerified'];
-    this.simpleFeatures = ['Text', 'TextStripped', 'Lang', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserDescription', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang',  'UserVerified'];
-    this.timeFeatures = ['Timestamp', 'UserCreatedAt'];
-    this.linkFeatures = ['ExpandedURL', 'ExpandedURL Domain', 'MediaURL'];
-    this.quantityFeatures = ['UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount'];
     
-    this.userFeatures = []
+    this.feats = {
+        counter: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount', 'UserVerified'],
+        shown: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount', 'UserVerified'],
+        simple: ['Text', 'TextStripped', 'Lang', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang',  'UserVerified'],
+        time: ['Timestamp', 'UserCreatedAt'],
+        link: ['ExpandedURL', 'ExpandedURL Domain', 'MediaURL'],
+        quantity: ['UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount'],
+        nominal: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserVerified'],
+        hasStopwords: ['TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'UserDescription Unigrams'],
+        user: [],
+    }
     
     // Page Objects
     this.body = [];
@@ -51,8 +55,8 @@ FeatureDistribution.prototype = {
         triggers.on('event:set', this.loadTweets.bind(this, 'event'));
         triggers.on('subset:set', this.loadTweets.bind(this, 'subset'));
         
-        triggers.on('events:updated', this.buildDatasetComparison.bind(this));
-        triggers.on('event2:set', this.loadTweets.bind(this, 'event', true));
+        triggers.on('event2:set', this.loadTweets.bind(this, 'event2'));
+        triggers.on('subset2:set', this.loadTweets.bind(this, 'subset2'));
         
         triggers.on('counters:count', this.countFeatures.bind(this));
         triggers.on('counters:show', this.showCounts.bind(this));
@@ -60,22 +64,6 @@ FeatureDistribution.prototype = {
     buildPage: function() {
         this.body = d3.select('body').append('div')
             .attr('id', 'body');
-    },
-    buildDatasetComparison: function() {
-        var labels = this.ops['Dataset']['Event'].labels.slice(0); // slice clones
-        labels.unshift('<em>None</em>')
-        var ids = this.ops['Dataset']['Event'].ids.slice(0);
-        ids.unshift('none');
-        
-        this.ops['Dataset']['Event2'] = new Option({
-            title: "Compare To Event",
-            labels: labels,
-            ids: ids,
-            default: 0,
-            callback: triggers.emitter('event2:set')
-        });
-        
-        this.ops.buildSidebarOption('Dataset', 'Event2');
     },
     setOptions: function() {
         this.ops.panels = ['Dataset', 'Display'];//, 'Comparison'];
@@ -106,12 +94,24 @@ FeatureDistribution.prototype = {
                 type: 'toggle',
                 callback: triggers.emitter('counters:show')
             }),
+            'Count Quantity': new Option({
+                title: 'Count Quantity',
+                labels: ['Count', 'Percent'],
+                ids: ['count', 'percent'],
+                callback: triggers.emitter('counters:show')
+            }),
+            'Cmp Quantity': new Option({
+                title: 'Cmp Quantity',
+                labels: ['Ratio', 'Log Ratio'],
+                ids: ['ratio', 'log-ratio'],
+                callback: triggers.emitter('counters:show')
+            }),
 //            Tables: new Option({
 //                title: "Tables",
 //                labels: ['n-grams', 'n-grams & co-occur', 'n-grams, co & tweets', 'n-grams, co & urls', 'All'],
 //                ids:    ['n', 'nc', 'nct', 'ncu', 'nctu'],
 //                default: 1,
-//                callback: triggers.emitter('counters:render')
+//                callback: triggers.emitter('counters:show')
 //            }),
 //            TF: new Option({
 //                title: "Term Frequency",
@@ -121,20 +121,20 @@ FeatureDistribution.prototype = {
 ////                breakbefore: true,
 //                callback: triggers.emitter('counters:show')
 //            }),
-            'TF Modifier': new Option({
-                title: "TF Modifier",
-                labels: ['Raw', 'Fraction', 'Percent', 'Log'],
-                ids:    ['raw', 'fraction', 'percent', 'log'],
-                default: 0,
-                callback: triggers.emitter('counters:show')
-            }),
+//            'TF Modifier': new Option({
+//                title: "TF Modifier",
+//                labels: ['Raw', 'Fraction', 'Percent', 'Log'],
+//                ids:    ['raw', 'fraction', 'percent', 'log'],
+//                default: 0,
+//                callback: triggers.emitter('counters:show')
+//            }),
 //            DF: new Option({
 //                title: "Doc Frequency",
 //                labels: ['None', '&sum; Has', '&sum; Count'],
 //                ids:    ['none', 'has', 'count'],
 //                default: 0,
 //                breakbefore: true,
-//                callback: triggers.emitter('counters:render')
+//                callback: triggers.emitter('counters:show')
 //            }),
 //            'IDF': new Option({
 //                title: "Inverse",
@@ -148,9 +148,11 @@ FeatureDistribution.prototype = {
         
         this.ops.init();
     },
-    loadTweets: function(collection, compare) {
+    loadTweets: function(collection) {
+        var cmp = collection.includes('2');
+        var collection_type = cmp ? collection.slice(0, -1) : collection;
         var post = {
-            collection: collection,
+            collection: collection_type,
             collection_id: this.dataset[collection] ? this.dataset[collection].ID : undefined,
             limit: 1000
         };
@@ -167,8 +169,7 @@ FeatureDistribution.prototype = {
         this.connection.php('tweets/get', post,
                             this.parseNewTweets.bind(this));
     },
-    parseNewTweets: function(file_data, other) {
-        console.log(other);
+    parseNewTweets: function(file_data) {
         var newTweets;
         try {
             newTweets = JSON.parse(file_data);
@@ -202,42 +203,41 @@ FeatureDistribution.prototype = {
         
         // Start Counters        
         set.counter = {};
-        this.counters.forEach(function(counter) {
+        this.feats.counter.forEach(function(counter) {
             set.counter[counter] = new Counter();
         });
         
         // TODO subselection of tweets
         
         // Add up ngrams
-        var redundantTweetsOK = this.ops['Display']['Filter'].is('none');
+        var repeatTextOK = this.ops['Display']['Filter'].is('none');
         set.tweets_arr.forEach(function(tweet) {
             set.nTweets += 1;
             
-            var newTweet = !set.counter.TextStripped.has(tweet.TextStripped);
-            var newURL = !set.counter.ExpandedURL.has(tweet.ExpandedURL);
+            var newTweetText = !set.counter.TextStripped.has(tweet.TextStripped);
 
-            if(newTweet || newURL || redundantTweetsOK) { // Aggressive redundancy check
+            if(repeatTextOK || newTweetText) { // Aggressive redundancy check
                 
                 // Count usual features
-                this.simpleFeatures.forEach(function(feature) {
+                this.feats.simple.forEach(function(feature) {
                     set.counter[feature].incr(tweet[feature]);
                 });
                 
                 // Get time features
-                this.timeFeatures.forEach(function(feature) {
+                this.feats.time.forEach(function(feature) {
                     var time = tweet[feature];
                     time = util.formatDateToMinutes(util.date(time));
                     set.counter[feature].incr(time);
                 });
                 
                 // Links
-                this.linkFeatures.forEach(function(feature) {
+                this.feats.link.forEach(function(feature) {
                     var url = tweet[feature];
                     if(feature == 'ExpandedURL Domain') {
                         url = tweet['ExpandedURL'];
                         if(url) {
                             url = url.replace(
-                                /.*:\/\/([^\/]*)\/.*/, '$1');
+                                /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
                         }
                     }
                     if(url) {
@@ -246,31 +246,19 @@ FeatureDistribution.prototype = {
                     set.counter[feature].incr(url);
                 });
                 
-                // Quantities (binned)
-                this.quantityFeatures.forEach(function(feature) {
-                    var quantity = tweet[feature];
-                    if(quantity == 0) {
-                        set.counter[feature].incr(0);
-                        return;
-                    }
-                    var log10 = Math.log(quantity) * Math.LOG10E;
-                    var digits = Math.floor(log10);
-                    var logdecimal = log10 - digits;
-                    var magnitude = Math.floor(Math.pow(10, digits));
-                    var bound = magnitude + ' to ' + (magnitude * 10 - 1);
-                    
-//                    if(logdecimal < .333) {
-//                        bound = Math.floor(1 * Math.pow(10, digits)) + ' to ' +
-//                                Math.floor(2.15 * Math.pow(10, digits));
-//                    } else if (logdecimal < .663) {
-//                        bound = Math.floor(2.15 * Math.pow(10, digits) + 1) + ' to ' +
-//                                Math.floor(4.6 * Math.pow(10, digits));
-//                    } else {
-//                        bound = Math.floor(4.6 * Math.pow(10, digits) + 1) + ' to ' +
-//                                Math.floor(10 * Math.pow(10, digits) - 1);
-//                    }
-                    
-                    set.counter[feature].incr(bound);
+                // Quantities (no longer binned)
+                this.feats.quantity.forEach(function(feature) {
+                    set.counter[feature].incr(tweet[feature]);
+                });
+                
+                // User Description Unigrams
+                var desc = (tweet.UserDescription || '').toLowerCase();
+                var desc_words = desc.split(/\W/).filter(function(word) { return word.length > 0; });
+                if(desc_words.length == 0) {
+                    desc_words = [tweet.UserDescription];
+                }
+                desc_words.forEach(function(word) {
+                    set.counter['UserDescription Unigrams'].incr(word);
                 });
                 
                 // Count Text features
@@ -337,21 +325,19 @@ FeatureDistribution.prototype = {
 //        }
         
         var n = parseInt(this.ops['Display']['TopX'].get());
+        var excludeStopwords = this.ops['Display']['Exclude Stopwords'].is('true');
+        var count_quantity = this.ops['Display']['Count Quantity'].get();
+        var cmp_quantity = this.ops['Display']['Cmp Quantity'].get();
 
         this.body.selectAll('*').remove();
         
-//        this.body.append('table')
-//            .style('width', '100%')
-//            .append('tr')
-//            .selectAll('td')
-//            .data(this.counters)
-//            .enter()
-//            .append('td')
         var table_containers = this.body.selectAll('div.counter_table_container')
-            .data(this.counters)
+            .data(this.feats.shown)
             .enter()
             .append('div')
-            .attr('class', 'counter_table_container');
+            .attr('class', function(d) {
+                return 'counter_table_container table-' + util.simplify(d);
+            });
     
         // Add header
         table_containers.append('h4')
@@ -364,63 +350,114 @@ FeatureDistribution.prototype = {
                 return set.counter[d].tokens + ' tokens';
             });
         
-        // Add tables of counts
-        table_containers.append('table')
-            .attr('class', 'counter_table')
-            .each(function(d, i) {
-                var table = d3.select(this);
+        // Add statistics for quantitative features
+        this.feats.quantity.forEach(function(quantity) {
+            var stats_table = d3.select('.table-' + util.simplify(quantity))
+                .append('table')
+                .attr('class', 'stats-table');
+            var stats = set.counter[quantity].statistics();
             
-                var header = table.append('thead').append('tr');
-                header.append('th')
-                    .attr('class', 'token')
-                    .html('Term');
+            var rows = stats_table.selectAll('tr')
+                .data(Object.keys(stats))
+                .enter()
+                .append('tr');
             
-                header.append('th')
-                    .attr('class', 'count')
-                    .html('Count');
-
-                var top_tokens = set.counter[d].top(n);
-                top_tokens = top_tokens.map(function(token_count) {
-                    var entry = {
-                        token: token_count.key,
-                        count: token_count.value,
-                        percent: token_count.value / set.nTweets
-                    };
-                    if(cmp) {
-                        entry['count2'] = cmp.counter[d].has(token_count.key);
-                        entry['percent2'] = entry['count2'] / cmp.nTweets;
-                        entry['ratio'] = entry['count'] / entry['count2'];
-                        entry['log-ratio'] = Math.log(entry['ratio']);
-                    }
-                    return entry;
-                })
+            rows.append('th').html(function(d) { return d; });
             
-                var rows = table.append('tbody')
-                    .selectAll('tr.token-count-set')
-                    .data(top_tokens)
-                    .enter()
-                    .append('tr')
-                    .attr('class', 'token-count-set');
-            
-                rows.append('td')
-                    .attr('class', 'token');
-
-                rows.append('td')
-                    .attr('class', 'count');
-            
-                if(cmp) {
-                    rows.append('td')
-                        .attr('class', 'count-cmp');
-                }
-            });
+            rows.append('td').html(function(d) {
+                var val = stats[d];
+                if(val % 1 > 0) val = val.toFixed(1);
+                return val; 
+            })
+        });
         
-        // Populate data
-        table_containers.selectAll('tbody .token')
-            .html(function(d) { return d['token']; });
-        table_containers.selectAll('tbody .count')
-            .html(function(d) { return d['count']; });
-        table_containers.selectAll('tbody .count-cmp')
-            .html(function(d) { return d['count2']; });
+        // Add tables of counts
+        this.feats.nominal.forEach(function(feature) {
+            var table = d3.select('.table-' + util.simplify(feature))
+                .append('table')
+                .attr('class', 'counter-table');
+            
+            var header = table.append('thead').append('tr');
+            header.append('th')
+                .attr('class', 'token')
+                .html('Term');
+
+            header.append('th')
+                .attr('class', 'count')
+                .html('Count');
+
+            var top_tokens;
+            if(excludeStopwords && this.feats.hasStopwords.includes(feature)) {
+                top_tokens = set.counter[feature].top_no_stopwords(n);
+            } else {
+                top_tokens = set.counter[feature].top(n);
+            }
+            
+            top_tokens = top_tokens.map(function(token_count) {
+                var entry = {
+                    token: token_count.key,
+                    count: token_count.value,
+                    percent: token_count.value / set.nTweets
+                };
+                if(cmp) {
+                    entry['count2'] = cmp.counter[feature].get(token_count.key);
+                    entry['percent2'] = entry['count2'] / cmp.nTweets;
+                    entry['ratio'] = entry['count'] / entry['count2'];
+                    entry['log-ratio'] = Math.log(entry['ratio']);
+                }
+                return entry;
+            })
+
+            var rows = table.append('tbody')
+                .selectAll('tr.token-count-set')
+                .data(top_tokens)
+                .enter()
+                .append('tr')
+                .attr('class', 'token-count-set');
+
+            var tokens = rows.append('td')
+                .attr('class', 'token');
+
+            var counts = rows.append('td')
+                .attr('class', 'count count-primary');
+
+            if(cmp) {
+                rows.append('td')
+                    .attr('class', 'count count-secondary');
+                rows.append('td')
+                    .attr('class', 'count count-cmp');
+            }
+            
+            // Fill data
+            table.selectAll('tbody .token')
+                .html(function(d) { return d['token']; });
+            table.selectAll('tbody .count-primary')
+                .html(function(d) { 
+                    if(count_quantity == 'count')
+                        return d['count']; 
+                    return (d['percent'] * 100).toFixed(1); 
+                });
+            table.selectAll('tbody .count-secondary')
+                .html(function(d) { 
+                    if(count_quantity == 'count')
+                        return d['count2']; 
+                    return (d['percent2'] * 100).toFixed(1); 
+                });
+            table.selectAll('tbody .count-cmp')
+                .html(function(d) { 
+                    if(cmp_quantity == 'ratio')
+                        return d['ratio']; 
+                    return d['log-ratio'];
+                });
+        }, this);
+        
+//        // Populate data
+//        table_containers.selectAll('tbody .token')
+//            .html(function(d) { return d['token']; });
+//        table_containers.selectAll('tbody .count')
+//            .html(function(d) { return d['count']; });
+//        table_containers.selectAll('tbody .count-cmp')
+//            .html(function(d) { return d['count2']; });
         
 //        if(this.ops.compare)
     }

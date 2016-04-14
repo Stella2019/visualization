@@ -96,7 +96,10 @@ function Counter() {
 }
 Counter.prototype = {
     has: function(key) {
-        return this.counts.get(key) || false;
+        return this.counts.has(key) || false;
+    },
+    get: function(key) {
+        return this.counts.get(key) || 0;
     },
     set: function(key, val) {
         //TODO add tokens/total_count setter
@@ -212,7 +215,57 @@ Counter.prototype = {
                 }
             }, this);
         }
-    }
+    },
+    statistics: function() { // presuming numeric keys
+        var stats = {};
+        
+        var entries = this.counts.entries();
+        entries.sort(function(a, b) { return parseInt(a.key) - parseInt(b.key); });
+        
+        // Quartiles
+        var quartile_labels = ['Minimum', '25<sup>th</sup> Quartile', 'Median', '75<sup>th</sup> Quartile', 'Maximum'];
+        var current_quartile = 0;
+        var partial_n = 0;
+        var n = this.total_count;
+        entries.forEach(function(d) {
+            partial_n += d.value;
+            while((current_quartile * .25) <= (partial_n / n) &&
+                  current_quartile < 5) {
+                stats[quartile_labels[current_quartile]] = d.key;
+                current_quartile++;
+            }
+        });
+        
+        // Distribution quantities
+        var n = 0;
+        var weighted_sum = 0;
+        var sum_squares = 0;
+        entries.forEach(function(d) {
+            var val =  parseInt(d.key);
+            n += d.value;
+            weighted_sum += val * d.value;
+            sum_squares += val * val * d.value;
+//            sum_cubes += val * val * d.value;
+//            sum_quads += val * val * val * d.value;
+        });
+        
+        stats['Mean'] = weighted_sum / n;
+        stats['Stdev'] = Math.sqrt((sum_squares / n) - (weighted_sum / n) * (weighted_sum / n));
+        stats['Skewness'] = '?';
+        stats['Kurtosis'] = '?';
+        
+        
+//        stats['min'] = d3.min(entries, function(d) { return d.key; });
+//        
+//        
+//        stats['max'] = d3.max(entries, function(d) { return d.key; });
+//        
+//        var values = this.counts.values();
+//        stats['stdev'] = Math.sqrt(Math.pow(mean, 2) - 
+//            d3.sum(entries, function(d) { return d.key * (d.value * d.value); }));
+        
+        return stats;
+    },
 };
 
 function Connection(args) {

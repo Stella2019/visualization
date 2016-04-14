@@ -7,10 +7,10 @@
     padding: 0px 7px;
     overflow-y: scroll;
 }
-.counter_table {
+.counter-table {
     width: 100%;
 }
-.counter_table tr:nth-child(even) {
+.counter-table tr:nth-child(even) {
     background: #EEE;
 }
 .token-count-set td {
@@ -24,4 +24,8 @@
 .count, .count-cmp {
     text-align: right;
     white-space: nowrap;
+}
+
+.stats-table th, .stats-table td {
+    padding: 0px 2px 2px 2px;
 }

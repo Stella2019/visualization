@@ -133,7 +133,7 @@ CollectionManager.prototype = {
         if(this.flag_secondary_event) {
             dropdowns.push('Event2');
             this.ops['Event2'] = new Option({
-                title: "Second Event",
+                title: "Event B",
                 labels: ["none"],
                 ids:    ["none"],
                 custom_entries_allowed: true,
@@ -146,7 +146,7 @@ CollectionManager.prototype = {
             if(this.flag_subset_menu) {
                 dropdowns.push('Subset2');
                 this.ops['Subset2'] = new Option({
-                    title: "Second Subset",
+                    title: "Subset B",
                     labels: ["none"],
                     ids:    ["none"],
                     custom_entries_allowed: true,
