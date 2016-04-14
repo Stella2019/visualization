@@ -427,6 +427,10 @@ StatusReport.prototype = {
                     (d.Level == 0 ? 'events' : (d.Level == 1 ? 'features' : 'matches')); 
             });
         
+        table_body.selectAll('.row_feature .cell-label, .row_event .cell-label, .row_type .cell-label')
+            .append('span')
+            .attr('class', 'glyphicon glyphicon-chervon-left glyphicon-hiddenclick')
+            .style('margin-left', '0px');
         
         this.tooltip.attach('.cell-label', function(set) {
             if(set['Level'] == 0) {
@@ -590,9 +594,9 @@ StatusReport.prototype = {
         this.ops.recordState(false);
 
         // Set the chevron to point the right direction
-//        d.row.select('.cell-label .glyphicon')
-//            .classed('glyphicon-chevron-left', show_children)
-//            .classed('glyphicon-chevron-down', !show_children);
+        d.row.select('.cell-label .glyphicon')
+            .classed('glyphicon-chevron-down', show_children)
+            .classed('glyphicon-chevron-left', !show_children);
         
         // Add/remove not shown class to subsets as appropriate
         var show_empties = this.ops['Rows']['Empties'].is('table-row');
