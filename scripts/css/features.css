@@ -1,0 +1,27 @@
+
+.counter_table_container {
+    display: inline-block;
+    width: 300px;
+    max-height: 400px;
+    vertical-align: top;
+    padding: 0px 7px;
+    overflow-y: scroll;
+}
+.counter_table {
+    width: 100%;
+}
+.counter_table tr:nth-child(even) {
+    background: #EEE;
+}
+.token-count-set td {
+    padding: 1px 3px;
+}
+.token {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+.count, .count-cmp {
+    text-align: right;
+    white-space: nowrap;
+}

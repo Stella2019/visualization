@@ -4,6 +4,9 @@ function CollectionManager(app, args) {
     this.name = args.name || 'Dataset';
     this.flag_subset_menu = args.flag_subset_menu || false;
     this.flag_sidebar = args.flag_sidebar || true;
+    this.flag_allow_edits = args.flag_allow_edits || true;
+    this.flag_secondary_event = args.flag_secondary_event || false;
+    this.flag_time_window = args.flag_time_window || true;
     this.ops = {};
     
     this.event_names;
@@ -16,6 +19,11 @@ function CollectionManager(app, args) {
     this.subsets_arr;
     this.subsets;
     this.subset;
+    
+    this.event2;
+    this.subsets2_arr;
+    this.subsets2;
+    this.subset2;
     
     this.init();
     
@@ -50,35 +58,51 @@ CollectionManager.prototype = {
                 triggers.on('subsets:updated', this.populateSubsetOptions.bind(this));
                 triggers.on('subset:set', this.setSubset.bind(this));
             }
+            
+            if(this.flag_secondary_event) {
+                triggers.on('events:updated', this.populateEvent2Options.bind(this));
+                triggers.on('event2:set', this.setEvent2.bind(this));
+//                triggers.on('event2:updated', this.loadSubsets2.bind(this));
+//                if(this.flag_subset_menu) {
+//                    triggers.on('subsets2:updated', this.populateSubset2Options.bind(this));
+//                    triggers.on('subset2:set', this.setSubset2.bind(this));
+//                }
+            }
         }
 
         // Editing Windows
-        triggers.on('edit_window:open', this.editWindow.bind(this));
-        triggers.on('edit_window:changed', this.editWindowChanged.bind(this));
-        triggers.on('edit_window:update', this.updateCollection.bind(this));
-        triggers.on('edit_window:verify update', this.verifyCollectionUpdate.bind(this));
-        triggers.on('time_window:edit', this.editLoadTimeWindow.bind(this));
-        triggers.on('time_window:choose', function() {
-            if(this.ops['Time Window'].is('custom')) {
-                triggers.emit('time_window:edit');
-            } else {
-                triggers.emit('time_window:set');
-//                triggers.emit('event:load_timeseries');
-            }
-        }.bind(this));
-        triggers.on('time_window:set', this.configureLoadTimeWindow.bind(this));  
+        if(this.flag_allow_edits) {
+            triggers.on('edit_window:open', this.editWindow.bind(this));
+            triggers.on('edit_window:changed', this.editWindowChanged.bind(this));
+            triggers.on('edit_window:update', this.updateCollection.bind(this));
+            triggers.on('edit_window:verify update', this.verifyCollectionUpdate.bind(this));
+        }
+        
+        // Time Setter
+        if(this.flag_time_window) {
+            triggers.on('time_window:edit', this.editLoadTimeWindow.bind(this));
+            triggers.on('time_window:choose', function() {
+                if(this.ops['Time Window'].is('custom')) {
+                    triggers.emit('time_window:edit');
+                } else {
+                    triggers.emit('time_window:set');
+    //                triggers.emit('event:load_timeseries');
+                }
+            }.bind(this));
+            triggers.on('time_window:set', this.configureLoadTimeWindow.bind(this));  
+        }
     },
     build: function() {
         this.setOptions();
         triggers.emit('events:load');
     },
     setOptions: function() {
+        var dropdowns = ['Event Type', 'Event'];
         this.ops = {
             'Event Type': new Option({
                 title: "Type",
                 labels: ["All", "Other Type"],
                 ids:    ["All", "Other Type"],
-                default: 0,
                 custom_entries_allowed: true,
                 callback: triggers.emitter('event_type:set')
             }),
@@ -86,49 +110,77 @@ CollectionManager.prototype = {
                 title: "Event",
                 labels: ["none"],
                 ids:    ["none"],
-                default: 0,
                 custom_entries_allowed: true,
-                callback: triggers.emitter('event:set'),
-                edit: function() { triggers.emit('edit_window:open', 'event'); }
-            }),
-            'Time Window': new Option({
-                title: "Time",
-                labels: ["First Day", "First 3 Days", "Whole Collection", "Custom",],
-                ids:    ['1d', '3d', 'all', 'custom'],
-                default: 0,
-                callback: triggers.emitter('time_window:choose'),
-                edit: triggers.emitter('time_window:edit')
-            }),
-            'Time Min': new Option({
-                title: "Time Min",
-                labels: [''],
-                ids: [''],
-                date: new Date(),
-                default: 0,
-                hidden: true,
-                custom_entries_allowed: true
-            }),
-            'Time Max': new Option({
-                title: "Time Max",
-                labels: [''],
-                ids: [''],
-                date: new Date(),
-                default: 0,
-                hidden: true,
-                custom_entries_allowed: true
+                callback: triggers.emitter('event:set')
             })
         };
-        var dropdowns = ['Event Type', 'Event', 'Time Window'];
+        if(this.flag_allow_edits) {
+            this.ops['Event'].edit = triggers.emitter('edit_window:open', 'event');
+        }
         if(this.flag_subset_menu) {
-            var dropdowns = ['Event Type', 'Event', 'Subset', 'Time Window'];
+            dropdowns.push('Subset');
             this.ops['Subset'] = new Option({
                 title: "Subset",
                 labels: ["none"],
                 ids:    ["none"],
-                default: 0,
                 custom_entries_allowed: true,
-                callback: triggers.emitter('subset:set'),
-                edit: function() { triggers.emit('edit_window:open', 'subset'); }
+                callback: triggers.emitter('subset:set')
+            });
+            if(this.flag_allow_edits) {
+                this.ops['Subset'].edit = triggers.emitter('edit_window:open', 'subset');
+            }
+        }
+        if(this.flag_secondary_event) {
+            dropdowns.push('Event2');
+            this.ops['Event2'] = new Option({
+                title: "Second Event",
+                labels: ["none"],
+                ids:    ["none"],
+                custom_entries_allowed: true,
+                callback: triggers.emitter('event2:set')
+            });
+            if(this.flag_allow_edits) {
+                this.ops['Event2'].edit = triggers.emitter('edit_window:open', 'event2');
+            }
+            
+            if(this.flag_subset_menu) {
+                dropdowns.push('Subset2');
+                this.ops['Subset2'] = new Option({
+                    title: "Second Subset",
+                    labels: ["none"],
+                    ids:    ["none"],
+                    custom_entries_allowed: true,
+                    callback: triggers.emitter('subset2:set')
+                });
+                if(this.flag_allow_edits) {
+                    this.ops['Subset2'].edit = triggers.emitter('edit_window:open', 'subset2');
+                }
+            }
+        }
+        if(this.flag_time_window) {
+            dropdowns.push('Time Window');
+            this.ops['Time Window'] = new Option({
+                title: "Time",
+                labels: ["First Day", "First 3 Days", "Whole Collection", "Custom",],
+                ids:    ['1d', '3d', 'all', 'custom'],
+                callback: triggers.emitter('time_window:choose'),
+                edit: triggers.emitter('time_window:edit')
+            });
+            this.ops['Time Min'] = new Option({
+                title: "Time Min",
+                labels: [''],
+                ids: [''],
+                date: new Date(),
+                hidden: true,
+                custom_entries_allowed: true
+            });
+            this.ops['Time Max'] = new Option({
+                title: "Time Max",
+                labels: [''],
+                ids: [''],
+                date: new Date(),
+                hidden: true,
+                custom_entries_allowed: true
             });
         }
         
@@ -211,12 +263,23 @@ CollectionManager.prototype = {
         
         triggers.emit('event:updated', this.event);
     },
+    setEvent2: function () {
+        var event_id = this.ops['Event2'].get();
+        this.event2 = this.events[parseInt(event_id)];
+        
+        triggers.emit('event2:updated', this.event2);
+    },
     setSubset: function() {
         var subset_id = this.ops['Subset'].get();
         this.subset = this.subsets[parseInt(subset_id)];
         
-        
         triggers.emit('subset:updated', this.subset);
+    },
+    setSubset2: function() {
+        var subset_id = this.ops['Subset2'].get();
+        this.subset2 = this.subsets2[parseInt(subset_id)];
+        
+        triggers.emit('subset2:updated', this.subset2);
     },
     updateCollection: function() {
         var fields = {};
@@ -296,7 +359,7 @@ CollectionManager.prototype = {
         // Make the dropdown
         this.app.ops.buildSidebarOption(this.name, 'Event');
         this.app.ops.recordState(true);
-        triggers.emit('event:set', this.event);
+        triggers.emit('event:set');
         
         // Generate Types of Collections
         var types = util.lunique(this.events_arr.map(function(event) { return event['Type']; }));
@@ -336,6 +399,51 @@ CollectionManager.prototype = {
         // Limit the collection selections to the particular type
         triggers.emit('event_type:set');
     },
+    populateEvent2Options: function() { // TODO verify this works and what is strange about it, looks like tooltips have problems
+        var event_op = this.ops['Event2'];
+        var event2_op = this.ops['Event2'];
+        
+        // Generate Collections List
+        event2_op['labels'] = event_op['labels'].slice(0);
+        event2_op['labels'].unshift('<em>None</em>');
+        event2_op['ids'] = event_op['ids'].slice(0);
+        event2_op['ids'].unshift('<em>None</em>');
+        event2_op['available'] = util.range(event2_op['labels'].length);
+        
+        // Find the current collection
+        var cur = event2_op.get();
+        event2_op.default = this.events_arr.reduce(function(candidate, event, i) {
+            if(event['ID'] == cur)
+                return i + 1;
+            return candidate;
+        }, 0);
+        event2_op.set(event2_op['ids'][event2_op.default]);
+        
+        // Make the dropdown
+        this.app.ops.buildSidebarOption(this.name, 'Event2');
+        this.app.ops.recordState(true);
+        triggers.emit('event2:set');
+
+        // Add additional information for events
+        this.app.tooltip.attach('#choose_l' + this.name + '_lEvent2 a', function(d) {
+            console.log(d);
+            var event = this.events_arr[d];
+            event = JSON.parse(JSON.stringify(event));
+
+            ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(quantity) {
+                event[quantity + ' <small>(Distinct)</small>'] = util.formatThousands(event[quantity]);
+                if(event['Distinct' + quantity]) {
+                    event[quantity + ' <small>(Distinct)</small>'] += 
+                        ' <small style="left: 200px; position: absolute">(' +
+                        util.formatThousands(event['Distinct' + quantity]) + ')</small>'; 
+                }
+                delete event[quantity];
+                delete event['Distinct' + quantity];
+            });
+
+            return event;
+        }.bind(this));
+    },
     populateSubsetOptions: function() {
         var subset_names = this.subsets_arr.map(function(subset) {
             return subset.Label;
@@ -344,7 +452,7 @@ CollectionManager.prototype = {
         // Generate Collections List
         subset_op = this.ops['Subset'];
         subset_op['labels'] = subset_names;
-        subset_op['labels'].unshift('None');
+        subset_op['labels'].unshift('<em>None</em>');
         subset_op['labels'].push('- New -');
         subset_op['ids'] = this.subsets_arr.map(function(subset) { return subset['ID']; });
         subset_op['ids'].unshift('_none_');

@@ -3,6 +3,7 @@ global_max_id = 1e20;
 
 var util = {
     formatDate: d3.time.format("%Y-%m-%d %H:%M:%S"),
+    formatDateToMinutes: d3.time.format("%Y-%m-%d %H:%M"),
     formDate: function(d) { return util.formatDate(new Date(new Date(new Date(d).setSeconds(0)).setMilliseconds(0))).replace(' ', 'T'); },
     date2monthstr: d3.time.format("%Y-%m"),
     date: function(str) {
@@ -90,17 +91,24 @@ var util = {
 
 function Counter() {
     this.counts = new d3.map();
+    this.tokens = 0;
+    this.total_count = 0;
 }
 Counter.prototype = {
     has: function(key) {
         return this.counts.get(key) || false;
     },
     set: function(key, val) {
+        //TODO add tokens/total_count setter
         this.counts.set(key, val);
     },
     incr: function(key, add) {
         add = add || 1;
         var val = this.counts.get(key) || 0;
+        if(val == 0) {
+            this.tokens++;
+        };
+        this.total_count += add;
         this.counts.set(key, val + add);
     },
     cmpCount: function(a, b) {
