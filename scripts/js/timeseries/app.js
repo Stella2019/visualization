@@ -119,7 +119,7 @@ function Timeseries () {
     this.collection = new CollectionManager(this);
     this.model = new TimeseriesModel(this);
     this.view = new TimeseriesView(this); // may be considered redundant
-    this.chart = new TimeseriesChart(this, 'timeseries');
+    this.focus = new TimeseriesChart(this, 'focus');
     this.context = new TimeseriesChart(this, 'context');
     this.legend = new TimeseriesLegend(this);
 }
@@ -144,9 +144,7 @@ Timeseries.prototype = {
                 labels: ["Day", "Hour", "10 Minutes", "Minute"],
                 ids:    ["day", "hour", "tenminute", "minute"],
                 default: 2,
-                callback: function () {
-                    pipeline.start('Calculate Timeseries');
-                }
+                callback: triggers.emitter('chart:context time')
             }),
             Shape: new Option({
                 title: "Shape",
@@ -208,7 +206,7 @@ Timeseries.prototype = {
                 custom_entries_allowed: true,
                 parent: '#chart-bottom',
                 render: false,
-                callback: function() { disp.setFocusTime('input_field'); }
+                callback: triggers.emitter('chart:focus time')
             }),
             'Time Max': new Option({
                 title: "End",
@@ -218,7 +216,7 @@ Timeseries.prototype = {
                 custom_entries_allowed: true,
                 parent: '#chart-bottom',
                 render: false,
-                callback: function() { disp.setFocusTime('input_field'); }
+                callback: triggers.emitter('chart:focus time')
             })
         };
         this.ops['Series'] = {
@@ -234,15 +232,15 @@ Timeseries.prototype = {
 //            }),
             'Tweet Types': new Option({
                 title: 'Tweet Types',
-                labels: ['Any', 'Originals', 'Retweets', 'Replies', 'Quotes'],
-                ids:    ["any", "original", "retweet", 'reply', 'quote'],
+                labels: ['Any', 'Split', 'Originals', 'Retweets', 'Replies', 'Quotes'],
+                ids:    ['any', 'split', 'original', 'retweet', 'reply', 'quote'],
                 default: 0,
                 callback: function() { 
 //                    pipeline.start('Prepare Timeseries Data for Chart'); // TODO
                 }
             }),
-            'Quantity': new Option({
-                title: "Quantity",
+            Unit: new Option({
+                title: 'Unit',
                 labels: ['Count of Tweets', 'Count of Distinct', 'Exposure'],
                 ids:    ['count', 'distinct', 'exposure'],
                 default: 0,
@@ -333,6 +331,7 @@ function initialize() {
     
     // Start loading data
     triggers.emit('modal:build');
+    triggers.emit('chart:build');
     triggers.emit('collectionManager:build');
     
 //    pipeline = new Pipeline();

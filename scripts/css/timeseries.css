@@ -18,7 +18,7 @@ body {
     flex: 0 1 auto;
     text-align: center;
 }
-#timeseries-container {
+#focus-container {
     flex: 3 1 200px;
     position: relative;
 }

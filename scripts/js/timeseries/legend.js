@@ -253,9 +253,11 @@ TimeseriesLegend.prototype = {
         legend.showOrHideAll(category);
     },
     cmp: function(a, b) {
-        if(options['Series']['Order'].is('alpha')) {
-            var name1 = a.display_name || a.name || '';
-            var name2 = b.display_name || b.name || '';
+        var ordering = this.app.ops['Series']['Order'];
+        
+        if(ordering == 'alpha') {
+            var name1 = a.label || '';
+            var name2 = b.label || '';
             name1 = name1.toLowerCase();
             name2 = name2.toLowerCase();
             
@@ -265,7 +267,7 @@ TimeseriesLegend.prototype = {
                 return 1;
             return 0
             
-        } else if(options['Series']['Order'].is('volume')) {
+        } else if(ordering == 'volume') {
             a = a.sum;
             b = b.sum;
 
@@ -274,7 +276,7 @@ TimeseriesLegend.prototype = {
             else if(a > b)
                 return -1;
             return 0
-        } else if(options['Series']['Order'].is('type')) {
+        } else if(ordering == 'type') {
             if((a.isKeyword && !b.isKeyword) || (a.isOldKeyword && !b.isKeyword && !b.isOldKeyword))
                 return -1;
             else if((!a.isKeyword && b.isKeyword) || (!a.isOldKeyword && !a.isKeyword && b.isOldKeyword))
