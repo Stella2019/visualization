@@ -6,11 +6,12 @@
     vertical-align: top;
     padding: 0px 7px;
     overflow-y: scroll;
+    margin-bottom: 15px;
 }
 .counter-table {
     width: 100%;
 }
-.counter-table tr:nth-child(even) {
+.counter-table tbody tr:nth-child(odd) {
     background: #EEE;
 }
 .token-count-set td {
@@ -26,6 +27,16 @@
     white-space: nowrap;
 }
 
-.stats-table th, .stats-table td {
-    padding: 0px 2px 2px 2px;
+/* Stats Table */
+
+.stats-table tr:nth-child(odd) {
+    background: #EEE;
+}
+.stat-token {
+    text-align: left;
+    padding: 2px 5px;
+}
+.stat-value {
+    text-align: right;
+    padding: 2px 5px;
 }

@@ -240,29 +240,26 @@ Counter.prototype = {
         var n = 0;
         var weighted_sum = 0;
         var sum_squares = 0;
-        entries.forEach(function(d) {
-            var val =  parseInt(d.key);
+        entries.forEach(function(d) { // Average & Stdev
+            var x =  parseInt(d.key);
             n += d.value;
-            weighted_sum += val * d.value;
-            sum_squares += val * val * d.value;
-//            sum_cubes += val * val * d.value;
-//            sum_quads += val * val * val * d.value;
+            weighted_sum += x * d.value; // value == count in this case
+            sum_squares += x * x * d.value;
+        });
+        var mean = weighted_sum / n;
+        
+        var ave_cube_diff = 0;
+        var ave_quad_diff = 0;
+        entries.forEach(function(d) { // 
+            var x =  parseInt(d.key);
+            ave_cube_diff += Math.pow(x - mean, 3) * d.value / n;
+            ave_quad_diff += Math.pow(x - mean, 4) * d.value / n;
         });
         
-        stats['Mean'] = weighted_sum / n;
+        stats['Mean'] = mean;
         stats['Stdev'] = Math.sqrt((sum_squares / n) - (weighted_sum / n) * (weighted_sum / n));
-        stats['Skewness'] = '?';
-        stats['Kurtosis'] = '?';
-        
-        
-//        stats['min'] = d3.min(entries, function(d) { return d.key; });
-//        
-//        
-//        stats['max'] = d3.max(entries, function(d) { return d.key; });
-//        
-//        var values = this.counts.values();
-//        stats['stdev'] = Math.sqrt(Math.pow(mean, 2) - 
-//            d3.sum(entries, function(d) { return d.key * (d.value * d.value); }));
+        stats['Skewness'] = ave_cube_diff / Math.pow(stats['Stdev'], 3);
+        stats['Kurtosis'] = ave_quad_diff / Math.pow(stats['Stdev'], 4) - 3;
         
         return stats;
     },

@@ -360,15 +360,29 @@ FeatureDistribution.prototype = {
             var rows = stats_table.selectAll('tr')
                 .data(Object.keys(stats))
                 .enter()
-                .append('tr');
+                .append('tr')
+                .style('border-top', function(d) { 
+                    return d == 'Mean' ? '3px solid' : 'none';
+                });
             
-            rows.append('th').html(function(d) { return d; });
+            rows.append('th')
+                .attr('class', 'stat-token')
+                .html(function(d) { return d; });
             
-            rows.append('td').html(function(d) {
-                var val = stats[d];
-                if(val % 1 > 0) val = val.toFixed(1);
-                return val; 
-            })
+            rows.append('td')
+                .attr('class', 'stat-value')
+                .html(function(d) {
+                    var val = stats[d];
+                    if(val == 0) return '0<span style="opacity: 0">.0</span>';
+                    var formatted = util.formatThousands(val);
+                    if(val % 1 > 0) {
+                        formatted += (val % 1).toFixed(1).slice(1);
+                    } else {
+                        formatted += '<span style="opacity: 0">.0</span>';
+                    }
+    //                if(val % 1 > 0) val = val.toFixed(1);
+                    return formatted; 
+                })
         });
         
         // Add tables of counts
