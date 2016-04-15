@@ -248,25 +248,25 @@ Counter.prototype = {
         });
         var mean = weighted_sum / n;
         
-        var ave_cube_diff = 0;
-        var ave_quad_diff = 0;
-        entries.forEach(function(d) { // 
-            var x =  parseInt(d.key);
-            ave_cube_diff += Math.pow(x - mean, 3) * d.value / n;
-            ave_quad_diff += Math.pow(x - mean, 4) * d.value / n;
-        });
+//        var ave_cube_diff = 0;
+//        var ave_quad_diff = 0;
+//        entries.forEach(function(d) { // 
+//            var x =  parseInt(d.key);
+//            ave_cube_diff += Math.pow(x - mean, 3) * d.value / n;
+//            ave_quad_diff += Math.pow(x - mean, 4) * d.value / n;
+//        });
         
         stats['Mean'] = mean;
         stats['Stdev'] = Math.sqrt((sum_squares / n) - (weighted_sum / n) * (weighted_sum / n));
-        stats['Skewness'] = ave_cube_diff / Math.pow(stats['Stdev'], 3);
-        stats['Kurtosis'] = ave_quad_diff / Math.pow(stats['Stdev'], 4) - 3;
+//        stats['Skewness'] = ave_cube_diff / Math.pow(stats['Stdev'], 3);
+//        stats['Kurtosis'] = ave_quad_diff / Math.pow(stats['Stdev'], 4) - 3;
         
         return stats;
     },
 };
 
 function Connection(args) {
-    var permitted_args = ['name', 'url', 'post', 'time_res',
+    var permitted_args = ['name', 'url', 'post', 'resolution', 'time_res',
                           'progress_div', 'progress_text', 'progress_full',
                           'quantity', 'min', 'max',
                           'failure_msg',
@@ -285,10 +285,10 @@ function Connection(args) {
     this.name            = this.name            || 'r' + Math.floor(Math.random() * 1000000 + 1);
     this.url             = this.url             || "";
     this.post            = this.post            || {};
-    this.time_res        = this.time_res        || 1; // 1 Hour
+    this.resolution      = this.resolution || this.time_res        || 1; // 1 Hour
     
     this.progress        = {};
-    this.progress_div    = this.progress_div    || '#timeseries-container';
+    this.progress_div    = this.progress_div    || '#body';
     this.progress_text   = this.progress_text   || "Working";
     this.progress_full   = this.progress_full   || false;
     
@@ -303,14 +303,16 @@ function Connection(args) {
     this.on_finish       = this.on_finish       || function () {};
     
     // Convert min & max to dates if they are inputted as tweets
-    if(typeof(this.min) == 'number') {
-        this.min = util.twitterID2Timestamp(this.min);
-    }
-    this.min.setMinutes(0); // Round to the nearest minute
-    this.min.setSeconds(0); 
-    this.min.setMilliseconds(0); 
-    if(typeof(this.max) == 'number') {
-        this.max = util.twitterID2Timestamp(this.max);
+    if(this.quantity != 'count') {
+        if(typeof(this.min) == 'number') {
+            this.min = util.twitterID2Timestamp(this.min);
+        }
+        this.min.setMinutes(0); // Round to the nearest minute
+        this.min.setSeconds(0); 
+        this.min.setMilliseconds(0); 
+        if(typeof(this.max) == 'number') {
+            this.max = util.twitterID2Timestamp(this.max);
+        }
     }
     
 }
@@ -336,23 +338,35 @@ Connection.prototype = {
         this.chunks = [];
         this.chunk_index = 0;
         
-        // Populate timestamps
-        for(var cur = new Date(this.min); 
-            cur < this.max;
-            cur.setMinutes(cur.getMinutes() + 60 * this.time_res)) {
-            
-            if(this.quantity == 'tweet') {
-                this.chunks.push(util.timestamp2TwitterID(cur));
-            } else {
-                this.chunks.push(util.formatDate(cur));
+        // Get chunk intervals
+        if(this.quantity == 'count') {
+            for(var cur = this.min; 
+                cur < this.max;
+                cur += this.resolution) {
+                
+                this.chunks.push(cur);
             }
-        }
-        
-        // Add last bound (the max)
-        if(this.quantity == 'tweet') {
-            this.chunks.push(util.timestamp2TwitterID(this.max));
+
+            // Add last bound (the max)
+            this.chunks.push(this.max);
         } else {
-            this.chunks.push(util.formatDate(this.max));
+            for(var cur = new Date(this.min); 
+                cur < this.max;
+                cur.setMinutes(cur.getMinutes() + 60 * this.resolution)) {
+
+                if(this.quantity == 'tweet') {
+                    this.chunks.push(util.timestamp2TwitterID(cur));
+                } else {
+                    this.chunks.push(util.formatDate(cur));
+                }
+            }
+
+            // Add last bound (the max)
+            if(this.quantity == 'tweet') {
+                this.chunks.push(util.timestamp2TwitterID(this.max));
+            } else {
+                this.chunks.push(util.formatDate(this.max));
+            }
         }
 
         // Start progress bar
@@ -382,8 +396,14 @@ Connection.prototype = {
             return;
         }
 
-        this.post[this.quantity + '_min'] = this.chunks[this.chunk_index];
+        // Define what it's loading
+        if(this.quantity == 'count') {
+            this.post['limit'] = this.resolution;
+            this.post['offset'] = this.chunks[this.chunk_index];
+        } else {
+            this.post[this.quantity + '_min'] = this.chunks[this.chunk_index];
         this.post[this.quantity + '_max'] = this.chunks[this.chunk_index + 1];
+        }
 
         this.php(this.url, this.post,
                      this.chunk_success.bind(this),

@@ -8,22 +8,16 @@ function FeatureDistribution() {
     this.dataset = new CollectionManager(this, {
         name: 'Dataset', 
         flag_subset_menu: true,
-        flag_secondary_event: true
+        flag_secondary_event: true,
+        flag_time_window: false,
+        flag_allow_edits: false
     });
-//    this.cmp = new CollectionManager(this, {name: 'Comparison', flag_subset_menu: true, flag_allow_edits: false});
     
     this.data = {};
     
-//    this.counters = {
-//        Text: {
-//            'title': 'Stripped Text',
-//        }
-//    }
-//    this.counters_arr = Object.keys(counters).map(function(key) { return this.counters[key]; }, this);
-    
     this.feats = {
-        counter: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount', 'UserVerified'],
-        shown: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount', 'UserVerified'],
+        counter: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserVerified', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount'],
+        shown: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserVerified', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount'],
         simple: ['Text', 'TextStripped', 'Lang', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang',  'UserVerified'],
         time: ['Timestamp', 'UserCreatedAt'],
         link: ['ExpandedURL', 'ExpandedURL Domain', 'MediaURL'],
@@ -32,6 +26,8 @@ function FeatureDistribution() {
         hasStopwords: ['TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'UserDescription Unigrams'],
         user: [],
     }
+    
+    this.tweet_limit = 100000;
     
     // Page Objects
     this.body = [];
@@ -106,13 +102,6 @@ FeatureDistribution.prototype = {
                 ids: ['ratio', 'log-ratio'],
                 callback: triggers.emitter('counters:show')
             }),
-//            Tables: new Option({
-//                title: "Tables",
-//                labels: ['n-grams', 'n-grams & co-occur', 'n-grams, co & tweets', 'n-grams, co & urls', 'All'],
-//                ids:    ['n', 'nc', 'nct', 'ncu', 'nctu'],
-//                default: 1,
-//                callback: triggers.emitter('counters:show')
-//            }),
 //            TF: new Option({
 //                title: "Term Frequency",
 //                labels: ['&sum; Has', '&sum; Count'],
@@ -144,7 +133,6 @@ FeatureDistribution.prototype = {
 //                callback: triggers.emitter('counters:count')
 //            }),
         };
-//        this.ops['Comparison'] = {};
         
         this.ops.init();
     },
@@ -154,7 +142,7 @@ FeatureDistribution.prototype = {
         var post = {
             collection: collection_type,
             collection_id: this.dataset[collection] ? this.dataset[collection].ID : undefined,
-            limit: 1000
+            limit: this.tweet_limit
         };
         if(!post.collection_id) {
             return;
@@ -166,15 +154,26 @@ FeatureDistribution.prototype = {
             tweets: {},
             tweets_arr: []
         };
-        this.connection.php('tweets/get', post,
-                            this.parseNewTweets.bind(this));
+//        this.connection.php('tweets/get', post,
+//                            this.parseNewTweets.bind(this));
+        
+        this.tweet_connection = new Connection({
+            url: 'tweets/get',
+            post: post,
+            quantity: 'count',
+            resolution: 1000,
+            max: this.tweet_limit,
+            on_chunk_finish: this.parseNewTweets.bind(this),
+            on_finish: triggers.emitter('counters:count'),
+        });
+        this.tweet_connection.startStream();
     },
     parseNewTweets: function(file_data) {
         var newTweets;
         try {
             newTweets = JSON.parse(file_data);
         } catch(err) {
-            console.error(setname, file_data);
+            console.error(file_data);
             return;
         }
         
@@ -184,14 +183,16 @@ FeatureDistribution.prototype = {
     
         // Add information to the tweets
         newTweets.forEach(function(tweet) {
-            if(!(tweet in this.data[setname].tweets)) {
+            if(!(tweet.ID in this.data[setname].tweets)) {
                 this.data[setname].tweets[tweet.ID] = tweet;
                 this.data[setname].tweets_arr.push(tweet);
             }
         }, this);
         
         console.log(this.data[setname].tweets_arr.length + ' Tweets Collected');
-        triggers.emit('counters:count');
+        if(this.data[setname].tweets_arr.length % 10000 == 0) {
+            triggers.emit('counters:count');
+        }
     },
     countFeatures: function() {
         var setname = 'event' + this.dataset.event.ID;
@@ -444,7 +445,19 @@ FeatureDistribution.prototype = {
             
             // Fill data
             table.selectAll('tbody .token')
-                .html(function(d) { return d['token']; });
+                .html(function(d) { 
+                    var token = d['token'];
+                    if(feature == 'UserUTCOffset' && token != 'null') {
+                        var hours = parseFloat(token) / 60 / 60;
+                        token = '' + (hours >= 0 ? '+' : '-');
+                        hours = Math.abs(hours);
+                        token +=
+                            (hours < 10 ? '0' : '') +
+                            hours.toFixed(0) + ':' +
+                            (hours * 6 % 6).toFixed(0) + (hours * 60 % 10).toFixed(0);
+                    }
+                    return token; 
+                });
             table.selectAll('tbody .count-primary')
                 .html(function(d) { 
                     if(count_quantity == 'count')

@@ -2,11 +2,19 @@ function CollectionManager(app, args) {
     this.app = app;
     args = args || {};
     this.name = args.name || 'Dataset';
-    this.flag_subset_menu = args.flag_subset_menu || false;
-    this.flag_sidebar = args.flag_sidebar || true;
-    this.flag_allow_edits = args.flag_allow_edits || true;
-    this.flag_secondary_event = args.flag_secondary_event || false;
-    this.flag_time_window = args.flag_time_window || true;
+    
+    this.flag_subset_menu = false;
+    this.flag_sidebar = true;
+    this.flag_allow_edits = true;
+    this.flag_secondary_event = false;
+    this.flag_time_window = true;
+    
+    Object.keys(args).forEach(function(arg) {
+        if(arg.includes('flag')) {
+            this[arg] = args[arg];
+        }
+    }, this);
+
     this.ops = {};
     
     this.event_names;
@@ -60,7 +68,8 @@ CollectionManager.prototype = {
             }
             
             if(this.flag_secondary_event) {
-                triggers.on('events:updated', this.populateEvent2Options.bind(this));
+                triggers.on('events:updated', // or event_type:set or ??
+                            this.populateEvent2Options.bind(this));
                 triggers.on('event2:set', this.setEvent2.bind(this));
 //                triggers.on('event2:updated', this.loadSubsets2.bind(this));
 //                if(this.flag_subset_menu) {
@@ -400,8 +409,8 @@ CollectionManager.prototype = {
         triggers.emit('event_type:set');
     },
     populateEvent2Options: function() { // TODO verify this works and what is strange about it, looks like tooltips have problems
-        var event_op = this.ops['Event2'];
         var event2_op = this.ops['Event2'];
+        var event_op = this.ops['Event'];
         
         // Generate Collections List
         event2_op['labels'] = event_op['labels'].slice(0);
