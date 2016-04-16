@@ -113,6 +113,14 @@ var util = {
             if(match in util.langs) {
                 return util.langs[match];
             }
+        } else if (feature.includes('URL')) {
+            match = '<a href=' + match + ' target="_blank">' + match + '</a>';
+        } else if(feature.includes('Timestamp') || feature.includes('CreatedAt')) {
+            if(typeof(match) == 'string' && !isNaN(match)) {
+                match = util.formatDateToMinutes(new Date(parseInt(match)));
+            } else if(typeof(match) == 'number') {
+                match = util.formatDateToMinutes(new Date(match));
+            }
         }
         return match;
     },
@@ -326,15 +334,19 @@ Counter.prototype = {
         return res;
     },
     purgeBelow: function(minimum, add_rare) { 
+        if(add_rare == undefined) add_rare = true;
         if(minimum) {
             var self = this;
             this.counts.forEach(function(key, val) {
                 if(val < minimum) {
                     this.remove(key);
                     if(add_rare)
-                        self.incr("_rare_", val);
+                        self.incr("<em>rare</em>", val);
                 }
             });
+            var old_count = this.tokens;
+            this.tokens = this.counts.size();
+            return old_count - this.tokens; // number removed
         } else { // Halves the size of the array
             var sorted = this.getSorted();
             minimum = sorted[sorted.length / 2].value + 1;
@@ -343,9 +355,12 @@ Counter.prototype = {
                 if(entry.value < minimum) {
                     this.counts.remove(entry.key);
                     if(add_rare)
-                        this.incr("_rare_", entry.value);
+                        this.incr("<em>rare</em>", entry.value);
                 }
             }, this);
+            var old_count = this.tokens;
+            this.tokens = this.counts.size();
+            return old_count - this.tokens; // number removed
         }
     },
     statistics: function() { // presuming numeric keys

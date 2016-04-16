@@ -18,9 +18,8 @@ function FeatureDistribution() {
     this.feats = {
         counter: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserVerified', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount'],
         shown: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserVerified', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount'],
-        simple: ['Text', 'TextStripped', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserLocation', 'UserUTCOffset', 'UserTimezone',  'UserVerified'],
+        simple: ['Text', 'TextStripped', 'Type', 'Distinct', 'Source', 'ParentID', 'ExpandedURL', 'MediaURL', 'UserID', 'Username', 'Screenname', 'UserLocation', 'UserUTCOffset', 'UserTimezone',  'UserVerified' ],
         time: ['Timestamp', 'UserCreatedAt'],
-        link: ['ExpandedURL', 'ExpandedURL Domain', 'MediaURL'],
         quantity: ['UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount'],
         nominal: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserVerified'],
         hasStopwords: ['TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'UserDescription Unigrams'],
@@ -36,6 +35,7 @@ FeatureDistribution.prototype = {
         this.setTriggers();
         this.buildPage();
         this.setOptions();
+        this.buildLoadButtons();
         
         this.tooltip.init();
         triggers.emit('modal:build');
@@ -47,11 +47,11 @@ FeatureDistribution.prototype = {
     },
     setTriggers: function() {
         
-        triggers.on('event:set', this.loadTweets.bind(this, 'event'));
-        triggers.on('subset:set', this.loadTweets.bind(this, 'subset'));
+        triggers.on('event:set', this.toggleLoadButtons.bind(this, 'event'));
+        triggers.on('subset:set', this.toggleLoadButtons.bind(this, 'subset'));
         
-        triggers.on('event2:set', this.loadTweets.bind(this, 'event2'));
-        triggers.on('subset2:set', this.loadTweets.bind(this, 'subset2'));
+        triggers.on('event2:set', this.toggleLoadButtons.bind(this, 'event2'));
+        triggers.on('subset2:set', this.toggleLoadButtons.bind(this, 'subset2'));
         
         triggers.on('counters:count', this.countFeatures.bind(this));
         triggers.on('counters:show', this.showCounts.bind(this));
@@ -81,8 +81,8 @@ FeatureDistribution.prototype = {
             }),
             'Chunk Size': new Option({
                 title: 'Tweets per Chunk',
-                labels: ['10', '100', '1 000', '10 000', '100 000'],
-                ids:    [ 1e1,   1e2,     1e3,      1e4,       1e5],
+                labels: ['10', '100', '1 000', '5 000'],
+                ids:    [ 1e1,   1e2,     1e3,     5e3],
                 isnumeric: true
             })
         };
@@ -121,12 +121,20 @@ FeatureDistribution.prototype = {
                 title: 'Cmp Quantity',
                 labels: ['Ratio', 'Log Ratio'],
                 ids: ['ratio', 'log-ratio'],
+                default: 1,
                 callback: triggers.emitter('counters:show')
             }),
             'Order': new Option({
                 title: 'Order by',
-                labels: ['Token', 'Freq A', 'Freq B', 'A / B', 'B / A'],
-                ids: ['Token', 'Frequency', 'Frequency B', 'Ratio', '-Ratio'],
+                labels: ['Token', 'Freq A', 'Freq B', 'Ratio', 'Ratio Magnitude'],
+                ids: ['Token', 'Frequency', 'Frequency B', 'Ratio', 'Ratio Magnitude'],
+                default: 1,
+                callback: triggers.emitter('counters:show')
+            }),
+            'Ascending': new Option({
+                title: 'Order Direction',
+                labels: ['Ascending', 'Descending'],
+                ids: ['asc', 'desc'],
                 default: 1,
                 callback: triggers.emitter('counters:show')
             }),
@@ -164,16 +172,77 @@ FeatureDistribution.prototype = {
         
         this.ops.init();
     },
-    loadTweets: function(collection) {
+    buildLoadButtons: function() {
+        // Change names in the dataset selector
+        this.ops.sidebar.select('#choose_lDataset_lEvent .option-label')
+            .html('Event A');
+        this.ops.sidebar.select('#choose_lDataset_lSubset .option-label')
+            .html('Subset A');
+        
+        // Add load buttons
+        this.download_box = this.ops.sidebar.select('#panel_lDownload');
+        
+        var load_buttons = this.download_box.append('div')
+            .attr('class', 'load-button-div')
+            .selectAll('div.load-button-set-div')
+            .data(['', ''])
+            .enter()
+            .append('div')
+            .attr('class', function(d, i) {
+                return 'load-button-set-' + String.fromCharCode(65 + i);
+            });
+        
+        load_buttons.append('button')
+            .attr('class', 'btn btn-xs load-start')
+            .html(function(d, i) { return 'Load Set ' + String.fromCharCode(65 + i); })
+            .on('click', this.loadTweets.bind(this));
+        
+        load_buttons.append('button')
+            .attr('class', 'btn btn-xs load-stop')
+            .html('Stop')
+            .on('click', this.abortLoadTweets.bind(this));
+        
+        load_buttons.append('button')
+            .attr('class', 'btn btn-xs load-clear')
+            .html('Clear')
+            .on('click', this.clearTweets.bind(this));
+    },
+    toggleLoadButtons: function(collection) {
+        // Get name of set
         var cmp = collection.includes('2');
         var collection_type = cmp ? collection.slice(0, -1) : collection;
         var collection_id = this.dataset[collection] ? this.dataset[collection].ID : undefined;
-        if(!collection_id) {
-            return;
+        var setname = collection_type + ' ' + collection_id;
+        if(!collection_id && collection_type == 'subset') { // elevate to event set
+            collection_type = 'event';
+            collection = collection_type + (cmp ? '2' : '');
+            collection_id = this.dataset[collection] ? this.dataset[collection].ID : undefined;
+            setname = collection_type + ' ' + collection_id;
+        }
+        if (!collection_id) {
+            setname = '';
         }
         
+        // Set the buttons to react to that name
+        var button_box = this.download_box.select('.load-button-set-' + (cmp ? 'B' : 'A'))
+            .data([setname]);
+        button_box.select('.load-start')
+            .classed('btn-default', setname ? true : false);
+        button_box.select('.load-stop')
+            .classed('btn-default', setname ? true : false);
+        button_box.select('.load-clear')
+            .classed('btn-default', setname ? true : false);
+    },
+    loadTweets: function(setname) {
+        var args = setname.split(' ');
+        if(args.length < 2) {
+            triggers.emit('alert', 'Unable to load set: ' + setname);
+            return;
+        }
+        var collection_type = args[0];
+        var collection_id = args[1];
+        
         // Initialize the data storage
-        var setname = collection_type + collection_id;
         var data = {};
         var lastTweet = 0;
         if(!(setname in this.data)) {
@@ -196,7 +265,10 @@ FeatureDistribution.prototype = {
         } else {
             // Start where we left off
             data = this.data[setname];
-            lastTweet = new BigNumber(data.tweets_arr[data.tweets_arr.length - 1].ID);
+            lastTweet = data.tweets_arr[data.tweets_arr.length - 1];
+            if(typeof(lastTweet) == 'object')
+                lastTweet = lastTweet.ID;
+            lastTweet = new BigNumber(lastTweet);
         }
         
         // Initialize the connection
@@ -212,12 +284,20 @@ FeatureDistribution.prototype = {
             on_chunk_finish: this.parseNewTweets.bind(this, setname),
 //            on_finish: triggers.emitter('counters:count', setname),
         });
-        if(lastTweet) {
+        if(lastTweet) { // If we are continuing from when we left off
             data.tweet_connection['lastTweet'] = lastTweet;
         }
         
         // Start the connection
         data.tweet_connection.startStream();
+    },
+    abortLoadTweets: function(setname) {
+        this.data[setname].tweet_connection.stop();
+        this.data[setname].tweet_connection.progress.end();
+    },
+    clearTweets: function(setname) {
+        this.abortLoadTweets(setname);
+        delete this.data[setname];
     },
     parseNewTweets: function(setname, file_data) {
         var newTweets;
@@ -225,22 +305,25 @@ FeatureDistribution.prototype = {
             newTweets = JSON.parse(file_data);
         } catch(err) {
             console.error(file_data);
-            return;
+            throw(err);
         }
     
+        $.merge(this.data[setname].tweets_arr, newTweets);
         // Add information to the tweets
-        newTweets.forEach(function(tweet) {
-            if(!(tweet.ID in this.data[setname].tweets)) {
-                this.data[setname].tweets[tweet.ID] = tweet;
-                this.data[setname].tweets_arr.push(tweet);
-            }
-        }, this);
+//        newTweets.forEach(function(tweet) {
+//            if(!(tweet.ID in this.data[setname].tweets)) {
+//                this.data[setname].tweets[tweet.ID] = tweet;
+//                this.data[setname].tweets_arr.push(tweet);
+//            }
+//        }, this);
         
-        console.log(setname + ': ' + util.formatThousands(this.data[setname].tweets_arr.length) + ' Tweets');
+//        console.log(setname + ': ' + util.formatThousands(this.data[setname].tweets_arr.length) + ' Tweets');
         triggers.emit('counters:count', setname);
     },
     countFeatures: function(setname) {
         var set = this.data[setname];
+        
+        if(!set) return;
         
         // Remake counting attributes if they haven't been counted yet
         if(!set.counted || set.counted == set.tweets_arr.length) {
@@ -261,7 +344,7 @@ FeatureDistribution.prototype = {
             var tweet = set.tweets_arr[set.counted];
             set.nTweets += 1;
             
-//            var newTweetText = !set.counter.TextStripped.has(tweet.TextStripped);
+            var newTweetText = !set.counter.TextStripped.has(tweet.TextStripped);
 
             if(repeatTextOK || newTweetText) { // Aggressive redundancy check
                 
@@ -278,30 +361,24 @@ FeatureDistribution.prototype = {
                 // Get time features
                 this.feats.time.forEach(function(feature) {
                     var time = tweet[feature];
-                    time = util.formatDateToMinutes(util.date(time));
+                    time = util.date(time);
+                    time.setSeconds(0);
+                    time.setMilliseconds(0);
+                    time = time.getTime();
                     set.counter[feature].incr(time);
                 });
-                
-                // Links
-                this.feats.link.forEach(function(feature) {
-                    var url = tweet[feature];
-                    if(feature == 'ExpandedURL Domain') {
-                        url = tweet['ExpandedURL'];
-                        if(url) {
-                            url = url.replace(
-                                /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
-                        }
-                    }
-                    if(url) {
-                        url = '<a href=' + url + ' target="_blank">' + url + '</a>';
-                    }
-                    set.counter[feature].incr(url);
-                });
-                
                 // Quantities (no longer binned)
                 this.feats.quantity.forEach(function(feature) {
                     set.counter[feature].incr(tweet[feature]);
                 });
+                
+                // ExpandedURL Domain
+                var url = tweet['ExpandedURL'];
+                if(url) {
+                    url = url.replace(
+                        /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
+                }
+                set.counter['ExpandedURL Domain'].incr(url);
                 
                 // User Description Unigrams
                 var desc = (tweet.UserDescription || '').toLowerCase();
@@ -360,19 +437,53 @@ FeatureDistribution.prototype = {
                     }
                 });
             } // New Tweet or New URL
+            
+            // Remove the tweet object to save memory, will prevent other analysis but necessary for large datasets
+            set.tweets_arr[set.counted] = tweet.ID;
+        }
+        
+        // Purge rare quantities from counters that take a LOT of memory
+        if(set.counted > 1000000) {
+            // Increased
+            set.counter['TextCooccur'].purgeBelow(10);
+            set.counter['TextTrigrams'].purgeBelow(5);
+            set.counter['TextBigrams'].purgeBelow(5);
+            
+            // Old
+            set.counter['UserDescription Unigrams'].purgeBelow(2);
+            set.counter['UserCreatedAt'].purgeBelow(2);
+            
+            // New
+            set.counter['Screenname'].purgeBelow(2);
+            set.counter['Username'].purgeBelow(2);
+            set.counter['UserID'].purgeBelow(2);
+            set.counter['Text'].purgeBelow(2);
+            set.counter['TextStripped'].purgeBelow(2);
+            set.counter['UserLocation'].purgeBelow(2);
+            set.counter['ParentID'].purgeBelow(2);
+            set.counter['TextUnigrams'].purgeBelow(2);
+            set.counter['ExpandedURL'].purgeBelow(2);
+            set.counter['MediaURL'].purgeBelow(2);
+        } else {
+            set.counter['TextCooccur'].purgeBelow(5);
+            set.counter['TextTrigrams'].purgeBelow(2);
+            set.counter['TextBigrams'].purgeBelow(2);
+            
+            set.counter['UserDescription Unigrams'].purgeBelow(2);
+            set.counter['UserCreatedAt'].purgeBelow(2);
         }
         
         triggers.emit('counters:show', setname);
     },
     showCounts: function(setname, comparesetname) { // TODO not sure if these parameters are even used
         // Get appropriate set names
-        setname = 'event' + this.dataset.event.ID;
+        setname = 'event ' + this.dataset.event.ID;
         if(this.dataset.subset) 
-            setname = 'subset' + this.dataset.subset.ID;
+            setname = 'subset ' + this.dataset.subset.ID;
         if(this.dataset.event2) 
-            comparesetname = 'event' + this.dataset.event2.ID;
+            comparesetname = 'event ' + this.dataset.event2.ID;
         if(this.dataset.subset2) 
-            comparesetname = 'subset' + this.dataset.subset2.ID;
+            comparesetname = 'subset ' + this.dataset.subset2.ID;
         
         // Get set and comparison set
         var set = this.data[setname];
@@ -388,12 +499,14 @@ FeatureDistribution.prototype = {
         var cmp;
         if(comparesetname) {
             cmp = this.data[comparesetname];
-            this.desc_b.append('h3')
-                .html('Set B: ' + cmp.label);
-            this.desc_b.append('h4')
-                .html(cmp.collection + ' ' + cmp.id);
-            this.desc_b.append('p')
-                .html('Tweets: ' + cmp.counted);
+            if(cmp) {
+                this.desc_b.append('h3')
+                    .html('Set B: ' + cmp.label);
+                this.desc_b.append('h4')
+                    .html(cmp.collection + ' ' + cmp.id);
+                this.desc_b.append('p')
+                    .html('Tweets: ' + cmp.counted);
+            }
         }
         
         // Get parameters
@@ -402,8 +515,13 @@ FeatureDistribution.prototype = {
         var count_quantity = this.ops['Display']['Count Quantity'].get();
         var cmp_quantity = this.ops['Display']['Cmp Quantity'].get();
         var order_by = this.ops['Display']['Order'].get();
-        var order_sign = order_by == '-Ratio' || order_by == 'Token' ? -1 : 1;
-        if(order_by == '-Ratio') order_by = 'Ratio';
+        var order_sign =  this.ops['Display']['Ascending'].is('asc') ? -1 : 1;
+        if(order_by == 'Token') order_sign *= -1;
+        var abs = false;
+        if(order_by == 'Ratio Magnitude') {
+            abs = true;
+            order_by = 'Log Ratio';
+        }
         
         var table_divs = this.body.selectAll('div.feature-div')
             .data(this.feats.shown);
@@ -427,7 +545,12 @@ FeatureDistribution.prototype = {
         
         table_divs.select('p')
             .html(function(d) {
-                return set.counter[d].tokens + ' tokens';
+                if(cmp) {
+                     return '# Tokens: ' + util.formatThousands(set.counter[d].tokens) + ' in A, ' 
+                         + util.formatThousands(cmp.counter[d].tokens) + ' in B';
+                } else {
+                    return '# Tokens: ' + util.formatThousands(set.counter[d].tokens);
+                }
             });
         
         table_divs.select('table')
@@ -523,7 +646,12 @@ FeatureDistribution.prototype = {
                 if(cmp) {
                     entry['Frequency B'] = cmp.counter[feature].get(token);
                     entry['Percent B']   = entry['Frequency B'] / cmp.nTweets * 100;
-                    entry['Ratio']       = entry['Frequency'] / entry['Frequency B'];
+                    
+                    if(count_quantity == 'freq') {
+                        entry['Ratio']       = (entry['Frequency'] || 1e-5) / (entry['Frequency B'] || 1e-5);
+                    } else {
+                        entry['Ratio']       = (entry['Percent']   || 1e-5) / (entry['Percent B']   || 1e-5);
+                    }
                     entry['Log Ratio']   = Math.log(entry['Ratio']);
                 }
                 
@@ -532,6 +660,10 @@ FeatureDistribution.prototype = {
             
             // Sort Entries
             entries.sort(function(a, b) {
+                if(abs) {
+                    if(Math.abs(a[order_by]) < Math.abs(b[order_by])) return  1 * order_sign;
+                    if(Math.abs(a[order_by]) > Math.abs(b[order_by])) return -1 * order_sign;
+                }
                 if(a[order_by] < b[order_by]) return  1 * order_sign;
                 if(a[order_by] > b[order_by]) return -1 * order_sign;
                 if(a['Token']  < b['Token'] ) return  1 * order_sign;
@@ -548,10 +680,11 @@ FeatureDistribution.prototype = {
                     entry['Percent B']   = entry['Percent B'].toFixed(1);
                     
                     var neg_ratio = entry['Ratio'] < 1;
-                    if(entry['Ratio'] == Infinity) {
+                    if(entry['Ratio'] == Infinity || entry['Ratio'] > 1e4) {
                         entry['Ratio'] = '&infin;' 
                         entry['Log Ratio'] = '&infin;' 
-                    } else if(entry['Ratio'] == 0) {
+                    } else if(entry['Ratio'] == 0 || entry['Ratio'] < 1e-4) {
+                        entry['Ratio'] = 0;
                         entry['Log Ratio'] = '-&infin;' 
                     } else {
                         entry['Ratio'] = entry['Ratio'].toFixed(1);
@@ -572,7 +705,7 @@ FeatureDistribution.prototype = {
                 .enter()
                 .append('tr')
                 .attr('class', function(d, i) { return 'row' + i + ' token-freq-set'; });
-//                .call(function(a, b) {
+//                .call(function(a, b) { // TODO attach tooltips
 //                    console.log(this, a, b);
 //                });
 
@@ -610,7 +743,6 @@ FeatureDistribution.prototype = {
             
             table_divs.selectAll('tbody .freq-secondary')
                 .html(function(d) { 
-//                console.log(d);
                     if(count_quantity == 'freq')
                         return d['Frequency B']; 
                     return d['Percent B']; 

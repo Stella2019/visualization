@@ -57,3 +57,10 @@
     width: 50%;
     padding: 20px;
 }
+
+.load-button-div {
+    text-align: center;
+}
+.load-button-div button {
+    margin: 2px;
+}

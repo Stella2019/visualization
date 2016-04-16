@@ -751,7 +751,7 @@ Options.prototype = {
         
     },
     buildSidebar: function() {
-        var sidebar = d3.select('body').append('div')
+        this.sidebar = d3.select('body').append('div')
             .attr('class', 'sidebar sidebar-pinned');
         
         // Pin or Autohide
@@ -766,7 +766,7 @@ Options.prototype = {
                 })
         };
         
-        sidebar.append('button')
+        this.sidebar.append('button')
             .data([false])
             .attr({
                 id: 'toggle_sidebar',
@@ -786,7 +786,7 @@ Options.prototype = {
         pin_style('#toggle_sidebar');
         
         // Pages
-        var pages_panel = sidebar.append('div')
+        var pages_panel = this.sidebar.append('div')
             .attr('id', 'panel_pages')
             .attr('class', 'sidepanel');
         
@@ -806,7 +806,7 @@ Options.prototype = {
             label: "<span class='text-danger'>Coding</span> (not working)",
             url: "coding.html"
         },{
-            label: "<span class='text-warning'>Features</span> (in progress)",
+            label: "Features",
             url: "features.html"
         }]
             
@@ -833,7 +833,7 @@ Options.prototype = {
         if(!this.panels) return;
         
         this.panels.forEach(function(panel_name) {
-            var panel_div = sidebar.append('div')
+            var panel_div = this.sidebar.append('div')
                 .attr('id', 'panel_' + util.simplify(panel_name))
                 .attr('class', 'sidepanel');
 
@@ -884,10 +884,8 @@ Options.prototype = {
         var list_open = container.select('button.dropdown-toggle')
         if(!list_open[0][0]) {
             container.append('div')
-                .html(option.title)
-                .style('display', 'inline-block')
-                .style('margin-left', '5px')
-                .style('margin-right', '5px');
+                .attr('class', 'option-label')
+                .html(option.title);
             
             // Add an edit button if there is an edit function
             if('edit' in option) {
