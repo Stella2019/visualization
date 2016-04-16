@@ -1,5 +1,5 @@
 
-.counter_table_container {
+.feature-div {
     display: inline-block;
     width: 300px;
     max-height: 400px;
@@ -8,13 +8,13 @@
     overflow-y: scroll;
     margin-bottom: 15px;
 }
-.counter-table {
+.token-freq-table {
     width: 100%;
 }
-.counter-table tbody tr:nth-child(odd) {
+.token-freq-table tbody tr:nth-child(odd) {
     background: #EEE;
 }
-.token-count-set td {
+.token-freq-set td, .token-freq-set th {
     padding: 1px 3px;
 }
 .token {
@@ -22,9 +22,15 @@
     word-wrap: break-word;
     word-break: break-word;
 }
-.count, .count-cmp {
+.freq, .freq-cmp {
     text-align: right;
     white-space: nowrap;
+}
+.cell-hidden {
+    display: none;
+}
+.ratio-neg {
+    color: crimson;
 }
 
 /* Stats Table */
@@ -39,4 +45,15 @@
 .stat-value {
     text-align: right;
     padding: 2px 5px;
+}
+
+/* Description Boxes */
+.description_box {
+    
+}
+
+.description {
+    display: inline-block;
+    width: 50%;
+    padding: 20px;
 }

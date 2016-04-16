@@ -39,6 +39,10 @@
     // Add conditionals
     $conds = array();
     $conds[] = "TweetSet.$collection=$collection_id ";
+    if(isset($_POST["tweet_min"]))
+        $conds[] = "Tweet.ID >= " . $_REQUEST["tweet_min"] . " ";
+    if(isset($_POST["tweet_max"]))
+        $conds[] = "Tweet.ID < " . $_REQUEST["tweet_max"] . " ";
     if(isset($_POST["time_min"]))
         $conds[] = "Tweet.Timestamp >= '" . $_REQUEST["time_min"] . "'";
     if(isset($_POST["time_max"]))

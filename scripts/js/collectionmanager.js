@@ -435,7 +435,6 @@ CollectionManager.prototype = {
 
         // Add additional information for events
         this.app.tooltip.attach('#choose_l' + this.name + '_lEvent2 a', function(d) {
-            console.log(d);
             var event = this.events_arr[d];
             event = JSON.parse(JSON.stringify(event));
 

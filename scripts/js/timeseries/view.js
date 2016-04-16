@@ -10,7 +10,6 @@ TimeseriesView.prototype = {
     },
     setTriggers: function() {
         triggers.on('event_updated', this.setTitle.bind(this));
-//        triggers.on('page:resize', );
         $(window).on('resize', this.setChartHeights.bind(this));
         triggers.on('chart:plan resize', this.setChartHeights.bind(this));
         triggers.on('chart:context time', this.setContextTime.bind(this));
@@ -75,6 +74,120 @@ TimeseriesView.prototype = {
         
         // Send an event
         triggers.emit('chart:resize', [focus, context]);
+    },
+    buildTimeWindow: function() { // Legacy, not actually used right now
+        var container = d3.select(".ui-bottom").append("div")
+            .style({width: '500px', display: 'inline-table'})
+            .attr("class", "text-center input-group input-group-sm");
+//            .html("<strong>Time Window:</strong> ");
+        
+        
+        var right_buttons = container.append('div')
+            .attr('id', 'choices_time_right_buttons')
+            .attr('class', 'input-group-btn');
+        
+        right_buttons.append('button')
+            .attr({class: 'btn btn-default'})
+            .html('<span class="glyphicon glyphicon-step-backward"></span>')
+            .on('click', function(d) {
+                disp.setFocusTime('button_time_to_start');
+            });
+//        right_buttons.append('button')
+//            .attr({class: 'btn btn-default'})
+//            .html('<span class="glyphicon glyphicon-backward"></span>')
+//            .on('click', function(d) {
+//                setFocusTime('button_time_minus_6h');
+//            });
+//        right_buttons.append('button')
+//            .attr({class: 'btn btn-default'})
+//            .html('<span class="glyphicon glyphicon-triangle-left"></span>')
+//            .on('click', function(d) {
+//                setFocusTime('button_time_minus_1h');
+//            });
+        
+        container.append("input")
+//            .style('width', '140px') // add 40 px for timezones
+            .attr("id", "choose_lView_lTime_Min")
+            .attr("class", "text-center form-control");
+        container.append("span")
+            .attr("class", "input-group-addon")
+            .text("  to  ");
+        container.append("input")
+//            .style('width', '140px')
+            .attr("id", "choose_lView_lTime_Max")
+            .attr("class", "text-center form-control");
+        
+        var left_buttons = container.append('div')
+            .attr('id', 'choices_time_left_buttons')
+            .attr('class', 'input-group-btn');
+        
+//        left_buttons.append('button')
+//            .attr({class: 'btn btn-default'})
+//            .html('<span class="glyphicon glyphicon-triangle-right"></span>')
+//            .on('click', function(d) {
+//                setFocusTime('button_time_plus_1h');
+//            });
+//        left_buttons.append('button')
+//            .attr({class: 'btn btn-default'})
+//            .html('<span class="glyphicon glyphicon-forward"></span>')
+//            .on('click', function(d) {
+//                setFocusTime('button_time_plus_6h');
+//            });
+        left_buttons.append('button')
+            .attr({class: 'btn btn-default'})
+            .html('<span class="glyphicon glyphicon-step-forward"></span>')
+            .on('click', function(d) {
+                disp.setFocusTime('button_time_to_end');
+            });
+        
+        var startDateTextBox = $('#choose_time_min');
+        var endDateTextBox = $('#choose_time_max');
+        
+        startDateTextBox.datetimepicker({ 
+            dateFormat: 'yy-mm-dd',
+            timeFormat: 'HH:mm', // HH:mm z for timezone
+            onClose: function(dateText, inst) {
+                if (endDateTextBox.val() != '') {
+                    var testStartDate = startDateTextBox.datetimepicker('getDate');
+                    var testEndDate = endDateTextBox.datetimepicker('getDate');
+                    if (testStartDate > testEndDate)
+                        endDateTextBox.datetimepicker('setDate', testStartDate);
+                } else {
+                    endDateTextBox.val(dateText);
+                }
+            },
+            onSelect: function (selectedDateTime){
+                var date = startDateTextBox.datetimepicker('getDate');
+                endDateTextBox.datetimepicker('option', 'minDate', date);
+                endDateTextBox.datetimepicker('option', 'minDate', date);
+                options.time_min.set(date);
+                
+                options.time_min.callback();
+            }
+        });
+        endDateTextBox.datetimepicker({
+            dateFormat: 'yy-mm-dd',
+            timeFormat: 'HH:mm',
+            onClose: function(dateText, inst) {
+                if (startDateTextBox.val() != '') {
+                    var testStartDate = startDateTextBox.datetimepicker('getDate');
+                    var testEndDate = endDateTextBox.datetimepicker('getDate');
+                    if (testStartDate > testEndDate)
+                        startDateTextBox.datetimepicker('setDate', testEndDate);
+                } else {
+                    startDateTextBox.val(dateText);
+                }
+            },
+            onSelect: function (selectedDateTime){
+                var date = endDateTextBox.datetimepicker('getDate');
+                endDateTextBox.datetimepicker('option', 'maxDate', date);
+                options.time_max.set(date);
+                
+                options.time_max.callback();
+            }
+        });
+        
+//        d3.selectAll('#ui-datepicker-div button').classed('btn btn-default', true);
     },
     setContextTime: function() {
         // Establish the maximum and minimum time of the data series

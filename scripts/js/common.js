@@ -87,6 +87,138 @@ var util = {
             return 0;
         }, 0);
     },
+    featureMatchName: function(feature, match) {
+        if(match == undefined || match == 'null') 
+            return '<em>None</em>'
+        if(feature.includes('UTCOffset')) {
+            var hours = parseFloat(match) / 60 / 60;
+            match = '' + (hours >= 0 ? '+' : '&minus;');
+            hours = Math.abs(hours);
+            match +=
+                (hours < 10 ? '0' : '') +
+                hours.toFixed(0) + ':' +
+                (hours * 6 % 6).toFixed(0) + (hours * 60 % 10).toFixed(0);
+            
+            // Have to figure this out relative to time zones
+//            if(match == '-08:00') match += ' <small>US Pacific</small>';
+//            if(match == '-07:00') match += ' <small>US Mountain</small>';
+//            if(match == '-06:00') match += ' <small>US Central & Mexico</small>';
+//            if(match == '-05:00') match += ' <small>US Eastern & Andes</small>';
+//            if(match == '-03:00') match += ' <small>Brazil, Argentina</small>';
+//            if(match == '+00:00') match += ' <small>United Kingdom</small>';
+//            if(match == '+01:00') match += ' <small>Europe</small>';
+//            if(match == '+02:00') match += ' <small>Eastern Europe</small>';
+//            if(match == '+03:00') match += ' <small>Russia</small>';
+        } else if(feature.includes('Lang')) {
+            if(match in util.langs) {
+                return util.langs[match];
+            }
+        }
+        return match;
+    },
+    langs: {
+        'fr': 'French',
+        'en': 'English',
+        'ar': 'Arabic',
+        'ja': 'Japanese',
+        'es': 'Spanish',
+        'de': 'German',
+        'it': 'Italian',
+        'id': 'Indonesian',
+        'pt': 'Portuguese',
+        'ko': 'Korean',
+        'tr': 'Turkish',
+        'ru': 'Russian',
+        'nl': 'Dutch',
+        'fil': 'Filipino',
+        'msa': 'Malay',
+        'zh-tw': 'Traditional Chinese',
+        'zh-cn': 'Simplified Chinese',
+        'hi': 'Hindi',
+        'no': 'Norwegian',
+        'sv': 'Swedish',
+        'fi': 'Finnish',
+        'da': 'Danish',
+        'pl': 'Polish',
+        'hu': 'Hungarian',
+        'fa': 'Persian',
+        'he': 'Hebrew',
+        'th': 'Thai',
+        'uk': 'Ukrainian',
+        'cs': 'Czech',
+        'ro': 'Romanian',
+        'en-gb': 'British English',
+        'vi': 'Vietnamese',
+        'bn': 'Bengali',
+        'und': '<em>Undetermined</em>',
+        // End languages that are officially supported by Twitter 2016-04-15
+        // Start languages published in https://blog.twitter.com/2015/evaluating-language-identification-performance
+        'am': 'Amharic',
+        'bg': 'Bulgarian', 
+        'bo': 'Tibetan', 
+        'bs': 'Bosnian', 
+        'ca': 'Catalan', 
+        'ckb': 'Sorani Kurdish', 
+        'cy': 'Welsh', 
+        'dv': 'Maldivian', 
+        'el': 'Greek',  
+        'et': 'Estonian', 
+        'eu': 'Basque', 
+        'gu': 'Gujarati', 
+        'hi-Latn': 'Latinized Hindi', 
+        'hr': 'Croatian', 
+        'ht': 'Haitian Creole', 
+        'hy': 'Armenian', 
+        'is': 'Icelandic',
+        'ka': 'Georgian', 
+        'km': 'Khmer', 
+        'kn': 'Kannada', 
+        'lo': 'Lao', 
+        'lt': 'Lithuanian', 
+        'lv': 'Latvian', 
+        'ml': 'Malayalam', 
+        'mr': 'Marathi', 
+        'my': 'Burmese', 
+        'ne': 'Nepali',
+        'pa': 'Panjabi', 
+        'ps': 'Pashto', 
+        'sd': 'Sindhi', 
+        'si': 'Sinhala', 
+        'sk': 'Slovak', 
+        'sl': 'Slovenian', 
+        'sr': 'Serbian', 
+        'ta': 'Tamil', 
+        'te': 'Telugu', 
+        'tl': 'Tagalog', 
+        'ug': 'Uyghur',  
+        'ur': 'Urdu', 
+        // Start manually added because they appeared but weren't in official documentation
+        // I think in = indian which of course is not a language
+        'es-mx': 'Mexican Spanish',
+        'en-au': 'Australian Spanish',
+        'ga': 'Irish', // Gaelic, but Gaelic is actually gd
+        'gl': 'Galician',
+        'fr-ca': 'Quebecois',
+        'pt-pt': 'Portuguese Portuguese',
+        'nb': 'Norwegian Bokmal',
+        'select lan': 'Non-specified by User',
+        'sélectionn': 'Non-specified by User 2',
+        'in': 'Indonesian 2', // Old annotation
+        'iw': 'Hebrew', // Old annotation
+        'zh': 'Chinese',
+        'en-in': 'Indian English',
+        'ms': 'Malay',
+        'mn': 'Mongolian',
+        'en-us': 'United States English',
+        'af': 'Afrikaans',
+        'zh-hant': 'Traditional Chinese 2',
+        'zh-hans': 'Simplified Chinese 2',
+        'zh-hk': 'Hong-Kong Chinese',
+        'lolc': 'LOLCat (Synthetic)',
+        'xx-lc': 'LOLCat (Synthetic) 2', // I think
+        'pt-br': 'Brazilian Portuguese',
+        // Additional chinese codes may be listed here: https://www.w3.org/International/articles/bcp47/
+    }
 }
 
 function Counter() {
@@ -297,6 +429,7 @@ function Connection(args) {
     this.chunk_index     = 0;
     this.min             = this.min             || 0;
     this.max             = this.max             || new Date();
+    this.lastTweet       = 0;
     
     this.failure_msg     = this.failure_msg     || 'Problem with data stream';
     this.on_chunk_finish = this.on_chunk_finish || function () {};
@@ -399,7 +532,10 @@ Connection.prototype = {
         // Define what it's loading
         if(this.quantity == 'count') {
             this.post['limit'] = this.resolution;
-            this.post['offset'] = this.chunks[this.chunk_index];
+            if(this.lastTweet) {
+                this.post['tweet_min'] = this.lastTweet.add(1).toString();
+            }
+//            this.post['offset'] = this.chunks[this.chunk_index];
         } else {
             this.post[this.quantity + '_min'] = this.chunks[this.chunk_index];
         this.post[this.quantity + '_max'] = this.chunks[this.chunk_index + 1];
@@ -421,6 +557,11 @@ Connection.prototype = {
         // Update the progress bar
         this.progress.update(this.chunk_index + 1, this.progress_text);
 
+        if(this.quantity == 'count')  { // Makes a LOT of assumptions about the data
+            var lastTweetStart = file_data.lastIndexOf('"ID":"');
+            if(lastTweetStart >= 0)
+                this.lastTweet = new BigNumber(file_data.slice(lastTweetStart + 6, lastTweetStart + 24));
+        }
         this.on_chunk_finish(file_data);
 
         // Start loading the next batch
@@ -428,7 +569,7 @@ Connection.prototype = {
         this.startChunk();
     },
     chunk_failure: function (a, b, c) {
-        console.log(a, b, c);
+        console.error(a, b, c);
         triggers.emit('alert', this.failure_msg);
         this.progress.end();
     },
