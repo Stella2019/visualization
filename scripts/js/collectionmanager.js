@@ -292,7 +292,8 @@ CollectionManager.prototype = {
     },
     updateCollection: function() {
         var fields = {};
-        $("#edit_form").serializeArray().forEach(function(x) { console.log(x); fields[x.name] = x.value; });
+        $("#edit_form").serializeArray().forEach(function(x) { fields[x.name] = x.value; });
+        console.log(fields);
         
         this.app.connection.php('collection/update', fields, triggers.emitter('edit_window:verify update')); // add a callback
     },
@@ -738,7 +739,7 @@ CollectionManager.prototype = {
         Object.keys(info).forEach(function(key) {
             var value = info[key];
             if (!this.edit_window_fields.omitted.includes(key) && 
-               (typeof(value) == 'string' || typeof(value) == 'number' || value instanceof Date) ) {
+               (typeof(value) == 'string' || typeof(value) == 'number' || value == null || value instanceof Date) ) {
                 keys.push(key);
             }
         }, this);

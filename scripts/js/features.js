@@ -54,6 +54,7 @@ FeatureDistribution.prototype = {
         triggers.on('subset2:set', this.toggleLoadButtons.bind(this, 'subset2'));
         
         triggers.on('counters:count', this.countFeatures.bind(this));
+        triggers.on('counters:place', this.placeCounts.bind(this));
         triggers.on('counters:show', this.showCounts.bind(this));
     },
     buildPage: function() {
@@ -92,7 +93,7 @@ FeatureDistribution.prototype = {
                 labels: ['10', '20', '100', '200', '1000'],
                 ids:    ['10', '20', '100', '200', '1000'],
                 default: 1,
-                callback: triggers.emitter('counters:show')
+                callback: triggers.emitter('counters:place')
             }),
             Filter: new Option({
                 title: "Filter",
@@ -109,13 +110,13 @@ FeatureDistribution.prototype = {
                 ids:    ['false', 'true'],
                 default: 1,
                 type: 'toggle',
-                callback: triggers.emitter('counters:show')
+                callback: triggers.emitter('counters:place')
             }),
             'Count Quantity': new Option({
                 title: 'Count Quantity',
                 labels: ['Count', 'Percent'],
                 ids: ['freq', 'percent'],
-                callback: triggers.emitter('counters:show')
+                callback: triggers.emitter('counters:place')
             }),
             'Cmp Quantity': new Option({
                 title: 'Cmp Quantity',
@@ -129,14 +130,14 @@ FeatureDistribution.prototype = {
                 labels: ['Token', 'Freq A', 'Freq B', 'Ratio', 'Ratio Magnitude'],
                 ids: ['Token', 'Frequency', 'Frequency B', 'Ratio', 'Ratio Magnitude'],
                 default: 1,
-                callback: triggers.emitter('counters:show')
+                callback: triggers.emitter('counters:place')
             }),
             'Ascending': new Option({
                 title: 'Order Direction',
                 labels: ['Ascending', 'Descending'],
                 ids: ['asc', 'desc'],
                 default: 1,
-                callback: triggers.emitter('counters:show')
+                callback: triggers.emitter('counters:place')
             }),
 //            TF: new Option({
 //                title: "Term Frequency",
@@ -342,11 +343,11 @@ FeatureDistribution.prototype = {
         var repeatTextOK = this.ops['Display']['Filter'].is('none');
         for(; set.counted < set.tweets_arr.length; set.counted++) {
             var tweet = set.tweets_arr[set.counted];
-            set.nTweets += 1;
             
             var newTweetText = !set.counter.TextStripped.has(tweet.TextStripped);
 
             if(repeatTextOK || newTweetText) { // Aggressive redundancy check
+                set.nTweets += 1;
                 
                 // Count usual features
                 this.feats.simple.forEach(function(feature) {
@@ -355,7 +356,8 @@ FeatureDistribution.prototype = {
                 
                 // Languages
                 this.feats.lang.forEach(function(feature) {
-                    set.counter[feature].incr(util.featureMatchName('Lang', tweet[feature].toLowerCase()));
+                    var lang = tweet[feature] || '';
+                    set.counter[feature].incr(util.featureMatchName('Lang', lang.toLowerCase()));
                 });
                 
                 // Get time features
@@ -451,7 +453,6 @@ FeatureDistribution.prototype = {
             
             // Old
             set.counter['UserDescription Unigrams'].purgeBelow(2);
-            set.counter['UserCreatedAt'].purgeBelow(2);
             
             // New
             set.counter['Screenname'].purgeBelow(2);
@@ -470,20 +471,16 @@ FeatureDistribution.prototype = {
             set.counter['TextBigrams'].purgeBelow(2);
             
             set.counter['UserDescription Unigrams'].purgeBelow(2);
-            set.counter['UserCreatedAt'].purgeBelow(2);
         }
         
-        triggers.emit('counters:show', setname);
+        triggers.emit('counters:place', setname);
     },
-    showCounts: function(setname, comparesetname) { // TODO not sure if these parameters are even used
+    placeCounts: function() {
         // Get appropriate set names
-        setname = 'event ' + this.dataset.event.ID;
-        if(this.dataset.subset) 
-            setname = 'subset ' + this.dataset.subset.ID;
-        if(this.dataset.event2) 
-            comparesetname = 'event ' + this.dataset.event2.ID;
-        if(this.dataset.subset2) 
-            comparesetname = 'subset ' + this.dataset.subset2.ID;
+        var setname = this.dataset.subset ? 'subset ' + this.dataset.subset.ID : 
+                                            'event '  + this.dataset.event.ID;
+        var comparesetname = this.dataset.event2  ? 'event '  + this.dataset.event2.ID :
+                             this.dataset.subset2 ? 'subset ' + this.dataset.subset2.ID : '';
         
         // Get set and comparison set
         var set = this.data[setname];
@@ -513,7 +510,6 @@ FeatureDistribution.prototype = {
         var n = parseInt(this.ops['Display']['TopX'].get());
         var excludeStopwords = this.ops['Display']['Exclude Stopwords'].is('true');
         var count_quantity = this.ops['Display']['Count Quantity'].get();
-        var cmp_quantity = this.ops['Display']['Cmp Quantity'].get();
         var order_by = this.ops['Display']['Order'].get();
         var order_sign =  this.ops['Display']['Ascending'].is('asc') ? -1 : 1;
         if(order_by == 'Token') order_sign *= -1;
@@ -591,12 +587,15 @@ FeatureDistribution.prototype = {
                     }
     //                if(val % 1 > 0) val = val.toFixed(1);
                     return formatted; 
-                })
+                });
+            
+            // TODO cmp statistics
         });
         
         // Add tables of counts
         this.feats.nominal.forEach(function(feature) {
-            var table = table_divs.select('.table-' + util.simplify(feature) + ' table')
+            var table_id = '.table-' + util.simplify(feature);
+            var table = table_divs.select(table_id + ' table')
                 .classed('stats-table', false)
                 .classed('token-freq-table', true);
             
@@ -655,8 +654,60 @@ FeatureDistribution.prototype = {
                     entry['Log Ratio']   = Math.log(entry['Ratio']);
                 }
                 
+                if(['TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur'].includes(feature)) {
+                    var words = token.split(' ');
+                    var found = false;
+                    var partially_found = false;
+                    
+                    // Check all keywords that they line up
+                    set.event.Keywords.forEach(function(keyword) { 
+                        var keyword_parts = keyword.split(' ');
+                        var words_found = words.filter(function(word) {
+                            return keyword_parts.includes(word);
+                        });
+                        found |= words.length == words_found.length && words.length == keyword_parts.length;
+                        partially_found |= words_found.length > 0;
+//                        console.log(words_found.length, keyword_parts.length, words_found.length == keyword_parts.length, words_found.length > 0, words, words_found, keyword_parts);
+                    });
+                    
+                    // If perfect match return, otherwise check old keywords
+                    if(found) {
+                        entry['In Capture Keywords'] = 'Final Keyword';
+                    } else {
+                        set.event.OldKeywords.forEach(function(keyword) { 
+                            var keyword_parts = keyword.split(' ');
+                            var words_found = words.filter(function(word) {
+                                return keyword_parts.includes(word);
+                            });
+                            
+                            found |= words.length == words_found.length && words.length == keyword_parts.length;
+                            partially_found |= words_found.length > 0;
+//                            var matches = words_found.length / keyword_parts.length;
+//                            if(matches == 1) found = true;
+//                            if(matches > 0) partially_found = true;
+                        });
+                        
+                        if(found) {
+                            entry['In Capture Keywords'] = 'Early Keyword';
+                        } else if(partially_found) {
+                            entry['In Capture Keywords'] = 'In Parts of Keyword';
+                        }
+                    }
+                    
+                    // TODO check subsets
+                } else if(feature != 'Text') { // Check subsets
+                    this.dataset.subsets_arr.forEach(function(subset) {
+                        if(subset.Feature.replace('.','') == feature) {
+                            if(subset.Match == token) {
+                                entry['In Generated Subset'] = subset.ID;
+                            }
+                        }
+                    })
+                }
+                
+                
                 return entry;
-            });
+            }, this);
             
             // Sort Entries
             entries.sort(function(a, b) {
@@ -698,17 +749,16 @@ FeatureDistribution.prototype = {
             });
             
             // Add rows
-            var rows = table.selectAll('tbody')
+            var rows = table.select('tbody')
                 .selectAll('tr.token-freq-set');
             
             var rows_new = rows.data(entries)
                 .enter()
                 .append('tr')
-                .attr('class', function(d, i) { return 'row' + i + ' token-freq-set'; });
-//                .call(function(a, b) { // TODO attach tooltips
-//                    console.log(this, a, b);
-//                });
-
+                .attr('class', function(d, i) { 
+                    return 'row' + i + ' row-polar' + (i % 2) + ' token-freq-set';
+                });
+            
             rows_new.append('td')
                 .attr('class', 'token');
             rows_new.append('td')
@@ -722,8 +772,33 @@ FeatureDistribution.prototype = {
             rows.select('td.token');
             rows.select('td.freq-primary');
             rows.select('td.freq-secondary');
-            rows.select('td.freq-cmp');            
+            rows.select('td.freq-cmp');
+            
+            // Attach tooltip
+            this.tooltip.attach(table_id + ' .token-freq-set', function(d) { return d; });
         }, this);
+        
+        triggers.emit('counters:show');
+    },
+    showCounts: function() {
+        var table_divs = this.body.selectAll('div.feature-div');
+        var count_quantity = this.ops['Display']['Count Quantity'].get();
+        var cmp_quantity = this.ops['Display']['Cmp Quantity'].get();
+        var comparesetname = this.dataset.event2  ? 'event '  + this.dataset.event2.ID :
+                             this.dataset.subset2 ? 'subset ' + this.dataset.subset2.ID : '';
+        var cmp = comparesetname ? this.data[comparesetname] : '';
+        
+        // Set classes
+        table_divs.selectAll('.token-freq-set')
+            .classed('token-keyword', function(d) {
+                return d['In Capture Keywords'] && d['In Capture Keywords'] == 'Final Keyword';
+            })
+            .classed('token-partial-keyword', function(d) {
+                return d['In Capture Keywords'] && d['In Capture Keywords'] != 'Final Keyword';
+            })
+            .classed('token-subset', function(d) {
+                return d['In Generated Subset'];
+            });
         
         // Populate data
         table_divs.selectAll('tbody .token')

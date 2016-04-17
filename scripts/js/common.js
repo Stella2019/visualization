@@ -341,7 +341,7 @@ Counter.prototype = {
                 if(val < minimum) {
                     this.remove(key);
                     if(add_rare)
-                        self.incr("<em>rare</em>", val);
+                        self.incr("<em>Rare</em>", val);
                 }
             });
             var old_count = this.tokens;
@@ -355,7 +355,7 @@ Counter.prototype = {
                 if(entry.value < minimum) {
                     this.counts.remove(entry.key);
                     if(add_rare)
-                        this.incr("<em>rare</em>", entry.value);
+                        this.incr("<em>Rare</em>", entry.value);
                 }
             }, this);
             var old_count = this.tokens;

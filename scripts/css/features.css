@@ -11,9 +11,9 @@
 .token-freq-table {
     width: 100%;
 }
-.token-freq-table tbody tr:nth-child(odd) {
-    background: #EEE;
-}
+/*.token-freq-table tbody tr:nth-child(odd) {*/
+/*    background: #EEE;*/
+/*}*/
 .token-freq-set td, .token-freq-set th {
     padding: 1px 3px;
 }
@@ -31,6 +31,23 @@
 }
 .ratio-neg {
     color: crimson;
+}
+
+/* Row Backgrounds */
+.row-polar0 {
+    background: #EEE;
+}
+.row-polar1 {
+    background: #FFF;
+}
+.token-keyword {
+    background: #BDF;
+}
+.token-partial-keyword {
+    background: #DEF;
+}
+.token-subset {
+    background: #BFD;
 }
 
 /* Stats Table */
