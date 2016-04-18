@@ -23,7 +23,7 @@ timing = {'parseMetadata': 0,
 # Queries
 queries = {
     'get_subsets': ("SELECT * FROM Subset "
-                  "WHERE Event=%(Event)s AND Rumor=%(Rumor)s AND Superset=%(Superset)s"),
+                  "WHERE Event=%(Event)s AND Superset=%(Superset)s"),
     'add_subset': ("INSERT INTO Subset "
                  "(Event, Rumor, Superset, Feature, `Match`, Notes) "
                  "VALUES (%(Event)s, %(Rumor)s, %(Superset)s, %(Feature)s, %(Match)s, %(Notes)s) "),
@@ -214,7 +214,7 @@ def checkKeywords():
     final_keywords = []
     for keyword in collection["twitter_keywords"].split(','):
         keyword = keyword.lower().replace('#', '').strip()
-        if(len(keyword) > 0):
+        if(len(keyword) > 0 and keyword not in final_keywords):
             final_keywords.append(keyword)
     
     # Look through the history of modifications
@@ -262,7 +262,6 @@ def checkKeywords():
 def populateSubsets():
     global subsets
     subsets = []
-    cursor = serverStorage.cursor()
     
     subset = {
         'ID': 0,
@@ -280,11 +279,12 @@ def populateSubsets():
         subsets.append(subset.copy())
         
     # Major Timezones (Western US, Central US, Eastern US, UTC, Western Europe)
-    for timezone in [-28800, -21600, -18000, 0, 3600]:
-        subset['Feature'] = 'User.UTCOffset'
-        subset['Match'] = str(timezone)
-        subsets.append(subset.copy())
-        
+#    for timezone in [-28800, -21600, -18000, 0, 3600]:
+#        subset['Feature'] = 'User.UTCOffset'
+#        subset['Match'] = str(timezone)
+#        subsets.append(subset.copy())
+    # Turned off because inconsistent w/ daylight savings
+    
     # English versus Non-English
     for lang in ['en', 'es', 'fr', '!en & !fr & !es']:
         subset['Feature'] = 'Lang'
@@ -300,39 +300,28 @@ def populateSubsets():
         subset['Feature'] = 'Parent.User.Verified'
         subset['Match'] = str(verified)
         subsets.append(subset.copy())
+        
+    return subsets # for external programs using this
     
-    # Save
-    if(not options.test):
-        serverStorage.commit()
-    cursor.close()
-    
-def checkSubsetsAgainstDatabase():
+def checkSubsetsAgainstDatabase(connection=serverStorage):
     global subsets
     
     # Get subsets as defined by server
-    cursor = serverStorage.cursor()
+    cursor = connection.cursor(dictionary=True)
     event = {
         'Event': collection['id'],
-        'Rumor': 0,
+        #'Rumor': 0,
         'Superset': 0
     }
     cursor.execute(queries['get_subsets'], event)
     
     # Zip them together
     for dbsubset in dbIterator(cursor):
-        dbsubset = {
-            'ID': dbsubset[0],
-            'Event': dbsubset[1],
-            'Rumor': dbsubset[2],
-            'Superset': dbsubset[3],
-            'Feature': dbsubset[4],
-            'Match': dbsubset[5],
-            'Notes': dbsubset[6],
-        }
         matched = False
         for subset in subsets:
             if (dbsubset['Feature'] == subset['Feature'] and
-                dbsubset['Match']   == subset['Match']):
+                dbsubset['Match']   == subset['Match'] and
+                dbsubset['Rumor']   == subset['Rumor']):
                 subset['ID'] = dbsubset['ID']
                 subset['Notes'] = dbsubset['Notes']
                 matched = True
@@ -345,25 +334,17 @@ def checkSubsetsAgainstDatabase():
     for subset in subsets:
         if(subset['ID'] == 0):
             cursor.execute(queries['add_subset'], subset)
-    if(not options.test):
-        serverStorage.commit()
+    if(not options or not options.test):
+        connection.commit()
     
     # Retrieve the new set with the added subsets
     cursor.execute(queries['get_subsets'], event)
     for dbsubset in dbIterator(cursor):
-        dbsubset = {
-            'ID': dbsubset[0],
-            'Event': dbsubset[1],
-            'Rumor': dbsubset[2],
-            'Superset': dbsubset[3],
-            'Feature': dbsubset[4],
-            'Match': dbsubset[5],
-            'Notes': dbsubset[6],
-        }
         matched = False
         for subset in subsets:
             if (dbsubset['Feature'] == subset['Feature'] and
-                dbsubset['Match']   == subset['Match']):
+                dbsubset['Match']   == subset['Match'] and
+                dbsubset['Rumor']   == subset['Rumor']):
                 subset['ID'] = dbsubset['ID']
                 subset['Notes'] = dbsubset['Notes']
                 matched = True
@@ -373,6 +354,8 @@ def checkSubsetsAgainstDatabase():
             pprint(dbsubset)
         
     cursor.close()
+    
+    return subsets # for external programs using this
         
 def loadCollection(collection_name):
     global collection
@@ -492,56 +475,6 @@ def printNested(obj, level=0):
         text = rm_unicode(str(obj));
         print('  ' * level + text)
         
-def printNestedWithKeywords(obj, pre="  "):
-    if(type(obj) is dict):
-        for key in obj:
-            if(type(obj[key]) is str):
-                text = rm_unicode(obj[key]);
-                if(hasKeywords(text)):
-                    print(pre + "." + key + ": " + text)
-            elif(type(obj[key]) is int or type(obj[key]) is bool or not obj[key]):
-                text = str(obj[key]);
-                if(hasKeywords(text)):
-                    print(pre + "." + key + ": " + text)
-            else:
-                printNestedWithKeywords(obj[key], pre + '.' + key)
-    elif(type(obj) is list):
-        for i, item in enumerate(obj):
-            if(type(item) is str):
-                text = rm_unicode(item);
-                if(hasKeywords(text)):
-                    print(pre + '[' + str(i) + "]: " + text)
-            elif(type(item) is int or type(item) is bool or not item):
-                text = str(item);
-                if(hasKeywords(text)):
-                    print(pre + '[' + str(i) + "]:" + text)
-            else:
-                printNestedWithKeywords(item, pre + '[' + str(i) + ']')                
-                
-    elif(type(obj) is str):
-        text = rm_unicode(obj);
-        if(hasKeywords(text)):
-            print(pre + ": " + text)
-    else:
-        text = rm_unicode(str(obj));
-        if(hasKeywords(text)):
-            print(pre + ": " + text)
-        
-def hasKeywords(text):
-    text = text.lower()
-    found = []
-    
-    if(collection and 'keywords' in collection):
-        for keyword, keyword_parts in zip(collection['keywords'], collection['keywords_parts']):
-            parts_found = 0
-            for keyword_part in keyword_parts:
-                if (re.search('\\b' + keyword_part + '\\b', text)):
-                    parts_found += 1
-
-            if parts_found == len(keyword_parts):
-                found.append(keyword)
-                
-    return found
 
 def getExpandedURL(data):
     if('entities' in data and 'urls' in data['entities'] and len(data['entities']['urls']) > 0 and 'expanded_url' in data['entities']['urls'][0]):
