@@ -343,6 +343,10 @@ FeatureDistribution.prototype = {
         var repeatTextOK = this.ops['Display']['Filter'].is('none');
         for(; set.counted < set.tweets_arr.length; set.counted++) {
             var tweet = set.tweets_arr[set.counted];
+            if(!tweet || typeof(tweet) != 'object') {
+                this.abortLoadTweets(setname);
+                continue;
+            }
             
             var newTweetText = !set.counter.TextStripped.has(tweet.TextStripped);
 
@@ -356,8 +360,7 @@ FeatureDistribution.prototype = {
                 
                 // Languages
                 this.feats.lang.forEach(function(feature) {
-                    var lang = tweet[feature] || '';
-                    set.counter[feature].incr(util.featureMatchName('Lang', lang.toLowerCase()));
+                    set.counter[feature].incr(util.featureMatchName('Lang', tweet[feature].toLowerCase()));
                 });
                 
                 // Get time features
@@ -750,10 +753,10 @@ FeatureDistribution.prototype = {
             
             // Add rows
             var rows = table.select('tbody')
-                .selectAll('tr.token-freq-set');
+                .selectAll('tr.token-freq-set')
+                .data(entries);
             
-            var rows_new = rows.data(entries)
-                .enter()
+            var rows_new = rows.enter()
                 .append('tr')
                 .attr('class', function(d, i) { 
                     return 'row' + i + ' row-polar' + (i % 2) + ' token-freq-set';
@@ -767,6 +770,8 @@ FeatureDistribution.prototype = {
                 .attr('class', 'freq freq-secondary cell-cmp');
             rows_new.append('td')
                 .attr('class', 'freq freq-cmp cell-cmp');
+            
+            rows.exit().remove();
             
             // Propagate data
             rows.select('td.token');
