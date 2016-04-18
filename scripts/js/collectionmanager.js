@@ -61,21 +61,21 @@ CollectionManager.prototype = {
             triggers.on('events:updated', this.populateEventOptions.bind(this));
             triggers.on('event_type:set', this.chooseEventType.bind(this));
             triggers.on('event:set', this.setEvent.bind(this));
-            triggers.on('event:updated', this.loadSubsets.bind(this));
+            triggers.on('event:updated', this.loadSubsets.bind(this, ''));
             if(this.flag_subset_menu) {
-                triggers.on('subsets:updated', this.populateSubsetOptions.bind(this));
-                triggers.on('subset:set', this.setSubset.bind(this));
+                triggers.on('subsets:updated', this.populateSubsetOptions.bind(this, ''));
+                triggers.on('subset:set', this.setSubset.bind(this, ''));
             }
             
             if(this.flag_secondary_event) {
                 triggers.on('events:updated', // or event_type:set or ??
                             this.populateEvent2Options.bind(this));
                 triggers.on('event2:set', this.setEvent2.bind(this));
-//                triggers.on('event2:updated', this.loadSubsets2.bind(this));
-//                if(this.flag_subset_menu) {
-//                    triggers.on('subsets2:updated', this.populateSubset2Options.bind(this));
-//                    triggers.on('subset2:set', this.setSubset2.bind(this));
-//                }
+                triggers.on('event2:updated', this.loadSubsets.bind(this, '2'));
+                if(this.flag_subset_menu) {
+                    triggers.on('subsets2:updated', this.populateSubsetOptions.bind(this, '2'));
+                    triggers.on('subset2:set', this.setSubset.bind(this, '2'));
+                }
             }
         }
 
@@ -278,17 +278,11 @@ CollectionManager.prototype = {
         
         triggers.emit('event2:updated', this.event2);
     },
-    setSubset: function() {
-        var subset_id = this.ops['Subset'].get();
-        this.subset = this.subsets[parseInt(subset_id)];
+    setSubset: function(version) {
+        var subset_id = this.ops['Subset' + version].get();
+        this['subset' + version] = this['subsets' + version][parseInt(subset_id)];
         
-        triggers.emit('subset:updated', this.subset);
-    },
-    setSubset2: function() {
-        var subset_id = this.ops['Subset2'].get();
-        this.subset2 = this.subsets2[parseInt(subset_id)];
-        
-        triggers.emit('subset2:updated', this.subset2);
+        triggers.emit('subset' + version + ':updated', this['subset' + version]);
     },
     updateCollection: function() {
         var fields = {};
@@ -312,12 +306,13 @@ CollectionManager.prototype = {
             console.error(message);
         }
     },
-    loadSubsets: function () {
-        // Event selection
-        this.app.connection.php('collection/getSubset', {event: this.event.ID},
-             this.parseSubsetsFile.bind(this));
+    loadSubsets: function (version) {
+        if(this['event' + version] && this['event' + version].ID) {
+            this.app.connection.php('collection/getSubset', {event: this['event' + version].ID},
+                 this.parseSubsetsFile.bind(this, version));
+        }
     },
-    parseSubsetsFile: function(filedata) {
+    parseSubsetsFile: function(version, filedata) {
         try {
             filedata = JSON.parse(filedata);
         } catch (exception) {
@@ -325,9 +320,9 @@ CollectionManager.prototype = {
             return;
         }
         
-        this.subsets = {};
-        this.subsets_arr = filedata;
-        this.subsets_arr.forEach(function(subset) {
+        this['subsets' + version] = {};
+        this['subsets' + version + '_arr'] = filedata;
+        this['subsets' + version + '_arr'].forEach(function(subset) {
             subset.DisplayMatch = subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
             if(subset.Feature == 'User.UTCOffset') {
                 var hours = parseFloat(subset.DisplayMatch) / 60 / 60;
@@ -343,7 +338,7 @@ CollectionManager.prototype = {
             this.subsets[subset.ID] = subset;
         }, this);
         
-        triggers.emit('subsets:updated');
+        triggers.emit('subsets' + version + ':updated');
         
         // Populate the list of options
 //        options.buildRumors();
@@ -453,24 +448,25 @@ CollectionManager.prototype = {
             return event;
         }.bind(this));
     },
-    populateSubsetOptions: function() {
-        var subset_names = this.subsets_arr.map(function(subset) {
+    populateSubsetOptions: function(version) {
+        var subsets_arr = this['subsets' + version + '_arr'];
+        var subset_names = subsets_arr.map(function(subset) {
             return subset.Label;
         });
         
         // Generate Collections List
-        subset_op = this.ops['Subset'];
+        subset_op = this.ops['Subset' + version];
         subset_op['labels'] = subset_names;
         subset_op['labels'].unshift('<em>None</em>');
         subset_op['labels'].push('- New -');
-        subset_op['ids'] = this.subsets_arr.map(function(subset) { return subset['ID']; });
+        subset_op['ids'] = subsets_arr.map(function(subset) { return subset['ID']; });
         subset_op['ids'].unshift('_none_');
         subset_op['ids'].push('_new_');
         subset_op['available'] = util.range(subset_op['labels'].length);
         
         // Find the current collection
         var cur = subset_op.get();
-        subset_op.default = this.subsets_arr.reduce(function(candidate, subset, i) {
+        subset_op.default = subsets_arr.reduce(function(candidate, subset, i) {
             if(subset['ID'] == cur)
                 return i;
             return candidate;
@@ -478,14 +474,14 @@ CollectionManager.prototype = {
         subset_op.set(subset_op['ids'][subset_op.default]);
         
         // Make the dropdown
-        this.app.ops.buildSidebarOption(this.name, 'Subset');
+        this.app.ops.buildSidebarOption(this.name, 'Subset' + version);
         this.app.ops.recordState(true);
         
         // Add additional information for subsets
-        this.app.tooltip.attach('#choose_l' + this.name + '_lSubset a', function(d) {
+        this.app.tooltip.attach('#choose_l' + this.name + '_lSubset' + version + ' a', function(d) {
             var subset;
-            if(d > 0 && d <= this.subsets_arr.length) { // Regular subset
-                subset = this.subsets_arr[d - 1];
+            if(d > 0 && d <= subsets_arr.length) { // Regular subset
+                subset = subsets_arr[d - 1];
                 subset = JSON.parse(JSON.stringify(subset));
             } else if (d == 0) { // None option
                 return {Name: 'None'};
@@ -511,7 +507,7 @@ CollectionManager.prototype = {
             return subset;
         }.bind(this));
         
-        triggers.emit('subset:set');
+        triggers.emit('subset' + version + ':set');
     },
     chooseEventType: function() {
         var event_op = this.ops['Event'];
