@@ -16,15 +16,102 @@ function FeatureDistribution() {
     this.data = {};
     
     this.feats = {
-        counter: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserVerified', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount'],
-        shown: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserVerified', 'UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount'],
-        simple: ['Text', 'TextStripped', 'Type', 'Distinct', 'Source', 'ParentID', 'ExpandedURL', 'MediaURL', 'UserID', 'Username', 'Screenname', 'UserLocation', 'UserUTCOffset', 'UserTimezone',  'UserVerified' ],
-        time: ['Timestamp', 'UserCreatedAt'],
-        quantity: ['UserStatusesCount', 'UserFollowersCount', 'UserFriendsCount', 'UserListedCount', 'UserFavouritesCount'],
-        nominal: ['Text', 'TextStripped', 'TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'ExpandedURL', 'ExpandedURL Domain', 'MediaURL', 'Lang', 'Timestamp', 'Type', 'Distinct', 'Source', 'ParentID', 'UserID', 'Username', 'Screenname', 'UserCreatedAt', 'UserDescription Unigrams', 'UserLocation', 'UserUTCOffset', 'UserTimezone', 'UserLang', 'UserVerified'],
-        hasStopwords: ['TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur', 'UserDescription Unigrams'],
-        lang: ['Lang', 'UserLang'],
-        user: [],
+        counter: ['Text',
+                  'TextStripped',
+                  'TextUnigrams',
+                  'TextBigrams',
+                  'TextTrigrams',
+                  'TextCooccur',
+                  'ExpandedURL', 
+                  'ExpandedURL Domain',
+                  'MediaURL', 
+                  'Lang', 
+                  'Timestamp', 
+                  'Type',
+                  'Distinct',
+                  'Source',
+                  'ParentID',
+                  'Screenname - UserID',
+                  'UserTimezone', 
+                  'UserLang',
+                  'UsingPipe',
+//                  'IntervalBetweenPosts',
+                  
+                  'Username/User',
+                  'CreatedAt/User',
+                  'Description Unigrams/User',
+                  'Location/User', 
+                  'UTCOffset/User',
+                  'Timezone/User', 
+                  'Lang/User', 
+                  'Verified/User',
+                  'UsingPipe/User',
+                  'TweetsInCollection/User',
+                  'IntervalBetweenPosts/User',
+                  'StartStatuses/User',
+                  'EndStatuses/User',
+                  'GainStatuses/User',
+                  'StartFollowers/User',
+                  'EndFollowers/User',
+                  'GainFollowers/User',
+                  'StartFollowing/User',
+                  'EndFollowing/User',
+                  'GainFollowing/User',
+                  'StartListed/User', 
+                  'EndListed/User', 
+                  'GainListed/User', 
+                  'StartFavorites/User',
+                  'EndFavorites/User',
+                  'GainFavorites/User'],
+        simple: ['Text', 
+                 'TextStripped', 
+                 'Type',
+                 'Distinct',
+                 'Source', 
+                 'ParentID',
+                 'ExpandedURL', 
+                 'MediaURL',
+                 'UserTimezone'],
+        simple_user: ['Username',
+//                  'UserCreatedAt',
+//                  'UserDescription Unigrams',
+                  'UserLocation', 
+                  'UserUTCOffset',
+                  'UserTimezone', 
+                  'UserLang', 
+                  'UserVerified',
+//                  'UsingPipe',
+//                  'TweetsInCollection',
+//                  'IntervalBetweenPosts',
+                  'UserStatusesCount',
+                  'UserFollowersCount',
+                  'UserFriendsCount',
+                  'UserListedCount', 
+                  'UserFavouritesCount'],
+        hasStopwords: ['TextUnigrams', 
+                       'TextBigrams',
+                       'TextTrigrams',
+                       'TextCooccur',
+                       'Description Unigrams/User'],
+        
+        quantity: ['TweetsInCollection/User',
+                  'IntervalBetweenPosts/User',
+                  'StartStatuses/User',
+                  'EndStatuses/User',
+                  'GainStatuses/User',
+                  'StartFollowers/User',
+                  'EndFollowers/User',
+                  'GainFollowers/User',
+                  'StartFollowing/User',
+                  'EndFollowing/User',
+                  'GainFollowing/User',
+                  'StartListed/User', 
+                  'EndListed/User', 
+                  'GainListed/User', 
+                  'StartFavorites/User',
+                  'EndFavorites/User',
+                  'GainFavorites/User'],
+        
     }
     
     // Page Objects
@@ -139,36 +226,6 @@ FeatureDistribution.prototype = {
                 default: 1,
                 callback: triggers.emitter('counters:place')
             }),
-//            TF: new Option({
-//                title: "Term Frequency",
-//                labels: ['&sum; Has', '&sum; Count'],
-//                ids:    ['has', 'count'],
-//                default: 0,
-////                breakbefore: true,
-//                callback: triggers.emitter('counters:show')
-//            }),
-//            'TF Modifier': new Option({
-//                title: "TF Modifier",
-//                labels: ['Raw', 'Fraction', 'Percent', 'Log'],
-//                ids:    ['raw', 'fraction', 'percent', 'log'],
-//                default: 0,
-//                callback: triggers.emitter('counters:show')
-//            }),
-//            DF: new Option({
-//                title: "Doc Frequency",
-//                labels: ['None', '&sum; Has', '&sum; Count'],
-//                ids:    ['none', 'has', 'count'],
-//                default: 0,
-//                breakbefore: true,
-//                callback: triggers.emitter('counters:show')
-//            }),
-//            'IDF': new Option({
-//                title: "Inverse",
-//                labels: ['1 / DF', '#Docs / DF', 'Log(#Docs / DF)'],
-//                ids:    ['inv', 'ratio', 'log-ratio'],
-//                default: 0,
-//                callback: triggers.emitter('counters:count')
-//            }),
         };
         
         this.ops.init();
@@ -252,6 +309,7 @@ FeatureDistribution.prototype = {
                 id: collection_id,
                 tweets: {},
                 tweets_arr: [],
+                users: {},
                 counted: 0
             };
             if(collection_type == 'subset') {
@@ -357,25 +415,19 @@ FeatureDistribution.prototype = {
                 this.feats.simple.forEach(function(feature) {
                     set.counter[feature].incr(tweet[feature]);
                 });
+                set.counter['UsingPipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
                 
                 // Languages
-                this.feats.lang.forEach(function(feature) {
-                    set.counter[feature].incr(util.featureMatchName('Lang', tweet[feature].toLowerCase()));
-                });
+                set.counter['Lang'    ].incr(util.featureMatchName('Lang', tweet['Lang'    ].toLowerCase()));
+                set.counter['UserLang'].incr(util.featureMatchName('Lang', tweet['UserLang'].toLowerCase()));
                 
-                // Get time features
-                this.feats.time.forEach(function(feature) {
-                    var time = tweet[feature];
-                    time = util.date(time);
-                    time.setSeconds(0);
-                    time.setMilliseconds(0);
-                    time = time.getTime();
-                    set.counter[feature].incr(time);
-                });
-                // Quantities (no longer binned)
-                this.feats.quantity.forEach(function(feature) {
-                    set.counter[feature].incr(tweet[feature]);
-                });
+                // Get time feature
+                var time = tweet['Timestamp'];
+                time = util.date(time);
+                time.setSeconds(0);
+                time.setMilliseconds(0);
+                time = time.getTime();
+                set.counter['Timestamp'].incr(time);
                 
                 // ExpandedURL Domain
                 var url = tweet['ExpandedURL'];
@@ -384,16 +436,6 @@ FeatureDistribution.prototype = {
                         /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
                 }
                 set.counter['ExpandedURL Domain'].incr(url);
-                
-                // User Description Unigrams
-                var desc = (tweet.UserDescription || '').toLowerCase();
-                var desc_words = desc.split(/\W/).filter(function(word) { return word.length > 0; });
-                if(desc_words.length == 0) {
-                    desc_words = [tweet.UserDescription];
-                }
-                desc_words.forEach(function(word) {
-                    set.counter['UserDescription Unigrams'].incr(word);
-                });
                 
                 // Count Text features
                 var text = tweet.TextStripped.toLowerCase();
@@ -444,23 +486,112 @@ FeatureDistribution.prototype = {
             } // New Tweet or New URL
             
             // Remove the tweet object to save memory, will prevent other analysis but necessary for large datasets
-            set.tweets_arr[set.counted] = tweet.ID;
+//            set.tweets_arr[set.counted] = tweet.ID; // TODO
+            
+            var userscreenid = tweet['Screenname'] + ' - ' + tweet['UserID'];
+            var newUser = !set.counter['Screenname - UserID'].has(userscreenid);
+            
+            if(newUser) {
+                var user = {
+                    ID: tweet['UserID'],
+                    TweetsInCollection: 1,
+                    Username: tweet['Username'],
+                    CreatedAt: tweet['UserCreatedAt'],
+                    Description: tweet['UserDescription'],
+                    Location: tweet['UserLocation'],
+                    UTCOffset: tweet['UserUTCOffset'],
+                    Timezone: tweet['UserTimezone'],
+                    Lang: tweet['UserLang'],
+                    Verified: tweet['UserVerified'],
+                    UsingPipe: tweet['Text'].includes('|') ? 1 : 0,
+                    StartStatuses: parseInt(tweet['UserStatusesCount']),
+                    EndStatuses: parseInt(tweet['UserStatusesCount']),
+                    GainStatuses: 0,
+                    StartFollowers: parseInt(tweet['UserFollowersCount']),
+                    EndFollowers: parseInt(tweet['UserFollowersCount']),
+                    GainFollowers: 0,
+                    StartFollowing: parseInt(tweet['UserFriendsCount']),
+                    EndFollowing: parseInt(tweet['UserFriendsCount']),
+                    GainFollowing: 0,
+                    StartListed: parseInt(tweet['UserListedCount']),
+                    EndListed: parseInt(tweet['UserListedCount']),
+                    GainListed: 0,
+                    StartFavorites: parseInt(tweet['UserFavouritesCount']),
+                    EndFavorites: parseInt(tweet['UserFavouritesCount']),
+                    GainFavorites: 0,
+                }
+                set.users[user.ID] = user;
+                
+                Object.keys(user).forEach(function(feature) {
+                    if(feature == 'CreatedAt' && tweet['CreatedAt']) {
+                        var time = tweet['CreatedAt'];
+                        time = util.date(time);
+                        time.setMilliseconds(0);
+                        time.setSeconds(0);
+                        time.setMinutes(0);
+                        time.setHours(0);
+                        time = time.getTime();
+                        set.counter['CreatedAt/User'].incr(time);
+                    } else if (feature == 'ID' || feature == 'Description') {
+                        return;
+                    } else {
+                        set.counter[feature + '/User'].incr(user[feature]);
+                    }
+                });
+                
+                
+                // User Description Unigrams
+                var desc = (tweet.UserDescription || '').toLowerCase();
+                var desc_words = desc.split(/\W/).filter(function(word) { return word.length > 0; });
+                if(desc_words.length == 0) {
+                    desc_words = [tweet.UserDescription];
+                }
+                desc_words.forEach(function(word) {
+                    set.counter['Description Unigrams/User'].incr(word);
+                });
+            } else {
+                var user = set.users[tweet.UserID];
+                
+                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                    set.counter['End' + feature + '/User'].incr(user['End' + feature], -1);
+                    set.counter['Gain' + feature + '/User'].incr(user['End' + feature], -1);
+                });
+                set.counter['UsingPipe/User'].incr(user['UsingPipe'], -1);
+                set.counter['TweetsInCollection/User'].incr(user['TweetsInCollection'], -1);
+                
+                user['TweetsInCollection'] == user['TweetsInCollection'] + 1;
+                user['UsingPipe'] += tweet['Text'].includes('|') + 1;
+                user['EndStatuses'] = parseInt(tweet['UserStatusesCount']);
+                user['EndFollowers'] = parseInt(tweet['UserFollowersCount']);
+                user['EndFollowing'] = parseInt(tweet['UserFriendsCount']);
+                user['EndListed'] = parseInt(tweet['UserListedCount']);
+                user['EndFavorites'] = parseInt(tweet['UserFavouritesCount']);
+                
+                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                    user['Gain' + feature] = user['End' + feature] - user['Start' + feature];
+                    
+                    set.counter['End' + feature + '/User'].incr(user['End' + feature]);
+                    set.counter['Gain' + feature + '/User'].incr(user['Gain' + feature]);
+                });
+                set.counter['UsingPipe/User'].incr(user['UsingPipe']);
+                set.counter['TweetsInCollection/User'].incr(user['TweetsInCollection']);
+            }
         }
         
         // Purge rare quantities from counters that take a LOT of memory
-        if(set.counted > 1000000) {
+        if(set.counted > 1e6) {
             // Increased
             set.counter['TextCooccur'].purgeBelow(10);
             set.counter['TextTrigrams'].purgeBelow(5);
             set.counter['TextBigrams'].purgeBelow(5);
             
             // Old
-            set.counter['UserDescription Unigrams'].purgeBelow(2);
+            set.counter['UserDescription Unigrams/User'].purgeBelow(2);
             
             // New
-            set.counter['Screenname'].purgeBelow(2);
-            set.counter['Username'].purgeBelow(2);
-            set.counter['UserID'].purgeBelow(2);
+//            set.counter['Screenname'].purgeBelow(2);
+//            set.counter['Username'].purgeBelow(2);
+//            set.counter['UserID'].purgeBelow(2);
             set.counter['Text'].purgeBelow(2);
             set.counter['TextStripped'].purgeBelow(2);
             set.counter['UserLocation'].purgeBelow(2);
@@ -473,7 +604,7 @@ FeatureDistribution.prototype = {
             set.counter['TextTrigrams'].purgeBelow(2);
             set.counter['TextBigrams'].purgeBelow(2);
             
-            set.counter['UserDescription Unigrams'].purgeBelow(2);
+//            set.counter['UserDescription Unigrams'].purgeBelow(2);
         }
         
         triggers.emit('counters:place', setname);
@@ -523,7 +654,7 @@ FeatureDistribution.prototype = {
         }
         
         var table_divs = this.body.selectAll('div.feature-div')
-            .data(this.feats.shown);
+            .data(this.feats.counter);
         
         // Make any missing tables
         var table_divs_new = table_divs.enter()
@@ -539,7 +670,8 @@ FeatureDistribution.prototype = {
         // Add header
         table_divs.select('h4')
             .html(function(d) {
-                return d.replace(/([a-z])([A-Z])/g, "$1 $2");
+                return d.replace('/User', ' <small>Per User</small>')
+                        .replace(/([a-z])([A-Z])/g, '$1 $2');
             });
         
         table_divs.select('p')
@@ -560,7 +692,6 @@ FeatureDistribution.prototype = {
             var table = table_divs.select('.table-' + util.simplify(feature) + ' table')
                 .classed('stats-table', true)
                 .classed('token-freq-table', false);
-            
             var stats = set.counter[feature].statistics();
             
             table.select('thead').selectAll('*').remove();
@@ -596,7 +727,11 @@ FeatureDistribution.prototype = {
         });
         
         // Add tables of counts
-        this.feats.nominal.forEach(function(feature) {
+        this.feats.counter.forEach(function(feature) {
+            if(this.feats.quantity.includes(feature)) {
+                return;
+            }
+            
             var table_id = '.table-' + util.simplify(feature);
             var table = table_divs.select(table_id + ' table')
                 .classed('stats-table', false)
@@ -654,7 +789,7 @@ FeatureDistribution.prototype = {
                     } else {
                         entry['Ratio']       = (entry['Percent']   || 1e-5) / (entry['Percent B']   || 1e-5);
                     }
-                    entry['Log Ratio']   = Math.log(entry['Ratio']);
+                    entry['Log Ratio']   = Math.log(entry['Ratio']) * Math.log10e;
                 }
                 
                 if(['TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur'].includes(feature)) {
