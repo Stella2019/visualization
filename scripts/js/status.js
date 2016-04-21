@@ -198,6 +198,7 @@ StatusReport.prototype = {
             var feature;
             if(subset.Feature in rumor.features) {
                 feature = rumor.features[subset.Feature];
+                feature.subsets[subset.Match] = subset;
                 feature.subsets_arr.push(subset);
             } else {
                 feature = {
@@ -206,9 +207,11 @@ StatusReport.prototype = {
                     Rumor: rumor,
                     Event: event,
                     'Event Type': event['Event Type'],
+                    subsets: {},
                     subsets_arr: [subset]
                 }
                 feature['Feature'] = feature;
+                feature.subsets[subset.Match] = subset;
                 rumor.features[subset.Feature] = feature;
                 rumor.features_arr.push(feature);
                 this.features_arr.push(feature);
@@ -271,21 +274,26 @@ StatusReport.prototype = {
     },
     computeAggregates: function() {
         this.features_arr.forEach(function(d) {
+            var children = d.children;
+            if(d.Label == 'Code') {
+                children = [d.subsets['Uncodable'], d.subsets['Codable']];
+            }
+            
             ['Tweets', 'DistinctTweets', 
               'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
               'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 'Minutes'].forEach(function(count) {
-                d[count] = d3.sum(d.children, function(e) { return e[count] || 0; });
+                d[count] = d3.sum(children, function(e) { return e[count] || 0; });
             });
             
-            d.FirstTweet_Min    = d3.min(d.children, function(e) { return e.FirstTweet        || new BigNumber(1e20); });
-            d.FirstTweet_Max    = d3.max(d.children, function(e) { return e.FirstTweet        || new BigNumber(0); });
-            d.LastTweet_Min     = d3.min(d.children, function(e) { return e.LastTweet         || new BigNumber(1e20); });
-            d.LastTweet_Max     = d3.max(d.children, function(e) { return e.LastTweet         || new BigNumber(0); });
+            d.FirstTweet_Min    = d3.min(children, function(e) { return e.FirstTweet        || new BigNumber(1e20); });
+            d.FirstTweet_Max    = d3.max(children, function(e) { return e.FirstTweet        || new BigNumber(0); });
+            d.LastTweet_Min     = d3.min(children, function(e) { return e.LastTweet         || new BigNumber(1e20); });
+            d.LastTweet_Max     = d3.max(children, function(e) { return e.LastTweet         || new BigNumber(0); });
             
             d.FirstTweet        = d.FirstTweet_Min;
             d.LastTweet         = d.LastTweet_Max;
-            d.ID_Min            = d3.min(d.children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
-            d.ID_Max            = d3.max(d.children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
+            d.ID_Min            = d3.min(children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
+            d.ID_Max            = d3.max(children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
         });
         
         this.event_types_arr.forEach(function(d) {
