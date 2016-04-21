@@ -629,6 +629,14 @@ StatusReport.prototype = {
         table_body.selectAll('tr')
             .append('td')
             .attr('class', 'cell-lastdate');
+        this.tooltip.attach('.cell-firstdate, .cell-lastdate', function(set) {
+            return {
+                'First Tweet': set['FirstTweet'],
+                'Last Tweet':  set['LastTweet'],
+                'Start Time':  util.formatDate(util.twitterID2Timestamp(set['FirstTweet'])),
+                'End Time':    util.formatDate(util.twitterID2Timestamp(set['LastTweet'])),
+            };
+        });
         
         var minute_cells = table_body.selectAll('tr')
             .append('td')

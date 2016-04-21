@@ -25,11 +25,6 @@
         include '../printJSON.php';
         
     } else {
-            
-        // Get the last inserted rumor, so we get the rumor ID
-        $query = "" .
-            "SELECT * FROM Rumor" .
-            " WHERE ID = " . $_REQUEST["rumor"];
         
         // Setup Query
         $query = "SELECT * " .
