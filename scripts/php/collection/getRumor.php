@@ -1,25 +1,16 @@
 <?php
     include '../connect.php';
 
-    // Get input from user
-//    $event_id = $_GET["event_id"];
-//    $time_min = $_GET["time_min"];
-//    $time_max = $_GET["time_max"];
-
     // Execute Query
-    if($_REQUEST["rumor_id"] == '_new_') {
+    if(isset($_REQUEST["rumor"]) and $_REQUEST["rumor"] == '_new_') {
         // Insert values (presuming they all exist)
         // otherwise the PHP will terminate with the error
         $query = "" .
             "INSERT INTO Rumor " .
-            "(Event_ID, `Name`, Definition, `Query`, StartTime, StopTime) " .
+            "(Event_ID, `Name`) " .
             " VALUES (" . 
-            $_REQUEST["event_id"] . ", " . 
-            "'New Rumor'" . ", " . 
-            "''" . ", " . 
-            "''" . ", '" . 
-            $_REQUEST["time_min"] . "', '" . 
-            $_REQUEST["time_max"] . "') ";
+            $_REQUEST["event"] . ", " . 
+            "'New Rumor') ";
 
         $result = $mysqli->query($query);
         if (!$result) {
@@ -38,7 +29,23 @@
         // Get the last inserted rumor, so we get the rumor ID
         $query = "" .
             "SELECT * FROM Rumor" .
-            " WHERE ID = " . $_REQUEST["rumor_id"];
+            " WHERE ID = " . $_REQUEST["rumor"];
+        
+        // Setup Query
+        $query = "SELECT * " .
+                 "FROM Rumor ";
+
+        // Query Conditions
+        $conds = array();
+        if(isset($_REQUEST["event"]))
+            $conds[] = "`Event` = " . $_REQUEST["event"] . " ";
+        if(isset($_REQUEST["rumor"]))
+            $conds[] = "`ID` = '" . $_REQUEST["rumor"] . "' ";
+        if(isset($_REQUEST["active"]))
+            $conds[] = "`Active` = '" . $_REQUEST["active"] . "' ";
+
+        if(!empty($conds))
+            $query .= " WHERE " . join(" AND " , $conds);
  
         include '../printJSON.php';
     }

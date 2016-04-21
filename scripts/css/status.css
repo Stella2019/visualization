@@ -53,31 +53,36 @@ th:hover .glyphicon-hiddenclick {
     margin-left: auto;
 }
 
+.row_haschildren .cell-label {
+    cursor: pointer;
+}
+
 .row_type {
     background-color: #eee;
     border-top: solid 2px #ddd;
-}
-.row_type .cell-label .value {
-    padding-left: 10px;
-    font-weight: bold;
 }
 .row_event {
     background-color: aliceblue;
     border-top: solid 2px #def;
 }
-.row_event .cell-label .value {
-    padding-left: 20px;
-}
-.row_type .cell-label, .row_event .cell-label {
-    cursor: pointer;
-}
-.row_feature .cell-label .value {
-    font-style: italic;
-    padding-left: 30px;
-}
 .row_subset {
     border-top: solid 2px #fff;
 }
-.row_subset .cell-label .value {
+
+.row_type .cell-label .value {
+    padding-left: 10px;
+    font-weight: bold;
+}
+.row_event .cell-label .value {
+    padding-left: 20px;
+}
+.row_rumor .cell-label .value {
+    padding-left: 30px;
+}
+.row_feature .cell-label .value {
+    font-style: italic;
     padding-left: 40px;
+}
+.row_subset .cell-label .value {
+    padding-left: 50px;
 }

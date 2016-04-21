@@ -5,17 +5,22 @@ function StatusReport() {
     this.tooltip = new Tooltip();
     this.modal = new Modal();
     
-    this.events = {};
-    this.events_arr = [];
-    this.subsets = {};
-    this.subsets_arr = [];
+    this.hierarchy = ['Event Type', 'Event', 'Rumor', 'Feature', 'Subset'];
     this.event_types = {};
     this.event_types_arr = [];
+    this.events = {};
+    this.events_arr = [];
+    this.rumors = {};
+    this.rumors_arr = [];
+    this.features = {};
+    this.features_arr = [];
+    this.subsets = {};
+    this.subsets_arr = [];
     
     this.quantities = ['Tweets', 'DistinctTweets', 
                        'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
                        'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
-                       'FirstTweet', 'LastTweet', 'Datapoints'];
+                       'Minutes'];
 }
 StatusReport.prototype = {
     init: function() {
@@ -25,12 +30,12 @@ StatusReport.prototype = {
     },
     setTriggers: function() {
         triggers.on('sort_elements', function() { this.clickSort(false, 'maintain_direction'); }.bind(this));
-        triggers.on('new_counts', this.computeAggregates.bind(this));
-        triggers.on('update_counts', this.updateTableCounts.bind(this));
+        triggers.on('new_counts',         this.computeAggregates.bind(this));
+        triggers.on('update_counts',      this.updateTableCounts.bind(this));
         triggers.on('refresh_visibility', this.setVisibility.bind(this));
     },
     getData: function() {
-        var datasets = 2;
+        var datasets = 3;
             
         this.connection.php('collection/getEvent', {}, function(d) {
             try {
@@ -45,6 +50,19 @@ StatusReport.prototype = {
                 this.configureData();
         }.bind(this));
 
+        this.connection.php('collection/getRumor', {}, function(d) {
+            try {
+                this.rumors_arr = JSON.parse(d);
+            } catch(err) {
+                console.error(d);
+                return;
+            }
+            
+            datasets--;
+            if(datasets == 0)
+                this.configureData();
+        }.bind(this));
+        
         this.connection.php('collection/getSubset', {}, function(d) {
             try {
                 this.subsets_arr = JSON.parse(d);
@@ -61,10 +79,12 @@ StatusReport.prototype = {
     configureData: function() {
         // Clear any old data
         this.events = {};
+        this.rumors = {};
         this.subsets = {};
         this.event_types = {};
+        
         this.event_types_arr = [];
-        this.featuresets_arr = [];
+        this.features_arr = [];
         
         // Link all of the data
         this.events_arr.forEach(function(event) {
@@ -75,70 +95,131 @@ StatusReport.prototype = {
             this.quantities.forEach(function (quantity) {
                 event[quantity] = parseInt(event[quantity]) || 0;
             });
+            event['FirstTweet'] = event['FirstTweet'] ? new BigNumber(event['FirstTweet']) : new BigNumber('0');
+            event['LastTweet']  = event['LastTweet']  ? new BigNumber(event['LastTweet'])  : new BigNumber('0');
             
             // Add to event type list (or make new event type list)
             var type = event.Type;
+            var event_type;
             if(type in this.event_types) {
-                this.event_types[type].events.push(event);
+                event_type = this.event_types[type];
+                event_type.events_arr.push(event);
             } else {
-                var new_event_type = {
+                event_type = {
                     Level: 0,
                     Label: type,
-                    events: [event]
+                    events_arr: [event]
                 }
-                this.event_types[type] = new_event_type;
-                this.event_types_arr.push(new_event_type);
+                event_type['Event Type'] = event_type;
+                this.event_types[type] = event_type;
+                this.event_types_arr.push(event_type);
             }
-            event['Event Type'] = this.event_types[type];
-            event['Event'] = event; // weird but makes things easier
             
-            event.featuresets = {};
-            event.featuresets_arr = [];
+            // Add children
+            var event_rumor = {
+                Event: event.ID,
+                ID: 0,
+                Name: 'All Tweets in Event',
+                Definition: '',
+                Query: '',
+                StartTime: event.StartTime,
+                StopTime:  event.StopTime,
+                Active: '1'
+            }
+            event.rumors = {0: event_rumor};
+            event.rumors_arr = [event_rumor];
+            this.rumors_arr.push(event_rumor);
+            
+            this.quantities.forEach(function (quantity) {
+                event_rumor[quantity] = event[quantity];
+            });
+            event_rumor['FirstTweet'] = event['FirstTweet'];
+            event_rumor['LastTweet']  = event['LastTweet'];
+            
+            // Add ancestors
+            event['Event']      = event; // weird but makes things easier
+            event['Event Type'] = event_type;
             
             // Add to indiced object
             this.events[event.ID] = event;
+        }, this);
+        
+        this.rumors_arr.forEach(function(rumor) {
+            rumor.ID = parseInt(rumor.ID);
+            rumor.Level = 2;
+            rumor.Label = rumor.Name;
+            rumor.features =  {};
+            rumor.features_arr = [];
+            
+            // Add rumor to Event
+            rumor.Event_ID = rumor.Event;
+            var event = this.events[rumor.Event_ID];
+            if(!(rumor.ID in event.rumors)) {
+                event.rumors[rumor.ID] = rumor;
+                event.rumors_arr.push(rumor);
+            }
+            
+            // Add ancestors
+            rumor['Rumor']      = rumor;
+            rumor['Event']      = event;
+            rumor['Event Type'] = event['Event Type'];
+            
+            // Add to indiced object
+            this.rumors[event.ID + '_' + rumor.ID] = rumor;
         }, this);
         
         this.subsets_arr.forEach(function(subset) {
             // Add fields
             subset.ID = parseInt(subset.ID);
             subset.Label = subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
-            subset.Level = 3;
+            subset.Level = 4;
             this.quantities.forEach(function (quantity) {
                 subset[quantity] = parseInt(subset[quantity]) || 0;
             });
+            subset['FirstTweet'] = subset['FirstTweet'] ? new BigNumber(subset['FirstTweet']) : new BigNumber('0');
+            subset['LastTweet']  = subset['LastTweet']  ? new BigNumber(subset['LastTweet'])  : new BigNumber('0');
             
-            // Add direct subset to Event
+            // Get ancestors
             subset.Event_ID = subset.Event;
             var event = this.events[subset.Event_ID];
-            if(event.subsets) {
-                event.subsets.push(subset);
-            } else {
-                event.subsets = [subset];
+            var rumor = event.rumors[subset.Rumor];
+            
+            // If it is actually a rumor subset, add data to the rumor
+            if(subset.Feature == 'Rumor') {
+                var actual_rumor = event.rumors[subset.Match];
+                this.quantities.forEach(function (quantity) {
+                    actual_rumor[quantity] = parseInt(subset[quantity]) || 0;
+                });
+                actual_rumor['FirstTweet'] = subset['FirstTweet'] ? new BigNumber(subset['FirstTweet']) : new BigNumber('0');
+                actual_rumor['LastTweet']  = subset['LastTweet']  ? new BigNumber(subset['LastTweet'])  : new BigNumber('0');
             }
-            subset.Event = event;
             
-            // Add to higher event type
-            subset['Event Type'] = event['Event Type'];
-            
-            // Add to event's featuresets
-            if(subset.Feature in event.featuresets) {
-                event.featuresets[subset.Feature].subsets.push(subset);
+            // Add to feature in rumor
+            var feature;
+            if(subset.Feature in rumor.features) {
+                feature = rumor.features[subset.Feature];
+                feature.subsets_arr.push(subset);
             } else {
-                var new_feature_set = {
-                    Level: 2,
+                feature = {
+                    Level: 3,
                     Label: subset.Feature,
+                    Rumor: rumor,
                     Event: event,
                     'Event Type': event['Event Type'],
-                    subsets: [subset]
+                    subsets_arr: [subset]
                 }
-                new_feature_set['Feature Set'] = new_feature_set;
-                event.featuresets[subset.Feature] = new_feature_set;
-                event.featuresets_arr.push(new_feature_set);
-                this.featuresets_arr.push(new_feature_set);
-                
+                feature['Feature'] = feature;
+                rumor.features[subset.Feature] = feature;
+                rumor.features_arr.push(feature);
+                this.features_arr.push(feature);
             }
-            subset['Feature Set'] = event.featuresets[subset.Feature];
+            
+            // Add to ancestors
+            subset['Subset']     = subset;
+            subset['Feature']    = feature;
+            subset['Rumor']      = rumor;
+            subset['Event']      = event;
+            subset['Event Type'] = event['Event Type'];
             
             // Add to indiced object
             this.subsets[subset.ID] = subset;
@@ -152,89 +233,77 @@ StatusReport.prototype = {
         });
         this.event_types_arr.forEach(function(d, i) {
             d.ID = i;
-            d.children = d.events;
+            d.children = d.events_arr;
         });
         
-        this.events_arr.forEach(function(e) {
-            e.children = e.featuresets_arr;
+        this.events_arr.forEach(function(event) {
+            event.children = event.rumors_arr;
             
-            e.featuresets_arr.sort(function(a, b) {
-                if (a.Label < b.Label) return -1;
-                if (a.Label > b.Label) return 1;
+            event.rumors_arr.sort(function(a, b) {
+                if (a.ID < b.ID) return -1;
+                if (a.ID > b.ID) return 1;
                 return 0;
             });
-            e.featuresets_arr.forEach(function(d, i) {
-                d.ID = d.Event.ID * 100 + i;
-                d.children = d.subsets;
+        });
+        
+        this.rumors_arr.forEach(function(rumor) {
+            rumor.children = rumor.features_arr;
+            
+            rumor.features_arr.sort(function(a, b) {
+                if (a.ID < b.ID) return -1;
+                if (a.ID > b.ID) return 1;
+                return 0;
+            });
+        });
+        
+        this.features_arr.forEach(function(feature, i) {
+            feature.children = feature.subsets_arr;
+            feature.ID = feature.Event.ID * 100 + i;
+            
+            feature.subsets_arr.sort(function(a, b) {
+                if (a.ID < b.ID) return -1;
+                if (a.ID > b.ID) return 1;
+                return 0;
             });
         });
         
         this.buildOptions();
     },
     computeAggregates: function() {
-        this.events_arr.forEach(function(e) {
-//            e.children = e.subsets;
-            e.children = e.featuresets_arr;
-            
-//            e.featuresets_arr.forEach(function(d) {
-//                d.children = d.subsets;
-//            });
-            
-//            e.Tweets         = e.Tweets         || d3.sum(e.rumors, function(r) { return r.Tweets         || 0; });
-//            e.DistinctTweets = e.DistinctTweets || d3.sum(e.rumors, function(r) { return r.DistinctTweets || 0; });
-//            e.CodedTweets    = e.CodedTweets    || d3.sum(e.rumors, function(r) { return r.CodedTweets    || 0; });
-//            e.AdjudTweets    = e.AdjudTweets    || d3.sum(e.rumors, function(r) { return r.AdjudTweets    || 0; });
-//            e.Datapoints     = e.Datapoints     || d3.sum(e.rumors, function(r) { return r.Datapoints     || 0; });
-        });
-        
-        this.featuresets_arr.forEach(function(d) {
-            d.children = d.subsets;
-            
+        this.features_arr.forEach(function(d) {
             ['Tweets', 'DistinctTweets', 
               'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
-              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 'Datapoints'].forEach(function(count) {
+              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 'Minutes'].forEach(function(count) {
                 d[count] = d3.sum(d.children, function(e) { return e[count] || 0; });
             });
             
-//            d.CodedTweets       = d3.sum(d.events, function(e) { return e.CodedTweets    || 0; });
-//            d.AdjudTweets       = d3.sum(d.events, function(e) { return e.AdjudTweets    || 0; });
-            d.FirstTweet_Min    = d3.min(d.children, function(e) { return e.FirstTweet        || 1e20; });
-            d.FirstTweet_Max    = d3.max(d.children, function(e) { return e.FirstTweet        || 0; });
-            d.LastTweet_Min     = d3.min(d.children, function(e) { return e.LastTweet         || 1e20; });
-            d.LastTweet_Max     = d3.max(d.children, function(e) { return e.LastTweet         || 0; });
+            d.FirstTweet_Min    = d3.min(d.children, function(e) { return e.FirstTweet        || new BigNumber(1e20); });
+            d.FirstTweet_Max    = d3.max(d.children, function(e) { return e.FirstTweet        || new BigNumber(0); });
+            d.LastTweet_Min     = d3.min(d.children, function(e) { return e.LastTweet         || new BigNumber(1e20); });
+            d.LastTweet_Max     = d3.max(d.children, function(e) { return e.LastTweet         || new BigNumber(0); });
             
             d.FirstTweet        = d.FirstTweet_Min;
             d.LastTweet         = d.LastTweet_Max;
-            d.ID_Min            = d3.min(d.children, function(e) { return parseInt(e.ID)      || 0; });
-            d.ID_Max            = d3.max(d.children, function(e) { return parseInt(e.ID)      || 0; });
-            
-            // Self
-            d['Feature Set'] = d;
+            d.ID_Min            = d3.min(d.children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
+            d.ID_Max            = d3.max(d.children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
         });
         
         this.event_types_arr.forEach(function(d) {
-            d.children = d.events;
-            
             ['Tweets', 'DistinctTweets', 
               'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
-              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 'Datapoints'].forEach(function(count) {
-                d[count] = d3.sum(d.events, function(e) { return e[count] || 0; });
+              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 'Minutes'].forEach(function(count) {
+                d[count] = d3.sum(d.children, function(e) { return e[count] || 0; });
             });
             
-//            d.CodedTweets       = d3.sum(d.events, function(e) { return e.CodedTweets    || 0; });
-//            d.AdjudTweets       = d3.sum(d.events, function(e) { return e.AdjudTweets    || 0; });
-            d.FirstTweet_Min    = d3.min(d.events, function(e) { return e.FirstTweet        || 1e20; });
-            d.FirstTweet_Max    = d3.max(d.events, function(e) { return e.FirstTweet        || 0; });
-            d.LastTweet_Min     = d3.min(d.events, function(e) { return e.LastTweet         || 1e20; });
-            d.LastTweet_Max     = d3.max(d.events, function(e) { return e.LastTweet         || 0; });
+            d.FirstTweet_Min    = d3.min(d.children, function(e) { return e.FirstTweet        || new BigNumber(1e20); });
+            d.FirstTweet_Max    = d3.max(d.children, function(e) { return e.FirstTweet        || new BigNumber(0); });
+            d.LastTweet_Min     = d3.min(d.children, function(e) { return e.LastTweet         || new BigNumber(1e20); });
+            d.LastTweet_Max     = d3.max(d.children, function(e) { return e.LastTweet         || new BigNumber(0); });
             
             d.FirstTweet        = d.FirstTweet_Min;
             d.LastTweet         = d.LastTweet_Max;
-            d.ID_Min            = d3.min(d.events, function(e) { return parseInt(e.ID)      || 0; });
-            d.ID_Max            = d3.max(d.events, function(e) { return parseInt(e.ID)      || 0; });
-            
-            // Self
-            d['Event Type'] = d;
+            d.ID_Min            = d3.min(d.children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
+            d.ID_Max            = d3.max(d.children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
         });
         
         triggers.emit('update_counts');
@@ -244,7 +313,7 @@ StatusReport.prototype = {
         
         var orders = ['ID', 'Collection', 'Tweets', 
                       'Originals', 'Retweets', 'Replies', 'Quotes', 
-                      'First Tweet', 'Last Tweet', 'Datapoints'];
+                      'First Tweet', 'Last Tweet', 'Minutes'];
         this.ops['Columns'] = {
             Distinct: new Option({
                 title: 'Distinct?',
@@ -256,8 +325,8 @@ StatusReport.prototype = {
             }),
             Relative: new Option({
                 title: 'Relative to',
-                labels: ['-', 'Event', 'Event\'s Types', 'Feature', 'Match', 'Distinct/Not'],
-                ids:    ['raw', 'event', 'type', 'feature', 'match', 'distinct'],
+                labels: ['-', 'Event', 'Event\'s Tweet Types', 'Match', 'Distinct/Not'],
+                ids:    ['raw', 'event', 'type', 'match', 'distinct'],
                 default: 0,
                 type: "dropdown",
                 callback: triggers.emitter('update_counts')
@@ -270,9 +339,9 @@ StatusReport.prototype = {
                 type: "dropdown",
                 callback: triggers.emitter('update_counts')
             }),
-            'Datapoints Format': new Option({
-                title: 'Datapoints',
-                labels: ['Count', 'Minutes'],
+            'Minutes Format': new Option({
+                title: 'Minutes',
+                labels: ['Count', 'Day/Hour/Min'],
                 ids:    ['count', 'minutes'],
                 default: 0,
                 type: "dropdown",
@@ -329,6 +398,14 @@ StatusReport.prototype = {
                 callback: triggers.emitter('refresh_visibility')
             }),
             'Level 2 Showing Children': new Option({
+                title: 'Rumors Showing Features',
+                labels: ['List'],
+                ids:    [[]],
+                render: false,
+                custom_entries_allowed: true,
+                callback: triggers.emitter('refresh_visibility')
+            }),
+            'Level 3 Showing Children': new Option({
                 title: 'Features Showing Matches',
                 labels: ['List'],
                 ids:    [[]],
@@ -351,7 +428,7 @@ StatusReport.prototype = {
     buildTable: function() {
         var columns = ['ID', 'Collection',
                        'Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes', 
-                       'First Tweet', 'Last Tweet', 'Datapoints', 
+                       'First Tweet', 'Last Tweet', 'Minutes', 
                        'Open'];// <span class="glyphicon glyphicon-new-window"></span>
         
         d3.select('#table-container').selectAll('*').remove();
@@ -384,22 +461,28 @@ StatusReport.prototype = {
         this.event_types_arr.forEach(function(event_type) {
             event_type.row = table_body.append('tr')
                 .data([event_type])
-                .attr('class', 'row_type');
+                .attr('class', 'row_type row_haschildren');
             
-            event_type.events.forEach(function(event) {
+            event_type.events_arr.forEach(function(event) {
                 event.row = table_body.append('tr')
                     .data([event])
-                    .attr('class', function(d) { return 'row_event row_event_' + d.ID; });
+                    .attr('class', function(d) { return 'row_event row_haschildren row_event_' + d.ID; });
                 
-                event.featuresets_arr.forEach(function(featureset) {
-                    featureset.row = table_body.append('tr')
-                        .data([featureset])
-                        .attr('class', function(d) { return 'row_feature'; });
+                event.rumors_arr.forEach(function(rumor) {
+                    rumor.row = table_body.append('tr')
+                        .data([rumor])
+                        .attr('class', function(d) { return 'row_rumor row_haschildren row_rumor_' + d.ID; });
                     
-                    featureset.subsets.forEach(function(subset) {
-                        subset.row = table_body.append('tr')
-                            .data([subset])
-                            .attr('class', function(d) { return 'row_subset row_subset_' + d.ID; });
+                    rumor.features_arr.forEach(function(feature) {
+                        feature.row = table_body.append('tr')
+                            .data([feature])
+                            .attr('class', function(d) { return 'row_feature row_haschildren'; });
+
+                        feature.subsets_arr.forEach(function(subset) {
+                            subset.row = table_body.append('tr')
+                                .data([subset])
+                                .attr('class', function(d) { return 'row_subset row_subset_' + d.ID; });
+                        });
                     });
                 });
             });
@@ -408,7 +491,7 @@ StatusReport.prototype = {
         // ID & Label
         table_body.selectAll('tr')
             .append('td')
-            .html(function(d) { return d.Level % 2 == 1 ? d.ID : ''; })
+            .html(function(d) { return [1, 2, 4].includes(d.Level) ? d.ID : ''; })
         
         table_body.selectAll('tr')
             .append('td')
@@ -418,16 +501,16 @@ StatusReport.prototype = {
             .attr('class', 'value')
             .html(function(d) { return d.Label; });
         
-        table_body.selectAll('.row_feature .cell-label, .row_event .cell-label, .row_type .cell-label')
+        var level_names = ['events', 'rumors', 'features', 'matches', 'N/A'];
+        table_body.selectAll('.row_haschildren .cell-label')
             .on('click', this.setVisibility_children.bind(this))
             .append('small')
             .attr('class', 'glyphicon-hiddenclick')
             .html(function(d) { 
-                return d.children.length + ' ' + 
-                    (d.Level == 0 ? 'events' : (d.Level == 1 ? 'features' : 'matches')); 
+                return d.children.length + (d.Level == 1 ? -1 : 0) + ' ' + level_names[d.Level]; 
             });
         
-        table_body.selectAll('.row_feature .cell-label, .row_event .cell-label, .row_type .cell-label')
+        table_body.selectAll('.row_haschildren .cell-label')
             .append('span')
             .attr('class', 'glyphicon glyphicon-chervon-left glyphicon-hiddenclick')
             .style('margin-left', '0px');
@@ -435,29 +518,40 @@ StatusReport.prototype = {
         this.tooltip.attach('.cell-label', function(set) {
             if(set['Level'] == 0) {
                 return {
-                    ID: set['ID'],
+                    ID:           set['ID'],
                     'Event Type': set['Label'],
-                    Events: set['events'] ? set['events'].map(function(event) { return event['Label']; }) : null
+                    Events:       set['events_arr'] ? set['events_arr'].map(function(event) { return event['Label']; }) : null
                 }
             } else if(set['Level'] == 1) {
                 return {
-                    ID: set['ID'],
-                    Event: set['Label'],
-                    'Event Type': set['Event Type']['Label']
+                    ID:           set['ID'],
+                    Event:        set['Label'],
+                    'Event Type': set['Event Type']['Label'],
+                    Rumors:       set['rumors_arr'] ? set['rumors_arr'].map(function(event) { return event['Label']; }) : null
                 }
             } else if(set['Level'] == 2) {
                 return {
-                    ID: set['ID'],
-                    Feature: set['Label'],
-                    Event: set['Event']['Label'],
+                    ID:           set['ID'],
+                    Rumor:        set['Label'],
+                    Event:        set['Event']['Label'],
+                    'Event Type': set['Event Type']['Label'],
+                    Features:     set['features_arr'] ? set['features_arr'].map(function(event) { return event['Label']; }) : null
+                }
+            } else if(set['Level'] == 3) {
+                return {
+                    ID:           set['ID'],
+                    Feature:      set['Label'],
+                    Rumor:        set['Rumor']['Label'],
+                    Event:        set['Event']['Label'],
                     'Event Type': set['Event Type']['Label']
                 }
             } else {
                 return {
-                    ID: set['ID'],
-                    Match: set['Match'],
-                    Feature: set['Feature'],
-                    Event: set['Event']['Label'],
+                    ID:           set['ID'],
+                    Match:        set['Match'],
+                    Feature:      set['Feature']['Label'],
+                    Rumor:        set['Rumor']['Label'],
+                    Event:        set['Event']['Label'],
                     'Event Type': set['Event Type']['Label']
                 }
             }
@@ -480,15 +574,15 @@ StatusReport.prototype = {
                     return info;
 
                 var event = set['Event'] || set;
-                var feature = set['Feature Set'] || set;
+//                var feature = set['Feature'] || set;
                 info[type] = util.formatThousands(value);
                 if(set.Level >= 2 || type != 'Tweets') {
                     info['% of Event'] = (value / event['Tweets'] * 100).toFixed(1) + '%';
                 }
                 if(set.Level >= 2 && type != 'Tweets') {
                     info['% of Type'] = (value / event[type] * 100).toFixed(1) + '%';
-                    info['% of Feature'] = (value / feature['Tweets'] * 100).toFixed(1) + '%';
-                    if(set.Level >= 3) {
+//                    info['% of Feature'] = (value / feature['Tweets'] * 100).toFixed(1) + '%';
+                    if(set.Level >= 4) {
                         info['% of Subset'] = (value / set['Tweets'] * 100).toFixed(1) + '%';
                     }
                 }
@@ -501,8 +595,8 @@ StatusReport.prototype = {
                 }
                 if(set.Level >= 2 && type != 'Tweets') {
                     info['% D of Type '] = (distinct / event['Distinct' + type] * 100).toFixed(1) + '%';
-                    info['% D of Feature'] = (value / feature['Tweets'] * 100).toFixed(1) + '%';
-                    if(set.Level >= 3) {
+//                    info['% D of Feature'] = (value / feature['Tweets'] * 100).toFixed(1) + '%';
+                    if(set.Level >= 4) {
                         info['% D of Subset'] = (value / set['Tweets'] * 100).toFixed(1) + '%';
                     }
                 }
@@ -512,8 +606,10 @@ StatusReport.prototype = {
         }, this);
         
         // Append the recalculate button
-        table_body.selectAll('.row_type .cell-Tweets, .row_feature .cell-Tweets').append('span') // hidden one to help alignment
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
+//        table_body.selectAll('.row_type .cell-Tweets, .row_feature .cell-Tweets').append('span') // hidden one to help alignment
+//            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
+        table_body.selectAll('.row_type .cell-Tweets, .row_rumor .cell-Tweets, .row_feature .cell-Tweets').append('span') // hidden one to help alignment
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
         table_body.selectAll('.row_event .cell-Tweets, .row_subset .cell-Tweets').append('span')
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
             .on('click', this.recount.bind(this));
@@ -526,15 +622,17 @@ StatusReport.prototype = {
             .append('td')
             .attr('class', 'cell-lastdate');
         
-        var datapoint_cells = table_body.selectAll('tr')
+        var minute_cells = table_body.selectAll('tr')
             .append('td')
             .append('div')
-            .attr('class', 'cell-datapoints cell-count');
-        datapoint_cells.append('span').attr('class', 'value');
+            .attr('class', 'cell-minutes cell-count');
+        minute_cells.append('span').attr('class', 'value');
         
-        table_body.selectAll('.row_type .cell-datapoints, .row_feature .cell-datapoints').append('span') // hidden one to help alignment
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
-        table_body.selectAll('.row_event .cell-datapoints, .row_subset .cell-datapoints').append('span')
+//        table_body.selectAll('.row_type .cell-minutes, .row_feature .cell-minutes').append('span') // hidden one to help alignment
+//            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
+        table_body.selectAll('.row_type .cell-minutes, .row_rumor .cell-minutes, .row_feature .cell-minutes').append('span') // hidden one to help alignment
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
+        table_body.selectAll('.row_event .cell-minutes, .row_subset .cell-minutes').append('span')
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
             .on('click', this.computeTimeseries.bind(this));
         
@@ -548,11 +646,11 @@ StatusReport.prototype = {
             .attr('class', 'glyphicon glyphicon-edit glyphicon-hoverclick')
             .on('click', this.edit.bind(this));
 
-        table_body.selectAll('.row_event .cell_options')
-            .append('span')
-            .attr('class', 'glyphicon glyphicon-signal glyphicon-hoverclick')
-            .style('margin-left', '5px')
-            .on('click', this.openTimeseries);
+//        table_body.selectAll('.row_event .cell_options')
+//            .append('span')
+//            .attr('class', 'glyphicon glyphicon-signal glyphicon-hoverclick')
+//            .style('margin-left', '5px')
+//            .on('click', this.openTimeseries);
         
 //        table_body.selectAll('.row_rumor .cell_options')
 //            .append('span')
@@ -624,11 +722,11 @@ StatusReport.prototype = {
     },
     updateTableCounts: function(selector) {
         selector = selector || 'tbody';
-        var table_body = d3.select(selector);
-        var distinct = this.ops['Columns']['Distinct'].get();
-        var relative = this.ops['Columns']['Relative'].get();
-        var date_format = this.ops['Columns']['Date Format'].get();
-        var datapoints_format = this.ops['Columns']['Datapoints Format'].get();
+        var table_body     = d3.select(selector);
+        var distinct       = this.ops['Columns']['Distinct'].get();
+        var relative       = this.ops['Columns']['Relative'].get();
+        var date_format    = this.ops['Columns']['Date Format'].get();
+        var minutes_format = this.ops['Columns']['Minutes Format'].get();
         
         // Update the text of rows with the counts
         
@@ -645,7 +743,7 @@ StatusReport.prototype = {
                     }
                     var denom = relative == 'event'    ? (d['Level'] >= 2 ? d['Event']['Tweets'] : d['Tweets']) : 
                                 relative == 'type'     ? (d['Level'] >= 2 ? d['Event'][quantity] : d[quantity]) : 
-                                relative == 'feature'  ? (d['Level'] >= 3 ? d['Feature Set'][quantity] : d[quantity]): 
+//                                relative == 'feature'  ? (d['Level'] >= 3 ? d['Feature Set'][quantity] : d[quantity]): 
                                 relative == 'subset'   ? d['Tweets'] : 
                                 relative == 'distinct' ? d[type] : 1;
                     d[type + 'Display'] = value / denom;
@@ -655,7 +753,7 @@ StatusReport.prototype = {
         
         // Set visibility of zero/non-zero rows
         table_body.selectAll('tr')
-            .classed('row-zero', function(d) { return !(d.Tweets || d.Datapoints || d.CodedTweets) ; });
+            .classed('row-zero', function(d) { return !(d.Tweets || d.Minutes || d.CodedTweets) ; });
         
         // Dates
         table_body.selectAll('.cell-firstdate')
@@ -680,8 +778,8 @@ StatusReport.prototype = {
 //                return 'LastTweet' in d && d.LastTweet ? d.LastTweet || '-' : ''; 
             });
         
-        // Datapoints
-        table_body.selectAll(".cell-datapoints .value")
+        // Minutes
+        table_body.selectAll(".cell-minutes .value")
             .transition()
             .duration(1000)
             .tween("text", function (d) {
@@ -693,7 +791,7 @@ StatusReport.prototype = {
                         start = parseInt(start.replace(/ /g, ''));
                     }
                 }
-                var interpol = d3.interpolate(start || 0, d.Datapoints || 0);
+                var interpol = d3.interpolate(start || 0, d.Minutes || 0);
 
                 return function (value) {
                     if(typeof(value) == 'string') {
@@ -704,7 +802,7 @@ StatusReport.prototype = {
                         }
                     }
                     value = Math.round(interpol(value));
-                    if(datapoints_format == 'minutes') {
+                    if(minutes_format == 'minutes') {
                         this.textContent = util.formatMinutes(value);
                     } else {
                         this.textContent = util.formatThousands(value);
@@ -763,57 +861,22 @@ StatusReport.prototype = {
                 var lA = a['Level'];
                 var lB = b['Level'];
                 
-                // Compare Event Types
-                var A = a['Event Type'][quantity];
-                var B = b['Event Type'][quantity];
-//                if(lA == 0 && lB == 0 && !A && !B) return 0;
-                if(!A) return  1;
-                if(!B) return -1;
-                if(A < B) return -1 * ascending_bin;
-                if(A > B) return  1 * ascending_bin;
-                if(lA == 0 && lB == 0) return  a['ID_Min'] - b['ID_Min'];
-                if(lA == 0 && lB >  0) return -1;
-                if(lA >  0 && lB == 0) return  1;
-                
-                // Compare Events
-                A = a['Event'][quantity];
-                B = b['Event'][quantity];
-//                if(lA == 1 && lB == 1 && !A && !B) return 0;
-                if(!A) return  1;
-                if(!B) return -1;
-                if(A < B) return -1 * ascending_bin;
-                if(A > B) return  1 * ascending_bin;
-                if(lA == 1 && lB == 1) return  a['ID'] - b['ID'];
-                if(lA == 1 && lB >  1) return -1;
-                if(lA >  1 && lB == 1) return  1;
-                
-                // Compare Feature Sets
-                A = a['Feature Set'][quantity];
-                B = b['Feature Set'][quantity];
-//                if(lA == 2 && lB == 2 && !A && !B) return 0;
-                if(!A) return  1;
-                if(!B) return -1;
-                if(A < B) return -1 * ascending_bin;
-                if(A > B) return  1 * ascending_bin;
-                if(lA == 2 && lB == 2) return  a['ID'] - b['ID'];
-                if(lA == 2 && lB >  2) return -1;
-                if(lA >  2 && lB == 2) return  1;
-                
-                // Compare Subsets
-                A = a[quantity];
-                B = b[quantity];
-//                if(lA == 2 && lB == 2 && !A && !B) return 0;
-                if(!A) return  1;
-                if(!B) return -1;
-                if(A < B) return -1 * ascending_bin;
-                if(A > B) return  1 * ascending_bin;
-                
-                if(lA == lB) return  a['ID'] - b['ID'];
-                if(lA <  lB) return -1;
-                if(lA >  lB) return  1;
+                // Compare up hierarchy
+                for(var level = 0; level < 5; level++) {
+                    var type = this.hierarchy[level];
+                    var A = a[type][quantity];
+                    var B = b[type][quantity];
+                    if(!A) return  1;
+                    if(!B) return -1;
+                    if(A < B) return -1 * ascending_bin;
+                    if(A > B) return  1 * ascending_bin;
+                    if(lA == level && lB == level) return  a['ID'] - b['ID'];
+                    if(lA == level && lB >  level) return -1;
+                    if(lA >  level && lB == level) return  1;
+                }
 
                 return 0;
-            });
+            }.bind(this));
         } else {
 //            var ascending_minmax = ascending == 'true' ? 'Max' : 'Min';
             var ascending_bin = ascending == 'true' ? 1 : -1;
@@ -913,6 +976,8 @@ StatusReport.prototype = {
             this.quantities.forEach(function (quantity) {
                 d[quantity] = parseInt(result[quantity]) || 0;
             });
+            d['FirstTweet'] = result['FirstTweet'] ? new BigNumber(result['FirstTweet']) : new BigNumber('0');
+            d['LastTweet']  = result['LastTweet']  ? new BigNumber(result['LastTweet'])  : new BigNumber('0');
             
             triggers.emit('update_counts', row);
 
@@ -931,7 +996,7 @@ StatusReport.prototype = {
             quantity: 'tweet',
             min: d.FirstTweet,
             max: d.LastTweet,
-            progress_div: row + ' .cell-datapoints',
+            progress_div: row + ' .cell-minutes',
             progress_text: ' ',
             progress_full: true,
             on_chunk_finish: function(result) {
@@ -949,7 +1014,7 @@ StatusReport.prototype = {
                     return;
                 }
                 
-                d['Datapoints'] = parseInt(result['Datapoints']);
+                d['Minutes'] = parseInt(result['Minutes']);
                 
                 triggers.emit('update_counts', row);
                 

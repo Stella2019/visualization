@@ -4,6 +4,7 @@ global_max_id = 1e20;
 var util = {
     formatDate: d3.time.format("%Y-%m-%d %H:%M:%S"),
     formatDateToMinutes: d3.time.format("%Y-%m-%d %H:%M"),
+    formatDateToYMD: d3.time.format("%Y-%m-%d"),
     formDate: function(d) { return util.formatDate(new Date(new Date(new Date(d).setSeconds(0)).setMilliseconds(0))).replace(' ', 'T'); },
     date2monthstr: d3.time.format("%Y-%m"),
     date: function(str) {
@@ -115,11 +116,17 @@ var util = {
             }
         } else if (feature.includes('URL')) {
             match = '<a href=' + match + ' target="_blank">' + match + '</a>';
-        } else if(feature.includes('Timestamp') || feature.includes('CreatedAt')) {
+        } else if(feature.includes('Timestamp') || feature.includes('Created At')) {
             if(typeof(match) == 'string' && !isNaN(match)) {
                 match = util.formatDateToMinutes(new Date(parseInt(match)));
             } else if(typeof(match) == 'number') {
                 match = util.formatDateToMinutes(new Date(match));
+            }
+        } else if(feature.includes('Timestamp') || feature.includes('Created At')) {
+            if(typeof(match) == 'string' && !isNaN(match)) {
+                match = util.formatDateToYMD(new Date(parseInt(match)));
+            } else if(typeof(match) == 'number') {
+                match = util.formatDateToYMD(new Date(match));
             }
         }
         return match;
@@ -245,13 +252,19 @@ Counter.prototype = {
         //TODO add tokens/total_count setter
         this.counts.set(key, val);
     },
-    incr: function(key, add) {
+    incr: function(key, add, verbose) {
+        if(verbose) console.log('incr1: ', key, add, this.tokens, this.total_count);
         add = add || 1;
-        var val = this.counts.get(key) || 0;
-        if(val == 0) {
+        var val = this.counts.get(key);
+        if(val != 0 && val + add == 0) { // Properly add or remove tokens
+            this.tokens--;
+        } else if(val == 0 && val + add != 0) {
             this.tokens++;
-        };
+        }
+        
         this.total_count += add;
+        if(verbose) console.log('incr2: ', key, add, this.tokens, this.total_count);
+        
         this.counts.set(key, val + add);
     },
     cmpCount: function(a, b) {
@@ -363,11 +376,12 @@ Counter.prototype = {
             return old_count - this.tokens; // number removed
         }
     },
-    statistics: function() { // presuming numeric keys
+    statistics: function(verbose) { // presuming numeric keys
         var stats = {};
         
         var entries = this.counts.entries();
-        entries.sort(function(a, b) { return parseInt(a.key) - parseInt(b.key); });
+        entries.sort(function(a, b) { return parseFloat(a.key) - parseFloat(b.key); });
+        if(verbose) console.log(entries);
         
         // Quartiles
         var quartile_labels = ['Minimum', '25<sup>th</sup> Quartile', 'Median', '75<sup>th</sup> Quartile', 'Maximum'];
@@ -388,7 +402,7 @@ Counter.prototype = {
         var weighted_sum = 0;
         var sum_squares = 0;
         entries.forEach(function(d) { // Average & Stdev
-            var x =  parseInt(d.key);
+            var x =  parseFloat(d.key);
             n += d.value;
             weighted_sum += x * d.value; // value == count in this case
             sum_squares += x * x * d.value;
