@@ -1,5 +1,13 @@
-
-.feature-div {
+.basis {
+    margin: 20px;
+}
+.feat_type {
+    border-bottom: solid #eee;
+}
+.feat_type h3 {
+    color: #69f;
+}
+.feature {
     display: inline-block;
     width: 300px;
     max-height: 400px;
@@ -71,8 +79,8 @@
 
 .description {
     display: inline-block;
-    width: 50%;
-    padding: 20px;
+    width: 45%;
+    margin: 20px;
 }
 
 .load-button-div {

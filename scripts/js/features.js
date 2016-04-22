@@ -15,104 +15,38 @@ function FeatureDistribution() {
     
     this.data = {};
     
-    this.feats = {
-        counter: ['Text',
-                  'TextStripped',
-                  'TextUnigrams',
-                  'TextBigrams',
-                  'TextTrigrams',
-                  'TextCooccur',
-                  'ExpandedURL', 
-                  'ExpandedURL Domain',
-                  'MediaURL', 
-                  'Lang', 
-                  'Timestamp', 
-                  'Type',
-                  'Distinct',
-                  'Source',
-                  'ParentID',
-                  'Screenname - UserID',
-                  'UserTimezone', 
-                  'UserLang',
-                  'UsingPipe',
-//                  'IntervalBetweenPosts',
-                  
-                  'Username/User',
-                  'CreatedAt/User',
-                  'Description Unigrams/User',
-                  'Location/User', 
-                  'UTCOffset/User',
-                  'Timezone/User', 
-                  'Lang/User', 
-                  'Verified/User',
-                  'UsingPipe/User',
-                  'TweetsInCollection/User',
-                  'IntervalBetweenPosts/User',
-                  'StartStatuses/User',
-                  'EndStatuses/User',
-                  'GainStatuses/User',
-                  'StartFollowers/User',
-                  'EndFollowers/User',
-                  'GainFollowers/User',
-                  'StartFollowing/User',
-                  'EndFollowing/User',
-                  'GainFollowing/User',
-                  'StartListed/User', 
-                  'EndListed/User', 
-                  'GainListed/User', 
-                  'StartFavorites/User',
-                  'EndFavorites/User',
-                  'GainFavorites/User'],
-        simple: ['Text', 
-                 'TextStripped', 
-                 'Type',
-                 'Distinct',
-                 'Source', 
-                 'ParentID',
-                 'ExpandedURL', 
-                 'MediaURL',
-                 'UserTimezone'],
-        simple_user: ['Username',
-//                  'UserCreatedAt',
-//                  'UserDescription Unigrams',
-                  'UserLocation', 
-                  'UserUTCOffset',
-                  'UserTimezone', 
-                  'UserLang', 
-                  'UserVerified',
-//                  'UsingPipe',
-//                  'TweetsInCollection',
-//                  'IntervalBetweenPosts',
-                  'UserStatusesCount',
-                  'UserFollowersCount',
-                  'UserFriendsCount',
-                  'UserListedCount', 
-                  'UserFavouritesCount'],
-        hasStopwords: ['TextUnigrams', 
-                       'TextBigrams',
-                       'TextTrigrams',
-                       'TextCooccur',
-                       'Description Unigrams/User'],
-        
-        quantity: ['TweetsInCollection/User',
-                  'IntervalBetweenPosts/User',
-                  'StartStatuses/User',
-                  'EndStatuses/User',
-                  'GainStatuses/User',
-                  'StartFollowers/User',
-                  'EndFollowers/User',
-                  'GainFollowers/User',
-                  'StartFollowing/User',
-                  'EndFollowing/User',
-                  'GainFollowing/User',
-                  'StartListed/User', 
-                  'EndListed/User', 
-                  'GainListed/User', 
-                  'StartFavorites/User',
-                  'EndFavorites/User',
-                  'GainFavorites/User'],
-        
-    }
+    this.hierarchy = {
+        'Tweet Based': {
+            'Categories':   ['Type', 'Distinct'],
+            'Whole Text':  ['Text', 'Text Stripped'],
+            'Text N-Grams': ['Unigrams', 'Bigrams', 'Trigrams', 'Co-Occur'],
+            'Text Other':   ['Language', 'User Language', 'Using Pipe'],
+            'URLs':         ['Expanded URL Domain', 'Expanded URL', 'Media URL'],
+            'Origin':       ['Screenname / User ID', 'Parent Tweet', 'Source'],
+            'Temporal':     ['Time Posted (PT)', 'User\'s Timezone'],
+        },
+        'User Based': {
+            'Identity':     ['Username', 'Description Unigrams', 'Lang', 'Verified'],
+            'Temporal':     ['Account Creation Date', 'Age of Account', 'Median Interval Between Tweets'],
+            'Localization': ['Location', 'UTC Offset', 'Timezone'],
+            'Tweet Text':   ['Using Pipe'],
+            'Statuses':     ['Start', 'Growth'],
+            'Followers':    ['Start', 'Growth'],
+            'Following (Friends)': ['Start', 'Growth'],
+            'Listed':       ['Start', 'Growth'],
+            'Favorites':    ['Start', 'Growth']
+        }
+    };
+    this.hierarchy_flatted = [];
+    Object.keys(this.hierarchy).forEach(function(level1) {
+        var counters1 = this.hierarchy[level1];
+        Object.keys(counters1).forEach(function(level2) {
+            var counters2 = counters1[level2];
+            counters2.forEach(function(counter) {
+                this.hierarchy_flatted.push(level1 + '__' + level2 + '__' + counter);
+            }, this);
+        }, this);
+    }, this);
     
     // Page Objects
     this.body = [];
@@ -155,6 +89,47 @@ FeatureDistribution.prototype = {
             .attr('class', 'description');
         this.desc_b = description_box.append('div')
             .attr('class', 'description');
+        
+        this.basis_divs = this.body.selectAll('div.basis')
+            .data(Object.keys(this.hierarchy))
+            .enter()
+            .append('div')
+            .attr('class', function(d) { return 'basis basis-' + util.simplify(d); });
+        
+        this.basis_divs.append('h2')
+            .html(function(d) { return d; });
+        
+        this.feat_type_divs = this.basis_divs.selectAll('div.feat_type')
+            .data(function(d) {
+                return Object.keys(this.hierarchy[d]).map(function(e) { return d + '__' + e; }); 
+            }.bind(this))
+            .enter()
+            .append('div')
+            .attr('class', function(d) { return 'feat_type feat_type-' + util.simplify(d); });
+        
+        this.feat_type_divs.append('h3')
+            .html(function(d) { return d.split('__')[1]; });
+        
+        this.feature_divs = this.feat_type_divs.selectAll('div.feature')
+            .data(function(de) {
+                de = de.split('__');
+                var d = de[0]; var e = de[1];
+                return this.hierarchy[d][e].map(function(f) { return d + '__' + e + '__' + f; }); 
+            }.bind(this))
+            .enter()
+            .append('div')
+            .attr('class', function(d) { return 'feature feature-' + util.simplify(d); });
+        
+        this.feature_divs.append('h4')
+            .html(function(d) {
+                return d.split('__')[2];
+            });
+        
+        this.feature_divs.append('p');
+        this.feature_divs.append('table')
+            .attr('class', function(d) { return 'table-' + util.simplify(d); })
+            .append('thead');
+        this.feature_divs.select('table').append('tbody');
     },
     setOptions: function() {
         this.ops.panels = ['Dataset', 'Download', 'Display'];
@@ -186,7 +161,7 @@ FeatureDistribution.prototype = {
                 title: "Filter",
                 labels: ['None', 'Redundant Tweets'],
                 ids:    ['none', 'redun'],
-                default: 1,
+                default: 0,
                 callback: triggers.emitter('counters:count')
             }),
             'Exclude Stopwords': new Option({
@@ -391,7 +366,7 @@ FeatureDistribution.prototype = {
 
             // Start Counters        
             set.counter = {};
-            this.feats.counter.forEach(function(counter) {
+            this.hierarchy_flatted.forEach(function(counter) {
                 set.counter[counter] = new Counter();
             });
             
@@ -406,20 +381,18 @@ FeatureDistribution.prototype = {
                 continue;
             }
             
-            var newTweetText = !set.counter.TextStripped.has(tweet.TextStripped);
+            var newTweetText = !set.counter['Tweet Based__Whole Text__Text Stripped'].has(tweet.TextStripped);
 
             if(repeatTextOK || newTweetText) { // Aggressive redundancy check
                 set.nTweets += 1;
                 
-                // Count usual features
-                this.feats.simple.forEach(function(feature) {
-                    set.counter[feature].incr(tweet[feature]);
-                });
-                set.counter['UsingPipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
-                
-                // Languages
-                set.counter['Lang'    ].incr(util.featureMatchName('Lang', tweet['Lang'    ].toLowerCase()));
-                set.counter['UserLang'].incr(util.featureMatchName('Lang', tweet['UserLang'].toLowerCase()));
+                // Add new features
+                var domain = tweet['ExpandedURL'];
+                if(domain) {
+                    domain = domain.replace(
+                        /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
+                }
+                tweet['Expanded URL Domain'] = domain;
                 
                 // Get time feature
                 var time = tweet['Timestamp'];
@@ -427,17 +400,27 @@ FeatureDistribution.prototype = {
                 time.setSeconds(0);
                 time.setMilliseconds(0);
                 time = time.getTime();
-                set.counter['Timestamp'].incr(time);
+                tweet['Timestamp Minute'] = time;
                 
-                // ExpandedURL Domain
-                var url = tweet['ExpandedURL'];
-                if(url) {
-                    url = url.replace(
-                        /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
-                }
-                set.counter['ExpandedURL Domain'].incr(url);
+                // Count features
+                set.counter['Tweet Based__Categories__Type'].incr(tweet['Type']);
+                set.counter['Tweet Based__Categories__Distinct'].incr(tweet['Distinct']);
+                set.counter['Tweet Based__Whole Text__Text'].incr(tweet['Text']);
+                set.counter['Tweet Based__Whole Text__Text Stripped'].incr(tweet['TextStripped']);
+                set.counter['Tweet Based__Text Other__Language'].incr(util.featureMatchName('Lang', tweet['Lang'].toLowerCase()));
+                set.counter['Tweet Based__Text Other__User Language'].incr(util.featureMatchName('Lang', tweet['UserLang'].toLowerCase()));
+                set.counter['Tweet Based__Text Other__Using Pipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
+                set.counter['Tweet Based__URLs__Expanded URL Domain'].incr(tweet['Expanded URL Domain']);
+                set.counter['Tweet Based__URLs__Expanded URL'].incr(tweet['ExpandedURL']);
+                set.counter['Tweet Based__URLs__Media URL'].incr(tweet['MediaURL']);
+                set.counter['Tweet Based__Origin__Screenname / User ID'].incr(tweet['Screenname'] + '/' + tweet['UserID']);
+                set.counter['Tweet Based__Origin__Parent Tweet'].incr(tweet['ParentID']);
+                set.counter['Tweet Based__Origin__Source'].incr(tweet['Source']);
+                set.counter['Tweet Based__Temporal__Time Posted (PT)'].incr(tweet['Timestamp Minute']);
+                set.counter['Tweet Based__Temporal__User\'s Timezone'].incr(tweet['UserTimezone']);
                 
-                // Count Text features
+                
+                // Count N-Grams
                 var text = tweet.TextStripped.toLowerCase();
                 text = text.replace(/[^\w']+/g, ' ');
                 text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
@@ -447,21 +430,21 @@ FeatureDistribution.prototype = {
                 words.forEach(function(word, wi) {
                     if(word) {
                         var gram = word;
-                        set.counter['TextUnigrams'].incr(gram);
+                        set.counter['Tweet Based__Text N-Grams__Unigrams'].incr(gram);
                         if(!tweetgrams[0].has(gram)) {
                             tweetgrams[0].add(gram);
 //                            ngrams.NGramHasCounter[0].incr(gram);
                         }
                         if(words[wi + 1]) {
                             gram += " " + words[wi + 1];
-                            set.counter['TextBigrams'].incr(gram);
+                            set.counter['Tweet Based__Text N-Grams__Bigrams'].incr(gram);
                             if(!tweetgrams[1].has(gram)) {
                                 tweetgrams[1].add(gram);
 //                                ngrams.NGramHasCounter[1].incr(gram);
                             }
                             if(words[wi + 2]) {
                                 gram += " " + words[wi + 2];
-                                set.counter['TextTrigrams'].incr(gram);
+                                set.counter['Tweet Based__Text N-Grams__Trigrams'].incr(gram);
                                 if(!tweetgrams[2].has(gram)) {
                                     tweetgrams[2].add(gram);
 //                                    ngrams.NGramHasCounter[2].incr(gram);
@@ -474,7 +457,7 @@ FeatureDistribution.prototype = {
                                 gram = words[wj] + ' & ' + word;
                             // Add co-occurance
                             if(words[wj]) {
-                                set.counter['TextCooccur'].incr(gram);
+                                set.counter['Tweet Based__Text N-Grams__Co-Occur'].incr(gram);
                                 if(!tweetgrams[3].has(gram)) {
                                     tweetgrams[3].add(gram);
 //                                    ngrams.CoOccurHasCounter.incr(gram);
@@ -489,120 +472,140 @@ FeatureDistribution.prototype = {
 //            set.tweets_arr[set.counted] = tweet.ID; // TODO
             
             var userscreenid = tweet['Screenname'] + ' - ' + tweet['UserID'];
-            var newUser = !set.counter['Screenname - UserID'].has(userscreenid);
+            var newUser = !set.counter['Tweet Based__Origin__Screenname / User ID'].has(userscreenid);
             
-            if(newUser) {
-                var user = {
-                    ID: tweet['UserID'],
-                    TweetsInCollection: 1,
-                    Username: tweet['Username'],
-                    CreatedAt: tweet['UserCreatedAt'],
-                    Description: tweet['UserDescription'],
-                    Location: tweet['UserLocation'],
-                    UTCOffset: tweet['UserUTCOffset'],
-                    Timezone: tweet['UserTimezone'],
-                    Lang: tweet['UserLang'],
-                    Verified: tweet['UserVerified'],
-                    UsingPipe: tweet['Text'].includes('|') ? 1 : 0,
-                    StartStatuses: parseInt(tweet['UserStatusesCount']),
-                    EndStatuses: parseInt(tweet['UserStatusesCount']),
-                    GainStatuses: 0,
-                    StartFollowers: parseInt(tweet['UserFollowersCount']),
-                    EndFollowers: parseInt(tweet['UserFollowersCount']),
-                    GainFollowers: 0,
-                    StartFollowing: parseInt(tweet['UserFriendsCount']),
-                    EndFollowing: parseInt(tweet['UserFriendsCount']),
-                    GainFollowing: 0,
-                    StartListed: parseInt(tweet['UserListedCount']),
-                    EndListed: parseInt(tweet['UserListedCount']),
-                    GainListed: 0,
-                    StartFavorites: parseInt(tweet['UserFavouritesCount']),
-                    EndFavorites: parseInt(tweet['UserFavouritesCount']),
-                    GainFavorites: 0,
-                }
-                set.users[user.ID] = user;
-                
-                Object.keys(user).forEach(function(feature) {
-                    if(feature == 'CreatedAt' && tweet['CreatedAt']) {
-                        var time = tweet['CreatedAt'];
-                        time = util.date(time);
-                        time.setMilliseconds(0);
-                        time.setSeconds(0);
-                        time.setMinutes(0);
-                        time.setHours(0);
-                        time = time.getTime();
-                        set.counter['CreatedAt/User'].incr(time);
-                    } else if (feature == 'ID' || feature == 'Description') {
-                        return;
-                    } else {
-                        set.counter[feature + '/User'].incr(user[feature]);
-                    }
-                });
-                
-                
-                // User Description Unigrams
-                var desc = (tweet.UserDescription || '').toLowerCase();
-                var desc_words = desc.split(/\W/).filter(function(word) { return word.length > 0; });
-                if(desc_words.length == 0) {
-                    desc_words = [tweet.UserDescription];
-                }
-                desc_words.forEach(function(word) {
-                    set.counter['Description Unigrams/User'].incr(word);
-                });
-            } else {
-                var user = set.users[tweet.UserID];
-                
-                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
-                    set.counter['End' + feature + '/User'].incr(user['End' + feature], -1);
-                    set.counter['Gain' + feature + '/User'].incr(user['End' + feature], -1);
-                });
-                set.counter['UsingPipe/User'].incr(user['UsingPipe'], -1);
-                set.counter['TweetsInCollection/User'].incr(user['TweetsInCollection'], -1);
-                
-                user['TweetsInCollection'] == user['TweetsInCollection'] + 1;
-                user['UsingPipe'] += tweet['Text'].includes('|') + 1;
-                user['EndStatuses'] = parseInt(tweet['UserStatusesCount']);
-                user['EndFollowers'] = parseInt(tweet['UserFollowersCount']);
-                user['EndFollowing'] = parseInt(tweet['UserFriendsCount']);
-                user['EndListed'] = parseInt(tweet['UserListedCount']);
-                user['EndFavorites'] = parseInt(tweet['UserFavouritesCount']);
-                
-                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
-                    user['Gain' + feature] = user['End' + feature] - user['Start' + feature];
-                    
-                    set.counter['End' + feature + '/User'].incr(user['End' + feature]);
-                    set.counter['Gain' + feature + '/User'].incr(user['Gain' + feature]);
-                });
-                set.counter['UsingPipe/User'].incr(user['UsingPipe']);
-                set.counter['TweetsInCollection/User'].incr(user['TweetsInCollection']);
-            }
+//            if(newUser) {
+//                
+//            'User Based': {
+//                'Identity': ['Username', 'Description Unigrams', 'Lang', 'Verified'],
+//                'Temporal': ['Account Creation Date', 'Age of Account', 'Median Interval Between Tweets'],
+//                'Localization': ['Location', 'UTC Offset', 'Timezone'],
+//                'Text Other': ['Using Pipe'],
+//                'Statuses': ['Start', 'Growth'],
+//                'Followers': ['Start', 'Growth'],
+//                'Following (Friends)': ['Start', 'Growth'],
+//                'Listed': ['Start', 'Growth'],
+//                'Favorites': ['Start', 'Growth']
+//            }
+//                
+//                var user = {
+//                    ID: tweet['UserID'],
+//                    TweetsInCollection: 1,
+//                    Screenname: tweet['Screenname'],
+//                    Username: tweet['Username'],
+//                    CreatedAt: tweet['UserCreatedAt'],
+//                    Description: tweet['UserDescription'],
+//                    Location: tweet['UserLocation'],
+//                    UTCOffset: tweet['UserUTCOffset'],
+//                    Timezone: tweet['UserTimezone'],
+//                    Lang: tweet['UserLang'],
+//                    Verified: tweet['UserVerified'],
+//                    UsingPipe: tweet['Text'].includes('|') ? 1 : 0,
+//                    StartStatuses: parseInt(tweet['UserStatusesCount']),
+//                    EndStatuses: parseInt(tweet['UserStatusesCount']),
+//                    GainStatuses: 0,
+//                    StartFollowers: parseInt(tweet['UserFollowersCount']),
+//                    EndFollowers: parseInt(tweet['UserFollowersCount']),
+//                    GainFollowers: 0,
+//                    StartFollowing: parseInt(tweet['UserFriendsCount']),
+//                    EndFollowing: parseInt(tweet['UserFriendsCount']),
+//                    GainFollowing: 0,
+//                    StartListed: parseInt(tweet['UserListedCount']),
+//                    EndListed: parseInt(tweet['UserListedCount']),
+//                    GainListed: 0,
+//                    StartFavorites: parseInt(tweet['UserFavouritesCount']),
+//                    EndFavorites: parseInt(tweet['UserFavouritesCount']),
+//                    GainFavorites: 0,
+//                }
+//                set.users[user.ID] = user;
+//                
+//                Object.keys(user).forEach(function(feature) {
+//                    if(feature == 'CreatedAt' && user['CreatedAt']) {
+//                        var time = user['CreatedAt'];
+//                        time = util.date(time);
+//                        time.setMilliseconds(0);
+//                        time.setSeconds(0);
+//                        time.setMinutes(0);
+//                        time.setHours(0);
+//                        time = time.getTime();
+//                        set.counter['CreatedAt/User'].incr(time);
+//                    } else if (['ID', 'Description', 'Screenname'].includes(feature)) {
+//                        return;
+//                    } else {
+//                        set.counter[feature + '/User'].incr(user[feature]);
+//                    }
+//                });
+//                
+//                
+//                // User Description Unigrams
+//                var desc = (tweet.UserDescription || '').toLowerCase();
+//                var desc_words = desc.split(/\W/).filter(function(word) { return word.length > 0; });
+//                if(desc_words.length == 0) {
+//                    desc_words = [tweet.UserDescription];
+//                }
+//                desc_words.forEach(function(word) {
+//                    set.counter['Description Unigrams/User'].incr(word);
+//                });
+//            } else {
+//                var user = set.users[tweet.UserID];
+//                
+//                // Uncount the user's previous entry
+//                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+////                    console.log(user.Screenname + ' (' + feature + ' 1): ' + user['End' + feature], user['Start' + feature], user['Gain' + feature]);
+//                    set.counter['End' + feature + '/User'].incr(user['End' + feature], -1);
+//                    set.counter['Gain' + feature + '/User'].incr(user['Gain' + feature], -1);
+//                });
+//                set.counter['UsingPipe/User'].incr(user['UsingPipe'], -1);
+//                set.counter['TweetsInCollection/User'].incr(user['TweetsInCollection'], -1);
+//                
+//                // Get their new values
+//                user['TweetsInCollection'] == user['TweetsInCollection'] + 1;
+//                user['UsingPipe'] = (user['UsingPipe'] * (user['TweetsInCollection'] - 1) + tweet['Text'].includes('|') ? 1 : 0) / user['TweetsInCollection'];
+//                user['EndStatuses'] = parseInt(tweet['UserStatusesCount']);
+//                user['EndFollowers'] = parseInt(tweet['UserFollowersCount']);
+//                user['EndFollowing'] = parseInt(tweet['UserFriendsCount']);
+//                user['EndListed'] = parseInt(tweet['UserListedCount']);
+//                user['EndFavorites'] = parseInt(tweet['UserFavouritesCount']);
+//                
+//                // Insert new counts
+//                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+////                    console.log(user.Screenname + ' (' + feature + ' 2): ' +  user['End' + feature], user['Start' + feature], user['Gain' + feature]);
+//                    user['Gain' + feature] = user['End' + feature] - user['Start' + feature];
+//                    
+//                    set.counter['End' + feature + '/User'].incr(user['End' + feature], 1);
+//                    set.counter['Gain' + feature + '/User'].incr(user['Gain' + feature], 1);
+//                });
+//                set.counter['UsingPipe/User'].incr(user['UsingPipe'], 1, true);
+//                set.counter['TweetsInCollection/User'].incr(user['TweetsInCollection'], 1, true);
+//            }
         }
         
         // Purge rare quantities from counters that take a LOT of memory
         if(set.counted > 1e6) {
             // Increased
-            set.counter['TextCooccur'].purgeBelow(10);
-            set.counter['TextTrigrams'].purgeBelow(5);
-            set.counter['TextBigrams'].purgeBelow(5);
+            set.counter['Tweet Based__Text N-Grams__Co-Occur'].purgeBelow(10);
+            set.counter['Tweet Based__Text N-Grams__Bigrams'].purgeBelow(5);
+            set.counter['Tweet Based__Text N-Grams__Trigrams'].purgeBelow(5);
             
             // Old
-            set.counter['UserDescription Unigrams/User'].purgeBelow(2);
+//            set.counter['UserDescription Unigrams/User'].purgeBelow(2);
             
             // New
 //            set.counter['Screenname'].purgeBelow(2);
 //            set.counter['Username'].purgeBelow(2);
 //            set.counter['UserID'].purgeBelow(2);
-            set.counter['Text'].purgeBelow(2);
-            set.counter['TextStripped'].purgeBelow(2);
-            set.counter['UserLocation'].purgeBelow(2);
-            set.counter['ParentID'].purgeBelow(2);
-            set.counter['TextUnigrams'].purgeBelow(2);
-            set.counter['ExpandedURL'].purgeBelow(2);
-            set.counter['MediaURL'].purgeBelow(2);
+            
+//            set.counter['Text'].purgeBelow(2);
+//            set.counter['TextStripped'].purgeBelow(2);
+//            set.counter['UserLocation'].purgeBelow(2);
+//            set.counter['ParentID'].purgeBelow(2);
+//            set.counter['TextUnigrams'].purgeBelow(2);
+//            set.counter['ExpandedURL'].purgeBelow(2);
+//            set.counter['MediaURL'].purgeBelow(2);
         } else {
-            set.counter['TextCooccur'].purgeBelow(5);
-            set.counter['TextTrigrams'].purgeBelow(2);
-            set.counter['TextBigrams'].purgeBelow(2);
+            set.counter['Tweet Based__Text N-Grams__Co-Occur'].purgeBelow(5);
+            set.counter['Tweet Based__Text N-Grams__Bigrams'].purgeBelow(2);
+            set.counter['Tweet Based__Text N-Grams__Trigrams'].purgeBelow(2);
             
 //            set.counter['UserDescription Unigrams'].purgeBelow(2);
         }
@@ -652,29 +655,9 @@ FeatureDistribution.prototype = {
             abs = true;
             order_by = 'Log Ratio';
         }
-        
-        var table_divs = this.body.selectAll('div.feature-div')
-            .data(this.feats.counter);
-        
-        // Make any missing tables
-        var table_divs_new = table_divs.enter()
-            .append('div')
-            .attr('class', function(d) {
-                return 'feature-div table-' + util.simplify(d);
-            });
-        table_divs_new.append('h4');
-        table_divs_new.append('p');
-        table_divs_new.append('table').append('thead');
-        table_divs_new.select('table').append('tbody');
     
         // Add header
-        table_divs.select('h4')
-            .html(function(d) {
-                return d.replace('/User', ' <small>Per User</small>')
-                        .replace(/([a-z])([A-Z])/g, '$1 $2');
-            });
-        
-        table_divs.select('p')
+        this.feature_divs.select('p')
             .html(function(d) {
                 if(cmp) {
                      return '# Tokens: ' + util.formatThousands(set.counter[d].tokens) + ' in A, ' 
@@ -684,56 +667,55 @@ FeatureDistribution.prototype = {
                 }
             });
         
-        table_divs.select('table')
-            .attr('class', function(d) { return 'table-' + util.simplify(d); });
-        
         // Add statistics for quantitative features
-        this.feats.quantity.forEach(function(feature) {
-            var table = table_divs.select('.table-' + util.simplify(feature) + ' table')
-                .classed('stats-table', true)
-                .classed('token-freq-table', false);
-            var stats = set.counter[feature].statistics();
-            
-            table.select('thead').selectAll('*').remove();
-            
-            var rows = table.select('tbody').selectAll('tr')
-                .data(Object.keys(stats))
-                .enter()
-                .append('tr')
-                .style('border-top', function(d) { 
-                    return d == 'Mean' ? '3px solid' : 'none';
-                });
-            
-            rows.append('th')
-                .attr('class', 'stat-token')
-                .html(function(d) { return d; });
-            
-            rows.append('td')
-                .attr('class', 'stat-value')
-                .html(function(d) {
-                    var val = stats[d];
-                    if(val == 0) return '0<span style="opacity: 0">.0</span>';
-                    var formatted = util.formatThousands(val);
-                    if(val % 1 > 0) {
-                        formatted += (val % 1).toFixed(1).slice(1);
-                    } else {
-                        formatted += '<span style="opacity: 0">.0</span>';
-                    }
-    //                if(val % 1 > 0) val = val.toFixed(1);
-                    return formatted; 
-                });
-            
-            // TODO cmp statistics
-        });
+//        this.feats.quantity.forEach(function(feature) {
+//            var table = table_divs.select('.table-' + util.simplify(feature))
+//                .classed('stats-table', true)
+//                .classed('token-freq-table', false);
+//            var stats = set.counter[feature].statistics();
+////            console.log(stats, set.counter[feature].top(10));
+//            
+//            table.select('thead').selectAll('*').remove();
+//            
+//            var rows = table.select('tbody').selectAll('tr')
+//                .data(Object.keys(stats))
+//                .enter()
+//                .append('tr')
+//                .style('border-top', function(d) { 
+//                    return d == 'Mean' ? '3px solid' : 'none';
+//                });
+//            
+//            rows.append('th')
+//                .attr('class', 'stat-token')
+//                .html(function(d) { return d; });
+//            
+//            rows.append('td')
+//                .attr('class', 'stat-value')
+//                .html(function(d) {
+////                    console.log(feature, d, stats[d]);
+//                    var val = stats[d];
+//                    if(val == 0) return '0<span style="opacity: 0">.0</span>';
+//                    var formatted = util.formatThousands(val);
+//                    if(val % 1 > 0) {
+//                        formatted += (val % 1).toFixed(1).slice(1);
+//                    } else {
+//                        formatted += '<span style="opacity: 0">.0</span>';
+//                    }
+//    //                if(val % 1 > 0) val = val.toFixed(1);
+//                    return formatted; 
+//                });
+//            
+//            // TODO cmp statistics
+//        });
         
         // Add tables of counts
-        this.feats.counter.forEach(function(feature) {
-            if(this.feats.quantity.includes(feature)) {
-                return;
-            }
+        this.hierarchy_flatted.forEach(function(feature) {
+//            if(this.feats.quantity.includes(feature)) {
+//                return;
+//            }
             
             var table_id = '.table-' + util.simplify(feature);
-            var table = table_divs.select(table_id + ' table')
+            var table = this.feature_divs.select(table_id)
                 .classed('stats-table', false)
                 .classed('token-freq-table', true);
             
@@ -758,14 +740,14 @@ FeatureDistribution.prototype = {
                 .html('Cmp');
 
             var top_tokens;
-            if(excludeStopwords && this.feats.hasStopwords.includes(feature)) {
+            if(excludeStopwords && feature.includes('gram')) {
                 top_tokens = set.counter[feature].top_no_stopwords(n).map(function(d) { return d.key; });
             } else {
                 top_tokens = set.counter[feature].top(n).map(function(d) { return d.key; });
             }
             if(cmp) {
                 var cmp_tokens;
-                if(excludeStopwords && this.feats.hasStopwords.includes(feature)) {
+                if(excludeStopwords && feature.includes('gram')) {
                     cmp_tokens = cmp.counter[feature].top_no_stopwords(n).map(function(d) { return d.key; });
                 } else {
                     cmp_tokens = cmp.counter[feature].top(n).map(function(d) { return d.key; });
@@ -779,6 +761,7 @@ FeatureDistribution.prototype = {
                     Token: util.featureMatchName(feature, token),
                     Frequency: set.counter[feature].get(token)
                 };
+                console.log(entry);
                 entry['Percent']         = entry['Frequency'] / set.nTweets * 100;
                 if(cmp) {
                     entry['Frequency B'] = cmp.counter[feature].get(token);
@@ -921,7 +904,6 @@ FeatureDistribution.prototype = {
         triggers.emit('counters:show');
     },
     showCounts: function() {
-        var table_divs = this.body.selectAll('div.feature-div');
         var count_quantity = this.ops['Display']['Count Quantity'].get();
         var cmp_quantity = this.ops['Display']['Cmp Quantity'].get();
         var comparesetname = this.dataset.event2  ? 'event '  + this.dataset.event2.ID :
@@ -929,7 +911,7 @@ FeatureDistribution.prototype = {
         var cmp = comparesetname ? this.data[comparesetname] : '';
         
         // Set classes
-        table_divs.selectAll('.token-freq-set')
+        this.feature_divs.selectAll('.token-freq-set')
             .classed('token-keyword', function(d) {
                 return d['In Capture Keywords'] && d['In Capture Keywords'] == 'Final Keyword';
             })
@@ -941,11 +923,11 @@ FeatureDistribution.prototype = {
             });
         
         // Populate data
-        table_divs.selectAll('tbody .token')
+        this.feature_divs.selectAll('tbody .token')
             .html(function(d) { 
                 return d['Token'];
             });
-        table_divs.selectAll('tbody .freq-primary')
+        this.feature_divs.selectAll('tbody .freq-primary')
             .html(function(d) { 
                 if(count_quantity == 'freq')
                     return d['Frequency']; 
@@ -953,23 +935,23 @@ FeatureDistribution.prototype = {
             });
         
         if(cmp) {
-            table_divs.selectAll('.cell-cmp')
+            this.feature_divs.selectAll('.cell-cmp')
                 .classed('cell-hidden', false);
             
-            table_divs.selectAll('tbody .freq-secondary')
+            this.feature_divs.selectAll('tbody .freq-secondary')
                 .html(function(d) { 
                     if(count_quantity == 'freq')
                         return d['Frequency B']; 
                     return d['Percent B']; 
                 });
-            table_divs.selectAll('tbody .freq-cmp')
+            this.feature_divs.selectAll('tbody .freq-cmp')
                 .html(function(d) {
                     if(cmp_quantity == 'ratio')
                         return d['Ratio']; 
                     return d['Log Ratio'];
                 });
         } else {
-            table_divs.selectAll('.cell-cmp')
+            this.feature_divs.selectAll('.cell-cmp')
                 .classed('cell-hidden', true);
         }
     }
