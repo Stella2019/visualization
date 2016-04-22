@@ -761,7 +761,6 @@ FeatureDistribution.prototype = {
                     Token: util.featureMatchName(feature, token),
                     Frequency: set.counter[feature].get(token)
                 };
-                console.log(entry);
                 entry['Percent']         = entry['Frequency'] / set.nTweets * 100;
                 if(cmp) {
                     entry['Frequency B'] = cmp.counter[feature].get(token);

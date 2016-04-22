@@ -252,10 +252,9 @@ Counter.prototype = {
         //TODO add tokens/total_count setter
         this.counts.set(key, val);
     },
-    incr: function(key, add, verbose) {
-        if(verbose) console.log('incr1: ', key, add, this.tokens, this.total_count);
+    incr: function(key, add) {
         add = add || 1;
-        var val = this.counts.get(key);
+        var val = this.counts.get(key) || 0;
         if(val != 0 && val + add == 0) { // Properly add or remove tokens
             this.tokens--;
         } else if(val == 0 && val + add != 0) {
@@ -263,7 +262,6 @@ Counter.prototype = {
         }
         
         this.total_count += add;
-        if(verbose) console.log('incr2: ', key, add, this.tokens, this.total_count);
         
         this.counts.set(key, val + add);
     },
