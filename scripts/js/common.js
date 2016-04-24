@@ -466,12 +466,16 @@ function Connection(args) {
     if(this.quantity != 'count') {
         if(typeof(this.min) == 'number') {
             this.min = util.twitterID2Timestamp(this.min);
+        } else if(this.min instanceof BigNumber) {
+            this.min = util.twitterID2Timestamp(this.min.toNumber());
         }
         this.min.setMinutes(0); // Round to the nearest minute
         this.min.setSeconds(0); 
         this.min.setMilliseconds(0); 
         if(typeof(this.max) == 'number') {
             this.max = util.twitterID2Timestamp(this.max);
+        } else if(this.max instanceof BigNumber) {
+            this.max = util.twitterID2Timestamp(this.max.toNumber());
         }
     }
     
@@ -530,11 +534,14 @@ Connection.prototype = {
         }
 
         // Start progress bar
+        var progress_text = this.progress_text;
+        progress_text = progress_text.replace('{cur}', this.chunks[this.chunk_index + 1]);
+        progress_text = progress_text.replace('{max}', this.max);
         this.progress = new Progress({
             name:      this.name,
             parent_id: this.progress_div,
             full:      this.progress_full,
-            text:      this.progress_text,
+            text:      progress_text,
             steps:     this.chunks.length - 1
         });
         this.progress.start();
@@ -582,7 +589,10 @@ Connection.prototype = {
         }
 
         // Update the progress bar
-        this.progress.update(this.chunk_index + 1, this.progress_text);
+        var progress_text = this.progress_text;
+        progress_text = progress_text.replace('{cur}', this.chunks[this.chunk_index + 1]);
+        progress_text = progress_text.replace('{max}', this.max);
+        this.progress.update(this.chunk_index + 1, progress_text);
 
         if(this.quantity == 'count')  { // Makes a LOT of assumptions about the data
             var lastTweetStart = file_data.lastIndexOf('"ID":"');

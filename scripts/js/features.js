@@ -82,6 +82,78 @@ FeatureDistribution.prototype = {
         this.body = d3.select('body').append('div')
             .attr('id', 'body');
         
+        // Navbar
+        this.navbar = this.body.append('nav') 
+            .attr('class', 'navbar navbar-default navbar-fixed-top')
+            .append('div')
+            .attr('class', 'container-fluid');
+        
+        var navbar_header = this.navbar.append('div')
+            .attr('class', 'navbar-header');
+        
+        var collapse_button = navbar_header.append('button')
+            .attr({
+                type: 'button',
+                class: 'navbar-toggle collapsed',
+                'data-toggle': 'collapse',
+                'data-target': '#navbar',
+                'aria-expanded': false
+            });
+        
+        collapse_button.append('span').attr('class', 'sr-only').html('Toggle Navigation');
+        collapse_button.append('span').attr('class', 'icon-bar');
+        collapse_button.append('span').attr('class', 'icon-bar');
+        collapse_button.append('span').attr('class', 'icon-bar');
+        
+        navbar_header.append('a')
+            .attr('class', 'navbar-brand')
+            .html('Features');
+        
+        var navbar_bases = this.navbar.append('div')
+            .attr('id', 'navbar')
+//            .attr('class', 'collapse nav-collapse')
+            .append('ul')
+            .attr('class', 'nav navbar-nav')
+            .selectAll('li')
+            .data(Object.keys(this.hierarchy))
+            .enter()
+            .append('li')
+            .attr('class', 'dropdown');
+        
+        navbar_bases.append('a')
+            .attr({
+                class: 'dropdown-toggle',
+                'data-toggle': 'dropdown',
+                role: 'button',
+                'aria-haspopup': true,
+                'aria-expanded': false,
+            })
+            .html(function(d) { return d + '<span class="caret"></span>'; });
+        
+        navbar_bases.append('ul')
+            .attr('class', 'dropdown-menu')
+            .selectAll('li')
+            .data(function(basis) { 
+                return Object.keys(this.hierarchy[basis]).map(function(feat_type) { 
+                    return {feat_type: feat_type, basis: basis};
+                }); 
+            }.bind(this))
+            .enter()
+            .append('li')
+            .append('a')
+            .html(function(d) { return d.feat_type; })
+            .on('click', function(d) {
+                // Scroll page to table
+                var target = $('div.feat_type-' + util.simplify(d.basis + '__' + d.feat_type));
+                if (target.length)
+                {
+                    var top = target.offset().top;
+                    $('html,body').animate({scrollTop: top - 60}, 1000);
+                    return false;
+                }
+            });
+        
+        // Description Box
         var description_box = this.body.append('div')
             .attr('class', 'descriptions');
         
@@ -90,11 +162,14 @@ FeatureDistribution.prototype = {
         this.desc_b = description_box.append('div')
             .attr('class', 'description');
         
+        // Tables
         this.basis_divs = this.body.selectAll('div.basis')
             .data(Object.keys(this.hierarchy))
             .enter()
             .append('div')
-            .attr('class', function(d) { return 'basis basis-' + util.simplify(d); });
+            .attr('class', function(d) { 
+                return 'basis basis-' + util.simplify(d); 
+            });
         
         this.basis_divs.append('h2')
             .html(function(d) { return d; });
@@ -105,7 +180,15 @@ FeatureDistribution.prototype = {
             }.bind(this))
             .enter()
             .append('div')
-            .attr('class', function(d) { return 'feat_type feat_type-' + util.simplify(d); });
+            .attr('class', function(d) {
+                
+//                navbar_list.append('li')
+//                    .append('a')
+//                    .append('small')
+//                    .html(d);
+                
+                return 'feat_type feat_type-' + util.simplify(d); 
+            });
         
         this.feat_type_divs.append('h3')
             .html(function(d) { return d.split('__')[1]; });
@@ -305,6 +388,16 @@ FeatureDistribution.prototype = {
             lastTweet = new BigNumber(lastTweet);
         }
         
+        // Find the max amount of tweets
+        var limit = this.ops['Download']['Limit'].get();
+        if(limit == 1e10) {
+            if(data.subset) {
+                limit = parseInt(data.subset.Tweets);
+            } else {
+                limit = parseInt(data.event.Tweets);
+            }
+        }
+        
         // Initialize the connection
         data.tweet_connection = new Connection({
             url: 'tweets/get',
@@ -314,8 +407,9 @@ FeatureDistribution.prototype = {
             },
             quantity: 'count',
             resolution: this.ops['Download']['Chunk Size'].get(),
-            max: this.ops['Download']['Limit'].get(),
+            max: limit,
             on_chunk_finish: this.parseNewTweets.bind(this, setname),
+            progress_text: '{cur}/{max} Loaded',
 //            on_finish: triggers.emitter('counters:count', setname),
         });
         if(lastTweet) { // If we are continuing from when we left off
@@ -340,6 +434,11 @@ FeatureDistribution.prototype = {
         } catch(err) {
             console.error(file_data);
             throw(err);
+        }
+        
+        // End early if no more data
+        if(newTweets.length == 0) {
+            this.abortLoadTweets(setname);
         }
     
         $.merge(this.data[setname].tweets_arr, newTweets);
