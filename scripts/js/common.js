@@ -88,12 +88,18 @@ var util = {
             return 0;
         }, 0);
     },
-    featureMatchName: function(feature, match) {
+    subsetName: function(args) {
+        var feature = args.feature || args.Feature;
+        var match = args.match || args.Match;
+        
         if(match == undefined || match == 'null') 
             return '<em>None</em>'
+        if(feature.includes('Text')) {
+            match = match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
+        }
         if(feature.includes('UTCOffset')) {
             var hours = parseFloat(match) / 60 / 60;
-            match = '' + (hours >= 0 ? '+' : '&minus;');
+            match = '' + (hours >= 0 ? '+' : '−');
             hours = Math.abs(hours);
             match +=
                 (hours < 10 ? '0' : '') +
@@ -128,6 +134,12 @@ var util = {
             } else if(typeof(match) == 'number') {
                 match = util.formatDateToYMD(new Date(match));
             }
+        } else if(feature.includes('Verified')) {
+            match = ['Verified', 'Unverified'][match];
+        }
+        
+        if(args.includeFeature) {
+            return '<small>' + feature + '</small>: ' + match;
         }
         return match;
     },

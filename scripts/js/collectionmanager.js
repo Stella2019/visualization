@@ -22,6 +22,10 @@ function CollectionManager(app, args) {
     this.events;
     this.event;
     
+    this.rumors_arr;
+    this.rumors;
+    this.rumor;
+    
     this.time = {};
 
     this.subsets_arr;
@@ -58,6 +62,7 @@ CollectionManager.prototype = {
         // Dataset changes
         if(this.flag_sidebar) {
             triggers.on('events:load', this.loadEvents.bind(this));
+            triggers.on('events:load', this.loadRumors.bind(this));
             triggers.on('events:updated', this.populateEventOptions.bind(this));
             triggers.on('event_type:set', this.chooseEventType.bind(this));
             triggers.on('event:set', this.setEvent.bind(this));
@@ -133,6 +138,7 @@ CollectionManager.prototype = {
                 labels: ["none"],
                 ids:    ["none"],
                 custom_entries_allowed: true,
+                type: 'dropdown_autocomplete',
                 callback: triggers.emitter('subset:set')
             });
             if(this.flag_allow_edits) {
@@ -306,11 +312,29 @@ CollectionManager.prototype = {
             console.error(message);
         }
     },
+    loadRumors: function () {
+        this.app.connection.php('collection/getRumor', {},
+             this.parseRumorsFile.bind(this));
+    },
     loadSubsets: function (version) {
         if(this['event' + version] && this['event' + version].ID) {
             this.app.connection.php('collection/getSubset', {event: this['event' + version].ID},
                  this.parseSubsetsFile.bind(this, version));
         }
+    },
+    parseRumorsFile: function(filedata) {
+        try {
+            filedata = JSON.parse(filedata);
+        } catch (exception) {
+            console.log(filedata);
+            return;
+        }
+        
+        this.rumors = {};
+        this.rumors_arr = filedata;
+        this.rumors_arr.forEach(function(rumor) {
+            this.rumors[rumor.ID] = rumor;
+        }, this);
     },
     parseSubsetsFile: function(version, filedata) {
         try {
@@ -323,25 +347,33 @@ CollectionManager.prototype = {
         this['subsets' + version] = {};
         this['subsets' + version + '_arr'] = filedata;
         this['subsets' + version + '_arr'].forEach(function(subset) {
-            subset.DisplayMatch = subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
-            if(subset.Feature == 'User.UTCOffset') {
-                var hours = parseFloat(subset.DisplayMatch) / 60 / 60;
-                subset.DisplayMatch = 'UTC' + (hours >= 0 ? '+' : '-');
-                hours = Math.abs(hours);
-                subset.DisplayMatch +=
-                    (hours < 10 ? '0' : '') +
-                    hours.toFixed(0) + ':' +
-                    (hours * 6 % 6).toFixed(0) + (hours * 60 % 10).toFixed(0);
+            subset.rumor = {};
+            
+            // Get formatted display name
+            subset.DisplayMatch = util.subsetName({
+                feature: subset.Feature,
+                match: subset.Match
+            });
+            
+            // If subset IS a rumor
+            if(subset.Feature == 'Rumor') {
+                subset.rumor = this.rumors[subset.Match];
+                subset.DisplayMatch = subset.rumor.Name;
             }
-            subset.Label = subset.Feature + ': ' + subset.DisplayMatch;
+            
+            // Make Label
+            subset.Label = '<small>' + subset.Feature + '</small>: ' + subset.DisplayMatch;
+            
+            // Add rumor if the subset is under a rumor
+            if(subset.Rumor != '0') {
+                subset.rumor = this.rumors[subset.Rumor];
+                subset.Label = '<em><small>' + subset.rumor.Name + '</small></em> ' + subset.Label;
+            }
             
             this.subsets[subset.ID] = subset;
         }, this);
         
         triggers.emit('subsets' + version + ':updated');
-        
-        // Populate the list of options
-//        options.buildRumors();
     },
     populateEventOptions: function() {
         var event_op = this.ops['Event'];

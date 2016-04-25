@@ -126,6 +126,18 @@ button:focus {
     margin-right: 5px;
 }
 
+.tt-menu {
+    width: 100%;
+    max-height: 150px;
+    overflow-y: auto;
+}
+.tt-input {
+    width: 100%;
+}
+.tt-suggestion {
+    white-space: normal !important;
+}
+
 
 /* Modals */
 .badge a {
@@ -210,4 +222,3 @@ button:focus {
     padding: 5px 5px 0px 5px;
     max-width: 300px;
 }
-    

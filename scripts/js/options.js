@@ -865,6 +865,9 @@ Options.prototype = {
         if(option.type && option.type == 'textfieldautoman') {
             this.buildTextToggle(panel_name, option_name);
             return;
+        } else if(option.type && option.type == 'dropdown_autocomplete') {
+            this.buildDropdownAutocomplete(panel_name, option_name);
+            return;
         }
         
         // Make containers
@@ -908,7 +911,7 @@ Options.prototype = {
                 }
             }
             
-            // Add options dropdown
+            // Add list opener
             list_open = container.append("button")
                 .attr({type: "button",
                     class: 'btn btn-xs btn-default dropdown-toggle',
@@ -979,5 +982,206 @@ Options.prototype = {
         // Save the current value to the interface and the history
         container.select('.current')
             .html(option.labels[option.default]);
+    },
+    buildDropdownAutocomplete: function(panel_name, option_name) {
+        var panel = this[panel_name];
+        var option = panel[option_name];
+                
+        // Make containers
+        var container = d3.select('#choose_' + util.simplify(panel_name) + '_' + util.simplify(option_name));
+        
+        // If it does not exist, create it
+        if(!container[0][0]) {
+            container = d3.select('#panel_' + util.simplify(panel_name)).append("div")
+                .attr("class", "choice" + (option.breakbefore ? ' choice-break-before' : ''))
+                .style("display", option.hidden ? 'none' : 'inline-block')
+                .style("text-transform", "capitalize")
+                .append("div")
+                    .attr("id", "choose_" + util.simplify(panel_name) + '_' + util.simplify(option_name))
+                    .attr("class", "form-group");
+        }
+        
+        var list_open = container.select('label.option-label');
+        if(!list_open[0][0]) {
+            container.append('label')
+                .attr('class', 'option-label') //col-xs-3 control-label
+                .style('font-weight', 'normal')
+                .html(option.title);
+            
+//            // Add an edit button if there is an edit function
+//            if('edit' in option) {
+//                var edit_button = container.select('button.edit-button')
+//                if(!edit_button[0][0]) {
+//                    container.classed('btn-group', true);
+//
+//                    list_open.style({
+//                        'border-top-right-radius': '0px',
+//                        'border-bottom-right-radius': '0px',
+//                        'border-right': 'none'
+//                    });
+//
+//                    edit_button = container.append('button')
+//                        .attr('class', 'btn btn-xs btn-default edit-button')
+//                        .on('click', option.edit)
+//                        .style('float', 'right')
+//                        .append('span')
+//                        .attr('class', 'glyphicon glyphicon-pencil');
+//                }
+//            }
+        }
+        
+        var choices = option.available.map(function(i) {
+            var entry = {
+                id: option.ids[i],
+                label: option.labels[i],
+                name: option.labels[i].replace(/<[^>]*>/g, ''),
+                index: i
+            };
+            return entry;
+        })
+        var first_choices = choices.filter(function(d) {return d < 3;}).map(function(d) { return d.name });
+        
+        var listname = 'typeahead-' + util.simplify(panel_name + '_' + option_name);
+        var list = container.select('#' + listname);
+//        option.jq_list = $('#' + listname);/
+        if(!list[0][0]) {
+            list = container.append('input')
+                .style({
+                    right: '0px',
+                    left: 'auto',
+                    'max-width': '100%',
+                    'min-width': '0%',
+                    cursor: 'pointer'
+                })
+                .attr({
+                    type: 'text',
+                    'data-provide': 'typeahead',
+                    id: listname,
+                    placeholder: 'Enter search' // option_name
+                });
+            
+            option.bh_choices = new Bloodhound({
+                datumTokenizer: function (data) {
+                    return data.name.split(/[\W_]*/g);
+                },
+                queryTokenizer: function (data) {
+                    return data.split(/[\W_]*/g);
+                },
+                local: choices,
+            });
+            
+            option.bh_choices.initialize();
+            
+            // Initialize Autocompleting Input
+            $('#' + listname).typeahead({
+                hint: false,
+                highlight: true,
+                minLength: 0
+            }, {
+                name: listname,
+                limit: 100,
+                displayKey: 'name',
+                source: function (q, sync) {
+                    if (q === '') {
+                        sync(option.bh_choices.all());
+                    } else {
+                        option.bh_choices.search(q, sync);
+                    }
+                },
+                matcher: function(item) {
+                    return this.query == '' || item.indexOf(this.query) >= 0;
+                },
+                templates: {
+                    empty: '<div class="tt-suggestion"><em>No Match</em></div>',
+                    suggestion: function(d) {
+                        return '<div class="tt-suggestion">' + d.label + '</div>'; 
+                    }
+                }
+            });
+            
+            // Add happening on select
+            $('#' + listname).bind('typeahead:selected', function(ev, suggestion) {
+                option.set(suggestion.id);
+                this.recordState();
+                option.callback();
+            }.bind(this));
+            
+            // Add toggle button
+//            container.select('.twitter-typeahead')
+//                .append('span')
+//                .attr('class', 'input-group-btn')
+//                .style({
+//                    position: 'absolute',
+//                    right: '0px',
+//                    top: '0px',
+//                    width: '30px',
+//                })
+//                .append('button')
+//                .attr('class', 'btn btn-sm dropdown-toggle')
+//                .style({
+//                    height: '26px',
+//                    'line-height': 1
+//                })
+//                .on('click', function() {
+//                    $('#' + listname).focus(); // Can also get val('')
+//                })
+//                .append('span')
+//                .attr('class', 'caret')
+//                .html('');
+        } else {
+            // Change the choices
+            option.bh_choices.clear();
+            option.bh_choices.local = choices;
+            option.bh_choices.initialize(true);
+        }
+        
+        // Populate the list
+//        var elements = list.selectAll("li")
+//            .data(option.available);
+        
+//        elements.enter()
+//            .append("li")
+//            .attr('data-value', function(d) { return option.ids[d]; })
+//            .html(function(d) { return option.labels[d]; });
+////            .attr('class', 'sidebar-dropdown-option')
+////            .append("a");
+//        
+//        elements.exit().remove(); // Remove former columns
+//        elements.select('li'); // Propagate any data that refreshs to be
+//        $('#' + listname).append($('').val(1).html('Hello'));
+//            
+//        $('#' + listname).data('combobox').refresh();
+        
+//        container.select('#' + listname)
+//            .on('selected', function(d) { console.log('selected', d); })
+//            .on('select', function(d) { console.log('select', d); })
+//            .on('change', function(d) { console.log('change', d); });
+        
+//        option.updateInInterface = function(d) {
+//            container.select('.current')
+//                .html(option.labels[d]);
+//
+//            option.set(option.ids[d]);
+//            this.recordState();
+//        }.bind(this);
+//        option.updateInInterface_id = function(d) {
+//            option.updateInInterface(option.indexOf(d));
+//        }
+//        option.click = function(d) {
+//            option.updateInInterface(d);
+//
+//            option.callback();
+//        }
+//        
+//        list.selectAll('a')
+//            .attr("id", function(d) { return option_name + "_" + option.ids[d]; })
+//            .html(function(d) {
+//                return option.labels[d];
+//            })
+//            .on("click", option.click);
+//
+//        // Save the current value to the interface and the history
+//        container.select('.current')
+//            .html(option.labels[option.default]);
     }
 }

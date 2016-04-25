@@ -373,7 +373,7 @@ FeatureDistribution.prototype = {
             if(collection_type == 'subset') {
                 data.subset = this.dataset['subsets'][data.id];
                 data.event = this.dataset['events'][data.subset.Event];
-                data.label = (data.event.DisplayName || data.event.Name) + ' - ' + data.subset.Feature + ' - ' + data.subset.Match;
+                data.label = (data.event.DisplayName || data.event.Name) + ' - ' + data.subset.Feature + ' - ' + util.subsetName(data.subset);
             } else {
                 data.event = this.dataset['events'][data.id];
                 data.label = data.event.DisplayName || data.event.Name;
@@ -506,8 +506,8 @@ FeatureDistribution.prototype = {
                 set.counter['Tweet Based__Categories__Distinct'].incr(tweet['Distinct']);
                 set.counter['Tweet Based__Whole Text__Text'].incr(tweet['Text']);
                 set.counter['Tweet Based__Whole Text__Text Stripped'].incr(tweet['TextStripped']);
-                set.counter['Tweet Based__Text Other__Language'].incr(util.featureMatchName('Lang', tweet['Lang'].toLowerCase()));
-                set.counter['Tweet Based__Text Other__User Language'].incr(util.featureMatchName('Lang', tweet['UserLang'].toLowerCase()));
+                set.counter['Tweet Based__Text Other__Language'].incr(util.subsetName({feature: 'Lang', match: tweet['Lang'].toLowerCase()}));
+                set.counter['Tweet Based__Text Other__User Language'].incr(util.subsetName({feature: 'Lang', match: tweet['UserLang'].toLowerCase()}));
                 set.counter['Tweet Based__Text Other__Using Pipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
                 set.counter['Tweet Based__URLs__Expanded URL Domain'].incr(tweet['Expanded URL Domain']);
                 set.counter['Tweet Based__URLs__Expanded URL'].incr(tweet['ExpandedURL']);
@@ -857,7 +857,7 @@ FeatureDistribution.prototype = {
             
             var entries = top_tokens.map(function(token) {
                 var entry = {
-                    Token: util.featureMatchName(feature, token),
+                    Token: util.subsetName({feature: feature, match:token}),
                     Frequency: set.counter[feature].get(token)
                 };
                 entry['Percent']         = entry['Frequency'] / set.nTweets * 100;
