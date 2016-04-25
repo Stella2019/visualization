@@ -72,10 +72,18 @@ var util = {
     formatMinutes: function(value) {
         var days = Math.floor(value / 60 / 24);
         var hours = Math.floor(value / 60) % 24;
-        var minutes = value % 60;
+        var minutes = Math.floor(value % 60);
         if(days) return days + 'd ' + (hours < 10 ? '0' : '') + hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm';
         if(hours) return hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm';
         return minutes + 'm';
+    },
+    formatDays: function(value) {
+        var years = Math.floor(value / 365);
+        var months = Math.floor((value - years * 365) / 30);
+        var days = Math.floor(value - years * 365 - months * 30);
+        if(years) return years + 'y ' + (months < 10 ? '0' : '') + months + 'm ' + (days < 10 ? '0' : '') + days + 'd';
+        if(months) return months + 'm ' + (days < 10 ? '0' : '') + days + 'd';
+        return days + 'd';
     },
     deformatMinutes: function(minutes) {
         return minutes.split(' ').reduce(function(res, cur) {
@@ -97,7 +105,7 @@ var util = {
         if(feature.includes('Text')) {
             match = match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
         }
-        if(feature.includes('UTCOffset')) {
+        if(feature.includes('UTC')) {
             var hours = parseFloat(match) / 60 / 60;
             match = '' + (hours >= 0 ? '+' : '−');
             hours = Math.abs(hours);
@@ -128,14 +136,20 @@ var util = {
             } else if(typeof(match) == 'number') {
                 match = util.formatDateToMinutes(new Date(match));
             }
-        } else if(feature.includes('Timestamp') || feature.includes('Created At')) {
+        } else if(feature.includes('Creation Date')) {
             if(typeof(match) == 'string' && !isNaN(match)) {
                 match = util.formatDateToYMD(new Date(parseInt(match)));
             } else if(typeof(match) == 'number') {
                 match = util.formatDateToYMD(new Date(match));
             }
+        } else if(feature.includes('Age')) {
+            if(typeof(match) == 'string' && !isNaN(match)) {
+                match = util.formatDays(parseInt(match));
+            } else if(typeof(match) == 'number') {
+                match = util.formatDays(match);
+            }
         } else if(feature.includes('Verified')) {
-            match = ['Verified', 'Unverified'][match];
+            match = ['Unverified', 'Verified'][match];
         }
         
         if(args.includeFeature) {
@@ -252,6 +266,7 @@ function Counter() {
     this.counts = new d3.map();
     this.tokens = 0;
     this.total_count = 0;
+    this.not_applicable = 0;
 }
 Counter.prototype = {
     has: function(key) {

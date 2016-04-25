@@ -1133,6 +1133,7 @@ Options.prototype = {
             option.bh_choices.clear();
             option.bh_choices.local = choices;
             option.bh_choices.initialize(true);
+            $('#' + listname).val('');
         }
         
         // Populate the list

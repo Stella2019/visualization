@@ -18,7 +18,7 @@ function FeatureDistribution() {
     this.hierarchy = {
         'Tweet Based': {
             'Categories':   ['Type', 'Distinct'],
-            'Whole Text':  ['Text', 'Text Stripped'],
+            'Whole Text':   ['Text', 'Text Stripped'],
             'Text N-Grams': ['Unigrams', 'Bigrams', 'Trigrams', 'Co-Occur'],
             'Text Other':   ['Language', 'User Language', 'Using Pipe'],
             'URLs':         ['Expanded URL Domain', 'Expanded URL', 'Media URL'],
@@ -26,15 +26,16 @@ function FeatureDistribution() {
             'Temporal':     ['Time Posted (PT)', 'User\'s Timezone'],
         },
         'User Based': {
+            'Activity':     ['Tweets', 'Median Interval Between Tweets'],
             'Identity':     ['Username', 'Description Unigrams', 'Lang', 'Verified'],
-            'Temporal':     ['Account Creation Date', 'Age of Account', 'Median Interval Between Tweets'],
+            'Temporal':     ['Account Creation Date', 'Age of Account'],
             'Localization': ['Location', 'UTC Offset', 'Timezone'],
             'Tweet Text':   ['Using Pipe'],
-            'Statuses':     ['Start', 'Growth'],
-            'Followers':    ['Start', 'Growth'],
-            'Following (Friends)': ['Start', 'Growth'],
-            'Listed':       ['Start', 'Growth'],
-            'Favorites':    ['Start', 'Growth']
+            'Statuses':     ['Start', 'Growth', 'Growth > 0'],
+            'Followers':    ['Start', 'Growth', 'Growth > 0'],
+            'Following':    ['Start', 'Growth', 'Growth > 0'],
+            'Listed':       ['Start', 'Growth', 'Growth > 0'],
+            'Favorites':    ['Start', 'Growth', 'Growth > 0']
         }
     };
     this.hierarchy_flatted = [];
@@ -462,6 +463,7 @@ FeatureDistribution.prototype = {
         if(!set.counted || set.counted == set.tweets_arr.length) {
             set.counted = 0;
             set.nTweets = 0;
+            set.nUsers = 0;
 
             // Start Counters        
             set.counter = {};
@@ -512,7 +514,7 @@ FeatureDistribution.prototype = {
                 set.counter['Tweet Based__URLs__Expanded URL Domain'].incr(tweet['Expanded URL Domain']);
                 set.counter['Tweet Based__URLs__Expanded URL'].incr(tweet['ExpandedURL']);
                 set.counter['Tweet Based__URLs__Media URL'].incr(tweet['MediaURL']);
-                set.counter['Tweet Based__Origin__Screenname / User ID'].incr(tweet['Screenname'] + '/' + tweet['UserID']);
+                set.counter['Tweet Based__Origin__Screenname / User ID'].incr(tweet['Screenname'] + ' - ' + tweet['UserID']);
                 set.counter['Tweet Based__Origin__Parent Tweet'].incr(tweet['ParentID']);
                 set.counter['Tweet Based__Origin__Source'].incr(tweet['Source']);
                 set.counter['Tweet Based__Temporal__Time Posted (PT)'].incr(tweet['Timestamp Minute']);
@@ -571,112 +573,135 @@ FeatureDistribution.prototype = {
 //            set.tweets_arr[set.counted] = tweet.ID; // TODO
             
             var userscreenid = tweet['Screenname'] + ' - ' + tweet['UserID'];
-            var newUser = !set.counter['Tweet Based__Origin__Screenname / User ID'].has(userscreenid);
+            var newUser = set.counter['Tweet Based__Origin__Screenname / User ID'].get(userscreenid) == 1;
             
-//            if(newUser) {
-//                
-//            'User Based': {
-//                'Identity': ['Username', 'Description Unigrams', 'Lang', 'Verified'],
-//                'Temporal': ['Account Creation Date', 'Age of Account', 'Median Interval Between Tweets'],
-//                'Localization': ['Location', 'UTC Offset', 'Timezone'],
-//                'Text Other': ['Using Pipe'],
-//                'Statuses': ['Start', 'Growth'],
-//                'Followers': ['Start', 'Growth'],
-//                'Following (Friends)': ['Start', 'Growth'],
-//                'Listed': ['Start', 'Growth'],
-//                'Favorites': ['Start', 'Growth']
-//            }
-//                
-//                var user = {
-//                    ID: tweet['UserID'],
-//                    TweetsInCollection: 1,
-//                    Screenname: tweet['Screenname'],
-//                    Username: tweet['Username'],
-//                    CreatedAt: tweet['UserCreatedAt'],
-//                    Description: tweet['UserDescription'],
-//                    Location: tweet['UserLocation'],
-//                    UTCOffset: tweet['UserUTCOffset'],
-//                    Timezone: tweet['UserTimezone'],
-//                    Lang: tweet['UserLang'],
-//                    Verified: tweet['UserVerified'],
-//                    UsingPipe: tweet['Text'].includes('|') ? 1 : 0,
-//                    StartStatuses: parseInt(tweet['UserStatusesCount']),
-//                    EndStatuses: parseInt(tweet['UserStatusesCount']),
-//                    GainStatuses: 0,
-//                    StartFollowers: parseInt(tweet['UserFollowersCount']),
-//                    EndFollowers: parseInt(tweet['UserFollowersCount']),
-//                    GainFollowers: 0,
-//                    StartFollowing: parseInt(tweet['UserFriendsCount']),
-//                    EndFollowing: parseInt(tweet['UserFriendsCount']),
-//                    GainFollowing: 0,
-//                    StartListed: parseInt(tweet['UserListedCount']),
-//                    EndListed: parseInt(tweet['UserListedCount']),
-//                    GainListed: 0,
-//                    StartFavorites: parseInt(tweet['UserFavouritesCount']),
-//                    EndFavorites: parseInt(tweet['UserFavouritesCount']),
-//                    GainFavorites: 0,
-//                }
-//                set.users[user.ID] = user;
-//                
-//                Object.keys(user).forEach(function(feature) {
-//                    if(feature == 'CreatedAt' && user['CreatedAt']) {
-//                        var time = user['CreatedAt'];
-//                        time = util.date(time);
-//                        time.setMilliseconds(0);
-//                        time.setSeconds(0);
-//                        time.setMinutes(0);
-//                        time.setHours(0);
-//                        time = time.getTime();
-//                        set.counter['CreatedAt/User'].incr(time);
-//                    } else if (['ID', 'Description', 'Screenname'].includes(feature)) {
-//                        return;
-//                    } else {
-//                        set.counter[feature + '/User'].incr(user[feature]);
-//                    }
-//                });
-//                
-//                
-//                // User Description Unigrams
-//                var desc = (tweet.UserDescription || '').toLowerCase();
-//                var desc_words = desc.split(/\W/).filter(function(word) { return word.length > 0; });
-//                if(desc_words.length == 0) {
-//                    desc_words = [tweet.UserDescription];
-//                }
-//                desc_words.forEach(function(word) {
-//                    set.counter['Description Unigrams/User'].incr(word);
-//                });
-//            } else {
-//                var user = set.users[tweet.UserID];
-//                
-//                // Uncount the user's previous entry
-//                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
-////                    console.log(user.Screenname + ' (' + feature + ' 1): ' + user['End' + feature], user['Start' + feature], user['Gain' + feature]);
-//                    set.counter['End' + feature + '/User'].incr(user['End' + feature], -1);
-//                    set.counter['Gain' + feature + '/User'].incr(user['Gain' + feature], -1);
-//                });
-//                set.counter['UsingPipe/User'].incr(user['UsingPipe'], -1);
-//                set.counter['TweetsInCollection/User'].incr(user['TweetsInCollection'], -1);
-//                
-//                // Get their new values
-//                user['TweetsInCollection'] == user['TweetsInCollection'] + 1;
-//                user['UsingPipe'] = (user['UsingPipe'] * (user['TweetsInCollection'] - 1) + tweet['Text'].includes('|') ? 1 : 0) / user['TweetsInCollection'];
-//                user['EndStatuses'] = parseInt(tweet['UserStatusesCount']);
-//                user['EndFollowers'] = parseInt(tweet['UserFollowersCount']);
-//                user['EndFollowing'] = parseInt(tweet['UserFriendsCount']);
-//                user['EndListed'] = parseInt(tweet['UserListedCount']);
-//                user['EndFavorites'] = parseInt(tweet['UserFavouritesCount']);
-//                
-//                // Insert new counts
-//                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
-////                    console.log(user.Screenname + ' (' + feature + ' 2): ' +  user['End' + feature], user['Start' + feature], user['Gain' + feature]);
-//                    user['Gain' + feature] = user['End' + feature] - user['Start' + feature];
-//                    
-//                    set.counter['End' + feature + '/User'].incr(user['End' + feature], 1);
-//                    set.counter['Gain' + feature + '/User'].incr(user['Gain' + feature], 1);
-//                });
-//                set.counter['UsingPipe/User'].incr(user['UsingPipe'], 1, true);
-//                set.counter['TweetsInCollection/User'].incr(user['TweetsInCollection'], 1, true);
-//            }
+            if(newUser) {
+                set.nUsers += 1;
+                
+                var creation = util.date(tweet['UserCreatedAt']);
+                creation.setMilliseconds(0);
+                creation.setSeconds(0);
+                creation.setMinutes(0);
+                creation.setHours(0);
+                var firstTweet = util.twitterID2Timestamp(set.event.FirstTweet);
+                var age = Math.floor((firstTweet.getTime() - creation.getTime()) / 24 / 60 / 60 / 1000);
+            
+                var user = {
+                    ID: tweet['UserID'],
+                    Tweets: 1,
+                    Screenname: tweet['Screenname'],
+                    Username: tweet['Username'],
+                    CreatedAt: creation,
+                    Age: age,
+                    Description: tweet['UserDescription'],
+                    LastTimeTweeted: util.date(tweet['Timestamp']).getTime(),
+                    TweetIntervals: [],
+                    MedianTweetInterval: 0, // upper bound = 1 week
+                    Location: tweet['UserLocation'],
+                    UTCOffset: tweet['UserUTCOffset'],
+                    Timezone: tweet['UserTimezone'],
+                    Lang: tweet['UserLang'],
+                    Verified: tweet['UserVerified'],
+                    UsingPipe: tweet['Text'].includes('|') ? 1 : 0,
+                    Statuses: { Start:parseInt(tweet['UserStatusesCount']), 
+                               End:parseInt(tweet['UserStatusesCount']), Growth: 0},
+                    Followers: { Start:parseInt(tweet['UserFollowersCount']), 
+                               End:parseInt(tweet['UserFollowersCount']), Growth: 0},
+                    Following: { Start:parseInt(tweet['UserFriendsCount']), 
+                               End:parseInt(tweet['UserFriendsCount']), Growth: 0},
+                    Listed: { Start:parseInt(tweet['UserListedCount']), 
+                               End:parseInt(tweet['UserListedCount']), Growth: 0},
+                    Favorites: { Start:parseInt(tweet['UserFavouritesCount']), 
+                               End:parseInt(tweet['UserFavouritesCount']), Growth: 0},
+                }
+                set.users[user.ID] = user;
+                
+                set.counter['User Based__Identity__Username'].incr(user['Username']);
+                set.counter['User Based__Identity__Lang'].incr(user['Lang']);
+                set.counter['User Based__Identity__Verified'].incr(user['Verified']);
+                set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
+                set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable++;
+//                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval']);
+                set.counter['User Based__Temporal__Account Creation Date'].incr(creation.getTime());
+                set.counter['User Based__Temporal__Age of Account'].incr(age);
+                set.counter['User Based__Localization__Location'].incr(user['Location']);
+                set.counter['User Based__Localization__UTC Offset'].incr(user['UTCOffset']);
+                set.counter['User Based__Localization__Timezone'].incr(user['Timezone']);
+                set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe']);
+                
+                // User Description Unigrams
+                var desc = (tweet.UserDescription || '').toLowerCase();
+                var desc_words = desc.split(/\W/).filter(function(word) { return word.length > 0; });
+                if(desc_words.length == 0) {
+                    desc_words = [tweet.UserDescription];
+                }
+                desc_words.forEach(function(word) {
+                    set.counter['User Based__Identity__Description Unigrams'].incr(word);
+                });
+                
+                // Counts
+                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                    set.counter['User Based__' + feature + '__Start'].incr(user[feature]['Start']);
+                    set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth']);
+                    set.counter['User Based__' + feature + '__Growth > 0'].not_applicable++;
+                });
+            } else {
+                var user = set.users[tweet.UserID];
+                
+                // Tweets
+                set.counter['User Based__Activity__Tweets'].incr(user['Tweets'], -1);
+                user['Tweets']++;
+                set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
+                
+                // Median Interval between tweets
+                var thisTimeTweeted = util.date(tweet['Timestamp']).getTime();
+                var interval = (thisTimeTweeted - user['LastTimeTweeted']) / 60 / 1000;
+                user['TweetIntervals'].push(interval);
+                if(user['Tweets'] > 2) {
+                    set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval'], -1);
+                } else if(user['Tweets'] == 2) {
+                    set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable--;
+                }
+                user['MedianTweetInterval'] = d3.median(user['TweetIntervals']);
+                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval']);
+                
+                // Using Pipe
+                set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], -1);
+                user['UsingPipe'] = (user['UsingPipe'] * (user['Tweets'] - 1) + tweet['Text'].includes('|') ? 1 : 0) / user['Tweets'];
+                set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], 1);
+                
+                /* Counts */
+                
+                // Uncount the user's previous entry
+                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                    set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], -1);
+                    if(user[feature]['Growth'] == 0) {
+                        set.counter['User Based__' + feature + '__Growth > 0'].not_applicable--;
+                    } else {
+                        set.counter['User Based__' + feature + '__Growth > 0'].incr(user[feature]['Growth'], -1);
+                    }
+                });
+                
+                // Get their new values
+                user['Statuses']['End'] = parseInt(tweet['UserStatusesCount']);
+                user['Followers']['End'] = parseInt(tweet['UserFollowersCount']);
+                user['Following']['End'] = parseInt(tweet['UserFriendsCount']);
+                user['Listed']['End'] = parseInt(tweet['UserListedCount']);
+                user['Favorites']['End'] = parseInt(tweet['UserFavouritesCount']);
+                
+                // Insert new counts
+                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                    user[feature]['Growth'] = user[feature]['End'] - user[feature]['Start'];
+                    
+                    set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], 1);
+                    
+                    if(user[feature]['Growth'] == 0) {
+                        set.counter['User Based__' + feature + '__Growth > 0'].not_applicable++;
+                    } else {
+                        set.counter['User Based__' + feature + '__Growth > 0'].incr(user[feature]['Growth'], 1);
+                    }
+                });
+            }
         }
         
         // Purge rare quantities from counters that take a LOT of memory
@@ -758,60 +783,122 @@ FeatureDistribution.prototype = {
         // Add header
         this.feature_divs.select('p')
             .html(function(d) {
-                if(cmp) {
-                     return '# Tokens: ' + util.formatThousands(set.counter[d].tokens) + ' in A, ' 
-                         + util.formatThousands(cmp.counter[d].tokens) + ' in B';
+                var basis = d.split(' ')[0];
+                var info = ''
+                if(set.counter[d].not_applicable) {
+                    info += '# ' + basis + 's: ' + util.formatThousands(set['n' + basis + 's'] - set.counter[d].not_applicable)
+                    info += ' of ' + util.formatThousands(set['n' + basis + 's']);
+                    if(cmp) {
+                        info += ' in A, ' + util.formatThousands(cmp['n' + basis + 's'] - cmp.counter[d].not_applicable);
+                        info += ' of ' + util.formatThousands(cmp['n' + basis + 's']) + ' in B';
+                    } 
                 } else {
-                    return '# Tokens: ' + util.formatThousands(set.counter[d].tokens);
+                    info += '# ' + basis + 's: ' + util.formatThousands(set['n' + basis + 's'])
+                    if(cmp) info += ' in A, ' + util.formatThousands(cmp['n' + basis + 's']) + ' in B';
                 }
+                info += '<br/> # Tokens: ' + util.formatThousands(set.counter[d].tokens);
+                if(cmp) info += ' in A, ' + util.formatThousands(cmp.counter[d].tokens) + ' in B';
+                return info;
             });
         
         // Add statistics for quantitative features
-//        this.feats.quantity.forEach(function(feature) {
-//            var table = table_divs.select('.table-' + util.simplify(feature))
-//                .classed('stats-table', true)
-//                .classed('token-freq-table', false);
-//            var stats = set.counter[feature].statistics();
-////            console.log(stats, set.counter[feature].top(10));
-//            
-//            table.select('thead').selectAll('*').remove();
-//            
-//            var rows = table.select('tbody').selectAll('tr')
-//                .data(Object.keys(stats))
-//                .enter()
-//                .append('tr')
-//                .style('border-top', function(d) { 
-//                    return d == 'Mean' ? '3px solid' : 'none';
-//                });
-//            
-//            rows.append('th')
-//                .attr('class', 'stat-token')
-//                .html(function(d) { return d; });
-//            
-//            rows.append('td')
-//                .attr('class', 'stat-value')
-//                .html(function(d) {
-////                    console.log(feature, d, stats[d]);
-//                    var val = stats[d];
-//                    if(val == 0) return '0<span style="opacity: 0">.0</span>';
-//                    var formatted = util.formatThousands(val);
-//                    if(val % 1 > 0) {
-//                        formatted += (val % 1).toFixed(1).slice(1);
-//                    } else {
-//                        formatted += '<span style="opacity: 0">.0</span>';
-//                    }
-//    //                if(val % 1 > 0) val = val.toFixed(1);
-//                    return formatted; 
-//                });
-//            
-//            // TODO cmp statistics
-//        });
+        this.hierarchy_flatted.forEach(function(feature) {
+            if(!feature.includes('Age of Account') &&
+               !feature.includes('Start') &&
+               !feature.includes('Growth') &&
+               !feature.includes('Activity') &&
+               !(feature.includes('User Based') && feature.includes('Using Pipe'))) {
+                return;
+            }
+            
+            // Get page elements
+            var table_id = '.table-' + util.simplify(feature);
+            var table = this.feature_divs.select(table_id)
+                .classed('stats-table', true)
+                .classed('token-freq-table', false);
+            
+            // Compute stats
+            var stats = set.counter[feature].statistics();
+            var cmp_stats = {};
+            if(cmp) {
+                cmp_stats = cmp.counter[feature].statistics();
+            }
+            
+            table.select('thead').selectAll('*').remove();
+            
+            
+            // Add any new rows
+            var new_rows = table.select('tbody').selectAll('tr')
+                .data(Object.keys(stats))
+                .enter()
+                .append('tr')
+                .style('border-top', function(d) { 
+                    return d == 'Mean' ? '3px solid' : 'none';
+                });
+            
+            new_rows.append('th')
+                .attr('class', 'stat-token');
+            new_rows.append('td')
+                .attr('class', 'stat-value');
+            new_rows.append('td')
+                .attr('class', 'stat-cmp');
+            
+            // Push Data
+            var rows = table.select('tbody').selectAll('tr');
+            rows.select('th').html(function(d) { return d; });
+            rows.select('td.stat-value')
+                .html(function(d) {
+                    var val = stats[d];
+                    if(feature.includes('Interval')) {
+                        if(val == 60 * 24 * 7) return '&infin;';
+                        var formatted = util.formatMinutes(val);
+                        return formatted;
+                    }
+
+                    if(val == 0) return '0<span style="opacity: 0">.0</span>';
+                    var formatted = util.formatThousands(val);
+                    if(val % 1 > 0) {
+                        formatted += (val % 1).toFixed(1).slice(1);
+                    } else {
+                        formatted += '<span style="opacity: 0">.0</span>';
+                    }
+    //                if(val % 1 > 0) val = val.toFixed(1);
+                    return formatted; 
+                });
+            rows.select('td.stat-cmp')
+                .html(function(d) {
+                    if(cmp_stats && d in cmp_stats) {
+                        var val = cmp_stats[d];
+                        if(feature.includes('Interval')) {
+                            if(val == 60 * 24 * 7) return '&infin;';
+                            var formatted = util.formatMinutes(val);
+                            return formatted;
+                        }
+                        
+                        if(val == 0) return '0<span style="opacity: 0">.0</span>';
+                        var formatted = util.formatThousands(val);
+                        if(val % 1 > 0) {
+                            formatted += (val % 1).toFixed(1).slice(1);
+                        } else {
+                            formatted += '<span style="opacity: 0">.0</span>';
+                        }
+                        return formatted; 
+                    } else {
+                        return '';
+                    }
+                });
+        }, this);
         
         // Add tables of counts
         this.hierarchy_flatted.forEach(function(feature) {
-//            if(this.feats.quantity.includes(feature)) {
-//                return;
-//            }
+            var basis = feature.split(' ')[0];
+            if(feature.includes('Age of Account') || // Don't count quantities
+               feature.includes('Start') ||
+               feature.includes('Growth') ||
+               feature.includes('Activity') ||
+              (feature.includes('User Based') && feature.includes('Using Pipe'))) {
+                return;
+            }
             
             var table_id = '.table-' + util.simplify(feature);
             var table = this.feature_divs.select(table_id)
@@ -860,17 +947,17 @@ FeatureDistribution.prototype = {
                     Token: util.subsetName({feature: feature, match:token}),
                     Frequency: set.counter[feature].get(token)
                 };
-                entry['Percent']         = entry['Frequency'] / set.nTweets * 100;
+                entry['Percent']         = entry['Frequency'] / set['n' + basis + 's'] * 100;
                 if(cmp) {
                     entry['Frequency B'] = cmp.counter[feature].get(token);
-                    entry['Percent B']   = entry['Frequency B'] / cmp.nTweets * 100;
+                    entry['Percent B']   = entry['Frequency B'] / cmp['n' + basis + 's'] * 100;
                     
                     if(count_quantity == 'freq') {
                         entry['Ratio']       = (entry['Frequency'] || 1e-5) / (entry['Frequency B'] || 1e-5);
                     } else {
                         entry['Ratio']       = (entry['Percent']   || 1e-5) / (entry['Percent B']   || 1e-5);
                     }
-                    entry['Log Ratio']   = Math.log(entry['Ratio']) * Math.log10e;
+                    entry['Log Ratio']   = Math.log10(entry['Ratio']);
                 }
                 
                 if(['TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur'].includes(feature)) {
@@ -946,6 +1033,7 @@ FeatureDistribution.prototype = {
                 entry['Frequency'] = util.formatThousands(entry['Frequency']);
                 entry['Percent']   = entry['Percent'].toFixed(1);
                 if(cmp) {
+//                    console.log(entry['Frequency'], entry['Frequency B'], entry['Ratio'], entry['Log Ratio']);
                     entry['Frequency B'] = util.formatThousands(entry['Frequency B']);
                     entry['Percent B']   = entry['Percent B'].toFixed(1);
                     
