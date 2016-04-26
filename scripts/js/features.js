@@ -26,16 +26,16 @@ function FeatureDistribution() {
             'Temporal':     ['Time Posted (PT)', 'User\'s Timezone'],
         },
         'User Based': {
-            'Activity':     ['Tweets', 'Median Interval Between Tweets'],
+            'Activity':     ['Tweets', 'Median Interval Between Tweets', 'Deviation Interval Between Tweets', 'Normal Deviation Interval Between Tweets'],
             'Identity':     ['Username', 'Description Unigrams', 'Lang', 'Verified'],
             'Temporal':     ['Account Creation Date', 'Age of Account'],
             'Localization': ['Location', 'UTC Offset', 'Timezone'],
             'Tweet Text':   ['Using Pipe'],
-            'Statuses':     ['Start', 'Growth', 'Growth > 0'],
-            'Followers':    ['Start', 'Growth', 'Growth > 0'],
-            'Following':    ['Start', 'Growth', 'Growth > 0'],
-            'Listed':       ['Start', 'Growth', 'Growth > 0'],
-            'Favorites':    ['Start', 'Growth', 'Growth > 0']
+            'Statuses':     ['Start', 'Growth', 'Growth &ne; 0'],
+            'Followers':    ['Start', 'Growth', 'Growth &ne; 0'],
+            'Following':    ['Start', 'Growth', 'Growth &ne; 0'],
+            'Listed':       ['Start', 'Growth', 'Growth &ne; 0'],
+            'Favorites':    ['Start', 'Growth', 'Growth &ne; 0']
         }
     };
     this.hierarchy_flatted = [];
@@ -596,7 +596,10 @@ FeatureDistribution.prototype = {
                     Description: tweet['UserDescription'],
                     LastTimeTweeted: util.date(tweet['Timestamp']).getTime(),
                     TweetIntervals: [],
-                    MedianTweetInterval: 0, // upper bound = 1 week
+                    MedianTweetInterval: 0,
+                    MeanTweetInterval: 0,
+                    DeviationTweetInterval: 0,
+                    NormalDeviationTweetInterval: 0,
                     Location: tweet['UserLocation'],
                     UTCOffset: tweet['UserUTCOffset'],
                     Timezone: tweet['UserTimezone'],
@@ -621,6 +624,8 @@ FeatureDistribution.prototype = {
                 set.counter['User Based__Identity__Verified'].incr(user['Verified']);
                 set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
                 set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable++;
+                set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable++;
+                set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable++;
 //                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval']);
                 set.counter['User Based__Temporal__Account Creation Date'].incr(creation.getTime());
                 set.counter['User Based__Temporal__Age of Account'].incr(age);
@@ -643,7 +648,7 @@ FeatureDistribution.prototype = {
                 ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
                     set.counter['User Based__' + feature + '__Start'].incr(user[feature]['Start']);
                     set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth']);
-                    set.counter['User Based__' + feature + '__Growth > 0'].not_applicable++;
+                    set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
                 });
             } else {
                 var user = set.users[tweet.UserID];
@@ -657,13 +662,26 @@ FeatureDistribution.prototype = {
                 var thisTimeTweeted = util.date(tweet['Timestamp']).getTime();
                 var interval = (thisTimeTweeted - user['LastTimeTweeted']) / 60 / 1000;
                 user['TweetIntervals'].push(interval);
-                if(user['Tweets'] > 2) {
+                if(user['Tweets'] > 3) {
                     set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval'], -1);
+                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].incr(user['DeviationTweetInterval'], -1);
+                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].incr(user['NormalDeviationTweetInterval'], -1);
+                } else if(user['Tweets'] == 3) {
+                    set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval'], -1);
+                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable--;
+                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable--;
                 } else if(user['Tweets'] == 2) {
                     set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable--;
                 }
                 user['MedianTweetInterval'] = d3.median(user['TweetIntervals']);
+                user['MeanTweetInterval'] = d3.mean(user['TweetIntervals']);
                 set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval']);
+                if(user['Tweets'] >= 3) {
+                    user['DeviationTweetInterval'] = d3.deviation(user['TweetIntervals']);
+                    user['NormalDeviationTweetInterval'] = user['DeviationTweetInterval'] / user['MeanTweetInterval'];
+                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].incr(user['DeviationTweetInterval']);
+                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].incr(user['NormalDeviationTweetInterval']);
+                }
                 
                 // Using Pipe
                 set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], -1);
@@ -676,9 +694,9 @@ FeatureDistribution.prototype = {
                 ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
                     set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], -1);
                     if(user[feature]['Growth'] == 0) {
-                        set.counter['User Based__' + feature + '__Growth > 0'].not_applicable--;
+                        set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable--;
                     } else {
-                        set.counter['User Based__' + feature + '__Growth > 0'].incr(user[feature]['Growth'], -1);
+                        set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], -1);
                     }
                 });
                 
@@ -696,9 +714,9 @@ FeatureDistribution.prototype = {
                     set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], 1);
                     
                     if(user[feature]['Growth'] == 0) {
-                        set.counter['User Based__' + feature + '__Growth > 0'].not_applicable++;
+                        set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
                     } else {
-                        set.counter['User Based__' + feature + '__Growth > 0'].incr(user[feature]['Growth'], 1);
+                        set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], 1);
                     }
                 });
             }
@@ -824,8 +842,19 @@ FeatureDistribution.prototype = {
                 cmp_stats = cmp.counter[feature].statistics();
             }
             
-            table.select('thead').selectAll('*').remove();
-            
+            // Header
+            var header = table.select('thead');
+            header.selectAll('*').remove();
+            header.append('tr');
+            header.select('tr').append('th')
+                .attr('class', 'stat-token')
+                .html('Quantity');
+            header.select('tr').append('th')
+                .attr('class', 'stat-value')
+                .html('A');
+            header.select('tr').append('th')
+                .attr('class', 'stat-cmp')
+                .html('B');
             
             // Add any new rows
             var new_rows = table.select('tbody').selectAll('tr')
@@ -836,7 +865,7 @@ FeatureDistribution.prototype = {
                     return d == 'Mean' ? '3px solid' : 'none';
                 });
             
-            new_rows.append('th')
+            new_rows.append('td')
                 .attr('class', 'stat-token');
             new_rows.append('td')
                 .attr('class', 'stat-value');
@@ -845,12 +874,15 @@ FeatureDistribution.prototype = {
             
             // Push Data
             var rows = table.select('tbody').selectAll('tr');
-            rows.select('th').html(function(d) { return d; });
+            rows.select('td').html(function(d) { return d; });
             rows.select('td.stat-value')
                 .html(function(d) {
-                    var val = stats[d];
-                    if(feature.includes('Interval')) {
-                        if(val == 60 * 24 * 7) return '&infin;';
+                    var val = parseInt(stats[d]);
+                    
+                    if(feature.includes('Normal')) {
+                        var formatted = val.toFixed(2);//util.formatTimeCount(val, 's');
+                        return formatted;
+                    } else if(feature.includes('Interval')) {
                         var formatted = util.formatMinutes(val);
                         return formatted;
                     }
@@ -869,8 +901,10 @@ FeatureDistribution.prototype = {
                 .html(function(d) {
                     if(cmp_stats && d in cmp_stats) {
                         var val = cmp_stats[d];
-                        if(feature.includes('Interval')) {
-                            if(val == 60 * 24 * 7) return '&infin;';
+                        if(feature.includes('Normal')) {
+                            var formatted = val.toFixed(2);//util.formatTimeCount(val, 's');
+                            return formatted;
+                         } else if(feature.includes('Interval')) {
                             var formatted = util.formatMinutes(val);
                             return formatted;
                         }
@@ -887,6 +921,10 @@ FeatureDistribution.prototype = {
                         return '';
                     }
                 });
+            
+            // Show/hide comparison cells
+            table.selectAll('.stat-cmp')
+                .style('display', cmp ? 'table-cell' : 'none');
         }, this);
         
         // Add tables of counts
@@ -957,10 +995,10 @@ FeatureDistribution.prototype = {
                     } else {
                         entry['Ratio']       = (entry['Percent']   || 1e-5) / (entry['Percent B']   || 1e-5);
                     }
-                    entry['Log Ratio']   = Math.log10(entry['Ratio']);
+                    entry['Log Ratio']   = Math.log2(entry['Ratio']);
                 }
                 
-                if(['TextUnigrams', 'TextBigrams', 'TextTrigrams', 'TextCooccur'].includes(feature)) {
+                if(feature.includes('grams')) {
                     var words = token.split(' ');
                     var found = false;
                     var partially_found = false;
@@ -1001,14 +1039,14 @@ FeatureDistribution.prototype = {
                     }
                     
                     // TODO check subsets
-                } else if(feature != 'Text') { // Check subsets
-                    this.dataset.subsets_arr.forEach(function(subset) {
-                        if(subset.Feature.replace('.','') == feature) {
-                            if(subset.Match == token) {
-                                entry['In Generated Subset'] = subset.ID;
-                            }
-                        }
-                    })
+                } else if(feature != 'Text') { // Check subsets TODO fix
+//                    this.dataset.subsets_arr.forEach(function(subset) {
+//                        if(subset.Feature.replace('.','') == feature) {
+//                            if(subset.Match == token) {
+//                                entry['In Generated Subset'] = subset.ID;
+//                            }
+//                        }
+//                    })
                 }
                 
                 

@@ -60,7 +60,8 @@ var util = {
         return util.lshift(date.getTime() - 1288834974657, 22);
     },
     formatThousands: function(value) {
-        var res = '';
+        var res = value < 0 ? '-' : '';
+        value = Math.abs(value);
         for (var i = Math.floor(Math.log10(value)); i >= 0; i--) {
             res += Math.floor(value / Math.pow(10, i));
             if(i % 3 == 0 && i != 0)
@@ -70,20 +71,52 @@ var util = {
         return res;
     },
     formatMinutes: function(value) {
-        var days = Math.floor(value / 60 / 24);
-        var hours = Math.floor(value / 60) % 24;
-        var minutes = Math.floor(value % 60);
-        if(days) return days + 'd ' + (hours < 10 ? '0' : '') + hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm';
-        if(hours) return hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm';
-        return minutes + 'm';
+        return util.formatTimeCount(value * 60, 'm');
+//        var days = Math.floor(value / 60 / 24);
+//        var hours = Math.floor(value / 60) % 24;
+//        var minutes = Math.floor(value % 60);
+//        if(days) return days + 'd ' + (hours < 10 ? '0' : '') + hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm';
+//        if(hours) return hours + 'h ' + (minutes < 10 ? '0' : '') + minutes + 'm';
+//        return minutes + 'm';
     },
     formatDays: function(value) {
-        var years = Math.floor(value / 365);
-        var months = Math.floor((value - years * 365) / 30);
-        var days = Math.floor(value - years * 365 - months * 30);
-        if(years) return years + 'y ' + (months < 10 ? '0' : '') + months + 'm ' + (days < 10 ? '0' : '') + days + 'd';
-        if(months) return months + 'm ' + (days < 10 ? '0' : '') + days + 'd';
-        return days + 'd';
+        return util.formatTimeCount(value * 24 * 60 * 60, 'd');
+        
+//        var years = Math.floor(value / 365);
+//        var months = Math.floor((value - years * 365) / 30);
+//        var days = Math.floor(value - years * 365 - months * 30);
+//        if(years) return years + 'Y ' + (months < 10 ? '0' : '') + months + 'M ' + (days < 10 ? '0' : '') + days + 'd';
+//        if(months) return months + 'M ' + (days < 10 ? '0' : '') + days + 'd';
+//        return days + 'd';
+    },
+    formatTimeCount: function(seconds, smallest_quant) {
+        smallest_quant = smallest_quant || 's';
+        var sign = seconds < 0 ? -1 : 1;
+        seconds *= sign;
+        var vals = [];
+        var units = ['Y', 'M', 'd', 'h', 'm', 's'];
+        smallest_quant = units.indexOf(smallest_quant);
+        vals.push(Math.floor(seconds / 365 / 24 / 60 / 60));
+        seconds -= vals[0] * 365 * 24 * 60 * 60;
+        vals.push(Math.floor(seconds / 30 / 24 / 60 / 60));
+        seconds -= vals[1] * 30 * 24 * 60 * 60;
+        vals.push(Math.floor(seconds / 24 / 60 / 60));
+        seconds -= vals[2] * 24 * 60 * 60;
+        vals.push(Math.floor(seconds / 60 / 60));
+        seconds -= vals[3] * 60 * 60;
+        vals.push(Math.floor(seconds / 60));
+        seconds -= vals[4] * 60;
+        vals.push(Math.floor(seconds));
+        seconds -= vals[5];
+        
+        var formatted = [];
+        vals.forEach(function(val, i) {
+            if((val > 0 || formatted.length > 0) && i <= smallest_quant) {
+                formatted.push(val + units[i]);
+            }
+        });
+        if(formatted.length == 0) formatted.push('0' + units[smallest_quant]);
+        return (sign == -1 ? '-' : '') + formatted.join(' ');
     },
     deformatMinutes: function(minutes) {
         return minutes.split(' ').reduce(function(res, cur) {
@@ -114,7 +147,7 @@ var util = {
                 hours.toFixed(0) + ':' +
                 (hours * 6 % 6).toFixed(0) + (hours * 60 % 10).toFixed(0);
             
-            // Have to figure this out relative to time zones
+            // Have to figure this out relative to daylight saving times
 //            if(match == '-08:00') match += ' <small>US Pacific</small>';
 //            if(match == '-07:00') match += ' <small>US Mountain</small>';
 //            if(match == '-06:00') match += ' <small>US Central & Mexico</small>';
@@ -335,7 +368,7 @@ Counter.prototype = {
         return this.firstK(this.getSorted(), k);
     },
     stopwords: ['the', 'a', 'an', 'that', 'this',
-                'rt', 
+                'rt', 'via',
                 'in', 'on', 'to', 'of', 'at', 'for', 'with', 'about',
                 'is', 'are', 'be', 'was', 'have', 'has',
                 'i', 'you', 'he', 'she', 'it', 'we', 'they',

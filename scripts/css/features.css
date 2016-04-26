@@ -91,7 +91,7 @@
 
 /* Stats Table */
 
-.stats-table tr:nth-child(odd) {
+.stats-table tbody tr:nth-child(odd) {
     background: #EEE;
 }
 .stat-token {
