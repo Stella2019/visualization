@@ -26,11 +26,11 @@ function FeatureDistribution() {
             'Temporal':     ['Time Posted (PT)', 'User\'s Timezone'],
         },
         'User Based': {
-            'Activity':     ['Tweets', 'Median Interval Between Tweets', 'Deviation Interval Between Tweets', 'Normal Deviation Interval Between Tweets'],
+            'Activity':     ['Tweets', 'Tweets Per Day', 'Median Interval Between Tweets', 'Deviation Interval Between Tweets', 'Normal Deviation Interval Between Tweets'],
             'Identity':     ['Username', 'Description Unigrams', 'Lang', 'Verified'],
             'Temporal':     ['Account Creation Date', 'Age of Account'],
             'Localization': ['Location', 'UTC Offset', 'Timezone'],
-            'Tweet Text':   ['Using Pipe'],
+            'Tweet Text':   ['Lexicon Size', 'Lexicon Size / Tweets', 'Lexicon Size / Log<sub>2</sub> (Tweets + 1)', 'Using Pipe'],
             'Statuses':     ['Start', 'Growth', 'Growth &ne; 0'],
             'Followers':    ['Start', 'Growth', 'Growth &ne; 0'],
             'Following':    ['Start', 'Growth', 'Growth &ne; 0'],
@@ -69,11 +69,11 @@ FeatureDistribution.prototype = {
     },
     setTriggers: function() {
         
-        triggers.on('event:set', this.toggleLoadButtons.bind(this, 'event'));
-        triggers.on('subset:set', this.toggleLoadButtons.bind(this, 'subset'));
+        triggers.on('event:updated', this.toggleLoadButtons.bind(this, 'event'));
+        triggers.on('subset:updated', this.toggleLoadButtons.bind(this, 'subset'));
         
-        triggers.on('event2:set', this.toggleLoadButtons.bind(this, 'event2'));
-        triggers.on('subset2:set', this.toggleLoadButtons.bind(this, 'subset2'));
+        triggers.on('event2:updated', this.toggleLoadButtons.bind(this, 'event2'));
+        triggers.on('subset2:updated', this.toggleLoadButtons.bind(this, 'subset2'));
         
         triggers.on('counters:count', this.countFeatures.bind(this));
         triggers.on('counters:place', this.placeCounts.bind(this));
@@ -230,6 +230,7 @@ FeatureDistribution.prototype = {
                 title: 'Tweets per Chunk',
                 labels: ['10', '100', '1 000', '5 000'],
                 ids:    [ 1e1,   1e2,     1e3,     5e3],
+                default: 1,
                 isnumeric: true
             })
         };
@@ -375,9 +376,11 @@ FeatureDistribution.prototype = {
                 data.subset = this.dataset['subsets'][data.id];
                 data.event = this.dataset['events'][data.subset.Event];
                 data.label = (data.event.DisplayName || data.event.Name) + ' - ' + data.subset.Feature + ' - ' + util.subsetName(data.subset);
+                data.FirstTweet = data.subset['FirstTweet'];
             } else {
                 data.event = this.dataset['events'][data.id];
                 data.label = data.event.DisplayName || data.event.Name;
+                data.FirstTweet = data.event['FirstTweet'];
             }
             this.data[setname] = data;
         } else {
@@ -525,7 +528,7 @@ FeatureDistribution.prototype = {
                 var text = tweet.TextStripped.toLowerCase();
                 text = text.replace(/[^\w']+/g, ' ');
                 text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
-                var words = text.split(' ');
+                var words = text.split(' ').filter(function(word) { return word.length > 0; });
                 var tweetgrams = [new Set(), new Set(), new Set(), new Set()];
 
                 words.forEach(function(word, wi) {
@@ -585,44 +588,95 @@ FeatureDistribution.prototype = {
                 creation.setHours(0);
                 var firstTweet = util.twitterID2Timestamp(set.event.FirstTweet);
                 var age = Math.floor((firstTweet.getTime() - creation.getTime()) / 24 / 60 / 60 / 1000);
+                
+                // Get user's description's unigrams
+                var desc = (tweet.UserDescription || '').toLowerCase();
+                desc = desc.replace(/[^\w']+/g, ' ');
+                desc = desc.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
+                var desc_words = desc.split(' ').filter(function(word) { return word.length > 0; });
+                if(desc_words.length == 0) {
+                    desc_words = [tweet.UserDescription];
+                }
+                
+                // Count user's tweet's unigrams
+                var tweet_words = new Counter();
+                var text = tweet.TextStripped.toLowerCase();
+                text = text.replace(/[^\w']+/g, ' ');
+                text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
+                var words = text.split(' ').filter(function(word) { return word.length > 0; });
+                words.forEach(function(word) {
+                    tweet_words.incr(word);
+                });
             
                 var user = {
-                    ID: tweet['UserID'],
                     Tweets: 1,
+                    
+                    UserID: tweet['UserID'],
                     Screenname: tweet['Screenname'],
                     Username: tweet['Username'],
-                    CreatedAt: creation,
-                    Age: age,
-                    Description: tweet['UserDescription'],
-                    LastTimeTweeted: util.date(tweet['Timestamp']).getTime(),
-                    TweetIntervals: [],
-                    MedianTweetInterval: 0,
-                    MeanTweetInterval: 0,
-                    DeviationTweetInterval: 0,
-                    NormalDeviationTweetInterval: 0,
                     Location: tweet['UserLocation'],
                     UTCOffset: tweet['UserUTCOffset'],
                     Timezone: tweet['UserTimezone'],
                     Lang: tweet['UserLang'],
                     Verified: tweet['UserVerified'],
+                    
+                    Description: tweet['UserDescription'],
+                    DescriptionWords: desc_words,
+                    
+                    TweetWords: tweet_words,
+                    LexiconSize: tweet_words.tokens,
+                    LexiconSizePerTweet: tweet_words.tokens,
+                    LexiconSizePerLogTweet: tweet_words.tokens,
                     UsingPipe: tweet['Text'].includes('|') ? 1 : 0,
+                    
+                    CreatedAt: creation,
+                    Age: age,
+                    
+                    FirstTweet: tweet['ID'],
+                    LastTweet: tweet['ID'],
+                    
+                    MinutesInSet: 0,
+                    TweetsPerDay: 1,
+                    MinuteStarted: (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000,
+                    MinuteEnded: (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000,
+                    
+                    TweetInterval: {
+                        All: [],
+                        Min: 0, Max: 0,
+                        Med: 0, Ave: 0, 
+                        Dev: 0, NormDev: 0,
+                    },
                     Statuses: { Start:parseInt(tweet['UserStatusesCount']), 
-                               End:parseInt(tweet['UserStatusesCount']), Growth: 0},
+                               End:parseInt(tweet['UserStatusesCount']), Growth: 0, PerDay: 0},
                     Followers: { Start:parseInt(tweet['UserFollowersCount']), 
-                               End:parseInt(tweet['UserFollowersCount']), Growth: 0},
+                               End:parseInt(tweet['UserFollowersCount']), Growth: 0, PerDay: 0},
                     Following: { Start:parseInt(tweet['UserFriendsCount']), 
-                               End:parseInt(tweet['UserFriendsCount']), Growth: 0},
+                               End:parseInt(tweet['UserFriendsCount']), Growth: 0, PerDay: 0},
                     Listed: { Start:parseInt(tweet['UserListedCount']), 
-                               End:parseInt(tweet['UserListedCount']), Growth: 0},
+                               End:parseInt(tweet['UserListedCount']), Growth: 0, PerDay: 0},
                     Favorites: { Start:parseInt(tweet['UserFavouritesCount']), 
-                               End:parseInt(tweet['UserFavouritesCount']), Growth: 0},
-                }
-                set.users[user.ID] = user;
+                               End:parseInt(tweet['UserFavouritesCount']), Growth: 0, PerDay: 0},
+                    
+                    Distinct: {Count: tweet['Distinct'] == '1' ? 1 : 0, Fraction: tweet['Distinct'] == '1' ? 1 : 0},
+                    Originals: {Count: 0, Fraction: 0},
+                    Retweets: {Count: 0, Fraction: 0},
+                    Replies: {Count: 0, Fraction: 0},
+                    Quotes: {Count: 0, Fraction: 0},
+                };
+                ['Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
+                    if(tweet['Type'].includes(type.slice(0,4).toLowerCase())) {
+                        user[type]['Count'] = 1;
+                        user[type]['Fraction'] = 1;
+                    }
+                });
+                
+                set.users[user.UserID] = user;
                 
                 set.counter['User Based__Identity__Username'].incr(user['Username']);
-                set.counter['User Based__Identity__Lang'].incr(user['Lang']);
+                set.counter['User Based__Identity__Lang'].incr(util.subsetName({feature: 'Lang', match: user['Lang'].toLowerCase()}));
                 set.counter['User Based__Identity__Verified'].incr(user['Verified']);
                 set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
+                set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
                 set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable++;
                 set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable++;
                 set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable++;
@@ -632,14 +686,12 @@ FeatureDistribution.prototype = {
                 set.counter['User Based__Localization__Location'].incr(user['Location']);
                 set.counter['User Based__Localization__UTC Offset'].incr(user['UTCOffset']);
                 set.counter['User Based__Localization__Timezone'].incr(user['Timezone']);
+                set.counter['User Based__Tweet Text__Lexicon Size'].incr(user['LexiconSize']);
+                set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].incr(user['LexiconSizePerTweet']);
+                set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].incr(user['LexiconSizePerLogTweet']);
                 set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe']);
                 
                 // User Description Unigrams
-                var desc = (tweet.UserDescription || '').toLowerCase();
-                var desc_words = desc.split(/\W/).filter(function(word) { return word.length > 0; });
-                if(desc_words.length == 0) {
-                    desc_words = [tweet.UserDescription];
-                }
                 desc_words.forEach(function(word) {
                     set.counter['User Based__Identity__Description Unigrams'].incr(word);
                 });
@@ -654,33 +706,64 @@ FeatureDistribution.prototype = {
                 var user = set.users[tweet.UserID];
                 
                 // Tweets
-                set.counter['User Based__Activity__Tweets'].incr(user['Tweets'], -1);
+                set.counter['User Based__Activity__Tweets'].decr(user['Tweets']);
                 user['Tweets']++;
                 set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
                 
+                // Major metrics
+                set.counter['User Based__Activity__Tweets Per Day'].decr(user['TweetsPerDay']);
+                user['MinuteEnded'] = (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000;
+                user['MinutesInSet'] = user['MinuteEnded'] - user['MinuteStarted'];
+                user['TweetsPerDay'] = user['Tweets'] * 60 * 24 / user['MinutesInSet'];
+                set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
+                
+                // Count user's tweet's unigrams
+                var text = tweet.TextStripped.toLowerCase();
+                text = text.replace(/[^\w']+/g, ' ');
+                text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
+                var words = text.split(' ').filter(function(word) { return word.length > 0; });
+                words.forEach(function(word) {
+                    user['TweetWords'].incr(word);
+                });
+                
+                set.counter['User Based__Tweet Text__Lexicon Size'].decr(user['LexiconSize']);
+                set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].decr(user['LexiconSizePerTweet']);
+                set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].decr(user['LexiconSizePerLogTweet']);
+                user['LexiconSize'] = user['TweetWords'].tokens
+                user['LexiconSizePerTweet'] = user['TweetWords'].tokens / user['Tweets'];
+                user['LexiconSizePerLogTweet'] = user['TweetWords'].tokens / Math.log2(user['Tweets'] + 1);
+                set.counter['User Based__Tweet Text__Lexicon Size'].incr(user['LexiconSize']);
+                set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].incr(user['LexiconSizePerTweet']);
+                set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].incr(user['LexiconSizePerLogTweet']);
+                
                 // Median Interval between tweets
-                var thisTimeTweeted = util.date(tweet['Timestamp']).getTime();
-                var interval = (thisTimeTweeted - user['LastTimeTweeted']) / 60 / 1000;
-                user['TweetIntervals'].push(interval);
+                var thisTimeTweeted = util.twitterID2Timestamp(tweet['ID']).getTime();
+                var interval = (thisTimeTweeted -
+                                util.twitterID2Timestamp(user['LastTweet']).getTime())
+                                / 60 / 1000;
+                user['LastTweet'] = tweet['ID'];
+                user['TweetInterval']['All'].push(interval);
                 if(user['Tweets'] > 3) {
-                    set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval'], -1);
-                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].incr(user['DeviationTweetInterval'], -1);
-                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].incr(user['NormalDeviationTweetInterval'], -1);
+                    set.counter['User Based__Activity__Median Interval Between Tweets'].decr(user['TweetInterval']['Med']);
+                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].decr(user['TweetInterval']['Dev']);
+                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].decr(user['TweetInterval']['NormDev']);
                 } else if(user['Tweets'] == 3) {
-                    set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval'], -1);
+                    set.counter['User Based__Activity__Median Interval Between Tweets'].decr(user['TweetInterval']['Med']);
                     set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable--;
                     set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable--;
                 } else if(user['Tweets'] == 2) {
                     set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable--;
                 }
-                user['MedianTweetInterval'] = d3.median(user['TweetIntervals']);
-                user['MeanTweetInterval'] = d3.mean(user['TweetIntervals']);
-                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval']);
+                user['TweetInterval']['Min'] = d3.min(user['TweetInterval']['All']);
+                user['TweetInterval']['Max'] = d3.max(user['TweetInterval']['All']);
+                user['TweetInterval']['Med'] = d3.median(user['TweetInterval']['All']);
+                user['TweetInterval']['Ave'] = d3.mean(user['TweetInterval']['All']);
+                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['TweetInterval']['Med']);
                 if(user['Tweets'] >= 3) {
-                    user['DeviationTweetInterval'] = d3.deviation(user['TweetIntervals']);
-                    user['NormalDeviationTweetInterval'] = user['DeviationTweetInterval'] / user['MeanTweetInterval'];
-                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].incr(user['DeviationTweetInterval']);
-                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].incr(user['NormalDeviationTweetInterval']);
+                    user['TweetInterval']['Dev'] = d3.deviation(user['TweetInterval']['All']);
+                    user['TweetInterval']['NormDev'] = user['TweetInterval']['Dev'] * 1.0 / user['TweetInterval']['Ave'];
+                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].incr(user['TweetInterval']['Dev']);
+                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].incr(user['TweetInterval']['NormDev']);
                 }
                 
                 // Using Pipe
@@ -701,15 +784,24 @@ FeatureDistribution.prototype = {
                 });
                 
                 // Get their new values
-                user['Statuses']['End'] = parseInt(tweet['UserStatusesCount']);
+                user['Statuses']['End']  = parseInt(tweet['UserStatusesCount']);
                 user['Followers']['End'] = parseInt(tweet['UserFollowersCount']);
                 user['Following']['End'] = parseInt(tweet['UserFriendsCount']);
-                user['Listed']['End'] = parseInt(tweet['UserListedCount']);
+                user['Listed']['End']    = parseInt(tweet['UserListedCount']);
                 user['Favorites']['End'] = parseInt(tweet['UserFavouritesCount']);
+                ['Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
+                    if(tweet['Type'].includes(type.slice(0,4).toLowerCase())) {
+                        user[type]['Count']++;
+                    }
+                    user[type]['Fraction'] = user[type]['Count'] / user['Tweets'];
+                });
+                user['Distinct']['Count'] += tweet['Distinct'] == '1' ? 1 : 0;
+                user['Distinct']['Fraction'] = user['Distinct']['Count'] / user['Tweets'];
                 
                 // Insert new counts
                 ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
                     user[feature]['Growth'] = user[feature]['End'] - user[feature]['Start'];
+                    user[feature]['PerDay'] = user[feature]['Growth'] * 24 * 60 / user['MinutesInSet'];
                     
                     set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], 1);
                     
@@ -719,6 +811,7 @@ FeatureDistribution.prototype = {
                         set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], 1);
                     }
                 });
+                
             }
         }
         
@@ -758,8 +851,8 @@ FeatureDistribution.prototype = {
         // Get appropriate set names
         var setname = this.dataset.subset ? 'subset ' + this.dataset.subset.ID : 
                                             'event '  + this.dataset.event.ID;
-        var comparesetname = this.dataset.event2  ? 'event '  + this.dataset.event2.ID :
-                             this.dataset.subset2 ? 'subset ' + this.dataset.subset2.ID : '';
+        var comparesetname = this.dataset.subset2 ? 'subset '  + this.dataset.subset2.ID :
+                             this.dataset.event2  ? 'event '   + this.dataset.event2.ID : '';
         
         // Get set and comparison set
         var set = this.data[setname];
@@ -825,6 +918,7 @@ FeatureDistribution.prototype = {
                !feature.includes('Start') &&
                !feature.includes('Growth') &&
                !feature.includes('Activity') &&
+               !feature.includes('Lexicon Size') &&
                !(feature.includes('User Based') && feature.includes('Using Pipe'))) {
                 return;
             }
@@ -902,8 +996,11 @@ FeatureDistribution.prototype = {
                     if(cmp_stats && d in cmp_stats) {
                         var val = cmp_stats[d];
                         if(feature.includes('Normal')) {
-                            var formatted = val.toFixed(2);//util.formatTimeCount(val, 's');
-                            return formatted;
+                            if(typeof(val) == 'string') {
+                                return parseFloat(val).toFixed(2);
+                            } else {
+                                return val.toFixed(2);
+                            }
                          } else if(feature.includes('Interval')) {
                             var formatted = util.formatMinutes(val);
                             return formatted;
@@ -934,6 +1031,7 @@ FeatureDistribution.prototype = {
                feature.includes('Start') ||
                feature.includes('Growth') ||
                feature.includes('Activity') ||
+               feature.includes('Lexicon Size') ||
               (feature.includes('User Based') && feature.includes('Using Pipe'))) {
                 return;
             }
@@ -1123,6 +1221,12 @@ FeatureDistribution.prototype = {
             
             // Attach tooltip
             this.tooltip.attach(table_id + ' .token-freq-set', function(d) { return d; });
+            
+            // Attach user information
+            if(feature.includes('Screenname / User ID')) {
+                rows.on('click', this.inspectUser.bind(this))
+                    .classed('inspect_user', true);
+            }
         }, this);
         
         triggers.emit('counters:show');
@@ -1130,8 +1234,8 @@ FeatureDistribution.prototype = {
     showCounts: function() {
         var count_quantity = this.ops['Display']['Count Quantity'].get();
         var cmp_quantity = this.ops['Display']['Cmp Quantity'].get();
-        var comparesetname = this.dataset.event2  ? 'event '  + this.dataset.event2.ID :
-                             this.dataset.subset2 ? 'subset ' + this.dataset.subset2.ID : '';
+        var comparesetname = this.dataset.subset2 ? 'subset '  + this.dataset.subset2.ID :
+                             this.dataset.event2  ? 'event '   + this.dataset.event2.ID : '';
         var cmp = comparesetname ? this.data[comparesetname] : '';
         
         // Set classes
@@ -1178,7 +1282,200 @@ FeatureDistribution.prototype = {
             this.feature_divs.selectAll('.cell-cmp')
                 .classed('cell-hidden', true);
         }
-    }
+    },
+    inspectUser: function(row) {
+        // Just gets primary set now
+        var setname = this.dataset.subset ? 'subset ' + this.dataset.subset.ID : 
+                                            'event '  + this.dataset.event.ID;
+        var cmpsetname = this.dataset.subset2 ? 'subset '  + this.dataset.subset2.ID :
+                         this.dataset.event2  ? 'event '   + this.dataset.event2.ID : '';
+        
+        // Get data
+        var userID = row.Token.split(' - ')[1];
+        var user = 0;
+        var cmpuser = 0;
+        var sets = setname;
+        
+        // If not in the initial set, change the set
+        if(!(userID in this.data[setname].users)) {
+            setname = cmpsetname;
+            sets = setname;
+            if(!(userID in this.data[setname].users)) {
+                triggers.emit('alert', 'Unable to find user ' + row.Token);
+                return;
+            }
+        } else if(cmpsetname && cmpsetname in this.data && userID in this.data[cmpsetname].users) {
+            cmpuser = this.data[cmpsetname].users[userID];
+            sets += ' & ' + cmpsetname;
+        }
+        user = this.data[setname].users[userID];
+        
+        // Configure data
+        var keys = Object.keys(user);
+        keys = keys.filter(function(key) {
+            return key != 'DescriptionWords' &&
+                 key != 'TweetIntervals' &&
+                 key != 'TweetIntervals';
+        });
+        
+        // Start the modal
+        triggers.emit('modal:reset');
+        triggers.emit('modal:title', 'Inspecting User <a href="http://twitter.com/' + user.Screenname + '" target="_blank">' +
+                      user.UserID + ' - ' + user.Screenname + '</a> in ' + sets);
+        
+        // Fill the modal
+        var modal_body = this.modal.body;
+        
+        var table = modal_body.append('table')
+            .attr('class', 'inspect-table');
+        var rows = table.selectAll('tr')
+            .data(keys)
+            .enter()
+            .append('tr');
+        
+        rows.append('th')
+            .style('width', cmpuser ? '20%' : '30%')
+            .attr('class', 'inspect-key')
+            .html(function(label) { return label.replace(/([a-z])([A-Z])/g, "$1 $2"); });
+        
+        rows.append('td')
+            .attr('class', 'inspect-value')
+            .style('width', cmpuser ? '40%' : '70%')
+            .html(function(label) {
+                var val = user[label];
+            
+                if(label == 'Age')
+                    return util.formatTimeCount(val * 24 * 60 * 60, 'd');
+                if(label == 'CreatedAt')
+                    return util.formatDateToYMD(val);
+                if(label.includes('Minute'))
+                    return util.formatTimeCount(val * 60, 'm');
+                if(['Lang', 'UTCOffset', 'Verified'].includes(label))
+                    return util.subsetName({feature: label, match: val});
+                if(label == 'FirstTweet' || label == 'LastTweet') {
+                    return val + '&nbsp;&nbsp;&nbsp;&nbsp;' + 
+                        util.formatDate(util.twitterID2Timestamp(val));
+                }
+                if(label == 'TweetWords') {
+                    var topwords = val.top_no_stopwords(10);
+                    var result = '';
+                    return topwords.map(function(kvpair) {
+                        return kvpair.key + ' (' + kvpair.value + ')';
+                    }).join('&nbsp;&nbsp;&nbsp;&nbsp;');
+                }
+                if(label == 'TweetInterval') {
+                    return ['Min', 'Max', 'Med', 'Ave', 'Dev', 'NormDev'].map(function(key, i) { 
+                        if(key == 'All') return '';
+                        var value = val[key] || 0;
+                        if(typeof(value) == 'string') value = parseFloat(value);
+                        if(key == 'NormDev') {
+                            value = value.toFixed(2);
+                        } else {
+                            value = util.formatTimeCount(value * 60, 'm');
+                        }
+                        return '<em>' + key + '</em>: ' + value + (i % 2 == 1 ? '<br />' : '&nbsp;&nbsp;&nbsp;&nbsp;');
+                    }).join('');
+                }
+            
+                if(typeof(val) == 'number' && val % 1 != 0 && val < 1)
+                    return val.toFixed(2);
+                if(typeof(val) == 'number' && val % 1 != 0) 
+                    return val.toFixed(1);
+                if(typeof(val) == 'number') 
+                    return val.toFixed(0);
+                if(val instanceof Array) return val.join(', ');
+                if(val instanceof Date) return util.formatDate(val);
+            
+                if(val == null) return '<em>None</em>';
+            
+                if(typeof(val) == 'object') {
+//                    console.log(label, val, inner_keys);
+                    var inner_keys = Object.keys(val);
+                    return inner_keys.map(function(key) { 
+                        var value = val[key];
+                        if(typeof(value) == 'number' && value % 1 != 0 && value < 1)
+                            value = value.toFixed(2);
+                        if(typeof(value) == 'number' && value % 1 != 0) 
+                            value = value.toFixed(1);
+                        if(typeof(value) == 'number') 
+                            value = value.toFixed(0);
+                        return '<em>' + key + '</em>: ' + value;
+                    }).join('&nbsp;&nbsp;&nbsp;&nbsp;');
+                }
+                return val; 
+            });
+        
+        if(cmpuser) {
+            rows.append('td')
+                .attr('class', 'inspect-value')
+                .style('width', '40%')
+                .html(function(label) {
+                    var val = cmpuser[label];
+
+                    if(label == 'Age')
+                        return util.formatTimeCount(val * 24 * 60 * 60, 'd');
+                    if(label == 'CreatedAt')
+                        return util.formatDateToYMD(val);
+                    if(label.includes('Minute'))
+                        return util.formatTimeCount(val * 60, 'm');
+                    if(['Lang', 'UTCOffset', 'Verified'].includes(label))
+                        return util.subsetName({feature: label, match: val});
+                    if(label == 'FirstTweet' || label == 'LastTweet') {
+                        return val + '&nbsp;&nbsp;&nbsp;&nbsp;' + 
+                            util.formatDate(util.twitterID2Timestamp(val));
+                    }
+                    if(label == 'TweetWords') {
+                        var topwords = val.top_no_stopwords(10);
+                        var result = '';
+                        return topwords.map(function(kvpair) {
+                            return kvpair.key + ' (' + kvpair.value + ')';
+                        }).join('&nbsp;&nbsp;&nbsp;&nbsp;');
+                    }
+                    if(label == 'TweetInterval') {
+                        return ['Min', 'Max', 'Med', 'Ave', 'Dev', 'NormDev'].map(function(key, i) { 
+                            if(key == 'All') return '';
+                            var value = val[key] || 0;
+                            if(typeof(value) == 'string') value = parseFloat(value);
+                            if(key == 'NormDev') {
+                                value = value.toFixed(2);
+                            } else {
+                                value = util.formatTimeCount(value * 60, 'm');
+                            }
+                            return '<em>' + key + '</em>: ' + value + (i % 2 == 1 ? '<br />' : '&nbsp;&nbsp;&nbsp;&nbsp;');
+                        }).join('');
+                    }
+
+                    if(typeof(val) == 'number' && val % 1 != 0 && val < 1)
+                        return val.toFixed(2);
+                    if(typeof(val) == 'number' && val % 1 != 0) 
+                        return val.toFixed(1);
+                    if(typeof(val) == 'number') 
+                        return val.toFixed(0);
+                    if(val instanceof Array) return val.join(', ');
+                    if(val instanceof Date) return util.formatDate(val);
+
+                    if(val == null) return '<em>None</em>';
+
+                    if(typeof(val) == 'object') {
+//                        console.log(label, val, inner_keys);
+                        var inner_keys = Object.keys(val);
+                        return inner_keys.map(function(key) { 
+                            var value = val[key];
+                            if(typeof(value) == 'number' && value % 1 != 0 && value < 1)
+                                value = value.toFixed(2);
+                            if(typeof(value) == 'number' && value % 1 != 0) 
+                                value = value.toFixed(1);
+                            if(typeof(value) == 'number') 
+                                value = value.toFixed(0);
+                            return '<em>' + key + '</em>: ' + value;
+                        }).join('&nbsp;&nbsp;&nbsp;&nbsp;');
+                    }
+                    return val; 
+                });
+        }
+        
+        triggers.emit('modal:open');
+    },
 };
 
 function initialize() {

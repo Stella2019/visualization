@@ -72,6 +72,21 @@
     color: crimson;
 }
 
+.inspect_user {
+    cursor: pointer;
+}
+.inspect_user .token {
+    color: #337ab7;
+}
+.inspect_user .token:after {
+    content: ' \e003';
+    font-family: 'Glyphicons Halflings';
+}
+.inspect_user:hover .token {
+    color: #23527c;
+    text-decoration: underline;
+}
+
 /* Row Backgrounds */
 .row-polar0 {
     background: #EEE;
@@ -101,4 +116,19 @@
 .stat-value, .stat-cmp {
     text-align: right;
     padding: 2px 5px;
+}
+
+/* Inspector */
+
+.inspect-table tr:nth-child(even) {
+    background: #EEE;
+}
+
+/*
+.inspect-key {
+    width: 30%;
+}
+*/
+.inspect-value {
+    text-align: 'right';
 }

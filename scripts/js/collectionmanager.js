@@ -138,7 +138,7 @@ CollectionManager.prototype = {
                 labels: ["none"],
                 ids:    ["none"],
                 custom_entries_allowed: true,
-                type: 'dropdown_autocomplete',
+//                type: 'dropdown_autocomplete',
                 callback: triggers.emitter('subset:set')
             });
             if(this.flag_allow_edits) {
@@ -286,6 +286,7 @@ CollectionManager.prototype = {
     },
     setSubset: function(version) {
         var subset_id = this.ops['Subset' + version].get();
+        if(!('subsets' + version in this)) return;
         this['subset' + version] = this['subsets' + version][parseInt(subset_id)];
         
         triggers.emit('subset' + version + ':updated', this['subset' + version]);
@@ -370,7 +371,7 @@ CollectionManager.prototype = {
                 subset.Label = '<em><small>' + subset.rumor.Name + '</small></em> ' + subset.Label;
             }
             
-            this.subsets[subset.ID] = subset;
+            this['subsets' + version][subset.ID] = subset;
         }, this);
         
         triggers.emit('subsets' + version + ':updated');

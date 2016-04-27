@@ -94,7 +94,7 @@ var util = {
         var sign = seconds < 0 ? -1 : 1;
         seconds *= sign;
         var vals = [];
-        var units = ['Y', 'M', 'd', 'h', 'm', 's'];
+        var units = ['y', 'mo', 'd', 'h', 'm', 's'];
         smallest_quant = units.indexOf(smallest_quant);
         vals.push(Math.floor(seconds / 365 / 24 / 60 / 60));
         seconds -= vals[0] * 365 * 24 * 60 * 60;
@@ -183,6 +183,8 @@ var util = {
             }
         } else if(feature.includes('Verified')) {
             match = ['Unverified', 'Verified'][match];
+        } else if(feature.includes('Distinct')) {
+            match = ['Repeat', 'Distinct'][match];
         }
         
         if(args.includeFeature) {
@@ -311,6 +313,9 @@ Counter.prototype = {
     set: function(key, val) {
         //TODO add tokens/total_count setter
         this.counts.set(key, val);
+    },
+    decr: function(key) {
+        this.incr(key, -1);
     },
     incr: function(key, add) {
         add = add || 1;
