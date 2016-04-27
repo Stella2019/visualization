@@ -8,11 +8,11 @@ from pprint import pprint
 #mongoexport -h z --db <dbname> --collection <colname> --out <colname>.json
 
 # User Parameters
-db_name = 'Sydney Siege'
+db_name = 'Bosron'
 rumor_i = 0
 period = 1
 existing_collection = True
-upload_codes = False
+upload_codes = True
 upload_inrumor = True
 
 # Databases
@@ -23,9 +23,9 @@ mongoDBs = {
         'rumor_offset': 1
     },
     'MH-17': {
-        'files': [],
+        'files': ['american_falseflag', 'americans_onboard', 'blackbox'], # fighterjet, israel_falseflag, researchers, same_plane
         'event_id': -2,
-        'rumor_offset': 
+        'rumor_offset': 17
     },
     'Sydney Siege': {
         'files': ['airspace', 'flag', 'hadley', 'lakemba', 'suicide_belts'],
@@ -33,35 +33,35 @@ mongoDBs = {
         'rumor_offset': 10
     },
     'Westjet': {
-        'files': ['hijacking', 'blackbox'],
+        'files': ['hijacking'],#, 'signal'],
         'event_id': -4,
         'rumor_offset': 8
     },
     'Donetsk Ukraine Explosion': {
-        'files': [],
+        'files': ['nuclear'],
         'event_id': -5,
         'rumor_offset': 9
     },
-    'Baltimore': {
-        'files': [],
+    'Baltimore Riots': {
+        'files': ['gangs', 'purse', 'church_fire'],
         'event_id': -6,
-        'rumor_offset': 10000
+        'rumor_offset': [20, 21, 25]
     },
     'DC Power Outage': {
-        'files': [],
+        'files': ['explosion', 'foul_play'],
         'event_id': -7,
-        'rumor_offset': 10000
+        'rumor_offset': 15
     },
     'Paris Attacks': {
-        'files': [],
+        'files': ['les_halles', 'paris_crisis_actors', 'bot_prediction'],
         'event_id': -8,
-        'rumor_offset': 10000
-    }
+        'rumor_offset': 5
+    },
     'Navy Shooting': {
-        'files': [],
+        'files': ['chattanooga_isis', 'white_male', 'tennessee_college'],
         'event_id': 46,
-        'rumor_offset': 10000
-    }
+        'rumor_offset': 22
+    },
     'Umpqua': {
         'files': ['crisis_actors'],
         'event_id': 91,
@@ -84,7 +84,11 @@ mongoDBs = {
 
 # Make variables based on parameters
 db = mongoDBs[db_name]
-rumor_id = db['rumor_offset'] + rumor_i
+rumor_id = 0
+if(isinstance(db['rumor_offset'], list)):
+    rumor_id = db['rumor_offset'][rumor_i]
+else:
+    rumor_id = db['rumor_offset'] + rumor_i
 filename = db['files'][rumor_i]
 event_id = db['event_id']
 folder = db_name
@@ -92,7 +96,6 @@ folder = db_name
 filename = '..\\..\\..\\dav\\' + folder + '\\' + filename + '.json'
 config_file = '..\\..\\local.conf'
 query_tweet_exists = "SELECT * FROM Tweet WHERE ID=%(ID)s"
-
 
 # Load database
 with open(config_file) as config_file:
@@ -142,25 +145,35 @@ subsets = checkSubsetsAgainstDatabase(connection=connection)
 # Iterate through tweets
 n_tweets = 0
 with codecs.open(filename, 'r', 'utf-8') as data_file: 
+    line_incomplete = ''
     for line in data_file:
+        if(line_incomplete):
+            line = line_incomplete + line
+            line_incomplete = ''
         if len(line) < 5:
             continue
         line = re.sub(r'$oid', 'oid', line)
+        line = re.sub(r'\$date', 'date', line)
+        line = re.sub(r'\$oid', 'oid', line)
         line = re.sub(r'ObjectId\([a-z0-9" ]+\)', '0', line)
         line = re.sub(r'Date\( ([0-9]+) \)', r'\1', line)
         
         # Get tweet
         try:
             tweet = parseTweetJSON(line)
-        except: 
-            print("Unexpected error:", sys.exc_info()[0])
-            print(rm_unicode(line[:100]))
+        except Exception as inst:
+            if('Unterminated string' in str(inst)):
+                line_incomplete = line
+            else:
+                print(n_tweets + inst)
+                print(rm_unicode(line[:50]))
             continue
         
         # Upload tweet
         n_tweets += 1
         if(n_tweets % 1000 == 0):
             print(str(n_tweets) + ' tweets')
+            connection.commit()
         
         if(existing_collection):
             cursor.execute(query_tweet_exists, {'ID': tweet['ID']})
@@ -188,7 +201,7 @@ with codecs.open(filename, 'r', 'utf-8') as data_file:
                     'Period': period,
                     'Primary': primary_code,
                     'Uncodable': primary_code == 'Uncodable',
-                    'Codable':   primary_code in ['Related', 'Affirm', 'Deny', 'Neutral'],
+                    'Codable':   primary_code in ['Unrelated', 'Affirm', 'Deny', 'Neutral'],
                     'Unrelated': primary_code == 'Unrelated',
                     'Related':   primary_code in ['Affirm', 'Deny', 'Neutral'],
                     'Affirm':    primary_code == 'Affirm',
