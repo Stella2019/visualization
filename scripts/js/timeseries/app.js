@@ -317,7 +317,10 @@ Timeseries.prototype = {
 //            })
         };
         
-        this.ops.updateCollectionCallback = function() { data.loadRumors(); };
+        // Add dataset options
+        triggers.emit('collectionManager:setOptions');
+        
+//        this.ops.updateCollectionCallback = function() { data.loadRumors(); }; // TODO fix this
         this.ops.init();
     },
 };

@@ -491,7 +491,7 @@ Counter.prototype = {
 
 function Connection(args) {
     var permitted_args = ['name', 'url', 'post', 'resolution', 'time_res',
-                          'progress_div', 'progress_text', 'progress_full',
+                          'progress_div', 'progress_text', 'progress_style',
                           'quantity', 'min', 'max',
                           'failure_msg',
                           'on_chunk_finish', 'on_finish']
@@ -514,7 +514,7 @@ function Connection(args) {
     this.progress        = {};
     this.progress_div    = this.progress_div    || '#body';
     this.progress_text   = this.progress_text   || "Working";
-    this.progress_full   = this.progress_full   || false;
+    this.progress_style  = this.progress_style  || 'middle';
     
     this.quantity        = this.quantity        || 'tweet';
     this.chunks          = [];
@@ -600,12 +600,12 @@ Connection.prototype = {
 
         // Start progress bar
         var progress_text = this.progress_text;
-        progress_text = progress_text.replace('{cur}', this.chunks[this.chunk_index + 1]);
+        progress_text = progress_text.replace('{cur}', this.chunks[this.chunk_index]);
         progress_text = progress_text.replace('{max}', this.max);
         this.progress = new Progress({
             name:      this.name,
             parent_id: this.progress_div,
-            full:      this.progress_full,
+            style:     this.progress_style,
             text:      progress_text,
             steps:     this.chunks.length - 1
         });
@@ -838,7 +838,7 @@ triggers.on('alert', function(ops) {
 
 function Progress(args) {
     // Grab parameters
-    var valid_param = ['name', 'parent_id', 'full', 'text', 'steps', 'initial'];
+    var valid_param = ['name', 'parent_id', 'style', 'text', 'steps', 'initial'];
     Object.keys(args).forEach(function (item) {
         if(valid_param.includes(item)) {
             this[item] = args[item];
@@ -847,8 +847,8 @@ function Progress(args) {
     
     // Set defaults if they aren't already set
     this.name      = this.name      || "progress bar";
-    this.parent_id = this.parent_id || "#timeseries_div";
-    this.full      = this.full      || false;
+    this.parent_id = this.parent_id || "#body";
+    this.style     = this.style     || 'pagemiddle'; // pagemiddle divmiddle full
     this.text      = this.text      || "Working";
     this.steps     = this.steps     || 100;
     this.initial   = this.initial   || 0;
@@ -857,39 +857,6 @@ function Progress(args) {
     this.container_div = '';
     this.bar_div       = '';
     this.active        = false;
-    
-    // Set styles
-    this.bar_style = {
-        'width': '0%',
-        'font-weight': 'bold',
-        'padding': '10px 0px',
-        'font-size': '1em',
-        'text-align': 'center',
-        'white-space': 'nowrap',
-    };
-    if(this.full) {
-        this.container_style = {
-            position: 'absolute',
-            top: '0px',
-            left: '0px',
-            width: '100%',
-            height: '100%',
-            opacity: 0.75,
-            background: 'grey',
-            'z-index': 3
-        }
-        this.bar_style.padding = '5px 0px';
-    } else {
-        this.container_style = {
-            position: 'absolute',
-            top: '36%',
-            left: '10%',
-            width: '80%',
-            height: '40px',
-            background: '#ccc',
-            'z-index': 3
-        };
-    }
 }
 Progress.prototype = {
     start: function() {        
@@ -897,8 +864,7 @@ Progress.prototype = {
         this.container_div = d3.select(this.parent_id)
             .append('div')
             .attr('id', this.name + '_progress_div')
-            .attr('class', 'progress')
-            .style(this.container_style);
+            .attr('class', 'progress ' + this.style);
         
         this.bar_div = this.container_div
             .append('div')
@@ -911,7 +877,6 @@ Progress.prototype = {
                 'aria-valuemax': "100",
                 'transition': "width .1s ease"
             })
-            .style(this.bar_style)
             .text(this.text);
         
         this.active = true;
@@ -921,10 +886,15 @@ Progress.prototype = {
         var percentDone =  Math.floor(step * 100 / this.steps);
         this.text = text || this.text;
         
+        // Temporary text replacement
+        text = this.text;
+        text = text.replace('{cur}', step);
+        text = text.replace('{max}', this.steps);
+        
         this.bar_div
             .attr('aria-valuenow', percentDone + "")
             .style('width', percentDone + "%")
-            .text(this.text);
+            .text(text);
     },
     end: function() {
         if(this.active) {

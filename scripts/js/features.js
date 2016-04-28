@@ -299,7 +299,7 @@ FeatureDistribution.prototype = {
         this.ops.sidebar.select('#choose_lDataset_lSubset .option-label')
             .html('Subset A');
         
-        // Add load buttons
+        // Add download buttons
         this.download_box = this.ops.sidebar.select('#panel_lDownload');
         
         var load_buttons = this.download_box.append('div')
@@ -312,9 +312,12 @@ FeatureDistribution.prototype = {
                 return 'load-button-set-' + String.fromCharCode(65 + i);
             });
         
+        load_buttons.append('span')
+            .html(function(d, i) { return String.fromCharCode(65 + i) + ': '; });
+        
         load_buttons.append('button')
             .attr('class', 'btn btn-xs load-start')
-            .html(function(d, i) { return 'Load Set ' + String.fromCharCode(65 + i); })
+            .html('Load')
             .on('click', this.loadTweets.bind(this));
         
         load_buttons.append('button')
@@ -326,6 +329,11 @@ FeatureDistribution.prototype = {
             .attr('class', 'btn btn-xs load-clear')
             .html('Clear')
             .on('click', this.clearTweets.bind(this));
+        
+        load_buttons.append('button')
+            .attr('class', 'btn btn-xs upload-users')
+            .html('Upload Users')
+            .on('click', this.uploadAllUserStats.bind(this));
     },
     toggleLoadButtons: function(collection) {
         // Get name of set
@@ -351,6 +359,8 @@ FeatureDistribution.prototype = {
         button_box.select('.load-stop')
             .classed('btn-default', setname ? true : false);
         button_box.select('.load-clear')
+            .classed('btn-default', setname ? true : false);
+        button_box.select('.upload-users')
             .classed('btn-default', setname ? true : false);
     },
     loadTweets: function(setname) {
@@ -663,6 +673,11 @@ FeatureDistribution.prototype = {
                 MinuteStarted: (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000,
                 MinuteEnded: (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000,
 
+//                'OthersMentioned': 0, // TODO get these features later
+//                'OthersRetweeted': 0,
+//                'OthersReplied': 0,
+//                'OthersQuoted': 0,
+                
                 TweetInterval: {
                     All: [],
                     Min: 0, Max: 0,
@@ -1460,6 +1475,79 @@ FeatureDistribution.prototype = {
         }
         
         triggers.emit('modal:open');
+    },
+    uploadAllUserStats: function(setname) {
+        var set = this.data[setname];
+        var userIDs = Object.keys(set.users);
+        
+        set.user_upload = {
+            userIDs: userIDs,
+            i_user: 0,
+            n_users: userIDs.length,
+            prog: new Progress({
+                steps: userIDs.length,
+                text: '{cur}/{max} Users Uploaded',
+            })
+        };
+        
+        set.user_upload.prog.start();
+        this.continueUserUpload(set);
+    },
+    continueUserUpload: function(set) {
+        var i_user = set.user_upload.i_user;
+        if(i_user < 0 || i_user >= set.user_upload.n_users) {
+            set.user_upload.prog.end();
+            return;
+        }
+        set.user_upload.prog.update(i_user);
+        
+        // Configure user's data
+        var userID = set.user_upload.userIDs[i_user];
+        var user = set.users[userID];
+        
+        var post = {
+            Event: set.event.ID,
+            Subset: 'subset' in set ? set.subset.ID : 0,
+        };
+        
+        ['UserID', 'Screenname',
+         'Tweets', 'FirstTweet', 'LastTweet', 'TweetsPerDay',
+         'MinutesInSet', 'MinuteStarted', 'MinuteEnded', 'Age', 
+         'LexiconSize', 'LexiconSizePerTweet', 'LexiconSizePerLogTweet']
+            .forEach(function(feature) {
+            post[feature] = user[feature];
+        });
+        
+        ['Distinct', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(feature) {
+            post[feature] = user[feature]['Count'];
+            post['Fraction' + feature] = user[feature]['Fraction'];
+        });
+        ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+            post[feature + 'AtStart'] = user[feature]['Start'];
+            post[feature + 'GainFirstToLast'] = user[feature]['Growth'];
+            post[feature + 'GainPerDay'] = user[feature]['PerDay'];
+        });
+        ['Min', 'Max', 'Ave', 'Med', 'Dev', 'NormDev'].forEach(function(feature) {
+            post[feature + 'MinutesBetweenTweets'] = user['TweetInterval'][feature];
+        });
+        
+        var failure_func = function(msg) { // Failure
+            console.error(msg);
+            set.user_upload.prog.end();
+            triggers.emit('alert', 'Error uploading users');
+            return;
+        }
+        
+        this.connection.php('analysis/uploadUserStats', post,
+            function(msg) { // Success
+                if(msg == '1') { // Definitely success!
+                    set.user_upload.i_user++;
+                    setTimeout(this.continueUserUpload.bind(this, set), 1); // prevents a large call stack
+                } else {
+                    failure_func(msg);
+                }
+            }.bind(this), failure_func);
+        
     },
 };
 

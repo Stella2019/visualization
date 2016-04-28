@@ -967,7 +967,7 @@ StatusReport.prototype = {
         var prog_bar = new Progress({
             'initial': 100,
             'parent_id': row + ' .cell-Tweets',
-            full: true, 
+            style: 'full', 
             text: ' '
         });
         prog_bar.start();
@@ -1014,7 +1014,7 @@ StatusReport.prototype = {
             max: d.LastTweet,
             progress_div: row + ' .cell-minutes',
             progress_text: ' ',
-            progress_full: true,
+            progress_style: 'full',
             on_chunk_finish: function(result) {
                 if(result.includes('Error')) {
 //                    this.progress.update(100, 'Error');
