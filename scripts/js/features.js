@@ -63,8 +63,6 @@ FeatureDistribution.prototype = {
         triggers.emit('modal:build');
         triggers.emit('collectionManager:build');
         
-//        this.getEventData();
-        
         setTimeout(triggers.emitter('tweets:fetch'), 1000);
     },
     setTriggers: function() {
@@ -237,9 +235,9 @@ FeatureDistribution.prototype = {
         this.ops['Display'] = {
             TopX: new Option({
                 title: "Top",
-                labels: ['10', '20', '100', '200', '1000'],
-                ids:    ['10', '20', '100', '200', '1000'],
-                default: 1,
+                labels: ['1', '5', '10', '20', '100', '200', '1000'],
+                ids:    ['1', '5', '10', '20', '100', '200', '1000'],
+                default: 3,
                 callback: triggers.emitter('counters:place')
             }),
             Filter: new Option({
@@ -261,21 +259,21 @@ FeatureDistribution.prototype = {
             }),
             'Count Quantity': new Option({
                 title: 'Count Quantity',
-                labels: ['Count', 'Percent'],
-                ids: ['freq', 'percent'],
+                labels: ['Frequency', 'Percent'],
+                ids: ['Frequency', 'Percent'],
                 callback: triggers.emitter('counters:place')
             }),
             'Cmp Quantity': new Option({
                 title: 'Cmp Quantity',
-                labels: ['Ratio', 'Log Ratio'],
-                ids: ['ratio', 'log-ratio'],
-                default: 1,
+                labels: ['Difference', 'Ratio', 'Log Ratio'],
+                ids: ['Difference', 'Ratio', 'Log Ratio'],
+                default: 2,
                 callback: triggers.emitter('counters:show')
             }),
             'Order': new Option({
                 title: 'Order by',
-                labels: ['Token', 'Freq A', 'Freq B', 'Ratio', 'Ratio Magnitude'],
-                ids: ['Token', 'Frequency', 'Frequency B', 'Ratio', 'Ratio Magnitude'],
+                labels: ['Token Alphabetical', 'Frequency A', 'Frequency B', 'Frequency Combined', 'Comparison', 'Comparison Magnitude'],
+                ids: ['Token', 'Frequency', 'Frequency B', 'Frequency Combined', 'Comparison', 'Comparison Magnitude'],
                 default: 1,
                 callback: triggers.emitter('counters:place')
             }),
@@ -288,6 +286,10 @@ FeatureDistribution.prototype = {
             }),
         };
         
+        // Populate the dataset options with the collection manager
+        triggers.emit('collectionManager:setOptions');
+        
+        // Initialize the sidebar
         this.ops.init();
     },
     buildLoadButtons: function() {
@@ -454,7 +456,6 @@ FeatureDistribution.prototype = {
 //            }
 //        }, this);
         
-//        console.log(setname + ': ' + util.formatThousands(this.data[setname].tweets_arr.length) + ' Tweets');
         triggers.emit('counters:count', setname);
     },
     countFeatures: function(setname) {
@@ -476,343 +477,17 @@ FeatureDistribution.prototype = {
             
         }
         
-        // Add up ngrams
-        var repeatTextOK = this.ops['Display']['Filter'].is('none');
+        // Count features of the tweets & their users
         for(; set.counted < set.tweets_arr.length; set.counted++) {
             var tweet = set.tweets_arr[set.counted];
+            
             if(!tweet || typeof(tweet) != 'object') {
                 this.abortLoadTweets(setname);
                 continue;
             }
             
-            var newTweetText = !set.counter['Tweet Based__Whole Text__Text Stripped'].has(tweet.TextStripped);
-
-            if(repeatTextOK || newTweetText) { // Aggressive redundancy check
-                set.nTweets += 1;
-                
-                // Add new features
-                var domain = tweet['ExpandedURL'];
-                if(domain) {
-                    domain = domain.replace(
-                        /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
-                }
-                tweet['Expanded URL Domain'] = domain;
-                
-                // Get time feature
-                var time = tweet['Timestamp'];
-                time = util.date(time);
-                time.setSeconds(0);
-                time.setMilliseconds(0);
-                time = time.getTime();
-                tweet['Timestamp Minute'] = time;
-                
-                // Count features
-                set.counter['Tweet Based__Categories__Type'].incr(tweet['Type']);
-                set.counter['Tweet Based__Categories__Distinct'].incr(tweet['Distinct']);
-                set.counter['Tweet Based__Whole Text__Text'].incr(tweet['Text']);
-                set.counter['Tweet Based__Whole Text__Text Stripped'].incr(tweet['TextStripped']);
-                set.counter['Tweet Based__Text Other__Language'].incr(util.subsetName({feature: 'Lang', match: tweet['Lang'].toLowerCase()}));
-                set.counter['Tweet Based__Text Other__User Language'].incr(util.subsetName({feature: 'Lang', match: tweet['UserLang'].toLowerCase()}));
-                set.counter['Tweet Based__Text Other__Using Pipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
-                set.counter['Tweet Based__URLs__Expanded URL Domain'].incr(tweet['Expanded URL Domain']);
-                set.counter['Tweet Based__URLs__Expanded URL'].incr(tweet['ExpandedURL']);
-                set.counter['Tweet Based__URLs__Media URL'].incr(tweet['MediaURL']);
-                set.counter['Tweet Based__Origin__Screenname / User ID'].incr(tweet['Screenname'] + ' - ' + tweet['UserID']);
-                set.counter['Tweet Based__Origin__Parent Tweet'].incr(tweet['ParentID']);
-                set.counter['Tweet Based__Origin__Source'].incr(tweet['Source']);
-                set.counter['Tweet Based__Temporal__Time Posted (PT)'].incr(tweet['Timestamp Minute']);
-                set.counter['Tweet Based__Temporal__User\'s Timezone'].incr(tweet['UserTimezone']);
-                
-                
-                // Count N-Grams
-                var text = tweet.TextStripped.toLowerCase();
-                text = text.replace(/[^\w']+/g, ' ');
-                text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
-                var words = text.split(' ').filter(function(word) { return word.length > 0; });
-                var tweetgrams = [new Set(), new Set(), new Set(), new Set()];
-
-                words.forEach(function(word, wi) {
-                    if(word) {
-                        var gram = word;
-                        set.counter['Tweet Based__Text N-Grams__Unigrams'].incr(gram);
-                        if(!tweetgrams[0].has(gram)) {
-                            tweetgrams[0].add(gram);
-//                            ngrams.NGramHasCounter[0].incr(gram);
-                        }
-                        if(words[wi + 1]) {
-                            gram += " " + words[wi + 1];
-                            set.counter['Tweet Based__Text N-Grams__Bigrams'].incr(gram);
-                            if(!tweetgrams[1].has(gram)) {
-                                tweetgrams[1].add(gram);
-//                                ngrams.NGramHasCounter[1].incr(gram);
-                            }
-                            if(words[wi + 2]) {
-                                gram += " " + words[wi + 2];
-                                set.counter['Tweet Based__Text N-Grams__Trigrams'].incr(gram);
-                                if(!tweetgrams[2].has(gram)) {
-                                    tweetgrams[2].add(gram);
-//                                    ngrams.NGramHasCounter[2].incr(gram);
-                                }
-                            }
-                        }
-                        for(var wj = wi + 1; wj < words.length; wj++) { 
-                            gram = word + ' & ' + words[wj];
-                            if(words[wj] < word)
-                                gram = words[wj] + ' & ' + word;
-                            // Add co-occurance
-                            if(words[wj]) {
-                                set.counter['Tweet Based__Text N-Grams__Co-Occur'].incr(gram);
-                                if(!tweetgrams[3].has(gram)) {
-                                    tweetgrams[3].add(gram);
-//                                    ngrams.CoOccurHasCounter.incr(gram);
-                                }
-                            }
-                        }
-                    }
-                });
-            } // New Tweet or New URL
-            
-            // Remove the tweet object to save memory, will prevent other analysis but necessary for large datasets
-//            set.tweets_arr[set.counted] = tweet.ID; // TODO
-            
-            var userscreenid = tweet['Screenname'] + ' - ' + tweet['UserID'];
-            var newUser = set.counter['Tweet Based__Origin__Screenname / User ID'].get(userscreenid) == 1;
-            
-            if(newUser) {
-                set.nUsers += 1;
-                
-                var creation = util.date(tweet['UserCreatedAt']);
-                creation.setMilliseconds(0);
-                creation.setSeconds(0);
-                creation.setMinutes(0);
-                creation.setHours(0);
-                var firstTweet = util.twitterID2Timestamp(set.event.FirstTweet);
-                var age = Math.floor((firstTweet.getTime() - creation.getTime()) / 24 / 60 / 60 / 1000);
-                
-                // Get user's description's unigrams
-                var desc = (tweet.UserDescription || '').toLowerCase();
-                desc = desc.replace(/[^\w']+/g, ' ');
-                desc = desc.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
-                var desc_words = desc.split(' ').filter(function(word) { return word.length > 0; });
-                if(desc_words.length == 0) {
-                    desc_words = [tweet.UserDescription];
-                }
-                
-                // Count user's tweet's unigrams
-                var tweet_words = new Counter();
-                var text = tweet.TextStripped.toLowerCase();
-                text = text.replace(/[^\w']+/g, ' ');
-                text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
-                var words = text.split(' ').filter(function(word) { return word.length > 0; });
-                words.forEach(function(word) {
-                    tweet_words.incr(word);
-                });
-            
-                var user = {
-                    Tweets: 1,
-                    
-                    UserID: tweet['UserID'],
-                    Screenname: tweet['Screenname'],
-                    Username: tweet['Username'],
-                    Location: tweet['UserLocation'],
-                    UTCOffset: tweet['UserUTCOffset'],
-                    Timezone: tweet['UserTimezone'],
-                    Lang: tweet['UserLang'],
-                    Verified: tweet['UserVerified'],
-                    
-                    Description: tweet['UserDescription'],
-                    DescriptionWords: desc_words,
-                    
-                    TweetWords: tweet_words,
-                    LexiconSize: tweet_words.tokens,
-                    LexiconSizePerTweet: tweet_words.tokens,
-                    LexiconSizePerLogTweet: tweet_words.tokens,
-                    UsingPipe: tweet['Text'].includes('|') ? 1 : 0,
-                    
-                    CreatedAt: creation,
-                    Age: age,
-                    
-                    FirstTweet: tweet['ID'],
-                    LastTweet: tweet['ID'],
-                    
-                    MinutesInSet: 0,
-                    TweetsPerDay: 1,
-                    MinuteStarted: (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000,
-                    MinuteEnded: (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000,
-                    
-                    TweetInterval: {
-                        All: [],
-                        Min: 0, Max: 0,
-                        Med: 0, Ave: 0, 
-                        Dev: 0, NormDev: 0,
-                    },
-                    Statuses: { Start:parseInt(tweet['UserStatusesCount']), 
-                               End:parseInt(tweet['UserStatusesCount']), Growth: 0, PerDay: 0},
-                    Followers: { Start:parseInt(tweet['UserFollowersCount']), 
-                               End:parseInt(tweet['UserFollowersCount']), Growth: 0, PerDay: 0},
-                    Following: { Start:parseInt(tweet['UserFriendsCount']), 
-                               End:parseInt(tweet['UserFriendsCount']), Growth: 0, PerDay: 0},
-                    Listed: { Start:parseInt(tweet['UserListedCount']), 
-                               End:parseInt(tweet['UserListedCount']), Growth: 0, PerDay: 0},
-                    Favorites: { Start:parseInt(tweet['UserFavouritesCount']), 
-                               End:parseInt(tweet['UserFavouritesCount']), Growth: 0, PerDay: 0},
-                    
-                    Distinct: {Count: tweet['Distinct'] == '1' ? 1 : 0, Fraction: tweet['Distinct'] == '1' ? 1 : 0},
-                    Originals: {Count: 0, Fraction: 0},
-                    Retweets: {Count: 0, Fraction: 0},
-                    Replies: {Count: 0, Fraction: 0},
-                    Quotes: {Count: 0, Fraction: 0},
-                };
-                ['Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
-                    if(tweet['Type'].includes(type.slice(0,4).toLowerCase())) {
-                        user[type]['Count'] = 1;
-                        user[type]['Fraction'] = 1;
-                    }
-                });
-                
-                set.users[user.UserID] = user;
-                
-                set.counter['User Based__Identity__Username'].incr(user['Username']);
-                set.counter['User Based__Identity__Lang'].incr(util.subsetName({feature: 'Lang', match: user['Lang'].toLowerCase()}));
-                set.counter['User Based__Identity__Verified'].incr(user['Verified']);
-                set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
-                set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
-                set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable++;
-                set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable++;
-                set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable++;
-//                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval']);
-                set.counter['User Based__Temporal__Account Creation Date'].incr(creation.getTime());
-                set.counter['User Based__Temporal__Age of Account'].incr(age);
-                set.counter['User Based__Localization__Location'].incr(user['Location']);
-                set.counter['User Based__Localization__UTC Offset'].incr(user['UTCOffset']);
-                set.counter['User Based__Localization__Timezone'].incr(user['Timezone']);
-                set.counter['User Based__Tweet Text__Lexicon Size'].incr(user['LexiconSize']);
-                set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].incr(user['LexiconSizePerTweet']);
-                set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].incr(user['LexiconSizePerLogTweet']);
-                set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe']);
-                
-                // User Description Unigrams
-                desc_words.forEach(function(word) {
-                    set.counter['User Based__Identity__Description Unigrams'].incr(word);
-                });
-                
-                // Counts
-                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
-                    set.counter['User Based__' + feature + '__Start'].incr(user[feature]['Start']);
-                    set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth']);
-                    set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
-                });
-            } else {
-                var user = set.users[tweet.UserID];
-                
-                // Tweets
-                set.counter['User Based__Activity__Tweets'].decr(user['Tweets']);
-                user['Tweets']++;
-                set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
-                
-                // Major metrics
-                set.counter['User Based__Activity__Tweets Per Day'].decr(user['TweetsPerDay']);
-                user['MinuteEnded'] = (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000;
-                user['MinutesInSet'] = user['MinuteEnded'] - user['MinuteStarted'];
-                user['TweetsPerDay'] = user['Tweets'] * 60 * 24 / user['MinutesInSet'];
-                set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
-                
-                // Count user's tweet's unigrams
-                var text = tweet.TextStripped.toLowerCase();
-                text = text.replace(/[^\w']+/g, ' ');
-                text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
-                var words = text.split(' ').filter(function(word) { return word.length > 0; });
-                words.forEach(function(word) {
-                    user['TweetWords'].incr(word);
-                });
-                
-                set.counter['User Based__Tweet Text__Lexicon Size'].decr(user['LexiconSize']);
-                set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].decr(user['LexiconSizePerTweet']);
-                set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].decr(user['LexiconSizePerLogTweet']);
-                user['LexiconSize'] = user['TweetWords'].tokens
-                user['LexiconSizePerTweet'] = user['TweetWords'].tokens / user['Tweets'];
-                user['LexiconSizePerLogTweet'] = user['TweetWords'].tokens / Math.log2(user['Tweets'] + 1);
-                set.counter['User Based__Tweet Text__Lexicon Size'].incr(user['LexiconSize']);
-                set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].incr(user['LexiconSizePerTweet']);
-                set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].incr(user['LexiconSizePerLogTweet']);
-                
-                // Median Interval between tweets
-                var thisTimeTweeted = util.twitterID2Timestamp(tweet['ID']).getTime();
-                var interval = (thisTimeTweeted -
-                                util.twitterID2Timestamp(user['LastTweet']).getTime())
-                                / 60 / 1000;
-                user['LastTweet'] = tweet['ID'];
-                user['TweetInterval']['All'].push(interval);
-                if(user['Tweets'] > 3) {
-                    set.counter['User Based__Activity__Median Interval Between Tweets'].decr(user['TweetInterval']['Med']);
-                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].decr(user['TweetInterval']['Dev']);
-                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].decr(user['TweetInterval']['NormDev']);
-                } else if(user['Tweets'] == 3) {
-                    set.counter['User Based__Activity__Median Interval Between Tweets'].decr(user['TweetInterval']['Med']);
-                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable--;
-                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable--;
-                } else if(user['Tweets'] == 2) {
-                    set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable--;
-                }
-                user['TweetInterval']['Min'] = d3.min(user['TweetInterval']['All']);
-                user['TweetInterval']['Max'] = d3.max(user['TweetInterval']['All']);
-                user['TweetInterval']['Med'] = d3.median(user['TweetInterval']['All']);
-                user['TweetInterval']['Ave'] = d3.mean(user['TweetInterval']['All']);
-                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['TweetInterval']['Med']);
-                if(user['Tweets'] >= 3) {
-                    user['TweetInterval']['Dev'] = d3.deviation(user['TweetInterval']['All']);
-                    user['TweetInterval']['NormDev'] = user['TweetInterval']['Dev'] * 1.0 / user['TweetInterval']['Ave'];
-                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].incr(user['TweetInterval']['Dev']);
-                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].incr(user['TweetInterval']['NormDev']);
-                }
-                
-                // Using Pipe
-                set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], -1);
-                user['UsingPipe'] = (user['UsingPipe'] * (user['Tweets'] - 1) + tweet['Text'].includes('|') ? 1 : 0) / user['Tweets'];
-                set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], 1);
-                
-                /* Counts */
-                
-                // Uncount the user's previous entry
-                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
-                    set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], -1);
-                    if(user[feature]['Growth'] == 0) {
-                        set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable--;
-                    } else {
-                        set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], -1);
-                    }
-                });
-                
-                // Get their new values
-                user['Statuses']['End']  = parseInt(tweet['UserStatusesCount']);
-                user['Followers']['End'] = parseInt(tweet['UserFollowersCount']);
-                user['Following']['End'] = parseInt(tweet['UserFriendsCount']);
-                user['Listed']['End']    = parseInt(tweet['UserListedCount']);
-                user['Favorites']['End'] = parseInt(tweet['UserFavouritesCount']);
-                ['Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
-                    if(tweet['Type'].includes(type.slice(0,4).toLowerCase())) {
-                        user[type]['Count']++;
-                    }
-                    user[type]['Fraction'] = user[type]['Count'] / user['Tweets'];
-                });
-                user['Distinct']['Count'] += tweet['Distinct'] == '1' ? 1 : 0;
-                user['Distinct']['Fraction'] = user['Distinct']['Count'] / user['Tweets'];
-                
-                // Insert new counts
-                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
-                    user[feature]['Growth'] = user[feature]['End'] - user[feature]['Start'];
-                    user[feature]['PerDay'] = user[feature]['Growth'] * 24 * 60 / user['MinutesInSet'];
-                    
-                    set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], 1);
-                    
-                    if(user[feature]['Growth'] == 0) {
-                        set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
-                    } else {
-                        set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], 1);
-                    }
-                });
-                
-            }
+            this.countTweet(set, tweet);
+            this.countUser(set, tweet);
         }
         
         // Purge rare quantities from counters that take a LOT of memory
@@ -821,22 +496,6 @@ FeatureDistribution.prototype = {
             set.counter['Tweet Based__Text N-Grams__Co-Occur'].purgeBelow(10);
             set.counter['Tweet Based__Text N-Grams__Bigrams'].purgeBelow(5);
             set.counter['Tweet Based__Text N-Grams__Trigrams'].purgeBelow(5);
-            
-            // Old
-//            set.counter['UserDescription Unigrams/User'].purgeBelow(2);
-            
-            // New
-//            set.counter['Screenname'].purgeBelow(2);
-//            set.counter['Username'].purgeBelow(2);
-//            set.counter['UserID'].purgeBelow(2);
-            
-//            set.counter['Text'].purgeBelow(2);
-//            set.counter['TextStripped'].purgeBelow(2);
-//            set.counter['UserLocation'].purgeBelow(2);
-//            set.counter['ParentID'].purgeBelow(2);
-//            set.counter['TextUnigrams'].purgeBelow(2);
-//            set.counter['ExpandedURL'].purgeBelow(2);
-//            set.counter['MediaURL'].purgeBelow(2);
         } else {
             set.counter['Tweet Based__Text N-Grams__Co-Occur'].purgeBelow(5);
             set.counter['Tweet Based__Text N-Grams__Bigrams'].purgeBelow(2);
@@ -846,6 +505,345 @@ FeatureDistribution.prototype = {
         }
         
         triggers.emit('counters:place', setname);
+    },
+    countTweet: function(set, tweet) {
+        var repeatTextOK = this.ops['Display']['Filter'].is('none');
+        var newTweetText = !set.counter['Tweet Based__Whole Text__Text Stripped'].has(tweet.TextStripped);
+
+        if(repeatTextOK || newTweetText) { // Aggressive redundancy check
+            set.nTweets += 1;
+
+            // Add new features
+            var domain = tweet['ExpandedURL'];
+            if(domain) {
+                domain = domain.replace(
+                    /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
+            }
+            tweet['Expanded URL Domain'] = domain;
+
+            // Get time feature
+            var time = tweet['Timestamp'];
+            time = util.date(time);
+            time.setSeconds(0);
+            time.setMilliseconds(0);
+            time = time.getTime();
+            tweet['Timestamp Minute'] = time;
+
+            // Count features
+            set.counter['Tweet Based__Categories__Type'].incr(tweet['Type']);
+            set.counter['Tweet Based__Categories__Distinct'].incr(tweet['Distinct']);
+            set.counter['Tweet Based__Whole Text__Text'].incr(tweet['Text']);
+            set.counter['Tweet Based__Whole Text__Text Stripped'].incr(tweet['TextStripped']);
+            set.counter['Tweet Based__Text Other__Language'].incr(util.subsetName({feature: 'Lang', match: tweet['Lang'].toLowerCase()}));
+            set.counter['Tweet Based__Text Other__User Language'].incr(util.subsetName({feature: 'Lang', match: tweet['UserLang'].toLowerCase()}));
+            set.counter['Tweet Based__Text Other__Using Pipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
+            set.counter['Tweet Based__URLs__Expanded URL Domain'].incr(tweet['Expanded URL Domain']);
+            set.counter['Tweet Based__URLs__Expanded URL'].incr(tweet['ExpandedURL']);
+            set.counter['Tweet Based__URLs__Media URL'].incr(tweet['MediaURL']);
+            set.counter['Tweet Based__Origin__Screenname / User ID'].incr(tweet['Screenname'] + ' - ' + tweet['UserID']);
+            set.counter['Tweet Based__Origin__Parent Tweet'].incr(tweet['ParentID']);
+            set.counter['Tweet Based__Origin__Source'].incr(tweet['Source']);
+            set.counter['Tweet Based__Temporal__Time Posted (PT)'].incr(tweet['Timestamp Minute']);
+            set.counter['Tweet Based__Temporal__User\'s Timezone'].incr(tweet['UserTimezone']);
+
+            // Count N-Grams
+            var text = tweet.TextStripped.toLowerCase();
+            text = text.replace(/[^\w']+/g, ' ');
+            text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
+            var words = text.split(' ').filter(function(word) { return word.length > 0; });
+            var tweetgrams = [new Set(), new Set(), new Set(), new Set()];
+
+            words.forEach(function(word, wi) {
+                if(word) {
+                    var gram = word;
+                    set.counter['Tweet Based__Text N-Grams__Unigrams'].incr(gram);
+                    if(!tweetgrams[0].has(gram)) {
+                        tweetgrams[0].add(gram);
+//                            ngrams.NGramHasCounter[0].incr(gram);
+                    }
+                    if(words[wi + 1]) {
+                        gram += " " + words[wi + 1];
+                        set.counter['Tweet Based__Text N-Grams__Bigrams'].incr(gram);
+                        if(!tweetgrams[1].has(gram)) {
+                            tweetgrams[1].add(gram);
+//                                ngrams.NGramHasCounter[1].incr(gram);
+                        }
+                        if(words[wi + 2]) {
+                            gram += " " + words[wi + 2];
+                            set.counter['Tweet Based__Text N-Grams__Trigrams'].incr(gram);
+                            if(!tweetgrams[2].has(gram)) {
+                                tweetgrams[2].add(gram);
+//                                    ngrams.NGramHasCounter[2].incr(gram);
+                            }
+                        }
+                    }
+                    for(var wj = wi + 1; wj < words.length; wj++) { 
+                        gram = word + ' & ' + words[wj];
+                        if(words[wj] < word)
+                            gram = words[wj] + ' & ' + word;
+                        // Add co-occurance
+                        if(words[wj]) {
+                            set.counter['Tweet Based__Text N-Grams__Co-Occur'].incr(gram);
+                            if(!tweetgrams[3].has(gram)) {
+                                tweetgrams[3].add(gram);
+//                                    ngrams.CoOccurHasCounter.incr(gram);
+                            }
+                        }
+                    }
+                }
+            });
+        } // New Tweet or New URL
+
+        // Remove the tweet object to save memory, will prevent other analysis but necessary for large datasets
+//            set.tweets_arr[set.counted] = tweet.ID; // TODO
+    },
+    countUser: function(set, tweet) {
+        var userscreenid = tweet['Screenname'] + ' - ' + tweet['UserID'];
+        var newUser = set.counter['Tweet Based__Origin__Screenname / User ID'].get(userscreenid) == 1;
+
+        if(newUser) {
+            set.nUsers += 1;
+
+            var creation = util.date(tweet['UserCreatedAt']);
+            creation.setMilliseconds(0);
+            creation.setSeconds(0);
+            creation.setMinutes(0);
+            creation.setHours(0);
+            var firstTweet = util.twitterID2Timestamp(set.event.FirstTweet);
+            var age = Math.floor((firstTweet.getTime() - creation.getTime()) / 24 / 60 / 60 / 1000);
+
+            // Get user's description's unigrams
+            var desc = (tweet.UserDescription || '').toLowerCase();
+            desc = desc.replace(/[^\w']+/g, ' ');
+            desc = desc.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
+            var desc_words = desc.split(' ').filter(function(word) { return word.length > 0; });
+            if(desc_words.length == 0) {
+                desc_words = [tweet.UserDescription];
+            }
+
+            // Count user's tweet's unigrams
+            var tweet_words = new Counter();
+            var text = tweet.TextStripped.toLowerCase();
+            text = text.replace(/[^\w']+/g, ' ');
+            text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
+            var words = text.split(' ').filter(function(word) { return word.length > 0; });
+            words.forEach(function(word) {
+                tweet_words.incr(word);
+            });
+
+            var user = {
+                Tweets: 1,
+
+                UserID: tweet['UserID'],
+                Screenname: tweet['Screenname'],
+                Username: tweet['Username'],
+                Location: tweet['UserLocation'],
+                UTCOffset: tweet['UserUTCOffset'],
+                Timezone: tweet['UserTimezone'],
+                Lang: tweet['UserLang'],
+                Verified: tweet['UserVerified'],
+
+                Description: tweet['UserDescription'],
+                DescriptionWords: desc_words,
+
+                TweetWords: tweet_words,
+                LexiconSize: tweet_words.tokens,
+                LexiconSizePerTweet: tweet_words.tokens,
+                LexiconSizePerLogTweet: tweet_words.tokens,
+                UsingPipe: tweet['Text'].includes('|') ? 1 : 0,
+
+                CreatedAt: creation,
+                Age: age,
+
+                FirstTweet: tweet['ID'],
+                LastTweet: tweet['ID'],
+
+                MinutesInSet: 0,
+                TweetsPerDay: 1,
+                MinuteStarted: (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000,
+                MinuteEnded: (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000,
+
+                TweetInterval: {
+                    All: [],
+                    Min: 0, Max: 0,
+                    Med: 0, Ave: 0, 
+                    Dev: 0, NormDev: 0,
+                },
+                Statuses: { Start:parseInt(tweet['UserStatusesCount']), 
+                           End:parseInt(tweet['UserStatusesCount']), Growth: 0, PerDay: 0},
+                Followers: { Start:parseInt(tweet['UserFollowersCount']), 
+                           End:parseInt(tweet['UserFollowersCount']), Growth: 0, PerDay: 0},
+                Following: { Start:parseInt(tweet['UserFriendsCount']), 
+                           End:parseInt(tweet['UserFriendsCount']), Growth: 0, PerDay: 0},
+                Listed: { Start:parseInt(tweet['UserListedCount']), 
+                           End:parseInt(tweet['UserListedCount']), Growth: 0, PerDay: 0},
+                Favorites: { Start:parseInt(tweet['UserFavouritesCount']), 
+                           End:parseInt(tweet['UserFavouritesCount']), Growth: 0, PerDay: 0},
+
+                Distinct: {Count: tweet['Distinct'] == '1' ? 1 : 0, Fraction: tweet['Distinct'] == '1' ? 1 : 0},
+                Originals: {Count: 0, Fraction: 0},
+                Retweets: {Count: 0, Fraction: 0},
+                Replies: {Count: 0, Fraction: 0},
+                Quotes: {Count: 0, Fraction: 0},
+            };
+            ['Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
+                if(tweet['Type'].includes(type.slice(0,4).toLowerCase())) {
+                    user[type]['Count'] = 1;
+                    user[type]['Fraction'] = 1;
+                }
+            });
+
+            set.users[user.UserID] = user;
+
+            set.counter['User Based__Identity__Username'].incr(user['Username']);
+            set.counter['User Based__Identity__Lang'].incr(util.subsetName({feature: 'Lang', match: user['Lang'].toLowerCase()}));
+            set.counter['User Based__Identity__Verified'].incr(user['Verified']);
+            set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
+            set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
+            set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable++;
+            set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable++;
+            set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable++;
+//                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval']);
+            set.counter['User Based__Temporal__Account Creation Date'].incr(creation.getTime());
+            set.counter['User Based__Temporal__Age of Account'].incr(age);
+            set.counter['User Based__Localization__Location'].incr(user['Location']);
+            set.counter['User Based__Localization__UTC Offset'].incr(user['UTCOffset']);
+            set.counter['User Based__Localization__Timezone'].incr(user['Timezone']);
+            set.counter['User Based__Tweet Text__Lexicon Size'].incr(user['LexiconSize']);
+            set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].incr(user['LexiconSizePerTweet']);
+            set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].incr(user['LexiconSizePerLogTweet']);
+            set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe']);
+
+            // User Description Unigrams
+            desc_words.forEach(function(word) {
+                set.counter['User Based__Identity__Description Unigrams'].incr(word);
+            });
+
+            // Counts
+            ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                set.counter['User Based__' + feature + '__Start'].incr(user[feature]['Start']);
+                set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth']);
+                set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
+            });
+        } else {
+            var user = set.users[tweet.UserID];
+
+            // Tweets
+            set.counter['User Based__Activity__Tweets'].decr(user['Tweets']);
+            user['Tweets']++;
+            set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
+
+            // Major metrics
+            set.counter['User Based__Activity__Tweets Per Day'].decr(user['TweetsPerDay']);
+            user['MinuteEnded'] = (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000;
+            user['MinutesInSet'] = user['MinuteEnded'] - user['MinuteStarted'];
+            user['TweetsPerDay'] = user['Tweets'] * 60 * 24 / user['MinutesInSet'];
+            set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
+
+            // Count user's tweet's unigrams
+            var text = tweet.TextStripped.toLowerCase();
+            text = text.replace(/[^\w']+/g, ' ');
+            text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
+            var words = text.split(' ').filter(function(word) { return word.length > 0; });
+            words.forEach(function(word) {
+                user['TweetWords'].incr(word);
+            });
+
+            set.counter['User Based__Tweet Text__Lexicon Size'].decr(user['LexiconSize']);
+            set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].decr(user['LexiconSizePerTweet']);
+            set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].decr(user['LexiconSizePerLogTweet']);
+            user['LexiconSize'] = user['TweetWords'].tokens
+            user['LexiconSizePerTweet'] = user['TweetWords'].tokens / user['Tweets'];
+            user['LexiconSizePerLogTweet'] = user['TweetWords'].tokens / Math.log2(user['Tweets'] + 1);
+            set.counter['User Based__Tweet Text__Lexicon Size'].incr(user['LexiconSize']);
+            set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].incr(user['LexiconSizePerTweet']);
+            set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].incr(user['LexiconSizePerLogTweet']);
+
+            // Median Interval between tweets
+            var thisTimeTweeted = util.twitterID2Timestamp(tweet['ID']).getTime();
+            var interval = (thisTimeTweeted -
+                            util.twitterID2Timestamp(user['LastTweet']).getTime())
+                            / 60 / 1000;
+            user['LastTweet'] = tweet['ID'];
+            user['TweetInterval']['All'].push(interval);
+            if(user['Tweets'] > 3) {
+                set.counter['User Based__Activity__Median Interval Between Tweets'].decr(user['TweetInterval']['Med']);
+                set.counter['User Based__Activity__Deviation Interval Between Tweets'].decr(user['TweetInterval']['Dev']);
+                set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].decr(user['TweetInterval']['NormDev']);
+            } else if(user['Tweets'] == 3) {
+                set.counter['User Based__Activity__Median Interval Between Tweets'].decr(user['TweetInterval']['Med']);
+                set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable--;
+                set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable--;
+            } else if(user['Tweets'] == 2) {
+                set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable--;
+            }
+            user['TweetInterval']['Min'] = d3.min(user['TweetInterval']['All']);
+            user['TweetInterval']['Max'] = d3.max(user['TweetInterval']['All']);
+            user['TweetInterval']['Med'] = d3.median(user['TweetInterval']['All']);
+            user['TweetInterval']['Ave'] = d3.mean(user['TweetInterval']['All']);
+            set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['TweetInterval']['Med']);
+            if(user['Tweets'] >= 3) {
+                user['TweetInterval']['Dev'] = d3.deviation(user['TweetInterval']['All']);
+                user['TweetInterval']['NormDev'] = user['TweetInterval']['Dev'] * 1.0 / user['TweetInterval']['Ave'];
+                set.counter['User Based__Activity__Deviation Interval Between Tweets'].incr(user['TweetInterval']['Dev']);
+                set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].incr(user['TweetInterval']['NormDev']);
+            }
+
+            // Using Pipe
+            set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], -1);
+            user['UsingPipe'] = (user['UsingPipe'] * (user['Tweets'] - 1) + tweet['Text'].includes('|') ? 1 : 0) / user['Tweets'];
+            set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], 1);
+
+            /* Counts */
+
+            // Uncount the user's previous entry
+            ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], -1);
+                if(user[feature]['Growth'] == 0) {
+                    set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable--;
+                } else {
+                    set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], -1);
+                }
+            });
+
+            // Get their new values
+            user['Statuses']['End']  = parseInt(tweet['UserStatusesCount']);
+            user['Followers']['End'] = parseInt(tweet['UserFollowersCount']);
+            user['Following']['End'] = parseInt(tweet['UserFriendsCount']);
+            user['Listed']['End']    = parseInt(tweet['UserListedCount']);
+            user['Favorites']['End'] = parseInt(tweet['UserFavouritesCount']);
+            ['Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
+                if(tweet['Type'].includes(type.slice(0,4).toLowerCase())) {
+                    user[type]['Count']++;
+                }
+                user[type]['Fraction'] = user[type]['Count'] / user['Tweets'];
+            });
+            user['Distinct']['Count'] += tweet['Distinct'] == '1' ? 1 : 0;
+            user['Distinct']['Fraction'] = user['Distinct']['Count'] / user['Tweets'];
+
+            // Insert new counts
+            ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                user[feature]['Growth'] = user[feature]['End'] - user[feature]['Start'];
+                user[feature]['PerDay'] = user[feature]['Growth'] * 24 * 60 / user['MinutesInSet'];
+
+                set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], 1);
+
+                if(user[feature]['Growth'] == 0) {
+                    set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
+                } else {
+                    set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], 1);
+                }
+            });
+
+        }
+    },
+    featureIsQuantitative: function(feature) {
+        return feature.includes('Age of Account') ||
+            feature.includes('Start') ||
+            feature.includes('Growth') ||
+            feature.includes('Activity') ||
+            feature.includes('Lexicon Size') ||
+            (feature.includes('User Based') && feature.includes('Using Pipe'));
     },
     placeCounts: function() {
         // Get appropriate set names
@@ -877,19 +875,6 @@ FeatureDistribution.prototype = {
                     .html('Tweets: ' + cmp.counted);
             }
         }
-        
-        // Get parameters
-        var n = parseInt(this.ops['Display']['TopX'].get());
-        var excludeStopwords = this.ops['Display']['Exclude Stopwords'].is('true');
-        var count_quantity = this.ops['Display']['Count Quantity'].get();
-        var order_by = this.ops['Display']['Order'].get();
-        var order_sign =  this.ops['Display']['Ascending'].is('asc') ? -1 : 1;
-        if(order_by == 'Token') order_sign *= -1;
-        var abs = false;
-        if(order_by == 'Ratio Magnitude') {
-            abs = true;
-            order_by = 'Log Ratio';
-        }
     
         // Add header
         this.feature_divs.select('p')
@@ -913,70 +898,95 @@ FeatureDistribution.prototype = {
             });
         
         // Add statistics for quantitative features
-        this.hierarchy_flatted.forEach(function(feature) {
-            if(!feature.includes('Age of Account') &&
-               !feature.includes('Start') &&
-               !feature.includes('Growth') &&
-               !feature.includes('Activity') &&
-               !feature.includes('Lexicon Size') &&
-               !(feature.includes('User Based') && feature.includes('Using Pipe'))) {
-                return;
-            }
-            
-            // Get page elements
-            var table_id = '.table-' + util.simplify(feature);
-            var table = this.feature_divs.select(table_id)
-                .classed('stats-table', true)
-                .classed('token-freq-table', false);
-            
-            // Compute stats
-            var stats = set.counter[feature].statistics();
-            var cmp_stats = {};
-            if(cmp) {
-                cmp_stats = cmp.counter[feature].statistics();
-            }
-            
-            // Header
-            var header = table.select('thead');
-            header.selectAll('*').remove();
-            header.append('tr');
-            header.select('tr').append('th')
-                .attr('class', 'stat-token')
-                .html('Quantity');
-            header.select('tr').append('th')
-                .attr('class', 'stat-value')
-                .html('A');
-            header.select('tr').append('th')
-                .attr('class', 'stat-cmp')
-                .html('B');
-            
-            // Add any new rows
-            var new_rows = table.select('tbody').selectAll('tr')
-                .data(Object.keys(stats))
-                .enter()
-                .append('tr')
-                .style('border-top', function(d) { 
-                    return d == 'Mean' ? '3px solid' : 'none';
-                });
-            
-            new_rows.append('td')
-                .attr('class', 'stat-token');
-            new_rows.append('td')
-                .attr('class', 'stat-value');
-            new_rows.append('td')
-                .attr('class', 'stat-cmp');
-            
-            // Push Data
-            var rows = table.select('tbody').selectAll('tr');
-            rows.select('td').html(function(d) { return d; });
-            rows.select('td.stat-value')
-                .html(function(d) {
-                    var val = parseInt(stats[d]);
-                    
+        this.hierarchy_flatted.forEach(this.buildQuantTable.bind(this, set, cmp));
+        
+        // Add tables of counts
+        this.hierarchy_flatted.forEach(this.buildNominalTable.bind(this, set, cmp));
+        
+        triggers.emit('counters:show');
+    },
+    buildQuantTable: function(set, cmp, feature) {
+        if(!this.featureIsQuantitative(feature)) return;
+
+        // Get page elements
+        var table_id = '.table-' + util.simplify(feature);
+        var table = this.feature_divs.select(table_id)
+            .classed('stats-table', true)
+            .classed('token-freq-table', false);
+
+        // Compute stats
+        var stats = set.counter[feature].statistics();
+        var cmp_stats = {};
+        if(cmp) {
+            cmp_stats = cmp.counter[feature].statistics();
+        }
+
+        // Header
+        var header = table.select('thead');
+        header.selectAll('*').remove();
+        header.append('tr');
+        header.select('tr').append('th')
+            .attr('class', 'stat-token')
+            .html('Quantity');
+        header.select('tr').append('th')
+            .attr('class', 'stat-value')
+            .html('A');
+        header.select('tr').append('th')
+            .attr('class', 'stat-cmp')
+            .html('B');
+
+        // Add any new rows
+        var new_rows = table.select('tbody').selectAll('tr')
+            .data(Object.keys(stats))
+            .enter()
+            .append('tr')
+            .style('border-top', function(d) { 
+                return d == 'Mean' ? '3px solid' : 'none';
+            });
+
+        new_rows.append('td')
+            .attr('class', 'stat-token');
+        new_rows.append('td')
+            .attr('class', 'stat-value');
+        new_rows.append('td')
+            .attr('class', 'stat-cmp');
+
+        // Push Data
+        var rows = table.select('tbody').selectAll('tr');
+        rows.select('td').html(function(d) { return d; });
+        rows.select('td.stat-value')
+            .html(function(d) {
+                var val = parseInt(stats[d]);
+
+                if(feature.includes('Normal')) {
+                    var formatted = val.toFixed(2);//util.formatTimeCount(val, 's');
+                    return formatted;
+                } else if(feature.includes('Interval')) {
+                    var formatted = util.formatMinutes(val);
+                    return formatted;
+                }
+
+                if(val == 0) return '0<span style="opacity: 0">.0</span>';
+                var formatted = util.formatThousands(val);
+                if(val % 1 > 0) {
+                    formatted += (val % 1).toFixed(1).slice(1);
+                } else {
+                    formatted += '<span style="opacity: 0">.0</span>';
+                }
+//                if(val % 1 > 0) val = val.toFixed(1);
+                return formatted; 
+            });
+        rows.select('td.stat-cmp')
+            .html(function(d) {
+                if(cmp_stats && d in cmp_stats) {
+                    var val = cmp_stats[d];
                     if(feature.includes('Normal')) {
-                        var formatted = val.toFixed(2);//util.formatTimeCount(val, 's');
-                        return formatted;
-                    } else if(feature.includes('Interval')) {
+                        if(typeof(val) == 'string') {
+                            return parseFloat(val).toFixed(2);
+                        } else {
+                            return val.toFixed(2);
+                        }
+                     } else if(feature.includes('Interval')) {
                         var formatted = util.formatMinutes(val);
                         return formatted;
                     }
@@ -988,156 +998,137 @@ FeatureDistribution.prototype = {
                     } else {
                         formatted += '<span style="opacity: 0">.0</span>';
                     }
-    //                if(val % 1 > 0) val = val.toFixed(1);
                     return formatted; 
-                });
-            rows.select('td.stat-cmp')
-                .html(function(d) {
-                    if(cmp_stats && d in cmp_stats) {
-                        var val = cmp_stats[d];
-                        if(feature.includes('Normal')) {
-                            if(typeof(val) == 'string') {
-                                return parseFloat(val).toFixed(2);
-                            } else {
-                                return val.toFixed(2);
-                            }
-                         } else if(feature.includes('Interval')) {
-                            var formatted = util.formatMinutes(val);
-                            return formatted;
-                        }
-                        
-                        if(val == 0) return '0<span style="opacity: 0">.0</span>';
-                        var formatted = util.formatThousands(val);
-                        if(val % 1 > 0) {
-                            formatted += (val % 1).toFixed(1).slice(1);
-                        } else {
-                            formatted += '<span style="opacity: 0">.0</span>';
-                        }
-                        return formatted; 
-                    } else {
-                        return '';
-                    }
-                });
-            
-            // Show/hide comparison cells
-            table.selectAll('.stat-cmp')
-                .style('display', cmp ? 'table-cell' : 'none');
-        }, this);
-        
-        // Add tables of counts
-        this.hierarchy_flatted.forEach(function(feature) {
-            var basis = feature.split(' ')[0];
-            if(feature.includes('Age of Account') || // Don't count quantities
-               feature.includes('Start') ||
-               feature.includes('Growth') ||
-               feature.includes('Activity') ||
-               feature.includes('Lexicon Size') ||
-              (feature.includes('User Based') && feature.includes('Using Pipe'))) {
-                return;
-            }
-            
-            var table_id = '.table-' + util.simplify(feature);
-            var table = this.feature_divs.select(table_id)
-                .classed('stats-table', false)
-                .classed('token-freq-table', true);
-            
-            // Add header if necessary
-            var header = table.select('thead')
-                .selectAll('tr')
-                .data(function(d) { return [d]; })
-                .enter()
-                .append('tr');
-            
-            header.append('th')
-                .attr('class', 'token')
-                .html('Term');
-            header.append('th')
-                .attr('class', 'freq')
-                .html('A');
-            header.append('th')
-                .attr('class', 'freq cell-cmp')
-                .html('B');
-            header.append('th')
-                .attr('class', 'freq cell-cmp')
-                .html('Cmp');
-
-            var top_tokens;
-            if(excludeStopwords && feature.includes('gram')) {
-                top_tokens = set.counter[feature].top_no_stopwords(n).map(function(d) { return d.key; });
-            } else {
-                top_tokens = set.counter[feature].top(n).map(function(d) { return d.key; });
-            }
-            if(cmp) {
-                var cmp_tokens;
-                if(excludeStopwords && feature.includes('gram')) {
-                    cmp_tokens = cmp.counter[feature].top_no_stopwords(n).map(function(d) { return d.key; });
                 } else {
-                    cmp_tokens = cmp.counter[feature].top(n).map(function(d) { return d.key; });
+                    return '';
                 }
-                top_tokens = top_tokens.concat(cmp_tokens);
-                top_tokens = util.lunique(top_tokens);
+            });
+
+        // Show/hide comparison cells
+        table.selectAll('.stat-cmp')
+            .style('display', cmp ? 'table-cell' : 'none');
+    },
+    buildNominalTable: function(set, cmp, feature) {
+        var n = parseInt(this.ops['Display']['TopX'].get());
+        var excludeStopwords = this.ops['Display']['Exclude Stopwords'].is('true');
+        var count_quantity = this.ops['Display']['Count Quantity'].get();
+        var cmp_quantity = this.ops['Display']['Cmp Quantity'].get();
+        var order_by = this.ops['Display']['Order'].get();
+        var order_sign =  this.ops['Display']['Ascending'].is('asc') ? -1 : 1;
+        var abs = false;
+        if (order_by == 'Token') {
+            order_sign *= -1;
+        } else if(order_by == 'Comparison') {
+            order_by = cmp_quantity;
+        } else if(order_by == 'Comparison Magnitude') {
+            abs = true;
+            order_by = cmp_quantity;
+            if(cmp_quantity.includes('Ratio')) {
+               order_by = 'Log Ratio';
             }
-            
-            var entries = top_tokens.map(function(token) {
-                var entry = {
-                    Token: util.subsetName({feature: feature, match:token}),
-                    Frequency: set.counter[feature].get(token)
-                };
-                entry['Percent']         = entry['Frequency'] / set['n' + basis + 's'] * 100;
-                if(cmp) {
-                    entry['Frequency B'] = cmp.counter[feature].get(token);
-                    entry['Percent B']   = entry['Frequency B'] / cmp['n' + basis + 's'] * 100;
-                    
-                    if(count_quantity == 'freq') {
-                        entry['Ratio']       = (entry['Frequency'] || 1e-5) / (entry['Frequency B'] || 1e-5);
-                    } else {
-                        entry['Ratio']       = (entry['Percent']   || 1e-5) / (entry['Percent B']   || 1e-5);
-                    }
-                    entry['Log Ratio']   = Math.log2(entry['Ratio']);
-                }
-                
-                if(feature.includes('grams')) {
-                    var words = token.split(' ');
-                    var found = false;
-                    var partially_found = false;
-                    
-                    // Check all keywords that they line up
-                    set.event.Keywords.forEach(function(keyword) { 
+        }
+        
+        if(this.featureIsQuantitative(feature)) return;
+
+        var basis = feature.split(' ')[0];
+
+        var table_id = '.table-' + util.simplify(feature);
+        var table = this.feature_divs.select(table_id)
+            .classed('stats-table', false)
+            .classed('token-freq-table', true);
+
+        // Add header if necessary
+        var header = table.select('thead')
+            .selectAll('tr')
+            .data(function(d) { return [d]; })
+            .enter()
+            .append('tr');
+
+        header.append('th')
+            .attr('class', 'token')
+            .html('Term');
+        header.append('th')
+            .attr('class', 'freq')
+            .html('A');
+        header.append('th')
+            .attr('class', 'freq cell-cmp')
+            .html('B');
+        header.append('th')
+            .attr('class', 'freq cell-cmp')
+            .html('Cmp');
+
+        var top_tokens;
+        if(excludeStopwords && feature.includes('gram')) {
+            top_tokens = set.counter[feature].top_no_stopwords(n).map(function(d) { return d.key; });
+        } else {
+            top_tokens = set.counter[feature].top(n).map(function(d) { return d.key; });
+        }
+        if(cmp) {
+            var cmp_tokens;
+            if(excludeStopwords && feature.includes('gram')) {
+                cmp_tokens = cmp.counter[feature].top_no_stopwords(n).map(function(d) { return d.key; });
+            } else {
+                cmp_tokens = cmp.counter[feature].top(n).map(function(d) { return d.key; });
+            }
+            top_tokens = top_tokens.concat(cmp_tokens);
+            top_tokens = util.lunique(top_tokens);
+        }
+
+        var entries = top_tokens.map(function(token) {
+            var entry = {
+                Token: util.subsetName({feature: feature, match:token}),
+                Frequency: set.counter[feature].get(token)
+            };
+            entry['Percent']         = entry['Frequency'] / set['n' + basis + 's'] * 100;
+            if(cmp) {
+                entry['Frequency B'] = cmp.counter[feature].get(token);
+                entry['Percent B']   = entry['Frequency B'] / cmp['n' + basis + 's'] * 100;
+                entry['Difference']  = entry[count_quantity] - entry[count_quantity + ' B'];
+                entry['Ratio']       = (entry[count_quantity] || 1e-5) / (entry[count_quantity + ' B'] || 1e-5);
+                entry['Log Ratio']   = Math.log2(entry['Ratio']);
+            }
+
+            if(feature.includes('grams')) {
+                var words = token.split(' ');
+                var found = false;
+                var partially_found = false;
+
+                // Check all keywords that they line up
+                set.event.Keywords.forEach(function(keyword) { 
+                    var keyword_parts = keyword.split(' ');
+                    var words_found = words.filter(function(word) {
+                        return keyword_parts.includes(word);
+                    });
+                    found |= words.length == words_found.length && words.length == keyword_parts.length;
+                    partially_found |= words_found.length > 0;
+                });
+
+                // If perfect match return, otherwise check old keywords
+                if(found) {
+                    entry['In Capture Keywords'] = 'Final Keyword';
+                } else {
+                    set.event.OldKeywords.forEach(function(keyword) { 
                         var keyword_parts = keyword.split(' ');
                         var words_found = words.filter(function(word) {
                             return keyword_parts.includes(word);
                         });
+
                         found |= words.length == words_found.length && words.length == keyword_parts.length;
                         partially_found |= words_found.length > 0;
-//                        console.log(words_found.length, keyword_parts.length, words_found.length == keyword_parts.length, words_found.length > 0, words, words_found, keyword_parts);
-                    });
-                    
-                    // If perfect match return, otherwise check old keywords
-                    if(found) {
-                        entry['In Capture Keywords'] = 'Final Keyword';
-                    } else {
-                        set.event.OldKeywords.forEach(function(keyword) { 
-                            var keyword_parts = keyword.split(' ');
-                            var words_found = words.filter(function(word) {
-                                return keyword_parts.includes(word);
-                            });
-                            
-                            found |= words.length == words_found.length && words.length == keyword_parts.length;
-                            partially_found |= words_found.length > 0;
 //                            var matches = words_found.length / keyword_parts.length;
 //                            if(matches == 1) found = true;
 //                            if(matches > 0) partially_found = true;
-                        });
-                        
-                        if(found) {
-                            entry['In Capture Keywords'] = 'Early Keyword';
-                        } else if(partially_found) {
-                            entry['In Capture Keywords'] = 'In Parts of Keyword';
-                        }
+                    });
+
+                    if(found) {
+                        entry['In Capture Keywords'] = 'Early Keyword';
+                    } else if(partially_found) {
+                        entry['In Capture Keywords'] = 'In Parts of Keyword';
                     }
-                    
-                    // TODO check subsets
-                } else if(feature != 'Text') { // Check subsets TODO fix
+                }
+
+                // TODO check subsets
+            } else if(feature != 'Text') { // Check subsets TODO fix
 //                    this.dataset.subsets_arr.forEach(function(subset) {
 //                        if(subset.Feature.replace('.','') == feature) {
 //                            if(subset.Match == token) {
@@ -1145,91 +1136,93 @@ FeatureDistribution.prototype = {
 //                            }
 //                        }
 //                    })
-                }
-                
-                
-                return entry;
-            }, this);
-            
-            // Sort Entries
-            entries.sort(function(a, b) {
-                if(abs) {
-                    if(Math.abs(a[order_by]) < Math.abs(b[order_by])) return  1 * order_sign;
-                    if(Math.abs(a[order_by]) > Math.abs(b[order_by])) return -1 * order_sign;
-                }
+            }
+
+
+            return entry;
+        }, this);
+
+        // Sort Entries
+        entries.sort(function(a, b) {
+            if(order_by == 'Frequency Combined') {
+                if(a['Frequency'] + a['Frequency B'] < b['Frequency'] + b['Frequency B']) return  1 * order_sign;
+                if(a['Frequency'] + a['Frequency B'] > b['Frequency'] + b['Frequency B']) return -1 * order_sign;
+            } else if(abs) {
+                if(Math.abs(a[order_by]) < Math.abs(b[order_by])) return  1 * order_sign;
+                if(Math.abs(a[order_by]) > Math.abs(b[order_by])) return -1 * order_sign;
+            } else {
                 if(a[order_by] < b[order_by]) return  1 * order_sign;
                 if(a[order_by] > b[order_by]) return -1 * order_sign;
-                if(a['Token']  < b['Token'] ) return  1 * order_sign;
-                if(a['Token']  > b['Token'] ) return -1 * order_sign;
-                return 0;
-            });
-            
-            // Format Numbers
-            entries.forEach(function(entry) {
-                entry['Frequency'] = util.formatThousands(entry['Frequency']);
-                entry['Percent']   = entry['Percent'].toFixed(1);
-                if(cmp) {
-//                    console.log(entry['Frequency'], entry['Frequency B'], entry['Ratio'], entry['Log Ratio']);
-                    entry['Frequency B'] = util.formatThousands(entry['Frequency B']);
-                    entry['Percent B']   = entry['Percent B'].toFixed(1);
-                    
-                    var neg_ratio = entry['Ratio'] < 1;
-                    if(entry['Ratio'] == Infinity || entry['Ratio'] > 1e4) {
-                        entry['Ratio'] = '&infin;' 
-                        entry['Log Ratio'] = '&infin;' 
-                    } else if(entry['Ratio'] == 0 || entry['Ratio'] < 1e-4) {
-                        entry['Ratio'] = 0;
-                        entry['Log Ratio'] = '-&infin;' 
-                    } else {
-                        entry['Ratio'] = entry['Ratio'].toFixed(1);
-                        entry['Log Ratio'] = entry['Log Ratio'].toFixed(1);
-                    }
-                    if(neg_ratio) {
-                        entry['Ratio'] = '<span class="ratio-neg">' + entry['Ratio'] + '</span>';
-                        entry['Log Ratio'] = '<span class="ratio-neg">' + entry['Log Ratio'] + '</span>';
-                    }
-                }
-            });
-            
-            // Add rows
-            var rows = table.select('tbody')
-                .selectAll('tr.token-freq-set')
-                .data(entries);
-            
-            var rows_new = rows.enter()
-                .append('tr')
-                .attr('class', function(d, i) { 
-                    return 'row' + i + ' row-polar' + (i % 2) + ' token-freq-set';
-                });
-            
-            rows_new.append('td')
-                .attr('class', 'token');
-            rows_new.append('td')
-                .attr('class', 'freq freq-primary');
-            rows_new.append('td')
-                .attr('class', 'freq freq-secondary cell-cmp');
-            rows_new.append('td')
-                .attr('class', 'freq freq-cmp cell-cmp');
-            
-            rows.exit().remove();
-            
-            // Propagate data
-            rows.select('td.token');
-            rows.select('td.freq-primary');
-            rows.select('td.freq-secondary');
-            rows.select('td.freq-cmp');
-            
-            // Attach tooltip
-            this.tooltip.attach(table_id + ' .token-freq-set', function(d) { return d; });
-            
-            // Attach user information
-            if(feature.includes('Screenname / User ID')) {
-                rows.on('click', this.inspectUser.bind(this))
-                    .classed('inspect_user', true);
             }
-        }, this);
-        
-        triggers.emit('counters:show');
+            if(a['Token']  < b['Token'] ) return  1 * order_sign;
+            if(a['Token']  > b['Token'] ) return -1 * order_sign;
+            return 0;
+        });
+
+        // Format Numbers
+        entries.forEach(function(entry) {
+            entry['Frequency'] = util.formatThousands(entry['Frequency']);
+            entry['Percent']   = entry['Percent'].toFixed(1);
+            if(cmp) {
+                entry['Frequency B'] = util.formatThousands(entry['Frequency B']);
+                entry['Difference']  = util.formatThousands(entry['Difference']) || 0;
+                entry['Percent B']   = entry['Percent B'].toFixed(1);
+
+                var neg_ratio = entry['Ratio'] < 1;
+                if(entry['Ratio'] == Infinity || entry['Ratio'] > 1e4) {
+                    entry['Ratio'] = '&infin;' 
+                    entry['Log Ratio'] = '&infin;' 
+                } else if(entry['Ratio'] == 0 || entry['Ratio'] < 1e-4) {
+                    entry['Ratio'] = 0;
+                    entry['Log Ratio'] = '-&infin;' 
+                } else {
+                    entry['Ratio'] = entry['Ratio'].toFixed(1);
+                    entry['Log Ratio'] = entry['Log Ratio'].toFixed(1);
+                }
+                if(neg_ratio) {
+                    entry['Difference'] = '<span class="ratio-neg">' + entry['Difference'] + '</span>';
+                    entry['Ratio'] = '<span class="ratio-neg">' + entry['Ratio'] + '</span>';
+                    entry['Log Ratio'] = '<span class="ratio-neg">' + entry['Log Ratio'] + '</span>';
+                }
+            }
+        });
+
+        // Add rows
+        var rows = table.select('tbody')
+            .selectAll('tr.token-freq-set')
+            .data(entries);
+
+        var rows_new = rows.enter()
+            .append('tr')
+            .attr('class', function(d, i) { 
+                return 'row' + i + ' row-polar' + (i % 2) + ' token-freq-set';
+            });
+
+        rows_new.append('td')
+            .attr('class', 'token');
+        rows_new.append('td')
+            .attr('class', 'freq freq-primary');
+        rows_new.append('td')
+            .attr('class', 'freq freq-secondary cell-cmp');
+        rows_new.append('td')
+            .attr('class', 'freq freq-cmp cell-cmp');
+
+        rows.exit().remove();
+
+        // Propagate data
+        rows.select('td.token');
+        rows.select('td.freq-primary');
+        rows.select('td.freq-secondary');
+        rows.select('td.freq-cmp');
+
+        // Attach tooltip
+        this.tooltip.attach(table_id + ' .token-freq-set', function(d) { return d; });
+
+        // Attach user information
+        if(feature.includes('Screenname / User ID')) {
+            rows.on('click', this.inspectUser.bind(this))
+                .classed('inspect_user', true);
+        }
     },
     showCounts: function() {
         var count_quantity = this.ops['Display']['Count Quantity'].get();
@@ -1256,10 +1249,8 @@ FeatureDistribution.prototype = {
                 return d['Token'];
             });
         this.feature_divs.selectAll('tbody .freq-primary')
-            .html(function(d) { 
-                if(count_quantity == 'freq')
-                    return d['Frequency']; 
-                return d['Percent']; 
+            .html(function(d) {
+                return d[count_quantity]; 
             });
         
         if(cmp) {
@@ -1268,15 +1259,11 @@ FeatureDistribution.prototype = {
             
             this.feature_divs.selectAll('tbody .freq-secondary')
                 .html(function(d) { 
-                    if(count_quantity == 'freq')
-                        return d['Frequency B']; 
-                    return d['Percent B']; 
+                    return d[count_quantity + ' B']; 
                 });
             this.feature_divs.selectAll('tbody .freq-cmp')
                 .html(function(d) {
-                    if(cmp_quantity == 'ratio')
-                        return d['Ratio']; 
-                    return d['Log Ratio'];
+                    return d[cmp_quantity];
                 });
         } else {
             this.feature_divs.selectAll('.cell-cmp')
@@ -1389,7 +1376,6 @@ FeatureDistribution.prototype = {
                 if(val == null) return '<em>None</em>';
             
                 if(typeof(val) == 'object') {
-//                    console.log(label, val, inner_keys);
                     var inner_keys = Object.keys(val);
                     return inner_keys.map(function(key) { 
                         var value = val[key];
@@ -1457,7 +1443,6 @@ FeatureDistribution.prototype = {
                     if(val == null) return '<em>None</em>';
 
                     if(typeof(val) == 'object') {
-//                        console.log(label, val, inner_keys);
                         var inner_keys = Object.keys(val);
                         return inner_keys.map(function(key) { 
                             var value = val[key];

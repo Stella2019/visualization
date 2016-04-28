@@ -163,7 +163,7 @@ var util = {
             }
         } else if (feature.includes('URL')) {
             match = '<a href=' + match + ' target="_blank">' + match + '</a>';
-        } else if(feature.includes('Timestamp') || feature.includes('Created At')) {
+        } else if(feature.includes('Timestamp') || feature.includes('Time Posted (PT)') || feature.includes('Created At')) {
             if(typeof(match) == 'string' && !isNaN(match)) {
                 match = util.formatDateToMinutes(new Date(parseInt(match)));
             } else if(typeof(match) == 'number') {

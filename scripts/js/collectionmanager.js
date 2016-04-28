@@ -57,6 +57,7 @@ CollectionManager.prototype = {
         this.setTriggers();
     },
     setTriggers: function() {
+        triggers.on('collectionManager:setOptions', this.setOptions.bind(this));
         triggers.on('collectionManager:build', this.build.bind(this));
         
         // Dataset changes
@@ -107,7 +108,7 @@ CollectionManager.prototype = {
         }
     },
     build: function() {
-        this.setOptions();
+//        this.setOptions(); // Instead, when setting options for an app, it should trigger 'collectionManager:setOptions'
         triggers.emit('events:load');
     },
     setOptions: function() {
@@ -201,9 +202,9 @@ CollectionManager.prototype = {
         
         // Save to main options menu and build dropdowns
         this.app.ops[this.name] = this.ops;
-        dropdowns.forEach(function(option_name) {
-            this.app.ops.buildSidebarOption(this.name, option_name);
-        }, this);
+//        dropdowns.forEach(function(option_name) {
+//            this.app.ops.buildSidebarOption(this.name, option_name);
+//        }, this);
     },
     loadEvents: function () {
         // Event selection
@@ -501,7 +502,7 @@ CollectionManager.prototype = {
         var cur = subset_op.get();
         subset_op.default = subsets_arr.reduce(function(candidate, subset, i) {
             if(subset['ID'] == cur)
-                return i;
+                return i + 1;
             return candidate;
         }, 0);
         subset_op.set(subset_op['ids'][subset_op.default]);
