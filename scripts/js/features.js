@@ -995,12 +995,11 @@ FeatureDistribution.prototype = {
             .html(function(d) {
                 if(cmp_stats && d in cmp_stats) {
                     var val = cmp_stats[d];
+                    if(typeof(val) == 'string') {
+                        val = parseFloat(val);
+                    }
                     if(feature.includes('Normal')) {
-                        if(typeof(val) == 'string') {
-                            return parseFloat(val).toFixed(2);
-                        } else {
-                            return val.toFixed(2);
-                        }
+                        return val.toFixed(2);
                      } else if(feature.includes('Interval')) {
                         var formatted = util.formatMinutes(val);
                         return formatted;
