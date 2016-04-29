@@ -514,7 +514,7 @@ function Connection(args) {
     this.progress        = {};
     this.progress_div    = this.progress_div    || '#body';
     this.progress_text   = this.progress_text   || "Working";
-    this.progress_style  = this.progress_style  || 'middle';
+    this.progress_style  = this.progress_style  || 'pagemiddle';
     
     this.quantity        = this.quantity        || 'tweet';
     this.chunks          = [];

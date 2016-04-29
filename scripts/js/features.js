@@ -752,7 +752,7 @@ FeatureDistribution.prototype = {
             set.counter['User Based__Activity__Tweets Per Day'].decr(user['TweetsPerDay']);
             user['MinuteEnded'] = (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000;
             user['MinutesInSet'] = user['MinuteEnded'] - user['MinuteStarted'];
-            user['TweetsPerDay'] = user['Tweets'] * 60 * 24 / user['MinutesInSet'];
+            user['TweetsPerDay'] = user['Tweets'] / Math.floor(user['MinutesInSet'] / 60 / 24 + 1);
             set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
 
             // Count user's tweet's unigrams
