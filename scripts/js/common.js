@@ -140,7 +140,7 @@ var util = {
         }
         if(feature.includes('UTC')) {
             var hours = parseFloat(match) / 60 / 60;
-            match = '' + (hours >= 0 ? '+' : '−');
+            match = '' + (hours >= 0 ? '+' : '-');
             hours = Math.abs(hours);
             match +=
                 (hours < 10 ? '0' : '') +
