@@ -8,7 +8,7 @@ from pprint import pprint
 #mongoexport -h z --db <dbname> --collection <colname> --out <colname>.json
 
 # User Parameters
-db_name = 'Bosron'
+db_name = 'Boston'
 rumor_i = 0
 period = 1
 existing_collection = True
