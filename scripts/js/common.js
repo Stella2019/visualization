@@ -660,8 +660,13 @@ Connection.prototype = {
 
         // Update the progress bar
         var progress_text = this.progress_text;
-        progress_text = progress_text.replace('{cur}', this.chunks[this.chunk_index + 1]);
-        progress_text = progress_text.replace('{max}', this.max);
+        if(this.quantity == 'count') {
+            progress_text = progress_text.replace('{cur}', this.chunks[this.chunk_index + 1]);
+            progress_text = progress_text.replace('{max}', this.max);  
+        } else {
+            progress_text = progress_text.replace('{cur}', util.formatDate(util.twitterID2Timestamp(this.chunks[this.chunk_index])));
+            progress_text = progress_text.replace('{max}', util.formatDate(this.max));  
+        }
         this.progress.update(this.chunk_index + 1, progress_text);
 
         if(this.quantity == 'count')  { // Makes a LOT of assumptions about the data

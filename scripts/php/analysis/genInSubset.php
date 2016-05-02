@@ -1,6 +1,7 @@
 <?php
     include '../connect.php';
 
+    ini_set('max_execution_time', 60);
 
     $query = "INSERT IGNORE INTO InSubset " .
         "SELECT " .
@@ -9,7 +10,6 @@
         "	 Tweet.`Distinct` as 'Distinct', " .
         "    Tweet.`Type` as 'Type' " .
         "FROM Tweet ";
-
 
 
     // Add conditionals
