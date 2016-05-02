@@ -529,7 +529,7 @@ function Connection(args) {
     
     // Convert min & max to dates if they are inputted as tweets
     if(this.quantity != 'count') {
-        if(typeof(this.min) == 'number') {
+        if(typeof(this.min) == 'number' || typeof(this.min) == 'string') {
             this.min = util.twitterID2Timestamp(this.min);
         } else if(this.min instanceof BigNumber) {
             this.min = util.twitterID2Timestamp(this.min.toNumber());
@@ -537,7 +537,7 @@ function Connection(args) {
         this.min.setMinutes(0); // Round to the nearest minute
         this.min.setSeconds(0); 
         this.min.setMilliseconds(0); 
-        if(typeof(this.max) == 'number') {
+        if(typeof(this.max) == 'number' || typeof(this.max) == 'string') {
             this.max = util.twitterID2Timestamp(this.max);
         } else if(this.max instanceof BigNumber) {
             this.max = util.twitterID2Timestamp(this.max.toNumber());
@@ -600,8 +600,13 @@ Connection.prototype = {
 
         // Start progress bar
         var progress_text = this.progress_text;
-        progress_text = progress_text.replace('{cur}', this.chunks[this.chunk_index]);
-        progress_text = progress_text.replace('{max}', this.max);
+        if(this.quantity == 'count') {
+            progress_text = progress_text.replace('{cur}', this.chunks[this.chunk_index]);
+            progress_text = progress_text.replace('{max}', this.max);  
+        } else {
+            progress_text = progress_text.replace('{cur}', util.formatDate(util.twitterID2Timestamp(this.chunks[this.chunk_index])));
+            progress_text = progress_text.replace('{max}', util.formatDate(this.max));  
+        }
         this.progress = new Progress({
             name:      this.name,
             parent_id: this.progress_div,
@@ -905,3 +910,36 @@ Progress.prototype = {
         }
     },
 };
+
+
+// Random code that needs a better home:
+potplourri = {
+    addInCombinedEvent: function(event, new_event, tweet_min, tweet_max) {
+        var connection = new Connection({
+            url: 'analysis/genInCombinedEvent',
+            post: {event: event, new_event: new_event}, 
+            min : tweet_min, 
+            max: tweet_max,
+            progress_text: '{cur} / {max}',
+            on_chunk_finish: function(d) { 
+                console.log(d + ' Tweets Added');
+            }});
+        
+        connection.startStream();
+        return connection;
+    },
+    addInSubset: function(post, tweet_min, tweet_max) {
+        var connection = new Connection({
+            url: 'analysis/genInSubset',
+            post: post,
+            min : tweet_min, 
+            max: tweet_max,
+            progress_text: '{cur} / {max}',
+            on_chunk_finish: function(d) { 
+                console.log(d);
+            }});
+        
+        connection.startStream();
+        return connection;
+    }
+}
