@@ -31,7 +31,9 @@
         $conds[] = "InSubset.Subset = " . $_REQUEST["superset"];
     }
     if(isset($_REQUEST["source"]))
-        $conds[] = "Tweet.Source = " . $_REQUEST["source"];
+        $conds[] = "LOWER(Tweet.Source) REGEXP " . $_REQUEST["source"];
+    if(isset($_REQUEST["lang"]))
+        $conds[] = "Tweet.Lang = '" . $_REQUEST["lang"] . "'";
     if(isset($_REQUEST["text_regex"])) {
         foreach(explode(' & ', $_REQUEST["text_regex"]) as $term) {
             $conds[] = "LOWER(Tweet.Text) REGEXP '" . $term . "'";

@@ -8,7 +8,7 @@ from pprint import pprint
 #mongoexport -h z --db <dbname> --collection <colname> --out <colname>.json
 
 # User Parameters
-db_name = 'Boston'
+db_name = 'Umpqua College Shooting'
 rumor_i = 0
 period = 1
 existing_collection = True
@@ -62,10 +62,10 @@ mongoDBs = {
         'event_id': 46,
         'rumor_offset': 22
     },
-    'Umpqua': {
+    'Umpqua College Shooting': {
         'files': ['crisis_actors'],
         'event_id': 91,
-        'rumor_offset': 10000
+        'rumor_offset': 26
     }
 }
 
