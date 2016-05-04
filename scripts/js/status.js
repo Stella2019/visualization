@@ -171,7 +171,8 @@ StatusReport.prototype = {
         this.subsets_arr.forEach(function(subset) {
             // Add fields
             subset.ID = parseInt(subset.ID);
-            subset.Label = subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
+            subset.Label = util.subsetName(subset);
+//            subset.Label = subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
             subset.Level = 4;
             this.quantities.forEach(function (quantity) {
                 subset[quantity] = parseInt(subset[quantity]) || 0;
@@ -186,12 +187,20 @@ StatusReport.prototype = {
             
             // If it is actually a rumor subset, add data to the rumor
             if(subset.Feature == 'Rumor') {
+                if(this.Match in this.rumors) {
+                    subset.Label = this.rumors[this.Match].Label;
+                }
+                
                 var actual_rumor = event.rumors[subset.Match];
                 this.quantities.forEach(function (quantity) {
                     actual_rumor[quantity] = parseInt(subset[quantity]) || 0;
                 });
                 actual_rumor['FirstTweet'] = subset['FirstTweet'] ? new BigNumber(subset['FirstTweet']) : new BigNumber('0');
                 actual_rumor['LastTweet']  = subset['LastTweet']  ? new BigNumber(subset['LastTweet'])  : new BigNumber('0');
+            } else if(subset.Feature == 'Event') {
+                if(this.Match in this.events) {
+                    subset.Label = this.events[this.Match].Label;
+                }
             }
             
             // Add to feature in rumor

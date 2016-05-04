@@ -161,7 +161,7 @@ var util = {
             if(match in util.langs) {
                 return util.langs[match];
             }
-        } else if (feature.includes('URL')) {
+        } else if (feature.includes('URL') && match.includes('.')) {
             match = '<a href=' + match + ' target="_blank">' + match + '</a>';
         } else if(feature.includes('Timestamp') || feature.includes('Time Posted (PT)') || feature.includes('Created At')) {
             if(typeof(match) == 'string' && !isNaN(match)) {
@@ -934,6 +934,18 @@ potplourri = {
         return connection;
     },
     addInSubset: function(post, tweet_min, tweet_max) {
+        if(!tweet_min) {
+            // If the user doesn't provide an minimum tweet (or a max)
+            // and we are in the status report, we can get it from the event list
+            if('event' in post && SR) { 
+                var event = SR.events[post.event];
+                tweet_min = event['FirstTweet'];
+                tweet_max = event['LastTweet'];
+            } else {
+                console.error("need to provide minimum tweet");
+            }
+        }
+        
         var connection = new Connection({
             url: 'analysis/genInSubset',
             post: post,
@@ -941,6 +953,9 @@ potplourri = {
             max: tweet_max,
             progress_text: '{cur} / {max}',
             on_chunk_finish: function(d) { 
+                if(d.includes(':')) { // new subset id
+                    post.subset = d.slice(0, d.indexOf(':'));
+                }
                 console.log(d);
             }});
         
