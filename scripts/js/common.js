@@ -1,5 +1,13 @@
-global_min_id = 0;
-global_max_id = 1e20;
+String.prototype.hashCode = function() {
+    var hash = 0, i, chr, len;
+    if (this.length === 0) return hash;
+    for (i = 0, len = this.length; i < len; i++) {
+        chr   = this.charCodeAt(i);
+        hash  = ((hash << 5) - hash) + chr;
+        hash |= 0; // Convert to 32bit integer
+    }
+    return hash;
+};
 
 var util = {
     formatDate: d3.time.format("%Y-%m-%d %H:%M:%S"),
@@ -52,6 +60,9 @@ var util = {
     },
     rshift: function(num, bits) {
         return num / Math.pow(2, bits);
+    },
+    mod: function(num, base) {
+        return (num % base + base) % base; // Fixes problems cause by modding negative numbers in Javascript
     },
     twitterID2Timestamp: function(ID) {
         return new Date(util.rshift(ID, 22) + 1288834974657);
@@ -941,6 +952,10 @@ potplourri = {
                 var event = SR.events[post.event];
                 tweet_min = event['FirstTweet'];
                 tweet_max = event['LastTweet'];
+            } else if('superset' in post && SR) { 
+                var subset = SR.subsets[post.superset];
+                tweet_min = subset['FirstTweet'];
+                tweet_max = subset['LastTweet'];
             } else {
                 console.error("need to provide minimum tweet");
             }

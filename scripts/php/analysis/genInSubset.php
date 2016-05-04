@@ -19,9 +19,9 @@
         if(isset($_REQUEST["event"]))
             $event = $_REQUEST["event"];
         if(isset($_REQUEST["rumor"]))
-            $event = $_REQUEST["rumor"];
+            $rumor = $_REQUEST["rumor"];
         if(isset($_REQUEST["superset"]))
-            $event = $_REQUEST["superset"];
+            $superset = $_REQUEST["superset"];
         if(isset($_REQUEST["url"])) {
             $feature = 'Expanded URL';
             $match = $_REQUEST["url"];

@@ -24,6 +24,7 @@ function FeatureDistribution() {
             'URLs':         ['Expanded URL Domain', 'Expanded URL', 'Media URL'],
             'Origin':       ['Screenname / User ID', 'Parent Tweet', 'Source'],
             'Temporal':     ['Time Posted (PT)', 'User\'s Timezone'],
+            'Mentions':     ['Users Mentioned', 'Users Retweeted', 'Users Replied', 'Users Quoted'],
         },
         'User Based': {
             'Activity':     ['Tweets', 'Tweets Per Day', 'Median Interval Between Tweets', 'Deviation Interval Between Tweets', 'Normal Deviation Interval Between Tweets'],
@@ -35,7 +36,7 @@ function FeatureDistribution() {
             'Followers':    ['Start', 'Growth', 'Growth &ne; 0'],
             'Following':    ['Start', 'Growth', 'Growth &ne; 0'],
             'Listed':       ['Start', 'Growth', 'Growth &ne; 0'],
-            'Favorites':    ['Start', 'Growth', 'Growth &ne; 0']
+            'Favorites':    ['Start', 'Growth', 'Growth &ne; 0'],
         }
     };
     this.hierarchy_flatted = [];
@@ -330,10 +331,19 @@ FeatureDistribution.prototype = {
             .html('Clear')
             .on('click', this.clearTweets.bind(this));
         
+        load_buttons.append('br');
+        load_buttons.append('small')
+            .html('Upload ');
+        
         load_buttons.append('button')
             .attr('class', 'btn btn-xs upload-users')
-            .html('Upload Users')
+            .html('Users')
             .on('click', this.uploadAllUserStats.bind(this));
+        
+        load_buttons.append('button')
+            .attr('class', 'btn btn-xs upload-mentions')
+            .html('Mentions')
+            .on('click', this.userMentionsUpload.bind(this));
     },
     toggleLoadButtons: function(collection) {
         // Get name of set
@@ -361,6 +371,8 @@ FeatureDistribution.prototype = {
         button_box.select('.load-clear')
             .classed('btn-default', setname ? true : false);
         button_box.select('.upload-users')
+            .classed('btn-default', setname ? true : false);
+        button_box.select('.upload-mentions')
             .classed('btn-default', setname ? true : false);
     },
     loadTweets: function(setname) {
@@ -426,7 +438,6 @@ FeatureDistribution.prototype = {
             max: limit,
             on_chunk_finish: this.parseNewTweets.bind(this, setname),
             progress_text: '{cur}/{max} Loaded',
-//            on_finish: triggers.emitter('counters:count', setname),
         });
         if(lastTweet) { // If we are continuing from when we left off
             data.tweet_connection['lastTweet'] = lastTweet;
@@ -602,6 +613,40 @@ FeatureDistribution.prototype = {
                     }
                 }
             });
+            
+            // User Mentions
+            if(tweet['Text']) {
+                var mentions = tweet['Text'].match(/@[A-Za-z_0-9]*/gi);
+                if(mentions) {
+                    mentions.forEach(function(mention) {
+                        set.counter['Tweet Based__Mentions__Users Mentioned'].incr(mention.slice(1));
+                    });
+                } else {
+                    set.counter['Tweet Based__Mentions__Users Mentioned'].not_applicable++;
+                }
+
+                // Retweets
+                mentions = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi);
+                if(mentions) {
+                    mentions.forEach(function(mention) {
+                        set.counter['Tweet Based__Mentions__Users Retweeted'].incr(mention.slice(4));
+                    });
+                } else {
+                    set.counter['Tweet Based__Mentions__Users Retweeted'].not_applicable++;
+                }
+
+                // Replies
+                mentions = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi);
+                if(mentions) {
+                    mentions.forEach(function(mention) {
+                        set.counter['Tweet Based__Mentions__Users Replied'].incr(mention.slice(1));
+                    });
+                } else {
+                    set.counter['Tweet Based__Mentions__Users Replied'].not_applicable++;
+                }
+
+                // TODO find a way for quotes or include in other program
+            }
         } // New Tweet or New URL
 
         // Remove the tweet object to save memory, will prevent other analysis but necessary for large datasets
@@ -610,6 +655,7 @@ FeatureDistribution.prototype = {
     countUser: function(set, tweet) {
         var userscreenid = tweet['Screenname'] + ' - ' + tweet['UserID'];
         var newUser = set.counter['Tweet Based__Origin__Screenname / User ID'].get(userscreenid) == 1;
+        var user = {};
 
         if(newUser) {
             set.nUsers += 1;
@@ -641,7 +687,7 @@ FeatureDistribution.prototype = {
                 tweet_words.incr(word);
             });
 
-            var user = {
+            user = {
                 Tweets: 1,
 
                 UserID: tweet['UserID'],
@@ -673,6 +719,10 @@ FeatureDistribution.prototype = {
                 MinuteStarted: (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000,
                 MinuteEnded: (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000,
 
+                'UsersMentioned': new Counter(),
+                'UsersRetweeted': new Counter(),
+                'UsersReplied': new Counter(),
+                'UsersQuoted': new Counter(),
 //                'OthersMentioned': 0, // TODO get these features later
 //                'OthersRetweeted': 0,
 //                'OthersReplied': 0,
@@ -741,7 +791,7 @@ FeatureDistribution.prototype = {
                 set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
             });
         } else {
-            var user = set.users[tweet.UserID];
+            user = set.users[tweet.UserID];
 
             // Tweets
             set.counter['User Based__Activity__Tweets'].decr(user['Tweets']);
@@ -849,7 +899,34 @@ FeatureDistribution.prototype = {
                     set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], 1);
                 }
             });
+        }
+        
+        // Users mentioned
+        if(tweet['Text']) {
+            var mentions = tweet['Text'].match(/@[A-Za-z_0-9]*/gi);
+            if(mentions) {
+                mentions.forEach(function(mention) {
+                    user['UsersMentioned'].incr(mention.slice(1));
+                });
+            }
 
+            // Retweets
+            mentions = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi);
+            if(mentions) {
+                mentions.forEach(function(mention) {
+                    user['UsersRetweeted'].incr(mention.slice(4));
+                });
+            }
+
+            // Replies
+            mentions = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi);
+            if(mentions) {
+                mentions.forEach(function(mention) {
+                    user['UsersReplied'].incr(mention.slice(1));
+                });
+            }
+
+            // TODO find a way for quotes or include in other program
         }
     },
     featureIsQuantitative: function(feature) {
@@ -1357,7 +1434,7 @@ FeatureDistribution.prototype = {
                     return val + '&nbsp;&nbsp;&nbsp;&nbsp;' + 
                         util.formatDate(util.twitterID2Timestamp(val));
                 }
-                if(label == 'TweetWords') {
+                if(['TweetWords', 'UsersMentioned', 'UsersRetweeted', 'UsersReplied', 'UsersQuoted'].includes(label)) {
                     var topwords = val.top_no_stopwords(10);
                     var result = '';
                     return topwords.map(function(kvpair) {
@@ -1424,7 +1501,7 @@ FeatureDistribution.prototype = {
                         return val + '&nbsp;&nbsp;&nbsp;&nbsp;' + 
                             util.formatDate(util.twitterID2Timestamp(val));
                     }
-                    if(label == 'TweetWords') {
+                    if(['TweetWords', 'UsersMentioned', 'UsersRetweeted', 'UsersReplied', 'UsersQuoted'].includes(label)) {
                         var topwords = val.top_no_stopwords(10);
                         var result = '';
                         return topwords.map(function(kvpair) {
@@ -1486,7 +1563,10 @@ FeatureDistribution.prototype = {
             prog: new Progress({
                 steps: userIDs.length,
                 text: '{cur}/{max} Users Uploaded',
-            })
+            }),
+            stop: function() {
+                this.i_user = this.n_users;
+            }
         };
         
         set.user_upload.prog.start();
@@ -1547,6 +1627,102 @@ FeatureDistribution.prototype = {
                 }
             }.bind(this), failure_func);
         
+    },
+    userMentionsUpload: function(setname) {
+        var set = this.data[setname];
+        if(!set) return;
+        
+        // Get known UserIDs
+        var screenname2ID = {};
+        Object.keys(set.users).forEach(function(userID) {
+            var user = set.users[userID];
+            screenname2ID[user.Screenname] = userID;
+        });
+        
+        // Build list of user tuples
+        var relations = [];
+        Object.keys(set.users).forEach(function(userID) {
+            var user = set.users[userID];
+            user['UsersMentioned'].getSorted().forEach(function(entry) {
+                var mentionID = screenname2ID[entry.key];
+                if(!mentionID) {
+                    mentionID = -1 * util.mod(entry.key.hashCode(), 1e9);
+                }
+                
+                var relation = {
+                    ActiveUserID: userID,
+                    MentionedUserID: mentionID,
+                    Mentions: entry.value,
+                    Retweets: user['UsersRetweeted'].get(entry.key),
+                    Replies: user['UsersReplied'].get(entry.key),
+                    Quotes: 0//user['UsersQuoted'].get(entry.key)
+                }
+                
+                // TODO Not included, yet
+//                'Follower', 'Following', 
+//                  'MutualFollowers', 'MutualFollowing', 'MutualConnections'
+//                  'CombinedFollowers', 'CombinedFollowing', 'CombinedConnections'
+//                  'FractionMutualFollowers', 'FractionMutualFollowing', 'FractionsMutualConnections'
+//                  'MutualWords', 'CombinedWords', 'FractionMutualWords', 
+//                  'MutualDescWords', 'CombinedDescWords', 'FractionMutualDescWords'
+                
+                relations.push(relation);
+                console.log(relation);
+            });
+        });
+        
+        // Start upload
+        
+        set.usermention_upload = {
+            relations: relations,
+            index: 0,
+            total: relations.length,
+            prog: new Progress({
+                steps: relations.length,
+                text: '{cur}/{max} User Mentions Uploaded',
+            }),
+            stop: function() {
+                this.i_user = this.n_users;
+            }
+        };
+        
+        set.usermention_upload.prog.start();
+        this.continueUserMentionUpload(set);
+    },
+    continueUserMentionUpload: function(set) {
+        var index = set.usermention_upload.index;
+        if(index < 0 || index >= set.usermention_upload.total) {
+            set.usermention_upload.prog.end();
+            return;
+        }
+        set.usermention_upload.prog.update(index);
+        
+        // Configure packet
+        var relation = set.usermention_upload.relations[index];
+        
+        var post = relation;
+        post.Event = set.event.ID;
+        post.Subset = 'subset' in set ? set.subset.ID : 0;
+        
+        // Configure functions
+        var failure = function(msg) { // Failure
+            console.error(msg);
+            set.usermention_upload.prog.end();
+            triggers.emit('alert', 'Error uploading user mentions');
+            return;
+        };
+        
+        var success =  function(msg) { // Success
+            if(msg == '1') { // Definitely success!
+                set.usermention_upload.index++;
+                setTimeout(this.continueUserMentionUpload.bind(this, set), 1); // prevents a large call stack
+            } else {
+                failure(msg);
+            }
+        }.bind(this);
+        
+        // Upload!
+        this.connection.php('analysis/uploadUserMentions', post, success, failure);
     },
 };
 
