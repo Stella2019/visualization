@@ -305,7 +305,16 @@ var util = {
         'xx-lc': 'LOLCat (Synthetic) 2', // I think
         'pt-br': 'Brazilian Portuguese',
         // Additional chinese codes may be listed here: https://www.w3.org/International/articles/bcp47/
-    }
+    },
+    stopwords: new Set(['the', 'a', 'an', 'that', 'this',
+                'rt', 'via',
+                'in', 'on', 'to', 'of', 'at', 'for', 'with', 'about',
+                'is', 'are', 'be', 'was', 'have', 'has',
+                'i', 'you', 'he', 'she', 'it', 'we', 'they',
+                'me', 'him', 'her', 'us', 'them', 
+                'my', 'your', 'his', 'its', 'our', 'their',
+                'and', 'or',
+                'as', 'if', 'so']),
 }
 
 function Counter() {
@@ -383,22 +392,12 @@ Counter.prototype = {
         
         return this.firstK(this.getSorted(), k);
     },
-    stopwords: ['the', 'a', 'an', 'that', 'this',
-                'rt', 'via',
-                'in', 'on', 'to', 'of', 'at', 'for', 'with', 'about',
-                'is', 'are', 'be', 'was', 'have', 'has',
-                'i', 'you', 'he', 'she', 'it', 'we', 'they',
-                'me', 'him', 'her', 'us', 'them', 
-                'my', 'your', 'his', 'its', 'our', 'their',
-                'and', 'or',
-                'as', 'if', 'so'],
     top_no_stopwords: function(k) {
         k |= 10; // default 10
-        var stopwords = this.stopwords;
         
         var entries = this.counts.entries().filter(function(d) {
             return !d.key.split(' ').reduce(function(found, word) {
-                return found || stopwords.includes(word);
+                return found || util.stopwords.has(word);
             }, false);
         }, this);
         return this.firstK(this.getSorted(entries), k)

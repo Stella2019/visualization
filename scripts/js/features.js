@@ -24,7 +24,7 @@ function FeatureDistribution() {
             'URLs':         ['Expanded URL Domain', 'Expanded URL', 'Media URL'],
             'Origin':       ['Screenname / User ID', 'Parent Tweet', 'Source'],
             'Temporal':     ['Time Posted (PT)', 'User\'s Timezone'],
-            'Mentions':     ['Users Mentioned', 'Users Retweeted', 'Users Replied', 'Users Quoted'],
+            'Mentions':     ['Users Retweeted', 'Users Replied', 'Users Quoted', 'Users Otherwise Mentioned'],
         },
         'User Based': {
             'Activity':     ['Tweets', 'Tweets Per Day', 'Median Interval Between Tweets', 'Deviation Interval Between Tweets', 'Normal Deviation Interval Between Tweets'],
@@ -344,8 +344,19 @@ FeatureDistribution.prototype = {
             .attr('class', 'btn btn-xs upload-mentions')
             .html('Mentions')
             .on('click', this.userMentionsUpload.bind(this));
+        
+        load_buttons.append('button')
+            .attr('class', 'btn btn-xs upload-lex')
+            .html('Lex')
+            .on('click', this.userLexiconUpload.bind(this));
     },
     toggleLoadButtons: function(collection) {
+        if(!collection) {
+            this.toggleLoadButtons('subset');
+            this.toggleLoadButtons('subset2');
+            return;
+        }
+        
         // Get name of set
         var cmp = collection.includes('2');
         var collection_type = cmp ? collection.slice(0, -1) : collection;
@@ -360,6 +371,7 @@ FeatureDistribution.prototype = {
         if (!collection_id) {
             setname = '';
         }
+        var has_dataset = setname in this.data && this.data[setname].tweets_arr.length > 1;
         
         // Set the buttons to react to that name
         var button_box = this.download_box.select('.load-button-set-' + (cmp ? 'B' : 'A'))
@@ -371,9 +383,11 @@ FeatureDistribution.prototype = {
         button_box.select('.load-clear')
             .classed('btn-default', setname ? true : false);
         button_box.select('.upload-users')
-            .classed('btn-default', setname ? true : false);
+            .classed('btn-default', has_dataset ? true : false);
         button_box.select('.upload-mentions')
-            .classed('btn-default', setname ? true : false);
+            .classed('btn-default', has_dataset ? true : false);
+        button_box.select('.upload-lex')
+            .classed('btn-default', has_dataset ? true : false);
     },
     loadTweets: function(setname) {
         var args = setname.split(' ');
@@ -437,6 +451,7 @@ FeatureDistribution.prototype = {
             resolution: this.ops['Download']['Chunk Size'].get(),
             max: limit,
             on_chunk_finish: this.parseNewTweets.bind(this, setname),
+            on_finish: this.toggleLoadButtons.bind(this, false),
             progress_text: '{cur}/{max} Loaded',
         });
         if(lastTweet) { // If we are continuing from when we left off
@@ -616,19 +631,10 @@ FeatureDistribution.prototype = {
             
             // User Mentions
             if(tweet['Text']) {
-                var mentions = tweet['Text'].match(/@[A-Za-z_0-9]*/gi);
-                if(mentions) {
-                    mentions.forEach(function(mention) {
-                        set.counter['Tweet Based__Mentions__Users Mentioned'].incr(mention.slice(1));
-                    });
-                } else {
-                    set.counter['Tweet Based__Mentions__Users Mentioned'].not_applicable++;
-                }
-
                 // Retweets
-                mentions = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi);
-                if(mentions) {
-                    mentions.forEach(function(mention) {
+                var rts = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi);
+                if(rts) {
+                    rts.forEach(function(mention) {
                         set.counter['Tweet Based__Mentions__Users Retweeted'].incr(mention.slice(4));
                     });
                 } else {
@@ -636,9 +642,9 @@ FeatureDistribution.prototype = {
                 }
 
                 // Replies
-                mentions = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi);
-                if(mentions) {
-                    mentions.forEach(function(mention) {
+                var res = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi);
+                if(res) {
+                    res.forEach(function(mention) {
                         set.counter['Tweet Based__Mentions__Users Replied'].incr(mention.slice(1));
                     });
                 } else {
@@ -646,6 +652,16 @@ FeatureDistribution.prototype = {
                 }
 
                 // TODO find a way for quotes or include in other program
+                
+                // Otherwise mentions
+                var mentions = tweet['Text'].match(/@[A-Za-z_0-9]*/gi);
+                if(mentions) {
+                    mentions.forEach(function(mention) {
+                        set.counter['Tweet Based__Mentions__Users Otherwise Mentioned'].incr(mention.slice(1));
+                    });
+                } else {
+                    set.counter['Tweet Based__Mentions__Users Otherwise Mentioned'].not_applicable++;
+                }
             }
         } // New Tweet or New URL
 
@@ -1663,11 +1679,8 @@ FeatureDistribution.prototype = {
 //                  'MutualFollowers', 'MutualFollowing', 'MutualConnections'
 //                  'CombinedFollowers', 'CombinedFollowing', 'CombinedConnections'
 //                  'FractionMutualFollowers', 'FractionMutualFollowing', 'FractionsMutualConnections'
-//                  'MutualWords', 'CombinedWords', 'FractionMutualWords', 
-//                  'MutualDescWords', 'CombinedDescWords', 'FractionMutualDescWords'
                 
                 relations.push(relation);
-                console.log(relation);
             });
         });
         
@@ -1722,7 +1735,125 @@ FeatureDistribution.prototype = {
         }.bind(this);
         
         // Upload!
-        this.connection.php('analysis/uploadUserMentions', post, success, failure);
+        this.connection.php('analysis/uploadUserRelations', post, success, failure);
+    },
+    userLexiconUpload: function(setname) {
+        var set = this.data[setname];
+        if(!set) return;
+        
+        // Get known UserIDs
+        var screenname2ID = {};
+        Object.keys(set.users).forEach(function(userID) {
+            var user = set.users[userID];
+            screenname2ID[user.Screenname] = userID;
+        });
+        
+        // Build list of user tuples
+        var userIDs = Object.keys(set.users);
+        var relations = [];
+        userIDs.forEach(function(idA) {
+            userIDs.forEach(function(idB) {
+                if(idA == idB) return;
+                
+                var relation = {
+                    ActiveUserID: idA,
+                    MentionedUserID: idB,
+                }
+                
+                var userA = set.users[idA];
+                var userB = set.users[idB];
+                
+                
+                // Get words between tweets in common
+                var wordsA = new Set(userA.TweetWords.top_no_stopwords(500).map(d => d.key));
+                var wordsB = new Set(userB.TweetWords.top_no_stopwords(500).map(d => d.key));
+                
+                if(wordsA.size > 0 || wordsB.size > 0) {
+                    var intersection = new Set(Array.from(wordsA).filter(x => wordsB.has(x)));
+                    var union = new Set([...wordsA, ...wordsB]);
+                    
+                    relation.MutualWords = intersection.size;
+                    relation.CombinedWords = union.size;
+                    relation.FractionMutualWords = intersection.size / union.size;
+                }
+                
+                // Gets words in description in common
+                var descA = new Set(userA.DescriptionWords.filter(x => !util.stopwords.has(x)));
+                var descB = new Set(userB.DescriptionWords.filter(x => !util.stopwords.has(x)));
+                
+                // Need to filter better when the intersection is filler words
+                descA.delete(null);
+                descB.delete(null);
+                if(descA.size > 0 || descB.size > 0) {
+                    var intersection = new Set(Array.from(descA).filter(x => descB.has(x)));
+                    var union = new Set([...descA, ...descB]);
+                    
+                    relation.MutualDescWords = intersection.size;
+                    relation.CombinedDescWords = union.size;
+                    relation.FractionMutualDescWords = intersection.size / union.size;
+                }
+            
+                if((relation.MutualWords && relation.MutualWords > 2 && relation.FractionMutualWords > 0.05) ||
+                   (relation.MutualDescWords && relation.MutualDescWords > 2 && relation.FractionMutualDescWords > 0.05)) {
+                    relations.push(relation);
+                    if(relations.length % 100 == 0)
+                        console.log(relations.length, relation);
+                }
+            });
+        });
+        
+        // Start upload
+        
+        set.user_lex_upload = {
+            relations: relations,
+            index: 0,
+            total: relations.length,
+            prog: new Progress({
+                steps: relations.length,
+                text: '{cur}/{max} User Lexical Relations Uploaded',
+            }),
+            stop: function() {
+                this.i_user = this.n_users;
+            }
+        };
+        
+        set.user_lex_upload.prog.start();
+        this.continueUserLexiconUpload(set);
+    },
+    continueUserLexiconUpload: function(set) {
+        var index = set.user_lex_upload.index;
+        if(index < 0 || index >= set.user_lex_upload.total) {
+            set.user_lex_upload.prog.end();
+            return;
+        }
+        set.user_lex_upload.prog.update(index);
+        
+        // Configure packet
+        var relation = set.user_lex_upload.relations[index];
+        
+        var post = relation;
+        post.Event = set.event.ID;
+        post.Subset = 'subset' in set ? set.subset.ID : 0;
+        
+        // Configure functions
+        var failure = function(msg) { // Failure
+            console.error(msg);
+            set.user_lex_upload.prog.end();
+            triggers.emit('alert', 'Error uploading user mentions');
+            return;
+        };
+        
+        var success =  function(msg) { // Success
+            if(msg == '1') { // Definitely success!
+                set.user_lex_upload.index++;
+                setTimeout(this.continueUserLexiconUpload.bind(this, set), 1); // prevents a large call stack
+            } else {
+                failure(msg);
+            }
+        }.bind(this);
+        
+        // Upload!
+        this.connection.php('analysis/uploadUserRelations', post, success, failure);
     },
 };
 
