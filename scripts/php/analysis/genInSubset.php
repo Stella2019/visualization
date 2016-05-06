@@ -123,7 +123,13 @@
 
     $result = $mysqli->query($query);
      
-    print $result;
+    if(!$result) {
+        print ($query);
+        print (mysqli_error($mysqli));
+    } else {
+        print ($query);
+        print ($result);
+    }
 
     $mysqli->close();
 ?>

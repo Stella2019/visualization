@@ -31,7 +31,8 @@ function FeatureDistribution() {
             'Identity':     ['Username', 'Description Unigrams', 'Lang', 'Verified'],
             'Temporal':     ['Account Creation Date', 'Age of Account'],
             'Localization': ['Location', 'UTC Offset', 'Timezone'],
-            'Tweet Text':   ['Lexicon Size', 'Lexicon Size / Tweets', 'Lexicon Size / Log<sub>2</sub> (Tweets + 1)', 'Using Pipe'],
+            'Tweet Text':   ['Words', 'Distinct Words', 'Words Per Tweet', 'Distinct Words Per Tweet', 'Using Pipe'],
+            'URLs':         ['URLs', 'URLs Per Tweet', 'Distinct Domains', 'Distinct Domains Per URL'],
             'Statuses':     ['Start', 'Growth', 'Growth &ne; 0'],
             'Followers':    ['Start', 'Growth', 'Growth &ne; 0'],
             'Following':    ['Start', 'Growth', 'Growth &ne; 0'],
@@ -720,6 +721,15 @@ FeatureDistribution.prototype = {
             words.forEach(function(word) {
                 tweet_words.incr(word);
             });
+            
+            // Get the user's domain
+            var hasURL = 0;
+            var domain = tweet['ExpandedURL'];
+            if(domain) {
+                hasURL = 1;
+                domain = domain.replace(
+                    /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
+            }
 
             user = {
                 Tweets: 1,
@@ -737,10 +747,17 @@ FeatureDistribution.prototype = {
                 DescriptionWords: desc_words,
 
                 TweetWords: tweet_words,
-                LexiconSize: tweet_words.tokens,
-                LexiconSizePerTweet: tweet_words.tokens,
-                LexiconSizePerLogTweet: tweet_words.tokens,
+                Words: tweet_words.total_count,
+                DistinctWords: tweet_words.tokens,
+                WordsPerTweet: tweet_words.total_count,
+                DistinctWordsPerTweet: tweet_words.tokens,
                 UsingPipe: tweet['Text'].includes('|') ? 1 : 0,
+                
+                URLs: hasURL,
+                URLsPerTweet: hasURL,
+                DistinctDomains: hasURL,
+                DistinctDomainsPerURL: hasURL,
+                Domains: new Counter(),
 
                 CreatedAt: creation,
                 Age: age,
@@ -757,10 +774,13 @@ FeatureDistribution.prototype = {
                 'UsersRetweeted': new Counter(),
                 'UsersReplied': new Counter(),
                 'UsersQuoted': new Counter(),
-//                'OthersMentioned': 0, // TODO get these features later
-//                'OthersRetweeted': 0,
-//                'OthersReplied': 0,
-//                'OthersQuoted': 0,
+                Mentions: 0,
+                SimpleMentions: 0,
+                'MentionsOfUser': 0, // These features are gotten by doing the mention script
+                'RetweetsOfUser': 0,
+                'RepliesOfUser': 0,
+                'QuotesOfUser': 0,
+                'SimpleMentionsOfUser': 0,
                 
                 TweetInterval: {
                     All: [],
@@ -808,9 +828,10 @@ FeatureDistribution.prototype = {
             set.counter['User Based__Localization__Location'].incr(user['Location']);
             set.counter['User Based__Localization__UTC Offset'].incr(user['UTCOffset']);
             set.counter['User Based__Localization__Timezone'].incr(user['Timezone']);
-            set.counter['User Based__Tweet Text__Lexicon Size'].incr(user['LexiconSize']);
-            set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].incr(user['LexiconSizePerTweet']);
-            set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].incr(user['LexiconSizePerLogTweet']);
+            set.counter['User Based__Tweet Text__Words'].incr(user['Words']);
+            set.counter['User Based__Tweet Text__Words Per Tweet'].incr(user['WordsPerTweet']);
+            set.counter['User Based__Tweet Text__Distinct Words'].incr(user['DistinctWords']);
+            set.counter['User Based__Tweet Text__Distinct Words Per Tweet'].incr(user['DistinctWordsPerTweet']);
             set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe']);
 
             // User Description Unigrams
@@ -824,7 +845,21 @@ FeatureDistribution.prototype = {
                 set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth']);
                 set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
             });
-        } else {
+            
+            // URLs
+            if(user['URLs'] == 0) {
+                set.counter['User Based__URLs__URLs'].not_applicable++;
+                set.counter['User Based__URLs__URLs Per Tweet'].not_applicable++;
+                set.counter['User Based__URLs__Distinct Domains'].not_applicable++;
+                set.counter['User Based__URLs__Distinct Domains Per URL'].not_applicable++;
+            } else {
+                user['Domains'].incr(domain);
+                set.counter['User Based__URLs__URLs'].incr(user['URLs']);
+                set.counter['User Based__URLs__URLs Per Tweet'].incr(user['URLsPerTweet']);
+                set.counter['User Based__URLs__Distinct Domains'].incr(user['DistinctDomains']);
+                set.counter['User Based__URLs__Distinct Domains Per URL'].incr(user['DistinctDomainsPerURL']);
+            }
+        } else { // Old user
             user = set.users[tweet.UserID];
 
             // Tweets
@@ -848,15 +883,18 @@ FeatureDistribution.prototype = {
                 user['TweetWords'].incr(word);
             });
 
-            set.counter['User Based__Tweet Text__Lexicon Size'].decr(user['LexiconSize']);
-            set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].decr(user['LexiconSizePerTweet']);
-            set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].decr(user['LexiconSizePerLogTweet']);
-            user['LexiconSize'] = user['TweetWords'].tokens
-            user['LexiconSizePerTweet'] = user['TweetWords'].tokens / user['Tweets'];
-            user['LexiconSizePerLogTweet'] = user['TweetWords'].tokens / Math.log2(user['Tweets'] + 1);
-            set.counter['User Based__Tweet Text__Lexicon Size'].incr(user['LexiconSize']);
-            set.counter['User Based__Tweet Text__Lexicon Size / Tweets'].incr(user['LexiconSizePerTweet']);
-            set.counter['User Based__Tweet Text__Lexicon Size / Log<sub>2</sub> (Tweets + 1)'].incr(user['LexiconSizePerLogTweet']);
+            set.counter['User Based__Tweet Text__Words'].decr(user['Words']);
+            set.counter['User Based__Tweet Text__Words Per Tweet'].decr(user['WordsPerTweet']);
+            set.counter['User Based__Tweet Text__Distinct Words'].decr(user['DistinctWords']);
+            set.counter['User Based__Tweet Text__Distinct Words Per Tweet'].decr(user['DistinctWordsPerTweet']);
+            user['Words'] = user['TweetWords'].total_count
+            user['WordsPerTweet'] = user['TweetWords'].total_count / user['Tweets'];
+            user['DistinctWords'] = user['TweetWords'].tokens
+            user['DistinctWordsPerTweet'] = user['TweetWords'].tokens / user['Tweets'];
+            set.counter['User Based__Tweet Text__Words'].incr(user['Words']);
+            set.counter['User Based__Tweet Text__Words Per Tweet'].incr(user['WordsPerTweet']);
+            set.counter['User Based__Tweet Text__Distinct Words'].incr(user['DistinctWords']);
+            set.counter['User Based__Tweet Text__Distinct Words Per Tweet'].incr(user['DistinctWordsPerTweet']);
 
             // Median Interval between tweets
             var thisTimeTweeted = util.twitterID2Timestamp(tweet['ID']).getTime();
@@ -920,7 +958,7 @@ FeatureDistribution.prototype = {
             user['Distinct']['Count'] += tweet['Distinct'] == '1' ? 1 : 0;
             user['Distinct']['Fraction'] = user['Distinct']['Count'] / user['Tweets'];
 
-            // Insert new counts
+            // Social feature counts
             ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
                 user[feature]['Growth'] = user[feature]['End'] - user[feature]['Start'];
                 user[feature]['PerDay'] = user[feature]['Growth'] * 24 * 60 / user['MinutesInSet'];
@@ -933,11 +971,42 @@ FeatureDistribution.prototype = {
                     set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], 1);
                 }
             });
+            
+            // URLs
+            var domain = tweet['ExpandedURL'];
+            if(domain) {
+                if(user['URLs'] == 0) {
+                    set.counter['User Based__URLs__URLs'].not_applicable--;
+                    set.counter['User Based__URLs__URLs Per Tweet'].not_applicable--;
+                    set.counter['User Based__URLs__Distinct Domains'].not_applicable--;
+                    set.counter['User Based__URLs__Distinct Domains Per URL'].not_applicable--;
+                } else {
+                    set.counter['User Based__URLs__URLs'].decr(user['URLs']);
+                    set.counter['User Based__URLs__URLs Per Tweet'].decr(user['URLsPerTweet']);
+                    set.counter['User Based__URLs__Distinct Domains'].decr(user['DistinctDomains']);
+                    set.counter['User Based__URLs__Distinct Domains Per URL'].decr(user['DistinctDomainsPerURL']);
+                }
+                
+                domain = domain.replace(
+                    /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
+                var hasDomain = user['Domains'].has(domain);
+                user['Domains'].incr(domain);
+                
+                user['URLs']++;
+                user['URLsPerTweet'] = user['URLs'] / user['Tweets'];
+                user['DistinctDomains'] = user['Domains'].tokens;
+                user['DistinctDomainsPerURL'] = user['DistinctDomains'] / user['URLs'];
+                
+                set.counter['User Based__URLs__URLs'].incr(user['URLs']);
+                set.counter['User Based__URLs__URLs Per Tweet'].incr(user['URLsPerTweet']);
+                set.counter['User Based__URLs__Distinct Domains'].incr(user['DistinctDomains']);
+                set.counter['User Based__URLs__Distinct Domains Per URL'].incr(user['DistinctDomainsPerURL']);
+            }
         }
         
         // Users mentioned
         if(tweet['Text']) {
-            var mentions = tweet['Text'].match(/@[A-Za-z_0-9]*/gi);
+            var mentions = tweet['Text'].match(/@[A-Za-z_0-9]*/gi) || [];
             if(mentions) {
                 mentions.forEach(function(mention) {
                     user['UsersMentioned'].incr(mention.slice(1));
@@ -945,20 +1014,24 @@ FeatureDistribution.prototype = {
             }
 
             // Retweets
-            mentions = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi);
-            if(mentions) {
-                mentions.forEach(function(mention) {
+            rts = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi) || [];
+            if(rts) {
+                rts.forEach(function(mention) {
                     user['UsersRetweeted'].incr(mention.slice(4));
                 });
             }
 
             // Replies
-            mentions = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi);
-            if(mentions) {
-                mentions.forEach(function(mention) {
+            res = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi) || [];
+            if(res) {
+                res.forEach(function(mention) {
                     user['UsersReplied'].incr(mention.slice(1));
                 });
             }
+            
+            // Add counters to user
+            user['Mentions'] += mentions.length;
+            user['SimpleMentions'] += mentions.length - rts.length - res.length;
 
             // TODO find a way for quotes or include in other program
         }
@@ -968,7 +1041,8 @@ FeatureDistribution.prototype = {
             feature.includes('Start') ||
             feature.includes('Growth') ||
             feature.includes('Activity') ||
-            feature.includes('Lexicon Size') ||
+            feature.includes('Words') ||
+            feature.includes('User Based__URLs') ||
             (feature.includes('User Based') && feature.includes('Using Pipe'));
     },
     placeCounts: function() {
@@ -1468,7 +1542,7 @@ FeatureDistribution.prototype = {
                     return val + '&nbsp;&nbsp;&nbsp;&nbsp;' + 
                         util.formatDate(util.twitterID2Timestamp(val));
                 }
-                if(['TweetWords', 'UsersMentioned', 'UsersRetweeted', 'UsersReplied', 'UsersQuoted'].includes(label)) {
+                if(val instanceof Counter) {
                     var topwords = val.top_no_stopwords(10);
                     var result = '';
                     return topwords.map(function(kvpair) {
@@ -1535,7 +1609,7 @@ FeatureDistribution.prototype = {
                         return val + '&nbsp;&nbsp;&nbsp;&nbsp;' + 
                             util.formatDate(util.twitterID2Timestamp(val));
                     }
-                    if(['TweetWords', 'UsersMentioned', 'UsersRetweeted', 'UsersReplied', 'UsersQuoted'].includes(label)) {
+                    if(val instanceof Counter) {
                         var topwords = val.top_no_stopwords(10);
                         var result = '';
                         return topwords.map(function(kvpair) {
@@ -1626,7 +1700,10 @@ FeatureDistribution.prototype = {
         ['UserID', 'Screenname',
          'Tweets', 'FirstTweet', 'LastTweet', 'TweetsPerDay',
          'MinutesInSet', 'MinuteStarted', 'MinuteEnded', 'Age', 
-         'LexiconSize', 'LexiconSizePerTweet', 'LexiconSizePerLogTweet']
+         'Words', 'DistinctWords', 'WordsPerTweet', 'DistinctWordsPerTweet',
+         'URLs', 'URLsPerTweet', 'DistinctDomains', 'DistinctDomainsPerURL',
+         'Mentions', 'SimpleMentions',
+         'MentionsOfUser', 'RetweetsOfUser', 'RepliesOfUser', 'QuotesOfUser', 'SimpleMentionsOfUser']
             .forEach(function(feature) {
             post[feature] = user[feature];
         });
@@ -1683,7 +1760,7 @@ FeatureDistribution.prototype = {
                 var mentionID = screenname2ID[entry.key];
                 if(!mentionID) {
                     mentionID = -1 * util.mod(entry.key.hashCode(), 1e9);
-                }
+                } 
                 
                 var relation = {
                     ActiveUserID: userID,
@@ -1694,8 +1771,19 @@ FeatureDistribution.prototype = {
                     JustMentionCount: entry.value,
 //                    QuoteCount: 0//user['UsersQuoted'].get(entry.key)
                 }
+                
                 relation.JustMentionCount -= relation.RetweetCount;
                 relation.JustMentionCount -= relation.ReplyCount;
+                
+                // Add these stats to other user
+                if(mentionID > 0) {
+                    var userB = set.users[mentionID];
+                    userB['MentionsOfUser'] += relation.MentionCount;
+                    userB['RetweetsOfUser'] += relation.RetweetCount || 0;
+                    userB['RepliesOfUser'] += relation.ReplyCount || 0;
+//                    userB['QuotesOfUser'] += relation.QuoteCount;
+                    userB['SimpleMentionsOfUser'] += relation.JustMentionCount;
+                }
                 
                 // TODO Not included, yet
 //                'Follower', 'Following', 
