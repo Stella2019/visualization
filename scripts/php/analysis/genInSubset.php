@@ -97,6 +97,14 @@
 
         $conds[] = "InSubset.Subset = " . $_REQUEST["superset"];
     }
+    if(isset($_REQUEST["userbot"])) {
+        $query .= "JOIN TweetUser " .
+                  "    ON Tweet.`ID` = TweetUser.Tweet " .
+                  "JOIN User " .
+                  "    ON TweetUser.`UserID` = User.UserID ";
+
+        $conds[] = "User.Bot = " . $_REQUEST["userbot"];
+    }
 
     if(isset($_REQUEST["source"]))
         $conds[] = "LOWER(Tweet.Source) REGEXP '" . $_REQUEST["source"] . "'";
