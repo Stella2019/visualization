@@ -352,14 +352,14 @@ FeatureDistribution.prototype = {
             .html('Mentions')
             .on('click', this.userMentionsUpload.bind(this));
         
-        load_buttons.append('button')
-            .attr('class', 'btn btn-xs upload-lexicon')
-            .html('Lexicon')
-            .on('click', this.userLexiconUpload.bind(this));
-        load_buttons.append('button')
-            .attr('class', 'btn btn-xs upload-lexical-relations')
-            .html('Lexical Rel')
-            .on('click', this.userLexicalRelationUpload.bind(this));
+//        load_buttons.append('button')
+//            .attr('class', 'btn btn-xs upload-lexicon')
+//            .html('Lexicon')
+//            .on('click', this.userLexiconUpload.bind(this));
+//        load_buttons.append('button')
+//            .attr('class', 'btn btn-xs upload-lexical-relations')
+//            .html('Lexical Rel')
+//            .on('click', this.userLexicalRelationUpload.bind(this));
     },
     toggleLoadButtons: function(collection) {
         if(!collection) {
@@ -1688,11 +1688,14 @@ FeatureDistribution.prototype = {
                 var relation = {
                     ActiveUserID: userID,
                     MentionedUserID: mentionID,
-                    Mentions: entry.value,
-                    Retweets: user['UsersRetweeted'].get(entry.key),
-                    Replies: user['UsersReplied'].get(entry.key),
-                    Quotes: 0//user['UsersQuoted'].get(entry.key)
+                    MentionCount: entry.value,
+                    RetweetCount: user['UsersRetweeted'].get(entry.key),
+                    ReplyCount: user['UsersReplied'].get(entry.key),
+                    JustMentionCount: entry.value,
+//                    QuoteCount: 0//user['UsersQuoted'].get(entry.key)
                 }
+                relation.JustMentionCount -= relation.RetweetCount;
+                relation.JustMentionCount -= relation.ReplyCount;
                 
                 // TODO Not included, yet
 //                'Follower', 'Following', 
@@ -1755,7 +1758,7 @@ FeatureDistribution.prototype = {
         }.bind(this);
         
         // Upload!
-        this.connection.php('analysis/uploadUserRelations', post, success, failure);
+        this.connection.php('analysis/uploadUserSocial', post, success, failure);
     },
     userLexiconUpload: function(setname) {
         var set = this.data[setname];
@@ -1834,7 +1837,7 @@ FeatureDistribution.prototype = {
         var post = lexicon_entry;
         post.Event = set.event.ID;
         post.Subset = 'subset' in set ? set.subset.ID : 0;
-        post.Term = post.Term.slice(0, 20).replace("'", "\\'");
+        post.Term = post.Term.slice(0, 20).replace(/'/g, "\\'");
         
         // Configure functions
         var failure = function(msg) { // Failure
