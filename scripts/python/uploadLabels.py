@@ -5,24 +5,34 @@ from pprint import pprint
 import mysql.connector
 
 # Queries
-query = ("UPDATE User "
+query = ("UPDATE IGNORE User "
         "SET Bot = %(Bot)s, "
         "    Botnet = %(Botnet)s "
         "WHERE Event = %(Event)s "
         "    AND Subset = %(Subset)s "
         "    AND UserID = %(UserID)s ")
+#query = ("UPDATE IGNORE User "
+#        "SET TruthyScore = %(TruthyScore)s "
+#        "WHERE Event = %(Event)s "
+#        "    AND Subset = %(Subset)s "
+#        "    AND Screenname = %(Screenname)s ")
 
 def main():
     database = connectToServer()
     cursor = database.cursor()
     
     folder = '/Users/aconradnied/Google Drive/Grad School/*Misinfo_Research_DRG/2015-2016/Bots Research/Tables/'
-    with open(folder + '/EarlyBotnetLabels.csv', 'rb') as csvfile:
+    filename = 'EarlyBotnetLabels.csv'
+#    folder = '/Users/aconradnied/Google Drive/Grad School/MisInfo Group/Twitter Bots/'
+#    filename = 'username_to_bot_score.csv'
+    with open(folder + filename, 'rb') as csvfile:
         csvrows = csv.reader(csvfile, delimiter=',')
         for row in csvrows:
             data = {
-                'Event': -9,
+                'Event': -9, # -9, 1100 || -8, 780|872 || 91, 1090
                 'Subset': 1100,
+#                'Screenname': row[0],
+#                'TruthyScore': row[1]
                 'UserID': row[0],
                 'Bot': 1 if row[2] not in ['Probably', 'Probably not', 'No', 'Unknowable'] else 0,
                 'Botnet': row[2]

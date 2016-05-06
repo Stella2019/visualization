@@ -231,6 +231,13 @@ FeatureDistribution.prototype = {
                 ids:    [ 1e1,   1e2,     1e3,     5e3],
                 default: 1,
                 isnumeric: true
+            }),
+            'Upload Limit': new Option({
+                title: 'Upload Limit / User',
+                labels: ['10', '100', 'All'],
+                ids:    [ 1e1,   1e2,   1e5],
+                default: 1,
+                isnumeric: true
             })
         };
         this.ops['Display'] = {
@@ -346,9 +353,13 @@ FeatureDistribution.prototype = {
             .on('click', this.userMentionsUpload.bind(this));
         
         load_buttons.append('button')
-            .attr('class', 'btn btn-xs upload-lex')
-            .html('Lex')
+            .attr('class', 'btn btn-xs upload-lexicon')
+            .html('Lexicon')
             .on('click', this.userLexiconUpload.bind(this));
+        load_buttons.append('button')
+            .attr('class', 'btn btn-xs upload-lexical-relations')
+            .html('Lexical Rel')
+            .on('click', this.userLexicalRelationUpload.bind(this));
     },
     toggleLoadButtons: function(collection) {
         if(!collection) {
@@ -386,7 +397,9 @@ FeatureDistribution.prototype = {
             .classed('btn-default', has_dataset ? true : false);
         button_box.select('.upload-mentions')
             .classed('btn-default', has_dataset ? true : false);
-        button_box.select('.upload-lex')
+        button_box.select('.upload-lexicon')
+            .classed('btn-default', has_dataset ? true : false);
+        button_box.select('.upload-lexical-relations')
             .classed('btn-default', has_dataset ? true : false);
     },
     loadTweets: function(setname) {
@@ -631,10 +644,13 @@ FeatureDistribution.prototype = {
             
             // User Mentions
             if(tweet['Text']) {
+                var already_mentioned = new Set();
+                
                 // Retweets
                 var rts = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi);
                 if(rts) {
                     rts.forEach(function(mention) {
+                        already_mentioned.add(mention.slice(4));
                         set.counter['Tweet Based__Mentions__Users Retweeted'].incr(mention.slice(4));
                     });
                 } else {
@@ -645,6 +661,7 @@ FeatureDistribution.prototype = {
                 var res = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi);
                 if(res) {
                     res.forEach(function(mention) {
+                        already_mentioned.add(mention.slice(1));
                         set.counter['Tweet Based__Mentions__Users Replied'].incr(mention.slice(1));
                     });
                 } else {
@@ -654,8 +671,9 @@ FeatureDistribution.prototype = {
                 // TODO find a way for quotes or include in other program
                 
                 // Otherwise mentions
-                var mentions = tweet['Text'].match(/@[A-Za-z_0-9]*/gi);
-                if(mentions) {
+                var mentions = tweet['Text'].match(/@[A-Za-z_0-9]*/gi) || [];
+                mentions = mentions.filter(mention => !already_mentioned.has(mention.slice(1)));
+                if(mentions && mentions.length > 0) {
                     mentions.forEach(function(mention) {
                         set.counter['Tweet Based__Mentions__Users Otherwise Mentioned'].incr(mention.slice(1));
                     });
@@ -1648,6 +1666,8 @@ FeatureDistribution.prototype = {
         var set = this.data[setname];
         if(!set) return;
         
+        var upload_limit = this.ops['Download']['Upload Limit'].get();
+        
         // Get known UserIDs
         var screenname2ID = {};
         Object.keys(set.users).forEach(function(userID) {
@@ -1659,7 +1679,7 @@ FeatureDistribution.prototype = {
         var relations = [];
         Object.keys(set.users).forEach(function(userID) {
             var user = set.users[userID];
-            user['UsersMentioned'].getSorted().forEach(function(entry) {
+            user['UsersMentioned'].top(upload_limit).forEach(function(entry) {
                 var mentionID = screenname2ID[entry.key];
                 if(!mentionID) {
                     mentionID = -1 * util.mod(entry.key.hashCode(), 1e9);
@@ -1741,6 +1761,8 @@ FeatureDistribution.prototype = {
         var set = this.data[setname];
         if(!set) return;
         
+        var upload_limit = this.ops['Download']['Upload Limit'].get();
+        
         // Get known UserIDs
         var screenname2ID = {};
         Object.keys(set.users).forEach(function(userID) {
@@ -1750,67 +1772,45 @@ FeatureDistribution.prototype = {
         
         // Build list of user tuples
         var userIDs = Object.keys(set.users);
-        var relations = [];
-        userIDs.forEach(function(idA) {
-            userIDs.forEach(function(idB) {
-                if(idA == idB) return;
-                
-                var relation = {
-                    ActiveUserID: idA,
-                    MentionedUserID: idB,
-                }
-                
-                var userA = set.users[idA];
-                var userB = set.users[idB];
-                
-                
-                // Get words between tweets in common
-                var wordsA = new Set(userA.TweetWords.top_no_stopwords(500).map(d => d.key));
-                var wordsB = new Set(userB.TweetWords.top_no_stopwords(500).map(d => d.key));
-                
-                if(wordsA.size > 0 || wordsB.size > 0) {
-                    var intersection = new Set(Array.from(wordsA).filter(x => wordsB.has(x)));
-                    var union = new Set([...wordsA, ...wordsB]);
-                    
-                    relation.MutualWords = intersection.size;
-                    relation.CombinedWords = union.size;
-                    relation.FractionMutualWords = intersection.size / union.size;
-                }
-                
-                // Gets words in description in common
-                var descA = new Set(userA.DescriptionWords.filter(x => !util.stopwords.has(x)));
-                var descB = new Set(userB.DescriptionWords.filter(x => !util.stopwords.has(x)));
-                
-                // Need to filter better when the intersection is filler words
-                descA.delete(null);
-                descB.delete(null);
-                if(descA.size > 0 || descB.size > 0) {
-                    var intersection = new Set(Array.from(descA).filter(x => descB.has(x)));
-                    var union = new Set([...descA, ...descB]);
-                    
-                    relation.MutualDescWords = intersection.size;
-                    relation.CombinedDescWords = union.size;
-                    relation.FractionMutualDescWords = intersection.size / union.size;
-                }
+        var lexicon = [];
+        userIDs.forEach(function(userID) {
+            var top_words = [];
+            var top_words_low = 0;
+            var top_descs = [];
+            var top_descs_low = 1e-6;
             
-                if((relation.MutualWords && relation.MutualWords > 2 && relation.FractionMutualWords > 0.05) ||
-                   (relation.MutualDescWords && relation.MutualDescWords > 2 && relation.FractionMutualDescWords > 0.05)) {
-                    relations.push(relation);
-                    if(relations.length % 100 == 0)
-                        console.log(relations.length, relation);
+            var user = set.users[userID];
+            
+            var words = user.TweetWords.top_no_stopwords(upload_limit);
+            var desc = util.lunique(user.DescriptionWords.filter(x => !util.stopwords.has(x)));
+            
+            words.forEach(function(word) {
+                if(word) {
+                    lexicon.push({
+                        User: userID,
+                        Term: word.key,
+                        Count: word.value
+                    });
+                }
+            });
+            desc.forEach(function(word) {
+                if(word) {
+                    lexicon.push({
+                        User: userID,
+                        Term: word
+                    });
                 }
             });
         });
         
         // Start upload
-        
         set.user_lex_upload = {
-            relations: relations,
+            lexicon: lexicon,
             index: 0,
-            total: relations.length,
+            total: lexicon.length,
             prog: new Progress({
-                steps: relations.length,
-                text: '{cur}/{max} User Lexical Relations Uploaded',
+                steps: lexicon.length,
+                text: '{cur}/{max} User Words Uploaded',
             }),
             stop: function() {
                 this.i_user = this.n_users;
@@ -1829,7 +1829,205 @@ FeatureDistribution.prototype = {
         set.user_lex_upload.prog.update(index);
         
         // Configure packet
-        var relation = set.user_lex_upload.relations[index];
+        var lexicon_entry = set.user_lex_upload.lexicon[index];
+        
+        var post = lexicon_entry;
+        post.Event = set.event.ID;
+        post.Subset = 'subset' in set ? set.subset.ID : 0;
+        post.Term = post.Term.slice(0, 20).replace("'", "\\'");
+        
+        // Configure functions
+        var failure = function(msg) { // Failure
+            console.error(msg);
+            set.user_lex_upload.prog.end();
+            triggers.emit('alert', 'Error uploading user terms');
+            return;
+        };
+        
+        var success =  function(msg) { // Success
+            if(msg == '1') { // Definitely success!
+                set.user_lex_upload.index++;
+                setTimeout(this.continueUserLexiconUpload.bind(this, set), 1); // prevents a large call stack
+            } else {
+                failure(msg);
+            }
+        }.bind(this);
+        
+        // Upload!
+        this.connection.php('analysis/uploadUserTerm', post, success, failure);
+    },
+    userLexicalRelationUpload: function(setname) {
+        var set = this.data[setname];
+        if(!set) return;
+        
+        var upload_limit = this.ops['Download']['Upload Limit'].get();
+        
+        // Get known UserIDs
+        var screenname2ID = {};
+        Object.keys(set.users).forEach(function(userID) {
+            var user = set.users[userID];
+            screenname2ID[user.Screenname] = userID;
+        });
+        
+        // Build list of user tuples
+        var userIDs = Object.keys(set.users);
+        var relations = [];
+        userIDs.forEach(function(idA) {
+            var top_words = [];
+            var top_words_low = 0;
+            var top_descs = [];
+            var top_descs_low = 1e-6;
+            
+            var userA = set.users[idA];
+            
+            userIDs.forEach(function(idB) {
+                if(idA == idB) return;
+                
+                var relation; 
+                var relation_desc;
+                
+                var userB = set.users[idB];
+                
+                // Get words between tweets in common
+                var wordsA = new Set(userA.TweetWords.top_no_stopwords(500).map(d => d.key));
+                var wordsB = new Set(userB.TweetWords.top_no_stopwords(500).map(d => d.key));
+                
+                if(wordsA.size > 0 || wordsB.size > 0) {
+                    var intersection = new Set(Array.from(wordsA).filter(x => wordsB.has(x)));
+                    var union = new Set([...wordsA, ...wordsB]);
+                    
+                    relation = {
+                        ActiveUserID: idA,
+                        MentionedUserID: idB,
+                        MutualWords: intersection.size,
+                        CombinedWords: union.size,
+                        FractionMutualWords: intersection.size / union.size,
+                    }
+                }
+                
+                // Check if it is one of the top relations
+                if(relation && relation.MutualWords && relation.FractionMutualWords >= top_words_low) {
+                    top_words.push(relation);
+                    
+                    if(upload_limit < 1e5 && relation.FractionMutualWords > top_words_low) {
+                        var n_top_words = top_words.length;
+                        if(n_top_words > upload_limit) {
+                            var top_words_limited = top_words.filter(rel => rel.FractionMutualWords > top_words_low);
+                            var n_top_words_over_low = top_words_limited.length;
+                            if(n_top_words_over_low >= upload_limit) {
+                                top_words_low = d3.min(top_words, rel => rel.FractionMutualWords);
+                                top_words = top_words_limited;
+                            }
+                        }
+                    }
+                }
+                
+                // Gets words in description in common
+                var descA = new Set(userA.DescriptionWords.filter(x => !util.stopwords.has(x)));
+                var descB = new Set(userB.DescriptionWords.filter(x => !util.stopwords.has(x)));
+                
+                // TODO filter better when the intersection is filler words
+                descA.delete(null);
+                descB.delete(null);
+                if(descA.size > 0 || descB.size > 0) {
+                    var intersection = new Set(Array.from(descA).filter(x => descB.has(x)));
+                    var union = new Set([...descA, ...descB]);
+                    
+                    relation_desc = {
+                        ActiveUserID: idA,
+                        MentionedUserID: idB,
+                        MutualDescWords: intersection.size,
+                        CombinedDescWords: union.size,
+                        FractionMutualDescWords: intersection.size / union.size,
+                    }
+                }
+                
+                // Check if it is one of the top relations
+                if(relation_desc && relation_desc.MutualDescWords && relation_desc.FractionMutualDescWords >= top_descs_low) {
+                    top_descs.push(relation_desc);
+                    
+                    if(upload_limit < 1e5 && relation_desc.FractionMutualDescWords > top_descs_low) {
+                        var n_top_descs = top_descs.length;
+                        if(n_top_descs > upload_limit) {
+                            var top_descs_limited = top_descs.filter(rel => rel.FractionMutualDescWords > top_descs_low);
+                            var n_top_descs_over_low = top_descs_limited.length;
+                            if(n_top_descs_over_low >= upload_limit) {
+                                top_descs_low = d3.min(top_descs, rel => rel.FractionMutualDescWords);
+                                top_descs = top_descs_limited;
+                            }
+                        }
+                    }
+                }
+            });
+            
+//            console.log(userA.Screenname, top_words.length, d3.min(top_words, rel => rel.) top_words,);
+            
+            // If there is a tie for last place, randomly filter out the last place.
+            if(top_words.length > 0) {
+                if(top_words.length > upload_limit) {
+                    var len = top_words.length;
+                    var min = d3.min(top_words, rel => rel.FractionMutualWords);
+                    var min_entries  = top_words.filter(rel => rel.FractionMutualWords = min)
+                    var okay_entries = top_words.filter(rel => rel.FractionMutualWords > min)
+                    
+                    // Randomly pop out elements from the array until we are at the upload limit
+                    while (okay_entries.length <= upload_limit && min_entries.length != 0) {
+                        okay_entries.push(min_entries.splice(Math.floor(Math.random() * min_entries.length), 1)[0]);
+                    }
+                    top_words = okay_entries;
+                }
+                
+                top_words.forEach(rel => relations.push(rel));
+            }
+            
+            // If there is a tie for last place, randomly filter out the last place.
+            if(top_descs.length > 0) {
+                if(top_descs.length > upload_limit) {
+                    var len = top_descs.length;
+                    var min = d3.min(top_descs, rel => rel.FractionMutualDescWords);
+                    var min_entries  = top_descs.filter(rel => rel.FractionMutualDescWords = min)
+                    var okay_entries = top_descs.filter(rel => rel.FractionMutualDescWords > min)
+                    
+                    // Randomly pop out elements from the array until we are at the upload limit
+                    while (okay_entries.length <= upload_limit && min_entries.length != 0) {
+                        okay_entries.push(min_entries.splice(Math.floor(Math.random() * min_entries.length), 1)[0]);
+                    }
+                    top_descs = okay_entries;
+                }
+                top_descs.forEach(rel => relations.push(rel));
+            }
+                
+            console.log(userA.Screenname, top_words, top_descs);
+        });
+        
+        // Start upload
+        
+        set.user_lexical_relations_upload = {
+            relations: relations,
+            index: 0,
+            total: relations.length,
+            prog: new Progress({
+                steps: relations.length,
+                text: '{cur}/{max} User Lexical Relations Uploaded',
+            }),
+            stop: function() {
+                this.i_user = this.n_users;
+            }
+        };
+        
+        set.user_lexical_relations_upload.prog.start();
+        this.continueUserLexicalRelationUpload(set);
+    },
+    continueUserLexicalRelationUpload: function(set) {
+        var index = set.user_lexical_relations_upload.index;
+        if(index < 0 || index >= set.user_lexical_relations_upload.total) {
+            set.user_lexical_relations_upload.prog.end();
+            return;
+        }
+        set.user_lexical_relations_upload.prog.update(index);
+        
+        // Configure packet
+        var relation = set.user_lexical_relations_upload.relations[index];
         
         var post = relation;
         post.Event = set.event.ID;
@@ -1838,15 +2036,15 @@ FeatureDistribution.prototype = {
         // Configure functions
         var failure = function(msg) { // Failure
             console.error(msg);
-            set.user_lex_upload.prog.end();
-            triggers.emit('alert', 'Error uploading user mentions');
+            set.user_lexical_relations_upload.prog.end();
+            triggers.emit('alert', 'Error uploading user lexical relations');
             return;
         };
         
         var success =  function(msg) { // Success
             if(msg == '1') { // Definitely success!
-                set.user_lex_upload.index++;
-                setTimeout(this.continueUserLexiconUpload.bind(this, set), 1); // prevents a large call stack
+                set.user_lexical_relations_upload.index++;
+                setTimeout(this.continueUserLexicalRelationUpload.bind(this, set), 1); // prevents a large call stack
             } else {
                 failure(msg);
             }

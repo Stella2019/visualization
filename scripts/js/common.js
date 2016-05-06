@@ -307,14 +307,17 @@ var util = {
         // Additional chinese codes may be listed here: https://www.w3.org/International/articles/bcp47/
     },
     stopwords: new Set(['the', 'a', 'an', 'that', 'this',
-                'rt', 'via',
-                'in', 'on', 'to', 'of', 'at', 'for', 'with', 'about',
-                'is', 'are', 'be', 'was', 'have', 'has',
+                'rt', 'via', 'com', 'www',
+                'in', 'on', 'to', 'of', 'at', 
+                'for', 'with', 'about', 'by', 'from',
+                'is', 'are', 'be', 'was', 'have', 'has', 'will',
                 'i', 'you', 'he', 'she', 'it', 'we', 'they',
                 'me', 'him', 'her', 'us', 'them', 
                 'my', 'your', 'his', 'its', 'our', 'their',
                 'and', 'or',
-                'as', 'if', 'so']),
+                'as', 'if', 'so',
+                'de', 'en', 'und', 'la',
+                'how', 'what', 'when', 'where', 'who']),
 }
 
 function Counter() {
