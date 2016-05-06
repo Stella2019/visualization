@@ -2,10 +2,10 @@
     include '../connect.php';
 
     // Values that can be submitted
-    $keys = array('Event', 'Subset', 'ActiveUserID', 'MentionedUserID',
-                  'MentionCount', 'RetweetCount', 'ReplyCount', 'QuoteCount', 'JustMentionCount' 
+    $keys = array('Event', 'Subset', 'ActiveUserID', 'SecondUserID',
+                  'MentionCount', 'RetweetCount', 'ReplyCount', 'QuoteCount', 'JustMentionCount',
                   'Follower', 'Following', 
-                  'MutualFollowers', 'MutualFollowing', 'MutualConnections',);
+                  'MutualFollowers', 'MutualFollowing', 'MutualConnections');
 
     // Get values
     $keys_used = array();

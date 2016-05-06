@@ -1687,7 +1687,7 @@ FeatureDistribution.prototype = {
                 
                 var relation = {
                     ActiveUserID: userID,
-                    MentionedUserID: mentionID,
+                    SecondUserID: mentionID,
                     MentionCount: entry.value,
                     RetweetCount: user['UsersRetweeted'].get(entry.key),
                     ReplyCount: user['UsersReplied'].get(entry.key),
