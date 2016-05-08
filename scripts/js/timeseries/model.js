@@ -19,8 +19,8 @@ function TimeseriesModel (app) {
     this.series_distinct = {};
     this.series_exposure = {};
     
-    this.focus = {series: {}, series_arr: []};
-    this.context = {series: {}, series_arr: []};
+    this.focus = {name: 'focus', series: {}, series_arr: []};
+    this.context = {name: 'context', series: {}, series_arr: []};
     
     this.typesC = ['Original', 'Retweet', 'Reply', 'Quote'];
     this.types = ['original', 'retweet', 'reply', 'quote'];
@@ -45,13 +45,20 @@ TimeseriesModel.prototype = {
     },
     setTriggers: function() {
         triggers.on('event:updated', this.loadTimeseries.bind(this, 'event'));
+//        triggers.on('time_window:updated', this.loadTimeseries.bind(this, 'event'));
+        triggers.on('timeseries:load', this.loadTimeseries.bind(this));
         triggers.on('timeseries:loaded', this.parseTimeseries.bind(this));
-        triggers.on('timeseries:ready', this.prepareContextSeries.bind(this));
+        triggers.on('timeseries:ready', this.prepareTimeseries.bind(this));
         triggers.on('timeseries:add', this.addSeries.bind(this));
         triggers.on('timeseries:clear', this.clearSeries.bind(this));
-//        triggers.on('subset:updated', this.loadSubsetTimeseries.bind(this)); // TODO
+        triggers.on('timeseries:stack', this.stackSeries.bind(this));
+        
+        // Subset triggers
+//        triggers.on('subsets:updated', this.loadSubsetTimeseries.bind(this)); // this interrupts the event load
+        triggers.on('subset_load:ready', this.loadSubsetTimeseries.bind(this));
+        triggers.on('subset_load:continue', this.continueLoadingSubsetTimeseries.bind(this));
     },
-    loadTimeseries: function(id) {
+    loadTimeseries: function(id, b) {
         var type;
         if(typeof(id) == 'number') {
             type = 'subset';
@@ -100,7 +107,43 @@ TimeseriesModel.prototype = {
         this.streamTimeseries.startStream();
     },
     loadSubsetTimeseries: function() {
-        console.log('Load Subset Timeseries: TODO');
+        var subsets = this.app.collection.subsets_arr;
+        var event = this.app.collection.event.ID;
+        
+        if(this.subset_load && this.subset_load.event == event) {
+            // Don't need to reload, return
+            return;
+        }
+        
+        this.subset_load = {
+            event: event,
+            subsets: subsets.map(d => parseInt(d.ID)),
+            index: -1
+        };
+        
+        var subset_progress_bar = new Progress({
+            style: 'page40',
+            color: 'info',
+            steps: subsets.length,
+            text: '{cur}/{max} Subset\'s Loaded',
+        });
+        this.subset_load.prog = subset_progress_bar;
+        
+        subset_progress_bar.start();
+        triggers.emit('subset_load:continue');
+    },
+    continueLoadingSubsetTimeseries: function() {
+        this.subset_load.index++;
+        this.subset_load.prog.update(this.subset_load.index);
+        
+        if(this.subset_load.index == this.subset_load.subsets.length
+          || this.subset_load.index > 4) { // TODO lift this when done testing
+            this.subset_load.prog.end();
+            return; // All done!
+        }
+        
+        var subset = this.subset_load.subsets[this.subset_load.index];
+        triggers.emit('timeseries:load', subset);
     },
     parseTimeseries: function(id) {
         // Reenable the button to choose the event
@@ -111,7 +154,11 @@ TimeseriesModel.prototype = {
         
         // If there is no data, stop
         if(!this.download || this.download.length == 0) {
-            triggers.emit('alert', 'Failure Fetching Timeseries Data from Database');
+            if(typeof(id) == 'number') { // Continue loading other subsets
+                triggers.emit('subset_load:continue');
+            } else {
+                triggers.emit('alert', 'Failure fetching event timeseries data from database');
+            }
             return;
         }
         
@@ -133,7 +180,7 @@ TimeseriesModel.prototype = {
         // Iterate through rows, adding them to the arrays
         this.download.forEach(function(row) {
             if(!(row.Time in this.time.stamp_index)) {
-                console.log('bad time for row', row);
+                console.log('bad time for row', row, this.time);
                 return;
             }
             var i_t = this.time.stamp_index[row.Time];
@@ -153,6 +200,32 @@ TimeseriesModel.prototype = {
         this.download = [];
         
         triggers.emit('timeseries:ready', id);
+        triggers.emit('subset_load:continue');
+    },
+    prepareTimeseries: function(id) {
+        var unit = this.app.ops['Series']['Unit'].get();
+        if(!id) { // Then prepare them all!
+            triggers.emit('timeseries:clear', 'focus'); // Not necessary though, TODO
+            
+            triggers.emit('timeseries:ready', 'event');
+            this.subset_load.subsets.forEach(triggers.emitter('timeseries:ready'));
+        } else if(id == 'event' || !id) {
+            this.prepareContextSeries(id);
+        } else {
+            var datapoints = this['series_' + unit][id];
+            if(!datapoints) return;
+            
+            var series = this.timepoints2Series(datapoints[0].map(function(val, i) {
+                return val + datapoints[1][i] + datapoints[2][i] + datapoints[3][i];
+            }));
+            
+            series.id = id;
+            series.label = 'Subset ' + id;
+            series.color = '#000';
+            series.chart = 'focus';
+            
+            triggers.emit('timeseries:add', series);
+        }
     },
     prepareContextSeries: function() {
         var unit = this.app.ops['Series']['Unit'].get();
@@ -160,7 +233,7 @@ TimeseriesModel.prototype = {
         var datapoints = this['series_' + unit].event;
         var typecolors = ['red', 'yellow', 'green', 'blue'];
         
-        triggers.emit('context:clearSeries');
+        triggers.emit('timeseries:clear', 'context');
         
         if(type == 'any') {
             // sum up
@@ -173,7 +246,7 @@ TimeseriesModel.prototype = {
             series.color = '#000';
             series.chart = 'context';
             
-            triggers.emit('context:add series', series);
+            triggers.emit('timeseries:add', series);
         } else if (type == 'split') {
             
             this.types.forEach(function(curtype, i_y) {
@@ -184,7 +257,7 @@ TimeseriesModel.prototype = {
                 series.color = typecolors[i_y];
                 series.chart = 'context';
                 
-                triggers.emit('context:add series', series);
+                triggers.emit('timeseries:add', series);
             }, this)
             
         } else {
@@ -195,8 +268,11 @@ TimeseriesModel.prototype = {
             series.label = type;
             series.color = typecolors[i_y];
             series.chart = 'context';
-            triggers.emit('context:add series', series);
+            triggers.emit('timeseries:add', series);
         }
+        
+        // Now get the subsets
+        triggers.emit('subset_load:ready');
     },
     buildTimeArrays: function() {
         // Populate array of timestamps
@@ -274,7 +350,7 @@ TimeseriesModel.prototype = {
     },
     clearSeries: function(chart) {
         if(!['context', 'focus'].includes(chart)) return;
-        this[chart] = {series: {}, series_arr: []};
+        this[chart] = {name: chart, series: {}, series_arr: []};
         
         triggers.emit(chart + ':place series');
     },
@@ -287,6 +363,58 @@ TimeseriesModel.prototype = {
         chart.series_arr.push(series);
         chart.series_arr.sort(this.app.legend.cmp.bind(this));
         
-        triggers.emit(series.chart + ':set series', chart);
+        triggers.emit('legend:series', series);
+        triggers.emit('timeseries:stack', chart);
+    },
+    stackSeries: function(chart) {
+        var plot_type = this.app.ops['View']['Plot Type'];
+        var series = chart.series_arr;
+        
+        if (plot_type == "wiggle") {
+            this.stack.offset("wiggle");
+        } else if (plot_type == "stream_expand") {
+            this.stack.offset("expand");
+        } else if (plot_type == "stream") {
+            this.stack.offset("silhouette");
+        } else {
+            this.stack.offset("zero");
+        }
+        
+        // TODO handle plotting only selective things;
+        
+        if(plot_type == "percent") {
+            data_100 = series.map(function(series) {
+                var new_series = JSON.parse(JSON.stringify(series)); // Cheap cloning
+                new_series.values = new_series.values.map(function(datum, i) {
+                    var new_datum = datum;
+                    new_datum.timestamp = new Date(new_datum.timestamp);
+                    new_datum.value *= 100 / data.time_totals[i];
+                    return new_datum;
+                });
+                return new_series;            
+            });
+            this.stack(data_100);
+        } else {
+            this.stack(series);
+        }
+        
+        // Convert to separate area plot if that's asked for
+        var n_series = series.length;
+        var n_datapoints = series[0].values.length;
+        if(plot_type == "separate") {
+            for (var i = n_series - 1; i >= 0; i--) {
+                series[i].offset = 0;
+                if(i < n_series - 1) {
+                    series[i].offset = series[i + 1].offset;
+                    series[i].offset += series[i + 1].max;
+                }
+
+                series[i].values.forEach(function(datum) {
+                    datum.value0 = series[i].offset;
+                });
+            }
+        } 
+        
+        triggers.emit(chart.name + ':set series', chart);
     },
 };

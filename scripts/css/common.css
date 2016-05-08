@@ -211,7 +211,7 @@ button:focus {
     white-space: nowrap;
 }
 
-.progress.pagemiddle {
+.progress.pagemiddle, .progress.page40 {
     position: fixed;
     top: 50%;
     left: 10%;
@@ -219,6 +219,9 @@ button:focus {
     height: 40px;
     transform: translateY(-50%);
     background: #ccc; 
+}
+.progress.page40 {
+    top: 40%;
 }
 .progress.middle {
     top: 36%;

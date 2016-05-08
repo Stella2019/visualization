@@ -6,11 +6,11 @@
              "FROM " . $_REQUEST["collection"] . "Timeseries " .
              "WHERE " . $_REQUEST["collection"] . " = " . $_REQUEST["id"];
 
-    if(isset($_REQUEST["min"])) {
-        $query = $query . " AND Time >= '" . $_REQUEST["min"] . "'";
+    if(isset($_REQUEST["time_min"])) {
+        $query = $query . " AND Time >= '" . $_REQUEST["time_min"] . "'";
     }
-    if(isset($_REQUEST["max"])) {
-        $query = $query . " AND Time < '" . $_REQUEST["max"] . "'";
+    if(isset($_REQUEST["time_max"])) {
+        $query = $query . " AND Time < '" . $_REQUEST["time_max"] . "'";
     }
 
 //    $query = $query .

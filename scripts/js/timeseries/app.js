@@ -135,9 +135,10 @@ Timeseries.prototype = {
                 labels: ["Stacked", "Overlap", "Lines", "Stream", "Separate", "100%"],
                 ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
                 default: 0,
-                callback: function () {
-                    pipeline.start('Prepare Timeseries Data for Chart');
-                }
+                callback: triggers.emitter('chart:render series')
+//                function () {
+//                    pipeline.start('Prepare Timeseries Data for Chart');
+//                }
             }),
             Resolution: new Option({
                 title: "Resolution",
@@ -220,33 +221,19 @@ Timeseries.prototype = {
             })
         };
         this.ops['Series'] = {
-//            'Chart Category': new Option({
-//                title: 'Show in Chart',
-//                labels: ["Tweet Types", "Distinctiveness", "Found Ins", "Keywords"],
-//                ids:    ["Tweet Type", "Distinctiveness", "Found In", "Keyword"],
-//                default: 3,
-//                type: "dropdown",
-//                callback: function() { 
-//                    pipeline.start('Prepare Timeseries Data for Chart');
-//                }
-//            }),
             'Tweet Types': new Option({
                 title: 'Tweet Types',
                 labels: ['Any', 'Split', 'Originals', 'Retweets', 'Replies', 'Quotes'],
                 ids:    ['any', 'split', 'original', 'retweet', 'reply', 'quote'],
                 default: 0,
-                callback: function() { 
-//                    pipeline.start('Prepare Timeseries Data for Chart'); // TODO
-                }
+                callback: triggers.emitter('timeseries:ready')
             }),
             Unit: new Option({
                 title: 'Unit',
                 labels: ['Count of Tweets', 'Count of Distinct', 'Exposure'],
                 ids:    ['count', 'distinct', 'exposure'],
                 default: 0,
-                callback: function() { 
-//                    pipeline.start('Prepare Timeseries Data for Chart'); // TODO
-                }
+                callback: triggers.emitter('timeseries:ready')
             }),
             Order: new Option({
                 title: "Order Legend by",
@@ -257,19 +244,6 @@ Timeseries.prototype = {
                     pipeline.start('Order Timeseries');
                 }
             }),
-//            'Add Term': new Option({
-//                title: "Add Term",
-//                labels: ["New Term"],
-//                ids:    ["new"],
-//                default: 0,
-//                custom_entries_allowed: true,   
-//                type: "textfieldconfirm",
-//                callback: function() {
-//                    data.genTweetCount(
-//                        options['Series']['Add Term'].get().toLowerCase()
-//                    ); 
-//                }
-//            }),
             'Clean Legend': new Option({
                 title: "Clean Up Legend",
                 styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],

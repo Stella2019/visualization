@@ -196,11 +196,19 @@ TimeseriesView.prototype = {
         var time_min_op = this.app.ops['View']['Time Min'];
         var time_max_op = this.app.ops['View']['Time Max'];
         var startTime = time_min_op.get();
-        var endTime =   time_max_op.get();
-        if(typeof(startTime) == 'string')
-            startTime = new Date(startTime);
-        if(typeof(endTime) == 'string')
-            endTime = new Date(endTime);
+        var endTime = time_max_op.get();
+        if(startTime) {
+            if(typeof(startTime) == 'string')
+                startTime = new Date(startTime);
+        } else {
+            startTime = new Date(time_min);
+        }
+        if(endTime) {
+            if(typeof(endTime) == 'string')
+                endTime = new Date(startTime);
+        } else {
+            endTime = new Date(time_max);
+        }
 
         if(startTime.getTime() == endTime.getTime()) {
             startTime = time_min;
@@ -265,7 +273,7 @@ TimeseriesView.prototype = {
                 // Update the brush
                 this.app.context.brush.extent([startTime, endTime])
                 this.app.context.brush(d3.select(".brush").transition());
-                this.app.context.brush.event(d3.select(".brush").transition())
+                this.app.context.brush.event(d3.select(".brush").transition());
             }
         } else {
             d3.selectAll(".brush").call(this.app.context.brush.clear());//brush.clear();
@@ -273,15 +281,10 @@ TimeseriesView.prototype = {
         
         this.app.ops.recordState();
         
-        // Move this to the chart itself
-        this.app.focus.x.domain(this.app.context.brush.empty() ?
-                               this.app.context.x.domain() :
-                               this.app.context.brush.extent());
-        this.app.focus.svg.selectAll("path.area")
-            .attr("d", function(d) { return this.app.focus.area(d.values)});
-        this.app.focus.svg.selectAll("path.area_total_line")
-            .attr("d", function(d) { return this.app.focus.area_total_line(d)});
-        this.app.focus.svg.select(".x.axis")
-            .call(this.app.focus.xAxis);
+        // Trigger focus
+        triggers.emit('focus:time_window', 
+                      this.app.context.brush.empty() ?
+                      this.app.context.x.domain() :
+                      this.app.context.brush.extent());
     },
 }

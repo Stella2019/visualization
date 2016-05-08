@@ -3,3 +3,5 @@ capture_stats
 scripts/external
 local.conf
 *.pyc
+
+scripts/python/build/

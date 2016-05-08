@@ -105,6 +105,7 @@ CollectionManager.prototype = {
                 }
             }.bind(this));
             triggers.on('time_window:set', this.configureLoadTimeWindow.bind(this));  
+            triggers.on('event:updated', this.configureLoadTimeWindow.bind(this));  
         }
     },
     build: function() {
@@ -267,16 +268,21 @@ CollectionManager.prototype = {
         this.event = this.events[parseInt(event_id)];
         
         // Save times for the collection
-        this.time.event_min = new Date(this.event.StartTime);
-        if(this.event.StopTime == "Ongoing") {
-            this.time.event_max = new Date();
-        } else {
-            this.time.event_max = new Date(this.event.StopTime);
-        }
+        // TODO fix when times are stale
+        this.time.event_min = util.twitterID2Timestamp(this.event.FirstTweet);
+        this.time.event_max = util.twitterID2Timestamp(this.event.LastTweet);
         
-        global_min_id = this.event.FirstTweet || util.timestamp2TwitterID(this.time.event_min);
-        global_max_id = this.event.LastTweet  || util.timestamp2TwitterID(this.time.event_max);
+//        this.time.event_min = new Date(this.event.StartTime);
+//        if(this.event.StopTime == "Ongoing") {
+//            this.time.event_max = new Date();
+//        } else {
+//            this.time.event_max = new Date(this.event.StopTime);
+//        }
+//        
+//        global_min_id = this.event.FirstTweet || util.timestamp2TwitterID(this.ime.event_min);
+//        global_max_id = this.event.LastTweet  || util.timestamp2TwitterID(this.time.event_max);
         
+        triggers.emit('time_window:set');
         triggers.emit('event:updated', this.event);
     },
     setEvent2: function () {
@@ -590,6 +596,7 @@ CollectionManager.prototype = {
             time_min_op.date = new Date(time_obj.event_min);
             time_max_op.date = new Date(time_obj.event_max);
         } else { // Custom
+            // TODO Fix problem when this is loaded & it is out of bound
 //            time_obj.selected_min = new Date(options.data_time.custom_min);
 //            time_obj.selected_max = new Date(options.data_time.custom_max);
         }
@@ -610,6 +617,8 @@ CollectionManager.prototype = {
         time_min_op.set(util.formDate(time_min_op.date));
         time_max_op.set(util.formDate(time_max_op.date));
         this.app.ops.recordState(false);
+        
+        triggers.emit('time_window:updated');
     },
     editLoadTimeWindow: function() {
         var op_time_min = this.ops['Time Min'];
@@ -733,8 +742,7 @@ CollectionManager.prototype = {
                 $('#modal').modal(false);
                 
                 // Functions
-                triggers.emit('global_time_set');
-                triggers.emit('event:load_timeseries'); // TODO
+                triggers.emit('time_window:updated');
             }.bind(this))
             .text('Update');
         

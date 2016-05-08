@@ -127,7 +127,6 @@
         print ($query);
         print (mysqli_error($mysqli));
     } else {
-        print ($query);
         print ($result);
     }
 

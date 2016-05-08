@@ -556,7 +556,6 @@ function Connection(args) {
             this.max = util.twitterID2Timestamp(this.max.toNumber());
         }
     }
-    
 }
 Connection.prototype = {
     php: function(url, fields, callback, error_callback) {
@@ -861,7 +860,7 @@ triggers.on('alert', function(ops) {
 
 function Progress(args) {
     // Grab parameters
-    var valid_param = ['name', 'parent_id', 'style', 'text', 'steps', 'initial'];
+    var valid_param = ['name', 'parent_id', 'style', 'text', 'steps', 'initial', 'color'];
     Object.keys(args).forEach(function (item) {
         if(valid_param.includes(item)) {
             this[item] = args[item];
@@ -875,6 +874,7 @@ function Progress(args) {
     this.text      = this.text      || "Working";
     this.steps     = this.steps     || 100;
     this.initial   = this.initial   || 0;
+    this.color     = this.color     || '';
     
     // Make holding containers
     this.container_div = '';
@@ -893,7 +893,7 @@ Progress.prototype = {
             .append('div')
             .attr({
                 id: this.name + "_progress",
-                class: "progress-bar progress-bar-striped active",
+                class: "progress-bar progress-bar-striped active " + this.color,
                 role: "progressbar",
                 'aria-valuenow': "0",
                 'aria-valuemin': "0",

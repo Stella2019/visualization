@@ -21,8 +21,14 @@ function TimeseriesLegend(app) {
         all[cur.label] = cur;
         return all;
     }, {});
+    this.color = d3.scale.category10();
     
     this.init();
+    
+    this.features = {};
+    this.features_arr = [];
+    this.subsets = {};
+    this.subsets_arr = [];
 }
 TimeseriesLegend.prototype = {
     init: function() {
@@ -31,54 +37,169 @@ TimeseriesLegend.prototype = {
     setTriggers: function() {
         triggers.on('page_built', this.buildLegend.bind(this));
         triggers.on('subsets:updated', this.populateLegend.bind(this));
+        triggers.on('legend:color scale', this.setColorScale.bind(this));
+        triggers.on('legend:color', this.colorSeries.bind(this));
+        triggers.on('legend:series', this.linkSeries.bind(this));
     },
     buildLegend: function() {
         this.container = d3.select('body').append('div')
             .attr('class', 'legend');
+        
+        triggers.emit('legend:color scale');
     },
     populateLegend: function() {
         // Destroy old legend
         this.container.selectAll('*').remove();
         
-        var features = [];
-        var features_subsets = {};
+        // Get list of features & subsets from the collection
+        this.features = {};
+        this.features_arr = [];
+        this.subsets = {};
+        this.subsets_arr = [];
         
         this.app.collection.subsets_arr.forEach(function(subset) {
-            if(!features.includes(subset.Feature)) {
-                features.push(subset.Feature);
-                features_subsets[subset.Feature] = [subset];
+            this.subsets[subset.ID] = subset;
+            this.subsets_arr.push(subset);
+            
+            // Add (to) feature
+            if(subset.Feature in this.features) {
+                var feature = this.features[subset.Feature];
+                feature.subsets.push(subset);
             } else {
-                features_subsets[subset.Feature].push(subset);
+                var feature = {
+                    Label: subset.Feature,
+                    subsets: [subset],
+                }
+                this.features[subset.Feature] = feature;
+                this.features_arr.push(feature);
             }
-        });
+        }, this);
         
-        features.forEach(function(feature) {
+        // Add features to the sidemenu
+        this.features_arr.forEach(function(feature) {
             var section = this.container.append('div');
             
             section.append('h4')
-                .html(feature);
+                .html(feature.Label);
             
             var list_div = section.append('div')
-                .attr('class', 'legend_series_list');
+                .attr('class', 'legend_series_list feature_' + util.simplify(feature.Label));
+            
+            this.placeNewSeries(feature);
             
             var entries = list_div
-                .selectAll('div.legend_entry')
-                .data(features_subsets[feature]);
+                .selectAll('div.legend_entry');
             
-            var new_entries = entries.enter().append('div')
-                .attr('id', function(d) {
-                    return 'legend_' + d.ID;
-                })
-                .attr('class', function(d) {
-                    return 'legend_entry ' + d.ID;
-                })
-                .html(function(d) { return d.DisplayMatch; });
-//                .on('mouseover', legend.hoverLegendEntry)
-//                .on('mousemove', legend.hoverLegendEntryMove)
-//                .on('mouseout', legend.hoverLegendEntryEnd);
+            // Propagate data to children
+            entries.each(function(d) {
+                var entry = d3.select(this);
+                entry.select('div.legend_icon').data([d])
+                    .select('svg').select('rect');
+                entry.select('div.legend_label').data([d]);
+                entry.select('div.legend_only').data([d]);
+            });
+            
+            entries
+                .attr('id', d => 'legend_' + d.ID)
+                .attr('class', d => 'legend_entry subset_' + d.ID);
+            
+            list_div.selectAll('div.legend_label')
+                .html(d => d.DisplayMatch);
+            
+//            list_div.on('mouseout', legend.endToggle);
         }, this);
     },
-    init2: function() {
+    placeNewSeries: function(feature) {
+        var entries = this.container.select('.feature_' + util.simplify(feature.Label))
+            .selectAll('div.legend_entry');
+        
+        var data_entries = entries
+            .data(feature.subsets);
+        
+        var new_entries = data_entries
+            .enter().append('div')
+            .attr('id', d => 'legend_' + d.ID)
+            .attr('class', d => 'legend_entry subset_' + d.ID);
+//                .on('mouseover', this.hoverLegendEntry)
+//                .on('mousemove', this.hoverLegendEntryMove)
+//                .on('mouseout', this.hoverLegendEntryEnd);
+
+        var legend_icon_divs = new_entries.append('div')
+            .attr('class', 'legend_icon');
+
+        legend_icon_divs.append('span')
+            .attr('class', 'glyphicon')
+            .on('click', function() { return false; });
+
+        legend_icon_divs.append('svg')
+            .attr({
+                class: "legend_icon_svg",
+                width: 25, height: 25
+            })
+//                .on('mousedown', this.startToggle)
+//                .on('mouseover', this.hoverOverSeries)
+//                .on('mouseup', this.endToggle)
+            .append('rect')
+            .attr({
+                class: "legend_icon_rect",
+                x: 2.5, y: 2.5,
+                rx: 5, ry: 5,
+                width: 20, height: 20
+            });
+
+        new_entries.append('div')
+            .attr('class', 'legend_label');
+
+//            new_entries.append('div')
+//                .attr('class', 'legend_only')
+//                .text('only')
+//                .on('click', this.toggleSingle);
+        
+        data_entries.exit().remove();
+    },
+    setColorScale: function() {
+//        this.typeColor = d3.scale.category20c();
+        this.typeColor = d3.scale.ordinal()
+//            .range(["#AAA", "#CCC", "#999", "#BBB"]);
+            .range(["#CCC"]);
+        
+        
+        switch(this.app.ops['View']['Color Scale'].get()) {
+            case "category10":
+                this.color = d3.scale.category10();
+                break;
+            case "category20":
+                this.color = d3.scale.category20();
+                break;
+            case "category20b":
+                this.color = d3.scale.category20b();
+                break;
+            case "category20c":
+                this.color = d3.scale.category20c();
+                break;
+            default:
+                this.color = d3.scale.category10();
+                break;
+        }
+        
+        triggers.emit('legend:color');
+    },
+    linkSeries: function(subset) {
+        // TODO handle context series
+        // TODO add to subsets list
+        
+        triggers.emit('legend:color', subset);
+    },
+    colorSeries: function(subset) {
+        if(!subset) {
+            // TODO color them all
+            return
+        }
+        
+        subset.fill = subset.color; //this.color(subset.ID);
+        subset.stroke = d3.rgb(subset.fill).darker();
+    },
+    init_old: function() {
         this.container = d3.select('#legend')
             .on('mouseout', this.endToggle);
         
@@ -137,7 +258,7 @@ TimeseriesLegend.prototype = {
                 .html(function(d) { return d.label; });
         }
     },
-    populate: function(category) {
+    populate_old: function(category) {
         var section_div = legend.container.select('.' + category.id);
         var list_div = section_div.select('.legend_series_list');
         
@@ -150,74 +271,6 @@ TimeseriesLegend.prototype = {
         var entries = list_div
             .selectAll('div.legend_entry')
             .data(ids);
-
-        var new_entries = entries.enter().append('div')
-            .attr('id', function(d) {
-                return 'legend_' + d;
-            })
-            .attr('class', function(d) {
-                return 'legend_entry ' + d;
-            })
-            .on('mouseover', legend.hoverLegendEntry)
-            .on('mousemove', legend.hoverLegendEntryMove)
-            .on('mouseout', legend.hoverLegendEntryEnd);
-
-        var legend_icon_divs = new_entries.append('div')
-            .attr('class', 'legend_icon');
-        
-        legend_icon_divs.append('span')
-            .attr('class', 'glyphicon')
-            .on('click', function() { return false; });
-        
-        legend_icon_divs.append('svg')
-            .attr({
-                class: "legend_icon_svg",
-                width: 25, height: 25
-            })
-            .on('mousedown', legend.startToggle)
-            .on('mouseover', legend.hoverOverSeries)
-            .on('mouseup', legend.endToggle)
-            .append('rect')
-            .attr({
-                class: "legend_icon_rect",
-                x: 2.5, y: 2.5,
-                rx: 5, ry: 5,
-                width: 20, height: 20
-            });
-
-        new_entries.append('div')
-            .attr('class', 'legend_label');
-        
-        new_entries.append('div')
-            .attr('class', 'legend_only')
-            .text('only')
-            .on('click', legend.toggleSingle);
-
-        // Remove entries
-        entries.exit().remove();
-        
-        // Propagate data to children
-        entries.each(function(d) {
-            var entry = d3.select(this);
-            entry.select('div.legend_icon').data([d])
-                .select('svg').select('rect');
-            entry.select('div.legend_label').data([d]);
-            entry.select('div.legend_only').data([d]);
-        });
-
-        entries
-            .attr('id', function(d) {
-                return 'legend_' + d;
-            })
-            .attr('class', function(d) {
-                return 'legend_entry ' + d;
-            });
-        
-//        list_div.on('mouseout', function(d) {
-//            d3.event.stopPropagation();
-//        });
-//        legend.container.on('mouseout', legend.endToggle);
-        list_div.on('mouseout', legend.endToggle);
         
         if(category.name == 'Keyword') {
             legend.key_data.forEach(function(item) {

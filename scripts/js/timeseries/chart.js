@@ -13,7 +13,8 @@ function TimeseriesChart(app, id) {
     this.height = this.canvas_height - this.top  - this.bottom;
     
     // Scales
-    this.x = d3.time.scale().range([0, this.width]);
+    this.x = d3.time.scale().range([0, this.width])
+                .clamp(true);
     this.y = d3.scale.linear().range([this.height, 0]);
     
     // Axes
@@ -31,7 +32,7 @@ function TimeseriesChart(app, id) {
     // D3 Functions
     this.area = d3.svg.area()
         .x(this.dataTimestamp_2_x);
-    this.color = d3.scale.category10();
+    this.color = d3.scale.category10(); // TODO may remove
     
     // Other attributes filled during execution
     this.brush = [];
@@ -57,6 +58,12 @@ TimeseriesChart.prototype = {
         triggers.on('chart:shape', this.setShape.bind(this));
         triggers.on('chart:y-scale', this.setYScale.bind(this));
         
+        // Generic chart functions
+        triggers.on('chart:place series', this.placeSeries.bind(this));
+        triggers.on('chart:render series', this.renderSeries.bind(this));
+        
+        // Specific chart functions
+        triggers.on(this.id + ':time_window', this.setTimeWindow.bind(this));
         triggers.on(this.id + ':set series', this.setSeries.bind(this));
         triggers.on(this.id + ':place series', this.placeSeries.bind(this));
         triggers.on(this.id + ':render series', this.renderSeries.bind(this));
@@ -69,7 +76,7 @@ TimeseriesChart.prototype = {
         if(this.id == 'context') {
             this.setContext();
         }
-        this.setColorScale();
+//        this.setColorScale();
         
         triggers.emit('chart:plan resize');
 //        setTimeout(this.adjustSize.bind(this), 2000);
@@ -196,9 +203,7 @@ TimeseriesChart.prototype = {
         if(scale == 'log') y_min = 1;
 
         var y_max = 100;
-        var biggest_datapoint = d3.max(this.series_arr.map(function (d) {
-                return d.max;
-            }));
+        var biggest_datapoint = d3.max(this.series_arr.map(d => d.max));
         var highest_datapoint = // because of stacked data
             d3.max(this.series_arr[0].values.map(function (d) {
                 return (d.value0 || 0) + d.value;
@@ -240,42 +245,33 @@ TimeseriesChart.prototype = {
         this.yAxis_element.transition().duration(1000)
             .call(this.yAxis);
     },
-    setColorScale: function() {
-//        this.typeColor = d3.scale.category20c();
-        this.typeColor = d3.scale.ordinal()
-//            .range(["#AAA", "#CCC", "#999", "#BBB"]);
-            .range(["#CCC"]);
+    setTimeWindow: function(domain) {
+        this.x.domain(domain);
+        this.svg.select(".x.axis")
+            .call(this.xAxis);
         
-        
-        switch(this.app.ops['View']['Color Scale'].get()) {
-            case "category10":
-                this.color = d3.scale.category10();
-                break;
-            case "category20":
-                this.color = d3.scale.category20();
-                break;
-            case "category20b":
-                this.color = d3.scale.category20b();
-                break;
-            case "category20c":
-                this.color = d3.scale.category20c();
-                break;
-            default:
-                this.color = d3.scale.category10();
-                break;
-        }
+        triggers.emit(this.id + ':render series', {speed: 10});
+//        this.svg.selectAll("path.area")
+//            .attr("d", function(d) { return this.area(d.values)});
+////        this.svg.selectAll("path.area_total_line")
+////            .attr("d", function(d) { return this.area_total_line(d)});
     },
     setSeries: function(arrays) {
         this.series = arrays.series;
         this.series_arr = arrays.series_arr;
+        
+        // TODO make timeseries based on values
+        
+        triggers.emit(this.id + ':place series');
     },
     placeSeries: function() {
+        if(!this.series_arr || this.series_arr.length == 0) {
+            this.series_objects = [];
+            console.log('placeSeries on ' + this.id + ', no series to place: ', this.series_arr);
+            return;
+        }
         this.setYAxes();
 //        this.adjustSize();
-//        if(!this.series_arr || this.series_arr.length == 0) {
-//            this.series_objects = [];
-//            return;
-//        }
         
         this.series_objects = this.plotarea.selectAll('g.series')
             .data(this.series_arr);
@@ -297,9 +293,11 @@ TimeseriesChart.prototype = {
         this.paths = this.series_objects.append("path")
             .attr("class", "area");
         
-        triggers.emit('context:render series');
+        triggers.emit(this.id + ':render series');
     },
-    renderSeries: function() {
+    renderSeries: function(args) {
+        args = args || {speed: 750};
+        
         if(!this.series_objects || this.series_objects.length == 0) {
             return;
         }
@@ -317,17 +315,16 @@ TimeseriesChart.prototype = {
         }
 
         // here we create the transition
-        var transition = //this.series_objects
-            this.svg.selectAll('.series')
+        var transition = this.series_objects
             .transition()
-            .duration(750);
+            .duration(args.speed);
 
         // Transition to the new area
         var fill_opacity = plottype == 'lines'   ? 0.0 : 
                            plottype == 'overlap' ? 0.1 :
                                                    0.8 ;
 
-//        this.series_objects.classed("lines", false); // TODO
+        this.series_objects.classed("lines", plottype == 'lines'); // TODO
         transition.select("path.area")
             .style("fill", function (d) { return d.fill; })
             .style("fill-opacity", fill_opacity)
