@@ -65,6 +65,7 @@ TimeseriesLegend.prototype = {
             if(subset.Feature in this.features) {
                 var feature = this.features[subset.Feature];
                 feature.subsets.push(subset);
+                subset.feature = feature;
             } else {
                 var feature = {
                     Label: subset.Feature,
@@ -72,6 +73,7 @@ TimeseriesLegend.prototype = {
                 }
                 this.features[subset.Feature] = feature;
                 this.features_arr.push(feature);
+                subset.feature = feature;
             }
         }, this);
         
@@ -163,7 +165,7 @@ TimeseriesLegend.prototype = {
 //            .range(["#AAA", "#CCC", "#999", "#BBB"]);
             .range(["#CCC"]);
         
-        
+        // Set global scale
         switch(this.app.ops['View']['Color Scale'].get()) {
             case "category10":
                 this.color = d3.scale.category10();
@@ -182,13 +184,23 @@ TimeseriesLegend.prototype = {
                 break;
         }
         
+        // Set per-feature scale TODO fix this to the last thing
+        this.features_arr.forEach(function(feature) {
+            feature.color = d3.scale.category10()
+                .domain(feature.subsets.map(d => d.ID));
+        }, this);
+        
         triggers.emit('legend:color');
     },
     linkSeries: function(subset) {
         // TODO handle context series
         // TODO add to subsets list
+        if(subset.chart == 'focus') {
+            console.log(this.subsets, subset);
+            this.subsets[subset.ID].data = subset;
+        }
         
-        triggers.emit('legend:color', subset);
+        triggers.emit('legend:color', this.subsets[subset.ID]);
     },
     colorSeries: function(subset) {
         if(!subset) {
@@ -196,8 +208,14 @@ TimeseriesLegend.prototype = {
             return
         }
         
-        subset.fill = subset.color; //this.color(subset.ID);
-        subset.stroke = d3.rgb(subset.fill).darker();
+        if(subset.chart = 'focus') {
+            subset.color = this.color(subset.ID);
+        } else {
+            subset.color = '#000'; // Black
+        }
+            
+        subset.data.fill = subset.color; //this.color(subset.ID);
+        subset.data.stroke = d3.rgb(subset.data.fill).darker();
     },
     init_old: function() {
         this.container = d3.select('#legend')

@@ -97,6 +97,13 @@
 
         $conds[] = "InSubset.Subset = " . $_REQUEST["superset"];
     }
+    if(isset($_REQUEST["excludeset"])) {
+        $query .= "LEFT JOIN InSubset ExcludeSet " .
+                "	ON Tweet.`ID` = ExcludeSet.Tweet " .
+                "   AND ExcludeSet.Subset = " . $_REQUEST["excludeset"] . "  ";
+
+        $conds[] = "ExcludeSet.Tweet IS NULL";
+    }
     if(isset($_REQUEST["userbot"])) {
         $query .= "JOIN TweetUser " .
                   "    ON Tweet.`ID` = TweetUser.Tweet " .
@@ -104,6 +111,20 @@
                   "    ON TweetUser.`UserID` = User.UserID ";
 
         $conds[] = "User.Bot = " . $_REQUEST["userbot"];
+    }
+    if(isset($_REQUEST["botnet"])) {
+        $query .= "JOIN TweetUser " .
+                  "    ON Tweet.`ID` = TweetUser.Tweet " .
+                  "JOIN User " .
+                  "    ON TweetUser.`UserID` = User.UserID ";
+        
+        $botnet = $_REQUEST["botnet"];
+        if(substr($botnet, 0, 1) == '!') {
+            $botnet = substr($botnet, 1);
+            $conds[] = "User.Botnet NOT LIKE '%$botnet%'";
+        } else {
+            $conds[] = "User.Botnet LIKE '%$botnet%'";
+        }
     }
 
     if(isset($_REQUEST["source"]))

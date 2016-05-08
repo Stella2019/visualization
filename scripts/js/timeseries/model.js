@@ -44,8 +44,8 @@ TimeseriesModel.prototype = {
         this.setTriggers();
     },
     setTriggers: function() {
-        triggers.on('event:updated', this.loadTimeseries.bind(this, 'event'));
-//        triggers.on('time_window:updated', this.loadTimeseries.bind(this, 'event'));
+        triggers.on('event:updated', this.setEvent.bind(this));
+        triggers.on('time_window:updated', this.loadTimeseries.bind(this, 'event'));
         triggers.on('timeseries:load', this.loadTimeseries.bind(this));
         triggers.on('timeseries:loaded', this.parseTimeseries.bind(this));
         triggers.on('timeseries:ready', this.prepareTimeseries.bind(this));
@@ -54,9 +54,21 @@ TimeseriesModel.prototype = {
         triggers.on('timeseries:stack', this.stackSeries.bind(this));
         
         // Subset triggers
-//        triggers.on('subsets:updated', this.loadSubsetTimeseries.bind(this)); // this interrupts the event load
+        triggers.on('subsets:updated', this.setSubsets.bind(this));
         triggers.on('subset_load:ready', this.loadSubsetTimeseries.bind(this));
         triggers.on('subset_load:continue', this.continueLoadingSubsetTimeseries.bind(this));
+    },
+    setEvent: function() {
+        this.event_id = this.app.collection.event.ID;
+        this.subset_ids = [];
+        
+        triggers.emit('timeseries:load', 'event');
+    },
+    setSubsets: function() {
+        this.subsets = this.app.collection.subsets;
+        this.subset_ids = this.app.collection.subsets_arr.map(d => d.ID);
+        
+//        triggers.emit('subset_load:ready', 'event');
     },
     loadTimeseries: function(id, b) {
         var type;
@@ -64,7 +76,7 @@ TimeseriesModel.prototype = {
             type = 'subset';
         } else {
             type = 'event';
-            id = this.app.collection.event.ID
+            id = this.event_id;
         }
         // If there is no event information, end, we cannot do this yet
         if (type == 'event' && $.isEmptyObject(this.app.collection.event)) {
@@ -107,24 +119,21 @@ TimeseriesModel.prototype = {
         this.streamTimeseries.startStream();
     },
     loadSubsetTimeseries: function() {
-        var subsets = this.app.collection.subsets_arr;
-        var event = this.app.collection.event.ID;
-        
-        if(this.subset_load && this.subset_load.event == event) {
+        if(this.subset_load && this.subset_load.event == this.event_id) {
             // Don't need to reload, return
             return;
         }
         
         this.subset_load = {
-            event: event,
-            subsets: subsets.map(d => parseInt(d.ID)),
+            event: this.event_id,
+            subsets: this.subset_ids,
             index: -1
         };
         
         var subset_progress_bar = new Progress({
             style: 'page40',
             color: 'info',
-            steps: subsets.length,
+            steps: this.subset_ids.length,
             text: '{cur}/{max} Subset\'s Loaded',
         });
         this.subset_load.prog = subset_progress_bar;
@@ -136,14 +145,17 @@ TimeseriesModel.prototype = {
         this.subset_load.index++;
         this.subset_load.prog.update(this.subset_load.index);
         
-        if(this.subset_load.index == this.subset_load.subsets.length
-          || this.subset_load.index > 4) { // TODO lift this when done testing
+        if(this.subset_load.index == this.subset_load.subsets.length) { // TODO lift this when done testing
             this.subset_load.prog.end();
             return; // All done!
         }
         
         var subset = this.subset_load.subsets[this.subset_load.index];
-        triggers.emit('timeseries:load', subset);
+        if(subset >= 1735 || subset == 872) {
+            triggers.emit('timeseries:load', subset);
+        } else {
+            triggers.emit('subset_load:continue');
+        }
     },
     parseTimeseries: function(id) {
         // Reenable the button to choose the event
@@ -203,6 +215,8 @@ TimeseriesModel.prototype = {
         triggers.emit('subset_load:continue');
     },
     prepareTimeseries: function(id) {
+        var cols = d3.scale.category10();
+        
         var unit = this.app.ops['Series']['Unit'].get();
         if(!id) { // Then prepare them all!
             triggers.emit('timeseries:clear', 'focus'); // Not necessary though, TODO
@@ -221,7 +235,7 @@ TimeseriesModel.prototype = {
             
             series.id = id;
             series.label = 'Subset ' + id;
-            series.color = '#000';
+            series.color = cols(id);
             series.chart = 'focus';
             
             triggers.emit('timeseries:add', series);
