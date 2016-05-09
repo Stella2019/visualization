@@ -467,13 +467,14 @@ TimeseriesLegend.prototype = {
         var time_min = time_obj[resolution + 's'][value_i - 1];
         var time_max = time_obj[resolution + 's'][value_i];
         
-        console.log('TODO: fetch tweets for ', series, time_min, time_max);
-
-//        data.getTweets({
-//            series: series,
-//            time_min: time_min,
-//            time_max: time_max
-//        });
+        triggers.emit('fetch tweets', {
+            collection: series.chart == 'context' ? 'event' : 'subset',
+            event_id: this.app.collection.event.ID,
+            subset_id: series.ID,
+            time_min: time_min,
+            time_max: time_max,
+            label: series.Label,
+        });
     },
     chartHoverEnter: function(series) {
         this.tooltip.on();

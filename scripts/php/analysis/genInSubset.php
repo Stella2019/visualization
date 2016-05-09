@@ -112,6 +112,12 @@
 
         $conds[] = "User.Bot = " . $_REQUEST["userbot"];
     }
+    if(isset($_REQUEST["userdesc"])) {
+        $query .= "JOIN TweetUser " .
+                  "    ON Tweet.`ID` = TweetUser.Tweet " .
+
+        $conds[] = "LOWER(TweetUser.Description) REGEXP '" . $_REQUEST["userdesc"] . "'";
+    }
     if(isset($_REQUEST["botnet"])) {
         $query .= "JOIN TweetUser " .
                   "    ON Tweet.`ID` = TweetUser.Tweet " .

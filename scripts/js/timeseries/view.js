@@ -2,6 +2,8 @@ function TimeseriesView(app) {
     this.app = app;
     
     this.init();
+    
+    this.tweets = {};
 }
 
 TimeseriesView.prototype = {
@@ -16,6 +18,7 @@ TimeseriesView.prototype = {
         triggers.on('chart:resolution change', this.setContextTime.bind(this));
         triggers.on('chart:focus time', this.setFocusTime.bind(this));
         triggers.on('tooltip:move', this.tooltipMove.bind(this));
+        triggers.on('fetch tweets', this.fetchTweets.bind(this));
     },
     buildPage: function() {
         var body = d3.select('body')
@@ -291,5 +294,236 @@ TimeseriesView.prototype = {
     },
     tooltipMove: function(xy) {
         this.app.tooltip.move(xy[0], xy[1]);
+    },
+    fetchTweets: function(args) {
+        var post = {
+            collection: args.collection,
+            collection_id: args[args.collection + '_id'],
+        };
+        
+        if(args['tweet_min']) { // Bound tweets in time
+            post['tweet_min'] = args['tweet_min'];
+            post['tweet_max'] = args['tweet_max'];
+        } else if(args['time_min']) {
+            post['tweet_min'] = util.timestamp2TwitterID(args['time_min']);
+            post['tweet_max'] = util.timestamp2TwitterID(args['time_max']);
+        }
+        
+        var order = this.app.ops['Analysis']['Fetched Tweet Order'].get();
+        if(order == "rand") {
+            post.rand = true;
+        } else if(order = "prevalence") {
+            post.order_prevalence = true;
+        }
+        
+        // Options not considered yet:
+        /* Distinct
+           Tweet Type
+           Limit
+           CSV */
+        
+        var title = 'Tweets in ' + args.label +
+                ' between <br />' + util.formatDate(args.time_min) + 
+                ' and ' + util.formatDate(args.time_max); // handle if there is no time min/max
+        
+        this.buildTweetsModal(post, title);
+    },
+    buildTweetsModal: function(post, title) {        
+        // Reset the modal & get the title
+        triggers.emit('modal:reset');
+        triggers.emit('modal:title', title +
+                      '<span class="tweet_modal_count"></span>');
+        
+        // Save the data for fetching more later
+        post.offset = 0;
+        post.limit = 5;
+        this.tweets = {
+            post: post,
+            count: 0,
+            modal: {
+                body: this.app.modal.body,
+                options: this.app.modal.options,
+                order: [],
+                steps: [],
+                count: d3.select('.tweet_modal_count'),
+            },
+            op_order: this.app.ops['Analysis']['Fetched Tweet Order'],
+            progress: new Progress({
+                parent_id: ".modal-options",
+                text: "Fetching Tweets",
+                full: true,
+                initial: 100
+            }),
+        }
+        
+        // Add options
+        this.buildTweetModalOptions();
+        
+        triggers.emit('modal:open');
+        
+        // Fill the modal
+        this.tweets.progress.start();
+        this.app.connection.php('tweets/get', post,
+            this.fillTweetModalContent.bind(this));
+    },
+    buildTweetModalOptions: function() {
+        var order_div = this.tweets.modal.options.append('div')
+            .attr('class', 'btn-group')
+            .style('margin-bottom', '0px');
+
+        order_div.append('span')
+            .attr('class', 'btn btn-default')
+            .attr('disabled', '')
+            .text('Order by:');
+
+        this.tweets.modal.order = order_div.selectAll('button.tweet_modal_order')
+            .data(this.tweets.op_order.available)
+            .enter()
+            .append('button')
+            .attr('class', 'btn tweet_modal_order')
+            .text(function(d) {
+                return this.tweets.op_order.labels[d];
+            }.bind(this))
+            .on('click', function(d) {
+                this.tweets.op_order.click(d);
+                var order = this.tweets.op_order.get();
+
+                var post = this.tweets.post;
+                if(order == 'rand') {
+                    post.rand = true;
+                    delete post.order_prevalence;
+                } else if(order == 'prevalence') {
+                    post.order_prevalence = true;
+                    delete post.rand;
+                } else {
+                    delete post.order_prevalence;
+                    delete post.rand;
+                }
+
+                // Fetch new data
+                this.tweets.progress.start();
+                this.app.connection.php('tweets/get', post,
+                    this.fillTweetModalContent.bind(this));
+            }.bind(this));
+
+        this.tweets.modal.steps = this.tweets.modal.options.append('div')
+            .attr('class', 'btn-group')
+            .style('margin-bottom', '0px')
+            .selectAll('button.tweet_modal_step')
+            .data([-10000, -5, 5])
+            .enter()
+            .append('button')
+            .attr('class', 'btn btn-primary tweet_modal_step')
+            .on('click', function(d) {
+                this.tweets.post.offset = Math.max(this.tweets.post.offset + d, 0);
+                this.styleTweetModal();
+
+                // Fetch new data
+                this.tweets.progress.start();
+                this.app.connection.php('tweets/get',
+                    this.tweets.post,
+                    this.fillTweetModalContent.bind(this));
+            }.bind(this));
+        
+        this.tweets.modal.steps.append('span')
+            .attr('class', function(d) {
+                var symbol = 'step-backward';
+                if(d == -5)
+                    symbol = 'chevron-left';
+                if(d == 5)
+                    symbol = 'chevron-right';
+            
+                return 'glyphicon glyphicon-' + symbol;
+            });
+    },
+    styleTweetModal: function() {
+        var offset = this.tweets.post.offset;
+        var limit = this.tweets.limit;
+        
+        this.tweets.modal.count
+            .html(' ('   + (offset + 1) +  
+                  ' to ' + Math.min(offset + limit, this.tweets.count) +
+                  ' of ' + this.tweets.count + ') ');
+        
+        this.tweets.modal.order
+            .attr('class', function(d) {
+                if(d == this.tweets.op_order.indexCur())
+                    return 'btn btn-primary tweet_modal_order';
+                return 'btn btn-default tweet_modal_order';
+            }.bind(this));
+                        
+        this.tweets.modal.steps
+            .attr('class', function(d) {
+                var max    = this.tweets.count;
+                var offset = this.tweets.post.offset;
+                var limit  = this.tweets.post.limit;
+                if((0 < offset && d < 0) ||
+                   (offset + limit < max && 0 < d) )
+                    return 'btn btn-primary tweet_modal_step';
+                return 'btn btn-default tweet_modal_step';
+            }.bind(this))
+            .attr('disabled', function(d) {
+//                var max    = this.tweets.count;
+//                var offset = this.tweets.post.offset;
+//                var limit  = this.tweets.post.limit;
+//                if((0 < offset && d < 0) ||
+//                   (offset + limit < max && 0 < d) )
+//                    return null;
+//                return ''; // TODO impose limits
+                return null;
+            }.bind(this));
+    },
+    fillTweetModalContent: function(filedata) {
+        var modal_body = this.tweets.modal.body;
+        modal_body.selectAll('*').remove();
+        
+        // Handle errors
+        if(filedata.indexOf('Maximum execution time') >= 0) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br /> Query took too long");
+        } else if (filedata.indexOf('Fatal error') >= 0 ||
+                   filedata.indexOf('Errormessage') >= 0 ||
+                   filedata.indexOf('[{') != 0) {
+            modal_body.append('div')
+                .attr('class', 'text-center')
+                .html("Error retrieving tweets. <br /><br /> " + filedata);
+        } else {
+            // Otherwise, parse the data
+            filedata = JSON.parse(filedata);
+
+            if(filedata.length == 0) {
+                modal_body.append('div')
+                    .attr('class', 'text-center')
+                    .text("No more tweets found in this selection.");
+            } else {
+                modal_body.append('ul')
+                    .attr('class', 'list-group')
+                    .selectAll('li').data(filedata).enter()
+                    .append('li')
+                    .attr('class', 'list-group-item')
+                    .html(function(d) {
+                        var content = '<span class="badge"><a href="https://twitter.com/emcomp/status/' + d['ID'] + '" target="_blank">' + d['ID'] + '</a></span>';
+                        content += d['Timestamp'] + ' ';
+                        content += d['Username'] + ' said: ';
+                        content += "<br />";
+                        content += d['Text'];
+                        content += "<br />";
+                        if(d['Distinct'] == '1')
+                            content += 'distinct ';
+                        content += d['Type'];
+                        if(d['Origin'])
+                            content += ' of <a href="https://twitter.com/emcomp/status/' + d['Origin'] + '" target="_blank">#' + d['Origin'] + '</a>'
+                        if(d['Count'] && d['Count'] > 1)
+                            content += ', ' + (d['Count'] - 1) + " repeats";
+                        return content;
+                    });
+                
+            }
+        }
+        
+        // Update style and stop progress bar
+        this.tweets.progress.end();
+        this.styleTweetModal();
     },
 }
