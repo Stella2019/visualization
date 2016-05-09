@@ -135,7 +135,8 @@ Timeseries.prototype = {
                 labels: ["Stacked", "Overlap", "Lines", "Stream", "Separate", "100%"],
                 ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
                 default: 0,
-                callback: triggers.emitter('chart:render series')
+                available: [0, 1, 2, 3, 4],
+                callback: triggers.emitter('timeseries:stack')
 //                function () {
 //                    pipeline.start('Prepare Timeseries Data for Chart');
 //                }
@@ -145,27 +146,27 @@ Timeseries.prototype = {
                 labels: ["Day", "Hour", "10 Minutes", "Minute"],
                 ids:    ["day", "hour", "tenminute", "minute"],
                 default: 2,
-                callback: triggers.emitter('chart:context time')
+                callback: triggers.emitter('chart:resolution change')
             }),
             Shape: new Option({
                 title: "Shape",
                 labels: ["Linear",  "Basis",        "Step"],
                 ids:    ["linear",  "basis-open",   "step-before"],
                 default: 2,
-                callback: triggers.emitter('chart:shape')
-//                function () { 
-//                    pipeline.start('Ready Context Chart');
-//                }
+                callback: function() {
+                    triggers.emit('chart:shape');
+                    triggers.emit('chart:render series');
+                }
             }),
             'Y Scale': new Option({
                 title: "Y Scale",
                 labels: ["Linear",  "Power", "Log"],
                 ids:    ["linear",  "pow",   "log"],
                 default: 0,
-                callback: triggers.emitter('chart:y-scale')
-//                callback: function () {
-//                    pipeline.start('Configure Plot Area')
-//                }
+                callback: function() {
+                    triggers.emit('chart:y-scale');
+                    triggers.emit('chart:render series');
+                }
             }),
             'Y Max': new Option({
                 title: "Y Max",
@@ -174,15 +175,14 @@ Timeseries.prototype = {
                 default: 0,
                 type: "textfieldautoman",
                 custom_entries_allowed: true,
-                callback: function() {
-                    pipeline.start('Configure Plot Area')
-                }
+                callback: triggers.emitter('focus:place series')
             }),
             'Color Scale': new Option({
                 title: "Color Scale",
                 labels: ["10", "20", "20b", "20c"],
                 ids:    ["category10", 'category20', 'category20b', 'category20c'],
                 default: 1,
+                render: false,
                 callback: function() {
                     pipeline.start('Set Colors');
                 }
@@ -194,6 +194,7 @@ Timeseries.prototype = {
                 ids:    ["false", "true"],
                 default: 0,
                 type: "toggle",
+                render: false,
                 callback: function() { 
                     triggers.emit('alert', 'Sorry this feature is broken right now.');
 //                    pipeline.start('Configure Plot Area'); TODO

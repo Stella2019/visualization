@@ -319,7 +319,7 @@ Options.prototype = {
             default: 0,
             callback: function() {
                 ops.recordState();
-                pipeline.start('Configure Plot Area');
+                triggers.emit('focus:place series');
             }
         });
             

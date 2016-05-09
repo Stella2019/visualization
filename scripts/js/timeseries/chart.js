@@ -41,7 +41,7 @@ function TimeseriesChart(app, id) {
     this.plotarea = [];
     this.container = [];
     this.y_label = [];
-    this.column_hover = [];
+    this.column_highlight = [];
     this.series = {};
     this.series_arr = [];
     
@@ -195,7 +195,8 @@ TimeseriesChart.prototype = {
         // Get Properties
         var scale = this.app.ops['View']['Y Scale'].get();
         var plottype = this.app.ops['View']['Plot Type'].get();
-        var ymax_manual = this.app.ops['View']['Y Max'].is('true');
+        var ymax_manual = this.app.ops['View']['Y Max Toggle'].is('true')
+        && this.id == 'focus';
         var ymax_op = this.app.ops['View']['Y Max'];
         
         // Set the Y Domain
@@ -278,16 +279,21 @@ TimeseriesChart.prototype = {
         
         // Make new paths
         this.series_objects.enter().append('g')
-//            .on("click", legend.chartClickGetTweets) // TODO
-//            .on("mouseover", legend.chartHoverEnter) // TODO
-//            .on("mousemove", legend.chartHoverMove) // TODO
-//            .on("mouseout", legend.chartHoverEnd); // TODO
+            .on('click', triggers.emitter('series:chart click'))
+            .on('mouseover', triggers.emitter('series:chart enter'))
+//            .on('mousemove', triggers.emitter('series:chart hover'))
+            .on('mousemove', function(d) {
+                var xy = d3.mouse(this);
+                d.cursor_xy = xy;
+                triggers.emit('series:chart hover', d);
+            })
+            .on('mouseout', triggers.emitter('series:chart exit'));
         
         // Clear extra paths
         this.series_objects.exit().remove();
         
         this.series_objects.attr("class", function(d) {
-                return "series series_" + d.id
+                return "series subset_" + d.ID
             });
         
         this.paths = this.series_objects.append("path")
@@ -330,5 +336,5 @@ TimeseriesChart.prototype = {
             .style("fill-opacity", fill_opacity)
             .style("stroke", function (d) { return d.stroke; })
             .attr("d", function(d) { return this.area(d.values)}.bind(this));
-    }
+    },
 };

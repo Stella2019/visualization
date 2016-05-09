@@ -13,7 +13,9 @@ TimeseriesView.prototype = {
         $(window).on('resize', this.setChartHeights.bind(this));
         triggers.on('chart:plan resize', this.setChartHeights.bind(this));
         triggers.on('chart:context time', this.setContextTime.bind(this));
+        triggers.on('chart:resolution change', this.setContextTime.bind(this));
         triggers.on('chart:focus time', this.setFocusTime.bind(this));
+        triggers.on('tooltip:move', this.tooltipMove.bind(this));
     },
     buildPage: function() {
         var body = d3.select('body')
@@ -286,5 +288,8 @@ TimeseriesView.prototype = {
                       this.app.context.brush.empty() ?
                       this.app.context.x.domain() :
                       this.app.context.brush.extent());
+    },
+    tooltipMove: function(xy) {
+        this.app.tooltip.move(xy[0], xy[1]);
     },
 }

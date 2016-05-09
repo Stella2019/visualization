@@ -793,7 +793,8 @@ triggers = {
     emit: function (eventName, data) {
         if (this.events[eventName]) {
             this.events[eventName].forEach(function(fn) {
-                setTimeout(fn(data), 0);
+                fn(data);
+//                setTimeout(function() { fn(data); }, 1);
             });
         }
     },

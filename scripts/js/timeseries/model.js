@@ -57,6 +57,9 @@ TimeseriesModel.prototype = {
         triggers.on('subsets:updated', this.setSubsets.bind(this));
         triggers.on('subset_load:ready', this.loadSubsetTimeseries.bind(this));
         triggers.on('subset_load:continue', this.continueLoadingSubsetTimeseries.bind(this));
+        
+        // Triggers that need to be better set
+        triggers.on('chart:resolution change', this.prepareTimeseries.bind(this));
     },
     setEvent: function() {
         this.event_id = this.app.collection.event.ID;
@@ -66,7 +69,7 @@ TimeseriesModel.prototype = {
     },
     setSubsets: function() {
         this.subsets = this.app.collection.subsets;
-        this.subset_ids = this.app.collection.subsets_arr.map(d => d.ID);
+        this.subset_ids = this.app.collection.subsets_arr.map(d => parseInt(d.ID));
         
 //        triggers.emit('subset_load:ready', 'event');
     },
@@ -145,7 +148,7 @@ TimeseriesModel.prototype = {
         this.subset_load.index++;
         this.subset_load.prog.update(this.subset_load.index);
         
-        if(this.subset_load.index == this.subset_load.subsets.length) { // TODO lift this when done testing
+        if(this.subset_load.index >= this.subset_load.subsets.length) { // TODO lift this when done testing
             this.subset_load.prog.end();
             return; // All done!
         }
@@ -154,7 +157,7 @@ TimeseriesModel.prototype = {
         if(subset >= 1735 || subset == 872) {
             triggers.emit('timeseries:load', subset);
         } else {
-            triggers.emit('subset_load:continue');
+            setTimeout(triggers.emitter('subset_load:continue'), 1);
         }
     },
     parseTimeseries: function(id) {
@@ -233,8 +236,8 @@ TimeseriesModel.prototype = {
                 return val + datapoints[1][i] + datapoints[2][i] + datapoints[3][i];
             }));
             
-            series.id = id;
-            series.label = 'Subset ' + id;
+            series.ID = id;
+            series.Label = 'Subset ' + id;
             series.color = cols(id);
             series.chart = 'focus';
             
@@ -255,8 +258,8 @@ TimeseriesModel.prototype = {
                 return val + datapoints[1][i] + datapoints[2][i] + datapoints[3][i];
             }));
             
-            series.id = 'event';
-            series.label = 'Whole Event';
+            series.ID = 'event';
+            series.Label = 'Whole Event';
             series.color = '#000';
             series.chart = 'context';
             
@@ -266,8 +269,8 @@ TimeseriesModel.prototype = {
             this.types.forEach(function(curtype, i_y) {
                 var series = this.timepoints2Series(datapoints[i_y]);
                 
-                series.id = curtype;
-                series.label = curtype;
+                series.ID = curtype;
+                series.Label = curtype;
                 series.color = typecolors[i_y];
                 series.chart = 'context';
                 
@@ -278,8 +281,8 @@ TimeseriesModel.prototype = {
             var i_y = this.types.indexOf(type);
             var series = this.timepoints2Series(datapoints[i_y]);
             
-            series.id = type;
-            series.label = type;
+            series.ID = type;
+            series.Label = type;
             series.color = typecolors[i_y];
             series.chart = 'context';
             triggers.emit('timeseries:add', series);
@@ -373,7 +376,7 @@ TimeseriesModel.prototype = {
         
         var chart = this[series.chart];
         
-        chart.series[series.id] = series;
+        chart.series[series.ID] = series;
         chart.series_arr.push(series);
         chart.series_arr.sort(this.app.legend.cmp.bind(this));
         
@@ -381,7 +384,13 @@ TimeseriesModel.prototype = {
         triggers.emit('timeseries:stack', chart);
     },
     stackSeries: function(chart) {
-        var plot_type = this.app.ops['View']['Plot Type'];
+        if(!chart) { // Stack both!
+            triggers.emit('timeseries:stack', this.focus);
+            triggers.emit('timeseries:stack', this.context);
+            return;
+        }
+        
+        var plot_type = this.app.ops['View']['Plot Type'].get();
         var series = chart.series_arr;
         
         if (plot_type == "wiggle") {

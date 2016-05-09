@@ -3,6 +3,7 @@ function TimeseriesLegend(app) {
     this.container = [];
     this.mouseOverToggle = false;
     this.mouseOverToggleState = true;
+    this.tooltip = app.tooltip;
     
     // Key Data
     this.key_data = [
@@ -40,6 +41,19 @@ TimeseriesLegend.prototype = {
         triggers.on('legend:color scale', this.setColorScale.bind(this));
         triggers.on('legend:color', this.colorSeries.bind(this));
         triggers.on('legend:series', this.linkSeries.bind(this));
+        
+        
+        triggers.on('series:highlight', this.highlightSeries.bind(this));
+        triggers.on('series:unhighlight', this.unHighlightSeries.bind(this));
+        
+        triggers.on('series:chart click', this.chartClickGetTweets.bind(this));
+        triggers.on('series:chart enter', this.chartHoverEnter.bind(this));
+        triggers.on('series:chart hover', this.chartHoverMove.bind(this));
+        triggers.on('series:chart exit', this.chartHoverEnd.bind(this));
+        
+        triggers.on('series:legend enter', this.hoverLegendEntry.bind(this));
+        triggers.on('series:legend hover', this.hoverLegendEntryMove.bind(this));
+        triggers.on('series:legend exit', this.hoverLegendEntryEnd.bind(this));
     },
     buildLegend: function() {
         this.container = d3.select('body').append('div')
@@ -62,12 +76,12 @@ TimeseriesLegend.prototype = {
             this.subsets_arr.push(subset);
             
             // Add (to) feature
-            if(subset.Feature in this.features) {
-                var feature = this.features[subset.Feature];
+            var feature = this.features[subset.Feature];
+            if(feature) {
                 feature.subsets.push(subset);
                 subset.feature = feature;
             } else {
-                var feature = {
+                feature = {
                     Label: subset.Feature,
                     subsets: [subset],
                 }
@@ -75,6 +89,9 @@ TimeseriesLegend.prototype = {
                 this.features_arr.push(feature);
                 subset.feature = feature;
             }
+            // TODO make this respond to changes
+            feature.color = d3.scale.category10()
+                .domain(feature.subsets.map(d => d.ID));
         }, this);
         
         // Add features to the sidemenu
@@ -121,10 +138,10 @@ TimeseriesLegend.prototype = {
         var new_entries = data_entries
             .enter().append('div')
             .attr('id', d => 'legend_' + d.ID)
-            .attr('class', d => 'legend_entry subset_' + d.ID);
-//                .on('mouseover', this.hoverLegendEntry)
-//                .on('mousemove', this.hoverLegendEntryMove)
-//                .on('mouseout', this.hoverLegendEntryEnd);
+            .attr('class', d => 'legend_entry subset_' + d.ID)
+            .on('mouseover', triggers.emitter('series:legend enter'))
+            .on('mousemove', triggers.emitter('series:legend hover'))
+            .on('mouseout', triggers.emitter('series:legend exit'));
 
         var legend_icon_divs = new_entries.append('div')
             .attr('class', 'legend_icon');
@@ -196,26 +213,37 @@ TimeseriesLegend.prototype = {
         // TODO handle context series
         // TODO add to subsets list
         if(subset.chart == 'focus') {
-            console.log(this.subsets, subset);
+//            console.log(this.subsets, subset);
             this.subsets[subset.ID].data = subset;
         }
         
         triggers.emit('legend:color', this.subsets[subset.ID]);
     },
     colorSeries: function(subset) {
-        if(!subset) {
-            // TODO color them all
-            return
+        if(!subset) { // Then color them all =D
+            this.subsets_arr.forEach(this.colorSeries.bind(this));
+            return;
         }
-        
-        if(subset.chart = 'focus') {
-            subset.color = this.color(subset.ID);
+        if(!('data' in subset)) {
+            return;
+        }
+            
+        // Determine primary color
+        if(subset.data.chart == 'focus') {
+//            console.log(subset);
+            subset.color = subset.feature.color(subset.ID);
         } else {
             subset.color = '#000'; // Black
         }
             
+        // Determine fill & stroke color from that
         subset.data.fill = subset.color; //this.color(subset.ID);
         subset.data.stroke = d3.rgb(subset.data.fill).darker();
+        
+        // Color the legend icon
+        this.container.select(".subset_" + subset.ID + " .legend_icon")
+            .style('fill', subset.data.fill)
+            .style('stroke', subset.data.stroke);
     },
     init_old: function() {
         this.container = d3.select('#legend')
@@ -389,84 +417,115 @@ TimeseriesLegend.prototype = {
         }
     },
     highlightSeries: function(series) {
-        if(typeof(series) == "string")
-            series = data.series[series];
-
         d3.selectAll('.series, .legend_icon')
             .classed('focused', false)
             .classed('unfocused', true);
-        d3.selectAll('.series.' + series.id + ', .' + series.id + ' .legend_icon')
+        d3.selectAll('.series.subset_' + series.ID + ', .subset_' + series.ID + ' .legend_icon')
             .classed('unfocused', false)
             .classed('focused', true);
     },
+    unHighlightSeries: function() {
+        d3.selectAll('.series, .legend_icon')
+            .classed('focused', false)
+            .classed('unfocused', false);
+    },
     hoverLegendEntry: function(series) {
-        if(typeof(series) == "string")
-            series = data.series[series];
-        
         // Generate tooltip
-        disp.tooltip.setData({
-            total: series.total,
-            max: series.max,
-            type: series.type
-        });
-        disp.tooltip.on();
+        var info = {
+            ID: series.ID,
+            'Total Tweets': util.formatThousands(series.Tweets),
+        }
+        if(series.data) {
+            info['Total Shown'] = util.formatThousands(series.data.sum);
+            info['Max'] = util.formatThousands(series.data.max);
+        }
         
-        legend.highlightSeries(series);
+        this.tooltip.setData(info);
+        this.tooltip.on();
+        
+        triggers.emit('series:highlight', series);
     },
     hoverLegendEntryMove: function(series) {
-        disp.tooltip.move(d3.event.x, d3.event.y);
+        this.tooltip.move(d3.event.x, d3.event.y);
     },
     hoverLegendEntryEnd: function(series) {
-        if(typeof(series) == "string")
-            series = data.series[series];
-        
-        disp.tooltip.off();
-        
-        legend.unHighlightSeries(series);
+        this.tooltip.off();
+        triggers.emit('series:unhighlight');
     },
     chartClickGetTweets: function(series) {
-        var time = disp.getTimeHoveringOverAxis(this);
+        // Get parent objects
+        var chart = this.app[series.chart];
+        var time_obj = this.app.model.time;
+        
+        // Get position
+        var time = chart.x.invert(series.cursor_xy[0]);
+        time.setSeconds(0);
+        var resolution = this.app.ops['View']['Resolution'].get();
+        var i_r = ['minute', 'tenminute', 'hour', 'day'].indexOf(resolution);
+        var i_t = time_obj.stamp_index[util.formatDate(time)];
+        var value_i = time_obj.indices[i_t][i_r] + 1;
+        var time_min = time_obj[resolution + 's'][value_i - 1];
+        var time_max = time_obj[resolution + 's'][value_i];
+        
+        console.log('TODO: fetch tweets for ', series, time_min, time_max);
 
-        data.getTweets({
-            series: series,
-            time_min: time.min,
-            time_max: time.max
-        });
+//        data.getTweets({
+//            series: series,
+//            time_min: time_min,
+//            time_max: time_max
+//        });
     },
     chartHoverEnter: function(series) {
-        disp.tooltip.on();
+        this.tooltip.on();
         
-        legend.highlightSeries(series);
+        triggers.emit('series:highlight', series);
+//        disp.tooltip.on();
+//        
+//        legend.highlightSeries(series);
     },
     chartHoverMove: function(series) {
-        disp.tooltip.move(d3.event.x, d3.event.y);
+        this.tooltip.move(d3.event.x, d3.event.y);
+//        triggers.emit('tooltip:move', [d3.event.x, d3.event.y]);
         
-        var time = disp.getTimeHoveringOverAxis(this);
+        // Get parent objects
+        var chart = this.app[series.chart];
+        var time_obj = this.app.model.time;
+        
+        // Get position
+        var time = chart.x.invert(series.cursor_xy[0]);
+        time.setSeconds(0);
+        var resolution = this.app.ops['View']['Resolution'].get();
+        var i_r = ['minute', 'tenminute', 'hour', 'day'].indexOf(resolution);
+        var i_t = time_obj.stamp_index[util.formatDate(time)];
+        var value_i = time_obj.indices[i_t][i_r] + 1;
+        var time_min = time_obj[resolution + 's'][value_i - 1];
+        var time_max = time_obj[resolution + 's'][value_i];
 
-        var focus_column = disp.focus.svg.select('path.column_hover');
+        // Fetch column
+        var focus_column = chart.column_highlight;
         var old_data = focus_column.data();
 
-//      var value_i = Math.floor(xy[0] / focus.width * d.values.length);
-        var value_i = data.time.stamps_nested_int.indexOf(time.min.getTime()) + 1;
+        // Get data values
         var value = series.values[value_i].value;
         var value0 = series.values[value_i].value0;
         
-        disp.tooltip.setData({
-            series: series.display_name,
-            from: util.formatDate(time.min),
-            to: util.formatDate(time.max),
-            tweets: value,
+        // Set tooltip data
+        this.tooltip.setData({
+            series: series.Label,
+            from: util.formatDate(time_min),
+            to: util.formatDate(time_max),
+            tweets: util.formatThousands(value),
             ' ': '<i>Click to get tweets</i>'
         });
-
-        if(!old_data || old_data.series != series.id ||
-           util.compareDates(old_data.startTime, time.min) ||
-           util.compareDates(old_data.stopTime,  time.max) ) {
+        
+        if(!old_data || old_data.series != series.Label ||
+           util.compareDates(old_data.startTime, time_min) ||
+           util.compareDates(old_data.stopTime,  time_max) ) {
 
             focus_column.data([{
-                series: series.id,
-                startTime: time.min,
-                stopTime: time.max,
+                series: series.Label,
+                startTime: time_min,
+                stopTime: time_max,
                 value: value,
                 value0: value0
             }]);
@@ -475,34 +534,23 @@ TimeseriesLegend.prototype = {
                 .transition()
                 .duration(50)
                 .attr("d", 
-                    disp.focus.area([
-                        {timestamp: time.min, value: value, value0: value0},
-                        {timestamp: time.max, value: value, value0: value0}
+                    chart.area([
+                        {timestamp: time_min, value: value, value0: value0},
+                        {timestamp: time_max, value: value, value0: value0}
                     ]))
                 .style('display', 'block');
         }
 
         if(!old_data || old_data.series != series.id)
-            legend.highlightSeries(series);
+            trigger.emit('series:highlight', series);
     },
     chartHoverEnd: function(series) {
-        if(typeof(series) == "string")
-            series = data.series[series];
+//        triggers.emit('timeseries:column',) // TODO
+//        disp.focus.svg.select('path.column_hover')
+//            .style('display', 'none');
         
-        disp.focus.svg.select('path.column_hover')
-            .style('display', 'none');
-        
-        disp.tooltip.off();
-
-        legend.unHighlightSeries(series)
-    },
-    unHighlightSeries: function(series) {
-        if(typeof(series) == "string")
-            series = data.series[series];
-        
-        d3.selectAll('.series, .legend_icon')
-            .classed('focused', false)
-            .classed('unfocused', false);
+        this.tooltip.off();
+        triggers.emit('series:unhighlight');
     },
     toggleSeries: function(series) {
         if(typeof(series) == "string")
