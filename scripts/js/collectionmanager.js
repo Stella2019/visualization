@@ -362,6 +362,7 @@ CollectionManager.prototype = {
                 feature: subset.Feature,
                 match: subset.Match
             });
+            console.log(subset.Feature, subset.Match, subset.DisplayMatch)
             
             // If subset IS a rumor
             if(subset.Feature == 'Rumor') {
@@ -370,7 +371,7 @@ CollectionManager.prototype = {
             }
             
             // Make Label
-            subset.Label = '<small>' + subset.Feature + '</small>: ' + subset.DisplayMatch;
+            subset.Label = '<small>' + subset.Feature + ':</small> ' + subset.DisplayMatch;
             
             // Add rumor if the subset is under a rumor
             if(subset.Rumor != '0') {

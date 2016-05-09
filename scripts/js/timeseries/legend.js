@@ -71,7 +71,7 @@ TimeseriesLegend.prototype = {
         this.subsets = {};
         this.subsets_arr = [];
         
-        this.app.collection.subsets_arr.forEach(function(subset) {
+        this.app.collection.subsets_arr.forEach(function(subset) {            
             this.subsets[subset.ID] = subset;
             this.subsets_arr.push(subset);
             
@@ -232,6 +232,12 @@ TimeseriesLegend.prototype = {
         if(subset.data.chart == 'focus') {
 //            console.log(subset);
             subset.color = subset.feature.color(subset.ID);
+            
+            subset.data.Label = subset.Label;
+//            subset.data.Label = subset.Feature + ': ' + subset.DisplayMatch + ' (s#' + subset.ID + ')';
+//            if(subset.Rumor != 0) {
+//                subset.data.Label = subset.Rumor + ', ' + subset.data.Label;
+//            }
         } else {
             subset.color = '#000'; // Black
         }

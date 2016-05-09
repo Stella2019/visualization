@@ -268,3 +268,8 @@ button:focus {
     padding: 5px 5px 0px 5px;
     max-width: 300px;
 }
+
+.match_addon {
+    color: #ccc;
+    text-transform: lowercase;
+}
