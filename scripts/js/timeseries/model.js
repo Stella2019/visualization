@@ -122,7 +122,10 @@ TimeseriesModel.prototype = {
         this.streamTimeseries.startStream();
     },
     loadSubsetTimeseries: function() {
-        if(this.subset_load && this.subset_load.event == this.event_id) {
+        var time_max = this.app.ops['Dataset']['Time Max'].date.getTime();
+        if(this.subset_load && 
+           this.subset_load.event == this.event_id &&
+           this.subset_load.time_max < time_max) {
             // Don't need to reload, return
             return;
         }
@@ -130,7 +133,8 @@ TimeseriesModel.prototype = {
         this.subset_load = {
             event: this.event_id,
             subsets: this.subset_ids,
-            index: -1
+            index: -1,
+            time_max: time_max,
         };
         
         var subset_progress_bar = new Progress({
@@ -148,17 +152,17 @@ TimeseriesModel.prototype = {
         this.subset_load.index++;
         this.subset_load.prog.update(this.subset_load.index);
         
-        if(this.subset_load.index >= this.subset_load.subsets.length) { // TODO lift this when done testing
+        if(this.subset_load.index >= this.subset_load.subsets.length) {
             this.subset_load.prog.end();
             return; // All done!
         }
         
         var subset = this.subset_load.subsets[this.subset_load.index];
-        if(subset >= 1735 || subset == 872) {
+//        if(subset >= 1735 || subset == 872) {
             triggers.emit('timeseries:load', subset);
-        } else {
-            setTimeout(triggers.emitter('subset_load:continue'), 1);
-        }
+//        } else {
+//            setTimeout(triggers.emitter('subset_load:continue'), 1);
+//        }
     },
     parseTimeseries: function(id) {
         // Reenable the button to choose the event
@@ -240,6 +244,7 @@ TimeseriesModel.prototype = {
             series.Label = 'Subset ' + id;
             series.color = cols(id);
             series.chart = 'focus';
+            series.shown = true;
             
             triggers.emit('timeseries:add', series);
         }
@@ -262,6 +267,7 @@ TimeseriesModel.prototype = {
             series.Label = 'Whole Event';
             series.color = '#000';
             series.chart = 'context';
+            series.shown = true;
             
             triggers.emit('timeseries:add', series);
         } else if (type == 'split') {
@@ -273,6 +279,7 @@ TimeseriesModel.prototype = {
                 series.Label = curtype;
                 series.color = typecolors[i_y];
                 series.chart = 'context';
+                series.shown = true;
                 
                 triggers.emit('timeseries:add', series);
             }, this)
@@ -285,6 +292,7 @@ TimeseriesModel.prototype = {
             series.Label = type;
             series.color = typecolors[i_y];
             series.chart = 'context';
+            series.shown = true;
             triggers.emit('timeseries:add', series);
         }
         
@@ -403,10 +411,11 @@ TimeseriesModel.prototype = {
             this.stack.offset("zero");
         }
         
-        // TODO handle plotting only selective things;
+        // Only stack plots being shown
+        var series_to_plot = series.filter(series => series.shown);
         
         if(plot_type == "percent") {
-            data_100 = series.map(function(series) {
+            data_100 = series_to_plot.map(function(series) {
                 var new_series = JSON.parse(JSON.stringify(series)); // Cheap cloning
                 new_series.values = new_series.values.map(function(datum, i) {
                     var new_datum = datum;
@@ -418,25 +427,27 @@ TimeseriesModel.prototype = {
             });
             this.stack(data_100);
         } else {
-            this.stack(series);
+            this.stack(series_to_plot);
         }
         
         // Convert to separate area plot if that's asked for
-        var n_series = series.length;
-        var n_datapoints = series[0].values.length;
-        if(plot_type == "separate") {
-            for (var i = n_series - 1; i >= 0; i--) {
-                series[i].offset = 0;
-                if(i < n_series - 1) {
-                    series[i].offset = series[i + 1].offset;
-                    series[i].offset += series[i + 1].max;
-                }
+        var n_series = series_to_plot.length;
+        if(n_series > 0) {
+            var n_datapoints = series_to_plot[0].values.length;
+            if(plot_type == "separate") {
+                for (var i = n_series - 1; i >= 0; i--) {
+                    series_to_plot[i].offset = 0;
+                    if(i < n_series - 1) {
+                        series_to_plot[i].offset  = series_to_plot[i + 1].offset;
+                        series_to_plot[i].offset += series_to_plot[i + 1].max;
+                    }
 
-                series[i].values.forEach(function(datum) {
-                    datum.value0 = series[i].offset;
-                });
-            }
-        } 
+                    series_to_plot[i].values.forEach(function(datum) {
+                        datum.value0 = series_to_plot[i].offset;
+                    });
+                }
+            } 
+        }
         
         triggers.emit(chart.name + ':set series', chart);
     },

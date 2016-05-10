@@ -165,7 +165,7 @@ var util = {
                 }); 
             }).join('<span class="match_addon"> or </span>');
         } else if(match.includes('!')) {
-            match = '<span class="match_addon">not </span>' + util.subsetName({feature: feature, match: match.slice(1)});
+            match = '<span class="match_addon not">not </span>' + util.subsetName({feature: feature, match: match.slice(1)});
         } else if(feature.includes('UTC')) {
             var hours = parseFloat(match) / 60 / 60;
             match = '' + (hours >= 0 ? '+' : '-');

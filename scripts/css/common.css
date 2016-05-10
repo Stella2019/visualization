@@ -273,3 +273,6 @@ button:focus {
     color: #ccc;
     text-transform: lowercase;
 }
+.match_addon.not {
+    color: #f55;
+}

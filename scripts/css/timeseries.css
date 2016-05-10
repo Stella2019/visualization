@@ -115,12 +115,13 @@ body {
     width: 25px;
 }
 .legend_icon .glyphicon {
-    line-height: 1.9;
     opacity: 0;
     pointer-events: none;
     position: absolute;
     width: 100%;
     text-align: center;
+    top: 50%;
+    transform: translateY(-50%);
 }
 .legend_series_list:hover .glyphicon {
     opacity: 1;

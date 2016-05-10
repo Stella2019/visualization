@@ -178,8 +178,8 @@ CollectionManager.prototype = {
             dropdowns.push('Time Window');
             this.ops['Time Window'] = new Option({
                 title: "Time",
-                labels: ["First Day", "First 3 Days", "Whole Collection", "Custom",],
-                ids:    ['1d', '3d', 'all', 'custom'],
+                labels: ["First Hour", "First Day", "First 3 Days", "First Week", "Whole Collection", "Custom",],
+                ids:    ['1h', '1d', '3d', '1w', 'all', 'custom'],
                 callback: triggers.emitter('time_window:choose'),
                 edit: triggers.emitter('time_window:edit')
             });
@@ -362,7 +362,6 @@ CollectionManager.prototype = {
                 feature: subset.Feature,
                 match: subset.Match
             });
-            console.log(subset.Feature, subset.Match, subset.DisplayMatch)
             
             // If subset IS a rumor
             if(subset.Feature == 'Rumor') {
@@ -374,9 +373,11 @@ CollectionManager.prototype = {
             subset.Label = '<small>' + subset.Feature + ':</small> ' + subset.DisplayMatch;
             
             // Add rumor if the subset is under a rumor
+            subset.DisplayMatchWithRumor = subset.DisplayMatch;
             if(subset.Rumor != '0') {
                 subset.rumor = this.rumors[subset.Rumor];
                 subset.Label = '<em><small>' + subset.rumor.Name + '</small></em> ' + subset.Label;
+                subset.DisplayMatchWithRumor += ' <em><sup>' + subset.rumor.Name + '</sup></em>';
             }
             
             this['subsets' + version][subset.ID] = subset;
@@ -585,7 +586,11 @@ CollectionManager.prototype = {
         var time_max_op = this.ops['Time Max'];
         var time_obj = this.time;
         
-        if(window == '1d') {
+        if(window == '1h') {
+            time_min_op.date = new Date(time_obj.event_min);
+            time_max_op.date = new Date(time_obj.event_min);
+            time_max_op.date.setHours(time_max_op.date.getHours() + 1);
+        } else if(window == '1d') {
             time_min_op.date = new Date(time_obj.event_min);
             time_max_op.date = new Date(time_obj.event_min);
             time_max_op.date.setHours(time_max_op.date.getHours() + 24);
@@ -593,6 +598,10 @@ CollectionManager.prototype = {
             time_min_op.date = new Date(time_obj.event_min);
             time_max_op.date = new Date(time_obj.event_min);
             time_max_op.date.setHours(time_max_op.date.getHours() + 24 * 3);
+        } else if(window == '1w') {
+            time_min_op.date = new Date(time_obj.event_min);
+            time_max_op.date = new Date(time_obj.event_min);
+            time_max_op.date.setHours(time_max_op.date.getHours() + 24 * 7);
         } else if(window == 'all') {
             time_min_op.date = new Date(time_obj.event_min);
             time_max_op.date = new Date(time_obj.event_max);

@@ -505,7 +505,7 @@ TimeseriesView.prototype = {
                     .html(function(d) {
                         var content = '<span class="badge"><a href="https://twitter.com/emcomp/status/' + d['ID'] + '" target="_blank">' + d['ID'] + '</a></span>';
                         content += d['Timestamp'] + ' ';
-                        content += d['Username'] + ' said: ';
+                        content += d['Username'] + '(@' + d['Screenname'] + ') said: ';
                         content += "<br />";
                         content += d['Text'];
                         content += "<br />";

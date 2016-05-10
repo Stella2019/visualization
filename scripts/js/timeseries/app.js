@@ -137,9 +137,6 @@ Timeseries.prototype = {
                 default: 0,
                 available: [0, 1, 2, 3, 4],
                 callback: triggers.emitter('timeseries:stack')
-//                function () {
-//                    pipeline.start('Prepare Timeseries Data for Chart');
-//                }
             }),
             Resolution: new Option({
                 title: "Resolution",
@@ -151,7 +148,7 @@ Timeseries.prototype = {
             Shape: new Option({
                 title: "Shape",
                 labels: ["Linear",  "Basis",        "Step"],
-                ids:    ["linear",  "basis-open",   "step-before"],
+                ids:    ["linear",  "basis-open",   "step-after"],
                 default: 2,
                 callback: function() {
                     triggers.emit('chart:shape');
@@ -241,9 +238,7 @@ Timeseries.prototype = {
                 labels: ["Original", "Alphabet", "Volume Visible", 'Volume Overall'],
                 ids:    ["orig", "alpha", 'volume shown', 'volume'],
                 default: 3,
-                callback: function() { 
-                    pipeline.start('Order Timeseries');
-                }
+                callback: triggers.emitter('legend:order'),
             }),
             'Clean Legend': new Option({
                 title: "Clean Up Legend",
@@ -252,18 +247,16 @@ Timeseries.prototype = {
                 ids:    ["false", "true"],
                 default: 0,
                 type: "toggle",
-                callback: function() { legend.showOrHideAll(); }
+                callback: triggers.emitter('legend:clean'),
+            }),
+            'Shown': new Option({
+                title: "Series Shown",
+                labels: ['List'],
+                ids:    [[]],
+                render: false,
+                custom_entries_allowed: true, 
+                callback: triggers.emitter('chart:visible'), // TODO
             })
-//            'Shown': new Option({
-//                title: "Terms Selected",
-//                labels: [""],
-//                ids:    [''],
-//                available: [0],
-//                default: 0,
-//                custom_entries_allowed: true, 
-//                parent: '#choices_legend',
-//                callback: function() { pipeline.start('Find Which Data is Shown'); }
-//            })
         };     
         this.ops['Analysis'] = {
             'Fetched Tweet Order': new Option({

@@ -1,8 +1,8 @@
 function TimeseriesLegend(app) {
     this.app = app;
     this.container = [];
-    this.mouseOverToggle = false;
-    this.mouseOverToggleState = true;
+    this.cursorHeldDown = false;
+    this.cursorToggleTo = true;
     this.tooltip = app.tooltip;
     
     // Key Data
@@ -54,6 +54,14 @@ TimeseriesLegend.prototype = {
         triggers.on('series:legend enter', this.hoverLegendEntry.bind(this));
         triggers.on('series:legend hover', this.hoverLegendEntryMove.bind(this));
         triggers.on('series:legend exit', this.hoverLegendEntryEnd.bind(this));
+        
+        triggers.on('legend:clean', this.showOrHideAll.bind(this));
+        triggers.on('feature:legend visibility', this.showOrHideFeature.bind(this));
+        triggers.on('series:legend visibility', this.showOrHideSeries.bind(this));
+        
+        triggers.on('series:icon down', this.startToggle.bind(this));
+        triggers.on('series:icon over', this.hoverOverSeries.bind(this));
+        triggers.on('series:icon up', this.endToggle.bind(this));
     },
     buildLegend: function() {
         this.container = d3.select('body').append('div')
@@ -71,7 +79,8 @@ TimeseriesLegend.prototype = {
         this.subsets = {};
         this.subsets_arr = [];
         
-        this.app.collection.subsets_arr.forEach(function(subset) {            
+        // Iterate through subsets and add features
+        this.app.collection.subsets_arr.forEach(function(subset) { 
             this.subsets[subset.ID] = subset;
             this.subsets_arr.push(subset);
             
@@ -94,19 +103,32 @@ TimeseriesLegend.prototype = {
                 .domain(feature.subsets.map(d => d.ID));
         }, this);
         
+        // Sort the features and their subsets
+        this.features_arr.sort((A, B) => d3.ascending(A.Label, B.Label));
+        
         // Add features to the sidemenu
         this.features_arr.forEach(function(feature) {
-            var section = this.container.append('div');
+            feature.shown = false;
+            feature.subsets.sort((A, B) =>
+                                 A.Event > B.Event ?  1 :
+                                 A.Event < B.Event ? -1 :
+                                 A.Rumor > B.Rumor ?  1 :
+                                 A.Rumor < B.Rumor ? -1 :
+                                 A.DisplayMatch > B.DisplayMatch ?  1 :
+                                 A.DisplayMatch < B.DisplayMatch ? -1 :
+                                    0)
             
-            section.append('h4')
+            feature.div = this.container.append('div');
+            
+            feature.div.append('h4')
                 .html(feature.Label);
             
-            var list_div = section.append('div')
+            feature.list_div = feature.div.append('div')
                 .attr('class', 'legend_series_list feature_' + util.simplify(feature.Label));
             
             this.placeNewSeries(feature);
             
-            var entries = list_div
+            var entries = feature.list_div
                 .selectAll('div.legend_entry');
             
             // Propagate data to children
@@ -122,9 +144,11 @@ TimeseriesLegend.prototype = {
                 .attr('id', d => 'legend_' + d.ID)
                 .attr('class', d => 'legend_entry subset_' + d.ID);
             
-            list_div.selectAll('div.legend_label')
-                .html(d => d.DisplayMatch);
+            feature.list_div.selectAll('div.legend_label')
+                .html(d => d.DisplayMatchWithRumor);
             
+            // Hide the feature until we get data for it
+            triggers.emit('feature:legend visibility', feature);
 //            list_div.on('mouseout', legend.endToggle);
         }, this);
     },
@@ -155,9 +179,9 @@ TimeseriesLegend.prototype = {
                 class: "legend_icon_svg",
                 width: 25, height: 25
             })
-//                .on('mousedown', this.startToggle)
-//                .on('mouseover', this.hoverOverSeries)
-//                .on('mouseup', this.endToggle)
+            .on('mousedown', triggers.emitter('series:icon down'))
+            .on('mouseover', triggers.emitter('series:icon over'))
+            .on('mouseup', triggers.emitter('series:icon up'))
             .append('rect')
             .attr({
                 class: "legend_icon_rect",
@@ -230,18 +254,24 @@ TimeseriesLegend.prototype = {
             
         // Determine primary color
         if(subset.data.chart == 'focus') {
-//            console.log(subset);
             subset.color = subset.feature.color(subset.ID);
-            
             subset.data.Label = subset.Label;
-//            subset.data.Label = subset.Feature + ': ' + subset.DisplayMatch + ' (s#' + subset.ID + ')';
-//            if(subset.Rumor != 0) {
-//                subset.data.Label = subset.Rumor + ', ' + subset.data.Label;
-//            }
-        } else {
-            subset.color = '#000'; // Black
-        }
             
+            subset.data.shown = this.app.ops['Series']['Shown'].get()
+                .includes(subset.ID);
+            
+            // Turn on/off the legend entry // TODO verify consequences
+//            if(subset.data.shown) {
+                subset.feature.shown = true;
+                triggers.emit('feature:legend visibility', subset.feature);
+//            } else {
+//                triggers.emit('series:legend visibility', subset);
+//            }
+        } else { // Context
+            subset.color = '#000'; // Black
+            subset.data.shown = true;
+        }
+        
         // Determine fill & stroke color from that
         subset.data.fill = subset.color; //this.color(subset.ID);
         subset.data.stroke = d3.rgb(subset.data.fill).darker();
@@ -250,6 +280,7 @@ TimeseriesLegend.prototype = {
         this.container.select(".subset_" + subset.ID + " .legend_icon")
             .style('fill', subset.data.fill)
             .style('stroke', subset.data.stroke);
+        
     },
     init_old: function() {
         this.container = d3.select('#legend')
@@ -357,47 +388,56 @@ TimeseriesLegend.prototype = {
         
         legend.showOrHideAll(category);
     },
-    cmp: function(a, b) {
-        var ordering = this.app.ops['Series']['Order'];
+    cmp: function(A, B) {
+//        var ordering = this.app.ops['Series']['Order'];
+//        
+//        if(ordering == 'alpha') {
+//            var name1 = a.label || '';
+//            var name2 = b.label || '';
+//            name1 = name1.toLowerCase();
+//            name2 = name2.toLowerCase();
+//            
+//            if(name1 < name2)
+//                return -1;
+//            else if(name1 > name2)
+//                return 1;
+//            return 0
+//            
+//        } else if(ordering == 'volume') {
+//            a = a.sum;
+//            b = b.sum;
+//
+//            if(a < b)
+//                return 1;
+//            else if(a > b)
+//                return -1;
+//            return 0
+//        } else if(ordering == 'type') {
+//            if((a.isKeyword && !b.isKeyword) || (a.isOldKeyword && !b.isKeyword && !b.isOldKeyword))
+//                return -1;
+//            else if((!a.isKeyword && b.isKeyword) || (!a.isOldKeyword && !a.isKeyword && b.isOldKeyword))
+//                return 1;
+//            return b.sum - a.sum;
+//        } else {
+//            a = a.order;
+//            b = b.order;
+//            
+//            if(a < b)
+//                return -1;
+//            else if(a > b)
+//                return 1;
+//            return 0
+//        }
         
-        if(ordering == 'alpha') {
-            var name1 = a.label || '';
-            var name2 = b.label || '';
-            name1 = name1.toLowerCase();
-            name2 = name2.toLowerCase();
-            
-            if(name1 < name2)
-                return -1;
-            else if(name1 > name2)
-                return 1;
-            return 0
-            
-        } else if(ordering == 'volume') {
-            a = a.sum;
-            b = b.sum;
-
-            if(a < b)
-                return 1;
-            else if(a > b)
-                return -1;
-            return 0
-        } else if(ordering == 'type') {
-            if((a.isKeyword && !b.isKeyword) || (a.isOldKeyword && !b.isKeyword && !b.isOldKeyword))
-                return -1;
-            else if((!a.isKeyword && b.isKeyword) || (!a.isOldKeyword && !a.isKeyword && b.isOldKeyword))
-                return 1;
-            return b.sum - a.sum;
-        } else {
-            a = a.order;
-            b = b.order;
-            
-            if(a < b)
-                return -1;
-            else if(a > b)
-                return 1;
-            return 0
-        }
-        
+        return A.Feature > B.Feature ?  1 :
+            A.Feature < B.Feature ? -1 :
+            A.Event > B.Event ?  1 :
+            A.Event < B.Event ? -1 :
+            A.Rumor > B.Rumor ?  1 :
+            A.Rumor < B.Rumor ? -1 :
+            A.DisplayMatch > B.DisplayMatch ?  1 :
+            A.DisplayMatch < B.DisplayMatch ? -1 :
+            0;
     },
     cmp_byID: function(a, b) {
         a = data.series[a];
@@ -405,21 +445,19 @@ TimeseriesLegend.prototype = {
         return legend.cmp(a, b);
     },
     startToggle: function(series) {
-        if(typeof(series) == "string")
-            series = data.series[series];
-        
-        legend.mouseOverToggle = true;
-        legend.mouseOverToggleState = !series.shown;
-        legend.toggleSeries(series); 
+        this.cursorHeldDown = true;
+        this.cursorToggleTo = !series.data.shown;
+        this.toggleSeries(series); 
         d3.event.stopPropagation();
     },
     endToggle: function(series) {
         if(typeof(series) == "string")
             series = data.series[series];
         
-        if(legend.mouseOverToggle) {
-            legend.mouseOverToggle = false;
-            pipeline.start('Find Which Data is Shown');
+        if(this.cursorHeldDown) {
+            this.cursorHeldDown = false;
+            triggers.emit('timeseries:stack')// TODO
+//            pipeline.start('Find Which Data is Shown');
         }
     },
     highlightSeries: function(series) {
@@ -469,9 +507,9 @@ TimeseriesLegend.prototype = {
         var resolution = this.app.ops['View']['Resolution'].get();
         var i_r = ['minute', 'tenminute', 'hour', 'day'].indexOf(resolution);
         var i_t = time_obj.stamp_index[util.formatDate(time)];
-        var value_i = time_obj.indices[i_t][i_r] + 1;
-        var time_min = time_obj[resolution + 's'][value_i - 1];
-        var time_max = time_obj[resolution + 's'][value_i];
+        var value_i = time_obj.indices[i_t][i_r];
+        var time_min = time_obj[resolution + 's'][value_i];
+        var time_max = time_obj[resolution + 's'][value_i + 1];
         
         triggers.emit('fetch tweets', {
             collection: series.chart == 'context' ? 'event' : 'subset',
@@ -486,9 +524,6 @@ TimeseriesLegend.prototype = {
         this.tooltip.on();
         
         triggers.emit('series:highlight', series);
-//        disp.tooltip.on();
-//        
-//        legend.highlightSeries(series);
     },
     chartHoverMove: function(series) {
         this.tooltip.move(d3.event.x, d3.event.y);
@@ -504,9 +539,9 @@ TimeseriesLegend.prototype = {
         var resolution = this.app.ops['View']['Resolution'].get();
         var i_r = ['minute', 'tenminute', 'hour', 'day'].indexOf(resolution);
         var i_t = time_obj.stamp_index[util.formatDate(time)];
-        var value_i = time_obj.indices[i_t][i_r] + 1;
-        var time_min = time_obj[resolution + 's'][value_i - 1];
-        var time_max = time_obj[resolution + 's'][value_i];
+        var value_i = time_obj.indices[i_t][i_r];
+        var time_min = time_obj[resolution + 's'][value_i];
+        var time_max = time_obj[resolution + 's'][value_i + 1];
 
         // Fetch column
         var focus_column = chart.column_highlight;
@@ -552,49 +587,50 @@ TimeseriesLegend.prototype = {
             trigger.emit('series:highlight', series);
     },
     chartHoverEnd: function(series) {
-//        triggers.emit('timeseries:column',) // TODO
-//        disp.focus.svg.select('path.column_hover')
-//            .style('display', 'none');
+        this.app[series.chart].column_highlight.style('display', 'none');
         
         this.tooltip.off();
         triggers.emit('series:unhighlight');
     },
     toggleSeries: function(series) {
-        if(typeof(series) == "string")
-            series = data.series[series];
+        series.data.shown = !series.data.shown;
+        triggers.emit('series:legend visibility', series);
         
-        series.shown = !series.shown;
-        legend.showOrHideSeries(series);
-        
-        if(!legend.mouseOverToggle) {
-            pipeline.start('Find Which Data is Shown');
+        if(!this.cursorHeldDown) {
+            // TODO
+//            pipeline.start('Find Which Data is Shown');
         }
     },
     showOrHideSeries: function(series) {
-        d3.select('.' + series.id + ' .legend_icon')
-            .classed('off', !series.shown);
+        d3.select('.subset_' + series.ID + ' .legend_icon')
+            .classed('off', series.data && !series.data.shown);
         
-        if(options['Series']['Clean Legend'].is("true") && !series.shown) {
-            disp.fadeOut('.legend_entry.' + series.id);
+        if(!series.data || (this.app.ops['Series']['Clean Legend'].is("true") && !series.data.shown)) {
+            this.fadeOut('.legend_entry.subset_' + series.ID);
         } else {
-            disp.fadeIn('.legend_entry.' + series.id, 'table-row');
+            this.fadeIn('.legend_entry.subset_' + series.ID, 'table-row');
         }
     },
-    showOrHideCategory: function(category) {
-        category.series_plotted
-                .forEach(legend.showOrHideSeries);
+    showOrHideFeature: function(feature) { // TODO fix
+        feature.subsets.forEach(triggers.emitter('series:legend visibility'));
         
-        if(options['Series']['Clean Legend'].is("true") && !category.filter) {
-            disp.fadeOut('.legend_section.' + category.id);
+        // See if any of it's children are active
+        var children_shown = d3.max(feature.subsets, subset => subset.data && subset.data.shown);
+        
+        if(this.app.ops['Series']['Clean Legend'].is("true") && !children_shown) {
+            this.fadeOut(feature.div);
+        } else if(!feature.shown) {
+            this.fadeOut(feature.list_div);
         } else {
-            disp.fadeIn('.legend_section.' + category.id, 'block');
+            this.fadeIn(feature.div, 'block');
+            this.fadeIn(feature.list_div, 'block');
         }
     },
-    showOrHideAll: function(category) {
-        if(category) {
-            legend.showOrHideCategory(category);
+    showOrHideAll: function(feature) {
+        if(feature) {
+            this.showOrHideFeature(feature);
         } else {
-            data.cats_arr.forEach(legend.showOrHideCategory);
+            this.features_arr.forEach(this.showOrHideFeature);
         }
     },
     toggleSingle: function(series) {
@@ -624,12 +660,10 @@ TimeseriesLegend.prototype = {
         pipeline.start('Find Which Data is Shown');
     },
     hoverOverSeries: function(series) {
-        if(typeof(series) == "string")
-            series = data.series[series];
-        
         window.getSelection().removeAllRanges()
-        if(legend.mouseOverToggle && series.shown != legend.mouseOverToggleState) {
-            legend.toggleSeries(series);
+        if(this.cursorHeldDown && series.data.shown != this.cursorToggleTo) {
+            series.data.shown = this.cursorToggleTo;
+            triggers.emit('series:legend visibility', series);
         }
     },
     configureFilters: function() {
@@ -659,7 +693,7 @@ TimeseriesLegend.prototype = {
                 series.shown = on;
             }
             
-            legend.showOrHideSeries(series);
+            triggers.emit('series:legend visibility', series);
         });
         
         // Render any changes
@@ -694,5 +728,21 @@ TimeseriesLegend.prototype = {
             div.attr('disabled', true)
                 .html('In Chart');
         }
-    }
+    },
+    fadeIn: function(d3_object, display) {
+        if(typeof(d3_object) == "string")
+            d3_object = d3.select(d3_object);
+        d3_object.transition()
+            .style('opacity', 1)
+            .style('display', display || 'table');
+    },
+    fadeOut: function(d3_object) {
+        if(typeof(d3_object) == "string")
+            d3_object = d3.select(d3_object);
+        d3_object.transition()
+            .style('opacity', 0)
+            .each('end', function() {
+                d3.select(this).style('display', 'none')
+            });
+    },
 }

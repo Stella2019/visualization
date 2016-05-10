@@ -111,10 +111,11 @@
                   "    ON TweetUser.`UserID` = User.UserID ";
 
         $conds[] = "User.Bot = " . $_REQUEST["userbot"];
+        $conds[] = "User.Subset = 1100"; // Just the bot IDs from the main list
     }
     if(isset($_REQUEST["userdesc"])) {
         $query .= "JOIN TweetUser " .
-                  "    ON Tweet.`ID` = TweetUser.Tweet " .
+                  "    ON Tweet.`ID` = TweetUser.Tweet ";
 
         $conds[] = "LOWER(TweetUser.Description) REGEXP '" . $_REQUEST["userdesc"] . "'";
     }
@@ -131,6 +132,7 @@
         } else {
             $conds[] = "User.Botnet LIKE '%$botnet%'";
         }
+        $conds[] = "User.Subset = 1100"; // Just the bot IDs from the main list
     }
 
     if(isset($_REQUEST["source"]))

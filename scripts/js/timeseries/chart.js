@@ -198,17 +198,18 @@ TimeseriesChart.prototype = {
         var ymax_manual = this.app.ops['View']['Y Max Toggle'].is('true')
         && this.id == 'focus';
         var ymax_op = this.app.ops['View']['Y Max'];
+        var series_plotted = this.series_arr.filter(series => series.shown);
         
         // Set the Y Domain
         var y_min = 0;
         if(scale == 'log') y_min = 1;
 
         var y_max = 100;
-        var biggest_datapoint = d3.max(this.series_arr.map(d => d.max));
-        var highest_datapoint = // because of stacked data
-            d3.max(this.series_arr[0].values.map(function (d) {
+        var biggest_datapoint = d3.max(series_plotted.map(d => d.max));
+        var highest_datapoint = series_plotted && series_plotted[0] ?
+            d3.max(series_plotted[0].values.map(function (d) {
                 return (d.value0 || 0) + d.value;
-            }));
+            })) : 100;
 //        var biggest_totalpoint = 
 //            d3.max(data.total_tweets.map(function (d) {
 //                return d.value;
@@ -268,7 +269,7 @@ TimeseriesChart.prototype = {
     placeSeries: function() {
         if(!this.series_arr || this.series_arr.length == 0) {
             this.series_objects = [];
-            console.log('placeSeries on ' + this.id + ', no series to place: ', this.series_arr);
+//            console.log('placeSeries on ' + this.id + ', no series to place: ', this.series_arr);
             return;
         }
         this.setYAxes();
@@ -281,7 +282,6 @@ TimeseriesChart.prototype = {
         this.series_objects.enter().append('g')
             .on('click', triggers.emitter('series:chart click'))
             .on('mouseover', triggers.emitter('series:chart enter'))
-//            .on('mousemove', triggers.emitter('series:chart hover'))
             .on('mousemove', function(d) {
                 var xy = d3.mouse(this);
                 d.cursor_xy = xy;
@@ -298,6 +298,10 @@ TimeseriesChart.prototype = {
         
         this.paths = this.series_objects.append("path")
             .attr("class", "area");
+        
+        // Hide series that are not shown but exist in the background
+        this.series_objects
+            .style('display', subset => subset.shown ? 'block' : 'none');
         
         triggers.emit(this.id + ':render series');
     },
@@ -332,9 +336,10 @@ TimeseriesChart.prototype = {
 
         this.series_objects.classed("lines", plottype == 'lines'); // TODO
         transition.select("path.area")
-            .style("fill", function (d) { return d.fill; })
+            .style("fill", series => series.fill)
             .style("fill-opacity", fill_opacity)
-            .style("stroke", function (d) { return d.stroke; })
-            .attr("d", function(d) { return this.area(d.values)}.bind(this));
+            .style("stroke", series => series.stroke)
+            .attr("d", series => series.shown ? this.area(series.values) : '');
+//            .attr("d", function(d) { return this.area(d.values)}.bind(this));
     },
 };
