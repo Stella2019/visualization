@@ -164,7 +164,7 @@ var util = {
                     match: term
                 }); 
             }).join('<span class="match_addon"> or </span>');
-        } else if(match.includes('!')) {
+        } else if(match.charAt(0) == '!' && feature != 'Text') {
             match = '<span class="match_addon not">not </span>' + util.subsetName({feature: feature, match: match.slice(1)});
         } else if(feature.includes('UTC')) {
             var hours = parseFloat(match) / 60 / 60;
@@ -988,7 +988,7 @@ potplourri = {
             max: tweet_max,
             progress_text: '{cur} / {max}',
             on_chunk_finish: function(d) { 
-                if(d.includes(':')) { // new subset id
+                if(d.includes(':') && !d.includes('>:')) { // new subset id
                     post.subset = d.slice(0, d.indexOf(':'));
                 }
                 console.log(d);

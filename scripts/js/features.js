@@ -1063,16 +1063,18 @@ FeatureDistribution.prototype = {
             .html('Tweets: ' + set.counted);
         
         this.desc_b.selectAll('*').remove();
-        var cmp;
+        var cmp = false;
         if(comparesetname) {
             cmp = this.data[comparesetname];
-            if(cmp) {
+            if(cmp && cmp.counted) {
                 this.desc_b.append('h3')
                     .html('Set B: ' + cmp.label);
                 this.desc_b.append('h4')
                     .html(cmp.collection + ' ' + cmp.id);
                 this.desc_b.append('p')
                     .html('Tweets: ' + cmp.counted);
+            } else {
+                cmp = false;
             }
         }
     
