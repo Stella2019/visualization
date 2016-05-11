@@ -729,6 +729,87 @@ Connection.prototype = {
         this.chunk_index = -100;
     }
 };
+standardConnections = {
+    genInCombinedEvent: function(event, new_event, tweet_min, tweet_max) {
+        var connection = new Connection({
+            url: 'analysis/genInCombinedEvent',
+            post: {event: event, new_event: new_event}, 
+            min : tweet_min, 
+            max: tweet_max,
+            progress_text: '{cur} / {max}',
+            on_chunk_finish: function(d) { 
+                console.log(d + ' Tweets Added');
+            }});
+        
+        connection.startStream();
+        return connection;
+    },
+    genInSubset: function(post, tweet_min, tweet_max) {
+        if(!tweet_min) {
+            // If the user doesn't provide an minimum tweet (or a max)
+            // and we are in the status report, we can get it from the event list
+            if('event' in post && SR) { 
+                var event = SR.events[post.event];
+                tweet_min = event['FirstTweet'];
+                tweet_max = event['LastTweet'];
+            } else if('superset' in post && SR) { 
+                var subset = SR.subsets[post.superset];
+                tweet_min = subset['FirstTweet'];
+                tweet_max = subset['LastTweet'];
+            } else {
+                console.error("need to provide minimum tweet");
+            }
+        }
+        
+        var connection = new Connection({
+            url: 'analysis/genInSubset',
+            post: post,
+            min : tweet_min, 
+            max: tweet_max,
+            progress_text: '{cur} / {max}',
+            on_chunk_finish: function(d) { 
+                if(d.includes(':') && !d.includes('>:')) { // new subset id
+                    post.subset = d.slice(0, d.indexOf(':'));
+                }
+                console.log(d);
+            }});
+        
+        connection.startStream();
+        return connection;
+    },
+    genUsers: function(event, subset, tweet_min, tweet_max) {
+        var post = {
+            event: event,
+            subset: subset || 0
+        }
+        if(!tweet_min) {
+            if(subset && SR) {
+                var subset = SR.subsets[subset];
+                tweet_min = subset['FirstTweet'];
+                tweet_max = subset['LastTweet'];
+            } else if(SR) { 
+                var event = SR.events[event];
+                tweet_min = event['FirstTweet'];
+                tweet_max = event['LastTweet'];
+            } else {
+                console.error("Need to provide event and/or minimum and maximum tweet id");
+            }
+        }
+        
+        var connection = new Connection({
+            url: 'analysis/genUsers',
+            post: post, 
+            min : tweet_min, 
+            max: tweet_max,
+            progress_text: '{cur} / {max}',
+            on_chunk_finish: function(d) { 
+                console.log('Signal(' + d + '), counting users for Event ' + event + (subset ? ', Subset ' + subset : ''));
+            }});
+        
+        connection.startStream();
+        return connection;
+    },
+};
 
 function Tooltip() {
     this.div = {};
@@ -957,55 +1038,3 @@ Progress.prototype = {
         }
     },
 };
-
-
-// Random code that needs a better home:
-potplourri = {
-    addInCombinedEvent: function(event, new_event, tweet_min, tweet_max) {
-        var connection = new Connection({
-            url: 'analysis/genInCombinedEvent',
-            post: {event: event, new_event: new_event}, 
-            min : tweet_min, 
-            max: tweet_max,
-            progress_text: '{cur} / {max}',
-            on_chunk_finish: function(d) { 
-                console.log(d + ' Tweets Added');
-            }});
-        
-        connection.startStream();
-        return connection;
-    },
-    addInSubset: function(post, tweet_min, tweet_max) {
-        if(!tweet_min) {
-            // If the user doesn't provide an minimum tweet (or a max)
-            // and we are in the status report, we can get it from the event list
-            if('event' in post && SR) { 
-                var event = SR.events[post.event];
-                tweet_min = event['FirstTweet'];
-                tweet_max = event['LastTweet'];
-            } else if('superset' in post && SR) { 
-                var subset = SR.subsets[post.superset];
-                tweet_min = subset['FirstTweet'];
-                tweet_max = subset['LastTweet'];
-            } else {
-                console.error("need to provide minimum tweet");
-            }
-        }
-        
-        var connection = new Connection({
-            url: 'analysis/genInSubset',
-            post: post,
-            min : tweet_min, 
-            max: tweet_max,
-            progress_text: '{cur} / {max}',
-            on_chunk_finish: function(d) { 
-                if(d.includes(':') && !d.includes('>:')) { // new subset id
-                    post.subset = d.slice(0, d.indexOf(':'));
-                }
-                console.log(d);
-            }});
-        
-        connection.startStream();
-        return connection;
-    }
-}

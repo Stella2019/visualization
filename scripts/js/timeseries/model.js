@@ -165,7 +165,6 @@ TimeseriesModel.prototype = {
     continueLoadingSubsetTimeseries: function() {
         if(this.subset_load.index >= this.subset_load.subsets.length) {
             // Then we are probably done and we can stop, but start a new process to verify
-            console.log('done?');
             triggers.emit('subset_load:ready');
             return;
         }

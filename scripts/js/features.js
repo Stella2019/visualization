@@ -425,7 +425,7 @@ FeatureDistribution.prototype = {
                 counted: 0
             };
             if(collection_type == 'subset') {
-                data.subset = this.dataset['subsets'][data.id];
+                data.subset = this.dataset['subsets'][data.id] || this.dataset['subsets2'][data.id];
                 data.event = this.dataset['events'][data.subset.Event];
                 data.label = (data.event.DisplayName || data.event.Name) + ' - ' + data.subset.Feature + ' - ' + util.subsetName(data.subset);
                 data.FirstTweet = data.subset['FirstTweet'];

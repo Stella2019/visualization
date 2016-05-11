@@ -17,8 +17,13 @@
         "InEvent.`Distinct` = LEAST(InEvent.`Distinct`, Original.`Distinct`); ";
     
     $result = $mysqli->query($query);
-     
-    print $result;
+    
+    if(!$result) {
+        print ($query);
+        print (mysqli_error($mysqli));
+    } else {
+        print ($result);
+    }
 
     $mysqli->close();
 ?>
