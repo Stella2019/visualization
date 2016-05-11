@@ -282,7 +282,6 @@ CollectionManager.prototype = {
 //        global_min_id = this.event.FirstTweet || util.timestamp2TwitterID(this.ime.event_min);
 //        global_max_id = this.event.LastTweet  || util.timestamp2TwitterID(this.time.event_max);
         
-        triggers.emit('time_window:set');
         triggers.emit('event:updated', this.event);
     },
     setEvent2: function () {

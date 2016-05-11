@@ -48,7 +48,7 @@ def main():
             
             data = {
                 'Event': -9, # -9, 1100 || -8, 780|872 || 91, 1090
-                'Subset': 1100,
+                'Subset': 1745, # 1745 all TRS
 #                'Screenname': row[0],
 #                'TruthyContent': row[1],
 #                'TruthyTemporal': row[2],
