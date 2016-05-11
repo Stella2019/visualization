@@ -800,7 +800,7 @@ Options.prototype = {
             label: "Collection Overview",
             url: "status.html"
         },{
-            label: "<span class='text-warning'>Timeseries</span> (in progress)",
+            label: "Timeseries",
             url: "timeseries.html"
         },{
             label: "<span class='text-danger'>Coding</span> (not working)",

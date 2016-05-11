@@ -1,4 +1,3 @@
-
 function TimeseriesModel (app) {
     this.app = app;
     this.connection = new Connection();
@@ -61,11 +60,10 @@ TimeseriesModel.prototype = {
         // Triggers that need to be better set
         triggers.on('chart:resolution change', this.prepareTimeseries.bind(this));
     },
-    setEvent: function() {
-        this.event_id = this.app.collection.event.ID;
+    setEvent: function(event) {
         this.subset_ids = [];
         
-        triggers.emit('timeseries:load', 'event');
+//        triggers.emit('timeseries:load', 'event');
     },
     setSubsets: function() {
         this.subsets = this.app.collection.subsets;
@@ -73,19 +71,18 @@ TimeseriesModel.prototype = {
         
 //        triggers.emit('subset_load:ready', 'event');
     },
-    loadTimeseries: function(id, b) {
+    loadTimeseries: function(id) {
         var type;
         if(typeof(id) == 'number') {
             type = 'subset';
         } else {
+            // If there is no event information, end
+            if (!this.app.collection.event || !('ID' in this.app.collection.event)) {
+                return;
+            }
             type = 'event';
-            id = this.event_id;
+            id = this.app.collection.event.ID;
         }
-        // If there is no event information, end, we cannot do this yet
-        if (type == 'event' && $.isEmptyObject(this.app.collection.event)) {
-            return;
-        }
-        
         if(this.streamTimeseries)
             this.streamTimeseries.stop();
 
@@ -125,9 +122,10 @@ TimeseriesModel.prototype = {
         var time_max = this.app.ops['Dataset']['Time Max'].date.getTime();
         var op_shown = this.app.ops['Series']['Shown'];
         if(this.subset_load && 
-           this.subset_load.event == this.event_id) { // Existing event
+           this.subset_load.event == this.app.collection.event.ID) { // Existing event
             if(this.subset_load.time_max <= time_max) { // We already have the necessary datapoints
                 // Don't need to reload, return
+                this.subset_load.prog.end();
                 return;
             }
             // Otherwise we need more data!
@@ -137,7 +135,7 @@ TimeseriesModel.prototype = {
             
             // If we have subsets in common with above, then we can load as usual
             var intersect = util.lintersect(this.subset_ids, subsets);
-            if(intersect) {
+            if(intersect && intersect.length > 0) {
                 op_shown.set(intersect);
             } else {
                 // Otherwise we will just put the new ones in!
@@ -147,7 +145,7 @@ TimeseriesModel.prototype = {
         }
         
         this.subset_load = {
-            event: this.event_id,
+            event: this.app.collection.event.ID,
             subsets: this.subset_ids,
             index: -1,
             time_max: time_max,
@@ -165,13 +163,15 @@ TimeseriesModel.prototype = {
         triggers.emit('subset_load:continue');
     },
     continueLoadingSubsetTimeseries: function() {
+        if(this.subset_load.index >= this.subset_load.subsets.length) {
+            // Then we are probably done and we can stop, but start a new process to verify
+            console.log('done?');
+            triggers.emit('subset_load:ready');
+            return;
+        }
+        
         this.subset_load.index++;
         this.subset_load.prog.update(this.subset_load.index);
-        
-        if(this.subset_load.index >= this.subset_load.subsets.length) {
-            this.subset_load.prog.end();
-            return; // All done!
-        }
         
         var subset = this.subset_load.subsets[this.subset_load.index];
         triggers.emit('timeseries:load', subset);

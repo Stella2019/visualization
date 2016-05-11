@@ -249,7 +249,7 @@ Timeseries.prototype = {
                 type: "toggle",
                 callback: triggers.emitter('legend:clean'),
             }),
-            'Shown': new Option({
+            Shown: new Option({
                 title: "Series Shown",
                 labels: ['List'],
                 ids:    [[]],
@@ -267,22 +267,6 @@ Timeseries.prototype = {
                 type: "dropdown",
                 callback: function() { /* nothing */ }
             }),
-//            'N-Gram View': new Option({
-//                title: 'Fetch NGrams',
-//                labels: ["Whole Event"],
-//                ids:    ["e_event"],
-//                default: 0,
-//                type: "dropdown",
-//                callback: function() { data.calculateNGrams('ngram_view'); }
-//            }),
-//            'N-Gram Compare': new Option({
-//                title: 'compare w/',
-//                labels: ['-', 'Whole Event'],
-//                ids:    ['', 'e_event'],
-//                default: 0,
-//                type: "dropdown",
-//                callback: function() { data.calculateNGrams('ngram_cmp'); }
-//            })
         };
         
         // Add dataset options

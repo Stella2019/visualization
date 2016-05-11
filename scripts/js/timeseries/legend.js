@@ -256,8 +256,6 @@ TimeseriesLegend.prototype = {
         if(subset.data.chart == 'focus') {
             subset.color = subset.feature.color(subset.ID);
             subset.data.Label = subset.Label;
-            
-            console.log(subset.ID, this.app.ops['Series']['Shown'].get(),  this.app.ops['Series']['Shown'].get().includes(parseInt(subset.ID)));
             subset.data.shown = this.app.ops['Series']['Shown'].get()
                 .includes(parseInt(subset.ID));
             

@@ -758,6 +758,7 @@ FeatureDistribution.prototype = {
                 DistinctDomains: hasURL,
                 DistinctDomainsPerURL: hasURL,
                 Domains: new Counter(),
+                Sources: new Counter(),
 
                 CreatedAt: creation,
                 Age: age,
@@ -859,6 +860,7 @@ FeatureDistribution.prototype = {
                 set.counter['User Based__URLs__Distinct Domains'].incr(user['DistinctDomains']);
                 set.counter['User Based__URLs__Distinct Domains Per URL'].incr(user['DistinctDomainsPerURL']);
             }
+            user['Sources'].incr(tweet['Source'].replace(/.*>(.*)<.*/, '$1'));
         } else { // Old user
             user = set.users[tweet.UserID];
 
@@ -1002,6 +1004,7 @@ FeatureDistribution.prototype = {
                 set.counter['User Based__URLs__Distinct Domains'].incr(user['DistinctDomains']);
                 set.counter['User Based__URLs__Distinct Domains Per URL'].incr(user['DistinctDomainsPerURL']);
             }
+            user['Sources'].incr(tweet['Source'].replace(/.*>(.*)<.*/, '$1'));
         }
         
         // Users mentioned
