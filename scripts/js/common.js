@@ -39,6 +39,17 @@ var util = {
     lunique: function(list) {
         return Array.from(new Set(list)).sort();
     },
+    lunion: function(A, B) {
+        return [...new Set([...A, ...B])];
+    },
+    lintersect: function(A, B) {
+        B = new Set(B);
+        return A.filter(e => B.has(e));
+    },
+    ldiff: function(A, B) {
+        B = new Set(B);
+        return A.filter(e => !B.has(e));
+    },
     range: function(length) {
         var arr = [];
         for(var i = 0; i < length; i++) {
@@ -48,10 +59,10 @@ var util = {
     },
     zeros: function(length, width) { // just initialize a 1D or 2D matrix filled with zeros like in Matlab
         if(!width) {
-            return d3.range(length).map(function() { return 0; });
+            return d3.range(length).map(d => 0);
         } else {
             return d3.range(length).map(function() { 
-                return d3.range(width).map(function() { return 0; });
+                return d3.range(width).map(d => 0);
             });
         }
     },
@@ -390,13 +401,13 @@ Counter.prototype = {
             // If it is bigger than a candidate
             if(minVal < val) {
                 if(moreThanMin >= k - 1)
-                    top = top.filter(function(d) { return d.value > minVal});
+                    top = top.filter(d => d.value > minVal);
                 top.push({
                     key: key,
                     value: val
                 });
-                minVal = d3.min(top, function(d) { return d.value});
-                moreThanMin = top.filter(function(d) { return d.value > minVal}).length;
+                minVal = d3.min(top, d => d.value);
+                moreThanMin = top.filter(d => d.value > minVal).length;
             } else if(minVal == val) {
                 top.push({
                     key: key,
@@ -473,7 +484,7 @@ Counter.prototype = {
         var stats = {};
         
         var entries = this.counts.entries();
-        entries.sort(function(a, b) { return parseFloat(a.key) - parseFloat(b.key); });
+        entries.sort((a, b) => parseFloat(a.key) - parseFloat(b.key));
         if(verbose) console.log(entries);
         
         // Quartiles

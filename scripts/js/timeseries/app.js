@@ -132,10 +132,10 @@ Timeseries.prototype = {
         this.ops['View'] = {
             'Plot Type': new Option({
                 title: "Plot Type",
-                labels: ["Stacked", "Overlap", "Lines", "Stream", "Separate", "100%"],
-                ids:    ["stacked", "overlap", "lines", "stream", "separate", "percent"],
+                labels: ["Stacked", "Overlap", "Lines", "Stream", "Stream-Expand", "Wiggle", "Separate", "100%"],
+                ids:    ["stacked", "overlap", "lines", "stream", "stream_expand", "wiggle", "separate", "percent"],
                 default: 0,
-                available: [0, 1, 2, 3, 4],
+                available: [0, 1, 2, 3, 4, 5, 6],
                 callback: triggers.emitter('timeseries:stack')
             }),
             Resolution: new Option({

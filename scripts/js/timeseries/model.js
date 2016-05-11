@@ -123,11 +123,27 @@ TimeseriesModel.prototype = {
     },
     loadSubsetTimeseries: function() {
         var time_max = this.app.ops['Dataset']['Time Max'].date.getTime();
+        var op_shown = this.app.ops['Series']['Shown'];
         if(this.subset_load && 
-           this.subset_load.event == this.event_id &&
-           this.subset_load.time_max < time_max) {
-            // Don't need to reload, return
-            return;
+           this.subset_load.event == this.event_id) { // Existing event
+            if(this.subset_load.time_max <= time_max) { // We already have the necessary datapoints
+                // Don't need to reload, return
+                return;
+            }
+            // Otherwise we need more data!
+        } else {
+            // Do we already have subsets listed as shown?
+            var subsets = op_shown.get();
+            
+            // If we have subsets in common with above, then we can load as usual
+            var intersect = util.lintersect(this.subset_ids, subsets);
+            if(intersect) {
+                op_shown.set(intersect);
+            } else {
+                // Otherwise we will just put the new ones in!
+                op_shown.set(this.subset_ids.map(e => e));
+            }
+            this.app.ops.recordState();
         }
         
         this.subset_load = {
@@ -158,11 +174,7 @@ TimeseriesModel.prototype = {
         }
         
         var subset = this.subset_load.subsets[this.subset_load.index];
-//        if(subset >= 1735 || subset == 872) {
-            triggers.emit('timeseries:load', subset);
-//        } else {
-//            setTimeout(triggers.emitter('subset_load:continue'), 1);
-//        }
+        triggers.emit('timeseries:load', subset);
     },
     parseTimeseries: function(id) {
         // Reenable the button to choose the event
@@ -244,7 +256,7 @@ TimeseriesModel.prototype = {
             series.Label = 'Subset ' + id;
             series.color = cols(id);
             series.chart = 'focus';
-            series.shown = true;
+            series.shown = this.app.ops['Series']['Shown'].get().includes(id);
             
             triggers.emit('timeseries:add', series);
         }

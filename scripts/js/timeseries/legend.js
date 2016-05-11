@@ -257,8 +257,9 @@ TimeseriesLegend.prototype = {
             subset.color = subset.feature.color(subset.ID);
             subset.data.Label = subset.Label;
             
+            console.log(subset.ID, this.app.ops['Series']['Shown'].get(),  this.app.ops['Series']['Shown'].get().includes(parseInt(subset.ID)));
             subset.data.shown = this.app.ops['Series']['Shown'].get()
-                .includes(subset.ID);
+                .includes(parseInt(subset.ID));
             
             // Turn on/off the legend entry // TODO verify consequences
 //            if(subset.data.shown) {
@@ -594,9 +595,17 @@ TimeseriesLegend.prototype = {
     },
     toggleSeries: function(series) {
         series.data.shown = !series.data.shown;
+        var visible = this.app.ops['Series']['Shown'].get();
+        if(series.data.shown) {
+            visible = util.lunion(visible, [series.data.ID])
+        } else {
+            visible = util.ldiff(visible, [series.data.ID])
+        }
+        this.app.ops['Series']['Shown'].set(visible);
         triggers.emit('series:legend visibility', series);
         
         if(!this.cursorHeldDown) {
+            this.app.ops.recordState();
             // TODO
 //            pipeline.start('Find Which Data is Shown');
         }
@@ -630,10 +639,10 @@ TimeseriesLegend.prototype = {
         if(feature) {
             this.showOrHideFeature(feature);
         } else {
-            this.features_arr.forEach(this.showOrHideFeature);
+            this.features_arr.forEach(this.showOrHideFeature, this);
         }
     },
-    toggleSingle: function(series) {
+    toggleSingle: function(series) { // TODO fix or discard
         if(typeof(series) == "string")
             series = data.series[series];
         
@@ -649,7 +658,7 @@ TimeseriesLegend.prototype = {
 
         pipeline.start('Find Which Data is Shown');
     },
-    showAll: function(category) {
+    showAll: function(category) { // TODO fix or discard
         
         category.series_plotted.forEach(function(series) {
             series.shown = true;
@@ -663,10 +672,20 @@ TimeseriesLegend.prototype = {
         window.getSelection().removeAllRanges()
         if(this.cursorHeldDown && series.data.shown != this.cursorToggleTo) {
             series.data.shown = this.cursorToggleTo;
+            
+            var visible = this.app.ops['Series']['Shown'].get();
+            if(series.data.shown) {
+                visible = util.lunion(visible, [series.data.ID])
+            } else {
+                visible = util.ldiff(visible, [series.data.ID])
+            }
+            this.app.ops['Series']['Shown'].set(visible);
+            
+            this.app.ops.recordState();
             triggers.emit('series:legend visibility', series);
         }
     },
-    configureFilters: function() {
+    configureFilters: function() { // TODO fix or discard
         data.cats_arr.forEach(function(category) {
             // Toggle on if it is the display chart
             if(options['Series']['Chart Category'].is(category.name)) {
@@ -677,7 +696,7 @@ TimeseriesLegend.prototype = {
             legend.filterStyle(category);
         });
     },
-    filterToggle: function(category) {
+    filterToggle: function(category) { // TODO fix or discard
         var on = !category.filter;
         category.filter = on;
         
