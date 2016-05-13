@@ -125,10 +125,51 @@ function Timeseries () {
 }
 Timeseries.prototype = {
     setOptions: function() {
-        this.ops.panels = ['Dataset', 'View', 'Series', 'Analysis'];
+        this.ops.panels = ['Dataset', 'Series', 'View', 'Analysis'];
         var options = this.ops;
         
         this.ops['Dataset'] = { };
+        this.ops['Series'] = {
+            'Tweet Types': new Option({
+                title: 'Tweet Types',
+                labels: ['Any', 'Split', 'Originals', 'Retweets', 'Replies', 'Quotes'],
+                ids:    ['any', 'split', 'original', 'retweet', 'reply', 'quote'],
+                default: 0,
+                callback: triggers.emitter('timeseries:ready')
+            }),
+            Unit: new Option({
+                title: 'Unit',
+                labels: ['Count of Tweets', 'Count of Distinct', 'Exposure'],
+                ids:    ['count', 'distinct', 'exposure'],
+                default: 0,
+                callback: triggers.emitter('timeseries:ready')
+            }),
+            Order: new Option({
+                title: "Order Legend by",
+                labels: ["Original", "Alphabet", "Volume Visible", 'Volume Overall'],
+                ids:    ["orig", "alpha", 'volume shown', 'volume'],
+                default: 3,
+                render: false,
+                callback: triggers.emitter('legend:order'),
+            }),
+            'Clean Legend': new Option({
+                title: "Clean Up Legend",
+                styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
+                labels: ["No", 'Yes'],
+                ids:    ["false", "true"],
+                default: 0,
+                type: "toggle",
+                callback: triggers.emitter('legend:clean'),
+            }),
+            Shown: new Option({
+                title: "Series Shown",
+                labels: ['List'],
+                ids:    [[]],
+                render: false,
+                custom_entries_allowed: true, 
+                callback: triggers.emitter('chart:visible'), // TODO
+            })
+        };     
         this.ops['View'] = {
             'Plot Type': new Option({
                 title: "Plot Type",
@@ -218,46 +259,6 @@ Timeseries.prototype = {
                 callback: triggers.emitter('chart:focus time')
             })
         };
-        this.ops['Series'] = {
-            'Tweet Types': new Option({
-                title: 'Tweet Types',
-                labels: ['Any', 'Split', 'Originals', 'Retweets', 'Replies', 'Quotes'],
-                ids:    ['any', 'split', 'original', 'retweet', 'reply', 'quote'],
-                default: 0,
-                callback: triggers.emitter('timeseries:ready')
-            }),
-            Unit: new Option({
-                title: 'Unit',
-                labels: ['Count of Tweets', 'Count of Distinct', 'Exposure'],
-                ids:    ['count', 'distinct', 'exposure'],
-                default: 0,
-                callback: triggers.emitter('timeseries:ready')
-            }),
-            Order: new Option({
-                title: "Order Legend by",
-                labels: ["Original", "Alphabet", "Volume Visible", 'Volume Overall'],
-                ids:    ["orig", "alpha", 'volume shown', 'volume'],
-                default: 3,
-                callback: triggers.emitter('legend:order'),
-            }),
-            'Clean Legend': new Option({
-                title: "Clean Up Legend",
-                styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
-                labels: ["No", 'Yes'],
-                ids:    ["false", "true"],
-                default: 0,
-                type: "toggle",
-                callback: triggers.emitter('legend:clean'),
-            }),
-            Shown: new Option({
-                title: "Series Shown",
-                labels: ['List'],
-                ids:    [[]],
-                render: false,
-                custom_entries_allowed: true, 
-                callback: triggers.emitter('chart:visible'), // TODO
-            })
-        };     
         this.ops['Analysis'] = {
             'Fetched Tweet Order': new Option({
                 title: 'Fetched Tweets Order',
@@ -274,6 +275,28 @@ Timeseries.prototype = {
         
 //        this.ops.updateCollectionCallback = function() { data.loadRumors(); }; // TODO fix this
         this.ops.init();
+    },
+    publicationFormat: function() {
+        var feat = TS.legend.features["Code"];
+        feat.color = d3.scale.category10()
+                .domain(feat.subsets.map(d => d.ID));
+        TS.focus.xAxis.ticks(8);
+        TS.focus.yAxis.ticks(4);
+        TS.context.xAxis.ticks(8);
+        TS.context.yAxis.ticks(4);
+    },
+    pubTicks: function() {
+        var unit = TS.ops['Series']['Unit'].get();
+        if(unit == 'count') {
+            TS.focus.yAxis.tickFormat(x => x);
+            TS.context.yAxis.tickFormat(x => x / 1e3 + 'k');
+        } else if(unit == 'distinct') {
+            TS.focus.yAxis.tickFormat(x => x);
+            TS.context.yAxis.tickFormat(x => x / 1e3 + 'k');
+        } else if(unit == 'exposure') {
+            TS.focus.yAxis.tickFormat(x => x / 1e6 + 'M');
+            TS.context.yAxis.tickFormat(x => x / 1e9 + 'G');
+        }
     },
 };
 

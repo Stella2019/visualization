@@ -353,6 +353,10 @@ FeatureDistribution.prototype = {
             .html('Mentions')
             .on('click', this.userMentionsUpload.bind(this));
         
+        load_buttons.append('button')
+            .attr('class', 'btn btn-xs upload-sources')
+            .html('Sources')
+            .on('click', this.userSourceUpload.bind(this));
 //        load_buttons.append('button')
 //            .attr('class', 'btn btn-xs upload-lexicon')
 //            .html('Lexicon')
@@ -397,6 +401,8 @@ FeatureDistribution.prototype = {
         button_box.select('.upload-users')
             .classed('btn-default', has_dataset ? true : false);
         button_box.select('.upload-mentions')
+            .classed('btn-default', has_dataset ? true : false);
+        button_box.select('.upload-sources')
             .classed('btn-default', has_dataset ? true : false);
         button_box.select('.upload-lexicon')
             .classed('btn-default', has_dataset ? true : false);
@@ -2148,6 +2154,88 @@ FeatureDistribution.prototype = {
         
         // Upload!
         this.connection.php('analysis/uploadUserRelations', post, success, failure);
+    },
+    userSourceUpload: function(setname) {
+        var set = this.data[setname];
+        if(!set) return;
+        
+        var mobileclients = new Set('Mobile Web', 'Mobile Web (M5)', 'Mobile Web (M2)', 'Twitter For Android', 'Twitter for iPhone', 'Twitter for Windows Phone', 'Twitter for iPad', 'Twitter for Blackberry');
+        
+        // Build list of user tuples
+        var userIDs = Object.keys(set.users);
+        var records = [];
+        userIDs.forEach(function(userID) {
+            var user = set.users[userID];
+            var twittermobile = d3.sum(user.Sources.top(20).filter(x => mobileclients.has(x.key)), x => x.value);
+            
+            var record = {
+                UserID: userID,
+                Screenname: user.Screenname,
+                TwitterWeb: user.Sources.get('Twitter Web Client'),
+                TwitterMobile: twittermobile,
+                Google: user.Sources.get('Google'),
+                Facebook: user.Sources.get('Facebook'),
+                TweetDeck: user.Sources.get('TweetDeck'),
+                IFTTT: user.Sources.get('IFTTT'),
+                RoundTeam: user.Sources.get('RoundTeam'),
+                Other: user.Sources.total_count
+            }
+            record.Other -= record.TwitterWeb + record.TwitterMobile + record.Google + record.Facebook + record.TweetDeck + record.IFTTT + record.RoundTeam;
+            
+            records.push(record);
+        });
+        
+        // Start upload
+        set.user_sources_upload = {
+            records: records,
+            index: 0,
+            total: records.length,
+            prog: new Progress({
+                steps: records.length,
+                text: '{cur}/{max} Users\' Sources Uploaded',
+            }),
+            stop: function() {
+                this.index = this.total;
+            }
+        };
+        
+        set.user_sources_upload.prog.start();
+        this.continueUserSourceUpload(set);
+    },
+    continueUserSourceUpload: function(set) {
+        var index = set.user_sources_upload.index;
+        if(index < 0 || index >= set.user_sources_upload.total) {
+            set.user_sources_upload.prog.end();
+            return;
+        }
+        set.user_sources_upload.prog.update(index);
+        
+        // Configure packet
+        var record = set.user_sources_upload.records[index];
+        
+        var post = record;
+        post.Event = set.event.ID;
+        post.Subset = 'subset' in set ? set.subset.ID : 0;
+        
+        // Configure functions
+        var failure = function(msg) { // Failure
+            console.error(msg);
+            set.user_sources_upload.prog.end();
+            triggers.emit('alert', 'Error uploading user terms');
+            return;
+        };
+        
+        var success =  function(msg) { // Success
+            if(msg == '1') { // Definitely success!
+                set.user_sources_upload.index++;
+                setTimeout(this.continueUserSourceUpload.bind(this, set), 1); // prevents a large call stack
+            } else {
+                failure(msg);
+            }
+        }.bind(this);
+        
+        // Upload!
+        this.connection.php('analysis/uploadUserSources', post, success, failure);
     },
 };
 
