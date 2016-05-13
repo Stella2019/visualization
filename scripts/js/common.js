@@ -777,7 +777,7 @@ standardConnections = {
         connection.startStream();
         return connection;
     },
-    genUsers: function(event, subset, tweet_min, tweet_max) {
+    genUsers: function(event, subset, tweet_min, tweet_max, simple) {
         var post = {
             event: event,
             subset: subset || 0
@@ -797,10 +797,11 @@ standardConnections = {
         }
         
         var connection = new Connection({
-            url: 'analysis/genUsers',
+            url: 'analysis/genUsers' + (simple ? 'Simple' : ''),
             post: post, 
             min : tweet_min, 
             max: tweet_max,
+            resolution: 0.25,
             progress_text: '{cur} / {max}',
             on_chunk_finish: function(d) { 
                 console.log('Signal(' + d + '), counting users for Event ' + event + (subset ? ', Subset ' + subset : ''));
