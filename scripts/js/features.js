@@ -2159,7 +2159,7 @@ FeatureDistribution.prototype = {
         var set = this.data[setname];
         if(!set) return;
         
-        var mobileclients = new Set('Mobile Web', 'Mobile Web (M5)', 'Mobile Web (M2)', 'Twitter For Android', 'Twitter for iPhone', 'Twitter for Windows Phone', 'Twitter for iPad', 'Twitter for Blackberry');
+        var mobileclients = new Set(['Mobile Web', 'Mobile Web (M5)', 'Mobile Web (M2)', 'Twitter for Android', 'Twitter for iPhone', 'Twitter for Windows Phone', 'Twitter for iPad', 'Twitter for Blackberry']);
         
         // Build list of user tuples
         var userIDs = Object.keys(set.users);
@@ -2181,6 +2181,9 @@ FeatureDistribution.prototype = {
                 Other: user.Sources.total_count
             }
             record.Other -= record.TwitterWeb + record.TwitterMobile + record.Google + record.Facebook + record.TweetDeck + record.IFTTT + record.RoundTeam;
+//            if(record.Other > 0) {
+//                console.log(user.Sources.top(20).map(x => x.key + ': ' + x.value).join(', '));
+//            }
             
             records.push(record);
         });
