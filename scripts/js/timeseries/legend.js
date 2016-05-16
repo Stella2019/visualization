@@ -23,6 +23,9 @@ function TimeseriesLegend(app) {
         return all;
     }, {});
     this.color = d3.scale.category10();
+    // ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    this.codecolor = d3.scale.category10()
+        .domain(['Affirm', 'Deny', 'Neutral', 'Unrelated', 'Related', 'Codable', 'Uncertainty', 'Uncodable', 'TRS', 'Affirm, !TRS']);
     
     this.init();
     
@@ -40,6 +43,7 @@ TimeseriesLegend.prototype = {
         triggers.on('subsets:updated', this.populateLegend.bind(this));
         triggers.on('legend:color scale', this.setColorScale.bind(this));
         triggers.on('legend:color', this.colorSeries.bind(this));
+        triggers.on('legend:order', this.orderSeries.bind(this));
         triggers.on('legend:series', this.linkSeries.bind(this));
         
         
@@ -151,6 +155,8 @@ TimeseriesLegend.prototype = {
             triggers.emit('feature:legend visibility', feature);
 //            list_div.on('mouseout', legend.endToggle);
         }, this);
+        
+        triggers.emit('legend:order');
     },
     placeNewSeries: function(feature) {
         var entries = this.container.select('.feature_' + util.simplify(feature.Label))
@@ -200,38 +206,55 @@ TimeseriesLegend.prototype = {
         
         data_entries.exit().remove();
     },
-    setColorScale: function() {
-//        this.typeColor = d3.scale.category20c();
-        this.typeColor = d3.scale.ordinal()
-//            .range(["#AAA", "#CCC", "#999", "#BBB"]);
-            .range(["#CCC"]);
-        
-        // Set global scale
-        switch(this.app.ops['View']['Color Scale'].get()) {
-            case "category10":
-                this.color = d3.scale.category10();
-                break;
-            case "category20":
-                this.color = d3.scale.category20();
-                break;
-            case "category20b":
-                this.color = d3.scale.category20b();
-                break;
-            case "category20c":
-                this.color = d3.scale.category20c();
-                break;
-            default:
-                this.color = d3.scale.category10();
-                break;
+    orderSeries: function(feature) {
+        if(!feature) { this.features_arr.forEach(triggers.emitter('legend:order').bind(this));
+            // Do a grand sorting of the features?
+            
+            return;
         }
         
-        // Set per-feature scale TODO fix this to the last thing
-        this.features_arr.forEach(function(feature) {
-            feature.color = d3.scale.category10()
-                .domain(feature.subsets.map(d => d.ID));
-        }, this);
+        // Find the way to sort the series
+        var order = this.app.ops['Series']['Order'].get();
+        var sortID = (A, B) => d3.ascending(A.ID, B.ID);
+        var sortF = sortID;
+        if(order == 'alpha') {
+            sortF = (A, B) => d3.ascending(A.DisplayMatchWithRumor, B.DisplayMatchWithRumor) || sortID(A, B);
+        } else if(order == 'volume') {
+            sorfF = (A, B) => d3.descending(A.data ? A.data.sum : 0, B.data ? B.data.sum : 0) || sortID(A, B);
+        } else if(order == 'volume shown') {
+            sortF = (A, B) => d3.descending(parseInt(A.Tweets), parseInt(B.Tweets)) || sortID(A, B);
+        }
         
-        triggers.emit('legend:color');
+        // Sort them in the lists, in space, and on the graph (harder)
+        feature.subsets.sort(sortF);
+        feature.div.selectAll('.legend_entry').sort(sortF);
+        
+        triggers.emit('legend:color scale', feature);
+    },
+    setColorScale: function(feature) {
+        if(!feature) {
+            this.features_arr.forEach(triggers.emitter('legend:color scale').bind(this));
+            return;
+        }
+        
+        // Set global scale
+        var colorscale = this.app.ops['Series']['Color Scale'].get();
+        var codecolorscale = this.app.ops['Series']['Code Colors'].get();
+        var order = this.app.ops['Series']['Order'].get();
+        
+        if(feature.Label == 'Code' && codecolorscale == 'code') {
+            feature.colorscale = this.codecolor;
+            feature.color = subset => this.codecolor(subset.Match);
+//            } else if(feature.Label == 'Code' && codecolorscale == 'rumor') {
+//                feature.colorscale = this.codecolor;
+//                feature.color = subset => this.codecolor(subset.Match);
+        } else {
+            feature.colorscale = d3.scale[colorscale]()
+                .domain(feature.subsets.map(d => d.ID));
+            feature.color = subset => subset.feature.colorscale(subset.ID);
+        }
+        
+        triggers.emit('legend:color', feature);
     },
     linkSeries: function(subset) {
         // TODO handle context series
@@ -247,6 +270,9 @@ TimeseriesLegend.prototype = {
         if(!subset) { // Then color them all =D
             this.subsets_arr.forEach(this.colorSeries.bind(this));
             return;
+        } else if(subset.subsets) { // It's a feature, color its children
+            subset.subsets.forEach(this.colorSeries.bind(this));
+            return;
         }
         if(!('data' in subset)) {
             return;
@@ -254,7 +280,7 @@ TimeseriesLegend.prototype = {
             
         // Determine primary color
         if(subset.data.chart == 'focus') {
-            subset.color = subset.feature.color(subset.ID);
+            subset.color = subset.feature.color(subset);
             subset.data.Label = subset.Label;
             subset.data.shown = this.app.ops['Series']['Shown'].get()
                 .includes(parseInt(subset.ID));

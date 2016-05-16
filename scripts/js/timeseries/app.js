@@ -149,8 +149,30 @@ Timeseries.prototype = {
                 labels: ["Original", "Alphabet", "Volume Visible", 'Volume Overall'],
                 ids:    ["orig", "alpha", 'volume shown', 'volume'],
                 default: 3,
-                render: false,
-                callback: triggers.emitter('legend:order'),
+                callback: function() {
+                    triggers.emit('legend:order');
+                    triggers.emit('chart:render series');
+                }
+            }),
+            'Color Scale': new Option({
+                title: "Color Scale",
+                labels: ["10", "20", "20b", "20c"],
+                ids:    ["category10", 'category20', 'category20b', 'category20c'],
+                default: 1,
+                callback: function() {
+                    triggers.emit('legend:color scale');
+                    triggers.emit('chart:render series');
+                }
+            }),
+            'Code Colors': new Option({
+                title: "Code Colors",
+                labels: ['Regular', 'Code', 'Rumor'],
+                ids: ['regular', 'code', 'rumor'],
+                available: [0, 1],
+                callback: function() {
+                    triggers.emit('legend:color scale');
+                    triggers.emit('chart:render series');
+                }
             }),
             'Clean Legend': new Option({
                 title: "Clean Up Legend",
@@ -215,27 +237,13 @@ Timeseries.prototype = {
                 custom_entries_allowed: true,
                 callback: triggers.emitter('focus:place series')
             }),
-            'Color Scale': new Option({
-                title: "Color Scale",
-                labels: ["10", "20", "20b", "20c"],
-                ids:    ["category10", 'category20', 'category20b', 'category20c'],
-                default: 1,
-                render: false,
+            'Chart Size': new Option({
+                title: "Chart Size",
+                labels: ['Regular', 'Small'],
+                ids: ['regular', 'small'],
                 callback: function() {
-                    pipeline.start('Set Colors');
-                }
-            }),
-            'Total Line': new Option({
-                title: "Show Total Line",
-                styles: ["btn btn-sm btn-default", "btn btn-sm btn-primary"],
-                labels: ["No", "Yes"],
-                ids:    ["false", "true"],
-                default: 0,
-                type: "toggle",
-                render: false,
-                callback: function() { 
-                    triggers.emit('alert', 'Sorry this feature is broken right now.');
-//                    pipeline.start('Configure Plot Area'); TODO
+                    triggers.emit('chart:y-scale');
+                    triggers.emit('chart:render series');
                 }
             }),
             'Time Min': new Option({
@@ -275,28 +283,6 @@ Timeseries.prototype = {
         
 //        this.ops.updateCollectionCallback = function() { data.loadRumors(); }; // TODO fix this
         this.ops.init();
-    },
-    publicationFormat: function() {
-        var feat = TS.legend.features["Code"];
-        feat.color = d3.scale.category10()
-                .domain(feat.subsets.map(d => d.ID));
-        TS.focus.xAxis.ticks(8);
-        TS.focus.yAxis.ticks(4);
-        TS.context.xAxis.ticks(8);
-        TS.context.yAxis.ticks(4);
-    },
-    pubTicks: function() {
-        var unit = TS.ops['Series']['Unit'].get();
-        if(unit == 'count') {
-            TS.focus.yAxis.tickFormat(x => x);
-            TS.context.yAxis.tickFormat(x => x / 1e3 + 'k');
-        } else if(unit == 'distinct') {
-            TS.focus.yAxis.tickFormat(x => x);
-            TS.context.yAxis.tickFormat(x => x / 1e3 + 'k');
-        } else if(unit == 'exposure') {
-            TS.focus.yAxis.tickFormat(x => x / 1e6 + 'M');
-            TS.context.yAxis.tickFormat(x => x / 1e9 + 'G');
-        }
     },
 };
 

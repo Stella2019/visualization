@@ -33,6 +33,9 @@ function TimeseriesChart(app, id) {
     this.area = d3.svg.area()
         .x(this.dataTimestamp_2_x);
     this.color = d3.scale.category10(); // TODO may remove
+    // ['Blue', 'Orange', 'Green', 'Red', 'Purple', 'Brown', 'Pink', 'Gray', 'Yellow', 'Teal']
+    this.codecolor = d3.scale.category20()
+        .domain(['Affirm', 'Affirm2', 'Deny Uncertainty', 'Deny Uncertainty2', 'Neutral', 'Neutral2', 'Deny', 'Deny2', 'Botnet', 'Botnet2', 'Unrelated', 'Unrelated2', 'Uncertainty', 'Uncertainty2', 'Uncodable', 'Uncodable2', 'Neutral Uncertainty', 'Neutral Uncertainty2', 'Affirm Uncertainty', 'Affirm Uncertainy2']);
     
     // Other attributes filled during execution
     this.brush = [];
@@ -190,6 +193,15 @@ TimeseriesChart.prototype = {
             this.yAxis.scale(this.y)
                 .tickFormat(this.y.tickFormat(10, ",.0f"));
         }
+        if(this.app.ops['View']['Chart Size'].is('Small')) {
+            var feat = this.app.legend.features["Code"];
+            feat.color = d3.scale.category10()
+                    .domain(feat.subsets.map(d => d.ID));
+            this.xAxis.ticks(8);
+            this.yAxis.ticks(4);
+        } else {
+            this.xAxis.ticks(null);
+        }
     },
     setYAxes: function() {
         // Get Properties
@@ -241,6 +253,16 @@ TimeseriesChart.prototype = {
         if(scale == 'log') {
             this.yAxis.scale(this.y)
                 .tickFormat(this.y.tickFormat(10, ",.0f"));
+        } else if(y_max > 5e12) {
+            this.yAxis.tickFormat(x => x / 1e12 + 'T');
+        } else if(y_max > 5e9) {
+            this.yAxis.tickFormat(x => x / 1e9 + 'G');
+        } else if(y_max > 5e6) {
+            this.yAxis.tickFormat(x => x / 1e6 + 'M');
+        } else if(y_max > 5e3) {
+            this.yAxis.tickFormat(x => x / 1e3 + 'K');
+        } else {
+            this.yAxis.tickFormat(null);
         }
         
         // Create y Axises
