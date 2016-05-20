@@ -811,18 +811,23 @@ standardConnections = {
         return connection;
     },
     genInCluster: function(clustertype, superset, offset) {
-        
+        var conns = [];
         for(var i = 1; i <= 22; i++) {
             if(clustertype == 'Followship' && i > 10 && i <= 20) {
                 continue;
             }
-            standardConnections.genInSubset({
+            var conn = standardConnections.genInSubset({
                 superset: superset,
                 subset: offset + i,
                 usercluster: i,
                 clustertype: clustertype,
             });
+            
+            conn.progress.container_div.style('top', (i / 23 * 100) + '%')
+            conns.push(conn);
         }
+        
+        return conns
     }
 };
 
