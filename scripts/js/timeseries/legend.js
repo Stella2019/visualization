@@ -60,6 +60,7 @@ TimeseriesLegend.prototype = {
         triggers.on('series:legend exit', this.hoverLegendEntryEnd.bind(this));
         
         triggers.on('legend:clean', this.showOrHideAll.bind(this));
+        triggers.on('feature:toggle visibility', this.toggleFeature.bind(this));
         triggers.on('feature:legend visibility', this.showOrHideFeature.bind(this));
         triggers.on('series:legend visibility', this.showOrHideSeries.bind(this));
         
@@ -122,10 +123,13 @@ TimeseriesLegend.prototype = {
                                  A.DisplayMatch < B.DisplayMatch ? -1 :
                                     0)
             
-            feature.div = this.container.append('div');
+            feature.div = this.container.append('div')
+                .data([feature]);
             
             feature.div.append('h4')
-                .html(feature.Label);
+                .html(d => d.Label)
+                .style('cursor', 'pointer')
+                .on('click', triggers.emitter('feature:toggle visibility'));
             
             feature.list_div = feature.div.append('div')
                 .attr('class', 'legend_series_list feature_' + util.simplify(feature.Label));
@@ -643,6 +647,31 @@ TimeseriesLegend.prototype = {
         } else {
             this.fadeIn('.legend_entry.subset_' + series.ID, 'table-row');
         }
+    },
+    toggleFeature: function(feature) {
+        var children_shown = d3.max(feature.subsets, subset => subset.data && subset.data.shown);
+        feature.subsets.forEach(subset => {
+            if(subset.data) subset.data.shown = !children_shown;
+            triggers.emit('series:legend visibility', subset);
+        });
+        
+        // Update state entry
+        var visible = this.app.ops['Series']['Shown'].get();
+        var combine = children_shown ? 'ldiff' : 'lunion';
+        visible = util[combine](visible, feature.subsets.map(d => d.ID))
+        this.app.ops['Series']['Shown'].set(visible);
+        this.app.ops.recordState();// right?
+        
+        if(this.app.ops['Series']['Clean Legend'].is("true") && !children_shown) {
+            this.fadeOut(feature.div);
+        } else if(!feature.shown) { // TODO make it move below
+            this.fadeOut(feature.list_div);
+        } else {
+            this.fadeIn(feature.div, 'block');
+            this.fadeIn(feature.list_div, 'block');
+        }
+        
+        triggers.emit('timeseries:stack');
     },
     showOrHideFeature: function(feature) { // TODO fix
         feature.subsets.forEach(triggers.emitter('series:legend visibility'));
