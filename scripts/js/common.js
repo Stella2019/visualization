@@ -810,6 +810,20 @@ standardConnections = {
         connection.startStream();
         return connection;
     },
+    genInCluster: function(clustertype, superset, offset) {
+        
+        for(var i = 1; i <= 22; i++) {
+            if(clustertype == 'Followship' && i > 10 && i <= 20) {
+                continue;
+            }
+            standardConnections.genInSubset({
+                superset: superset,
+                subset: offset + i,
+                usercluster: i,
+                clustertype: clustertype,
+            });
+        }
+    }
 };
 
 function Tooltip() {

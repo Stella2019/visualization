@@ -8,8 +8,8 @@ from pprint import pprint
 #mongoexport -h z --db <dbname> --collection <colname> --out <colname>.json
 
 # User Parameters
-db_name = 'Umpqua College Shooting'
-rumor_i = 0
+db_name = 'Boston'
+rumor_i = 1
 period = 1
 existing_collection = True
 upload_codes = True

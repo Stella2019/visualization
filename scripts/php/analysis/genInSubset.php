@@ -8,7 +8,7 @@
     // Add a new subset
     if($subset == 'new') {
         // Defaults
-        $event = 0;
+        $event = -9; // TMP
         $rumor = 0;
         $superset = 0;
         $feature = '';
@@ -34,6 +34,9 @@
         } else if(isset($_REQUEST["text_regex"])) {
             $feature = 'Text';
             $match = $_REQUEST["text_regex"];
+        } else if(isset($_REQUEST["usercluster"])) {
+            $match = $_REQUEST["usercluster"];
+            $feature = 'User.' . $_REQUEST["clustertype"] . 'Cluster';
         }
         
         // Build query
@@ -108,10 +111,23 @@
         $query .= "JOIN TweetUser " .
                   "    ON Tweet.`ID` = TweetUser.Tweet " .
                   "JOIN User " .
-                  "    ON TweetUser.`UserID` = User.UserID ";
+                  "    ON TweetUser.`UserID` = User.UserID";
 
         $conds[] = "User.Bot = " . $_REQUEST["userbot"];
         $conds[] = "User.Subset = 1100"; // Just the bot IDs from the main list
+    }
+    if(isset($_REQUEST["usercluster"])) {
+        $clusternum = $_REQUEST["usercluster"];
+        $clustertype = $_REQUEST["clustertype"];
+        $superset = 1100;#$_REQUEST["superset"];
+        $query .= "JOIN TweetUser " .
+                  "    ON Tweet.`ID` = TweetUser.Tweet " .
+                  "INNER JOIN UserLabel " .
+                  "    ON TweetUser.`UserID` = UserLabel.UserID and UserLabel.Subset = $superset " .
+                  "    AND UserLabel.`$clustertype" . "Cluster` = $clusternum ";
+
+//        $conds[] = "UserLabel.ModularityClass = " . $_REQUEST["usermodclass"];
+//        $conds[] = "User.Subset = 1100"; // Just the bot IDs from the main list
     }
     if(isset($_REQUEST["userdesc"])) {
         $query .= "JOIN TweetUser " .
