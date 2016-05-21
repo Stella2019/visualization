@@ -353,9 +353,15 @@ TimeseriesChart.prototype = {
 
         // Transition to the new area
         var fill_opacity = plottype == 'lines'   ? 0.0 : 
-                           plottype == 'overlap' ? 0.1 :
+                           plottype == 'overlap' ? 0.2 :
                                                    0.8 ;
-
+        if(this.id == 'context') { // TODO quick fix
+            this.series_arr.forEach(series => {
+                series.stroke = '#111';
+                series.fill = '#444';
+            });
+        }
+        
         this.series_objects.classed("lines", plottype == 'lines'); // TODO
         transition.select("path.area")
             .style("fill", series => series.fill)
