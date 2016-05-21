@@ -64,7 +64,7 @@
     if(isset($_REQUEST["rand"])) {
         $query .= " ORDER BY RAND(3)";
     } else if(isset($_REQUEST["order_prevalence"])) {
-        $query .= " GROUP BY Tweet.Text";
+        $query .= " GROUP BY Tweet.TextStripped";
         $query .= " ORDER BY COUNT(*) DESC";
     }
 

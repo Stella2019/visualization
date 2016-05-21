@@ -655,10 +655,10 @@ TimeseriesLegend.prototype = {
             triggers.emit('series:legend visibility', subset);
         });
         
-        // Update state entry
+        // Update state entry // TODO this doesn't seem to work
         var visible = this.app.ops['Series']['Shown'].get();
         var combine = children_shown ? 'ldiff' : 'lunion';
-        visible = util[combine](visible, feature.subsets.map(d => d.ID))
+        visible = util[combine](visible, feature.subsets.map(d => parseInt(d.ID)));
         this.app.ops['Series']['Shown'].set(visible);
         this.app.ops.recordState();// right?
         

@@ -312,7 +312,7 @@ TimeseriesView.prototype = {
         var order = this.app.ops['Analysis']['Fetched Tweet Order'].get();
         if(order == "rand") {
             post.rand = true;
-        } else if(order = "prevalence") {
+        } else if(order == "prevalence") {
             post.order_prevalence = true;
         }
         
