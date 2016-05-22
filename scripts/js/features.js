@@ -32,7 +32,7 @@ function FeatureDistribution() {
             'Temporal':     ['Account Creation Date', 'Age of Account'],
             'Localization': ['Location', 'UTC Offset', 'Timezone'],
             'Tweet Text':   ['Words', 'Distinct Words', 'Words Per Tweet', 'Distinct Words Per Tweet', 'Using Pipe'],
-            'URLs':         ['URLs', 'URLs Per Tweet', 'Distinct Domains', 'Distinct Domains Per URL'],
+            'URLs':         ['Domains', 'URLs', 'URLs Per Tweet', 'Distinct Domains', 'Distinct Domains Per URL'],
             'Statuses':     ['Start', 'Growth', 'Growth &ne; 0'],
             'Followers':    ['Start', 'Growth', 'Growth &ne; 0'],
             'Following':    ['Start', 'Growth', 'Growth &ne; 0'],
@@ -584,8 +584,7 @@ FeatureDistribution.prototype = {
             // Add new features
             var domain = tweet['ExpandedURL'];
             if(domain) {
-                domain = domain.replace(
-                    /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
+                domain = util.URL2Domain(domain);
             }
             tweet['Expanded URL Domain'] = domain;
 
@@ -605,7 +604,11 @@ FeatureDistribution.prototype = {
             set.counter['Tweet Based__Text Other__Language'].incr(util.subsetName({feature: 'Lang', match: tweet['Lang'].toLowerCase()}));
             set.counter['Tweet Based__Text Other__User Language'].incr(util.subsetName({feature: 'Lang', match: (tweet['UserLang'] || '').toLowerCase()}));
             set.counter['Tweet Based__Text Other__Using Pipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
-            set.counter['Tweet Based__URLs__Expanded URL Domain'].incr(tweet['Expanded URL Domain']);
+            if(tweet['Expanded URL Domain']) {
+                set.counter['Tweet Based__URLs__Expanded URL Domain'].incr(tweet['Expanded URL Domain']);
+            } else {
+                set.counter['Tweet Based__URLs__Expanded URL Domain'].not_applicable++;
+            }
             set.counter['Tweet Based__URLs__Expanded URL'].incr(tweet['ExpandedURL']);
             set.counter['Tweet Based__URLs__Media URL'].incr(tweet['MediaURL']);
             set.counter['Tweet Based__Origin__Screenname / User ID'].incr(tweet['Screenname'] + ' - ' + tweet['UserID']);
@@ -780,8 +783,7 @@ FeatureDistribution.prototype = {
             var domain = tweet['ExpandedURL'];
             if(domain) {
                 hasURL = 1;
-                domain = domain.replace(
-                    /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
+                domain = util.URL2Domain(domain);
             }
 
             user = {
@@ -909,6 +911,7 @@ FeatureDistribution.prototype = {
                 set.counter['User Based__URLs__Distinct Domains Per URL'].not_applicable++;
             } else {
                 user['Domains'].incr(domain);
+                set.counter['User Based__URLs__Domains'].incr(domain);
                 set.counter['User Based__URLs__URLs'].incr(user['URLs']);
                 set.counter['User Based__URLs__URLs Per Tweet'].incr(user['URLsPerTweet']);
                 set.counter['User Based__URLs__Distinct Domains'].incr(user['DistinctDomains']);
@@ -1043,10 +1046,12 @@ FeatureDistribution.prototype = {
                     set.counter['User Based__URLs__Distinct Domains Per URL'].decr(user['DistinctDomainsPerURL']);
                 }
                 
-                domain = domain.replace(
-                    /.*:\/\/([^\/]*)(\/.*|$)/, '$1');
+                domain = util.URL2Domain(domain);
                 var hasDomain = user['Domains'].has(domain);
                 user['Domains'].incr(domain);
+                if(user['Domains'].get(domain) == 1) {
+                    set.counter['User Based__URLs__Domains'].incr(domain);
+                }
                 
                 user['URLs']++;
                 user['URLsPerTweet'] = user['URLs'] / user['Tweets'];
@@ -1119,7 +1124,7 @@ FeatureDistribution.prototype = {
             feature.includes('Growth') ||
             feature.includes('Activity') ||
             feature.includes('Words') ||
-            feature.includes('User Based__URLs') ||
+            (feature.includes('User Based__URLs') && !feature.includes('__Domains')) ||
             (feature.includes('User Based') && feature.includes('Using Pipe'));
     },
     placeCounts: function() {
@@ -1837,7 +1842,7 @@ FeatureDistribution.prototype = {
             otherusers.forEach(function(otheruser) {
                 var mentionID = this.screenname2ID[otheruser.toLowerCase()];
                 if(!mentionID) {
-                    mentionID = -1 * util.mod(entry.key.hashCode(), 1e9);
+                    mentionID = -1 * util.mod(otheruser.hashCode(), 1e9);
                 } 
                 
                 var relation = {
@@ -1851,7 +1856,7 @@ FeatureDistribution.prototype = {
                 }
                 
                 // Add these stats to other user
-                if(mentionID > 0) {
+                if(mentionID > 0 && mentionID in set.users) {
                     var userB = set.users[mentionID];
                     userB['MentionsOfUser'] += relation.MentionCount || 0;
                     userB['RetweetsOfUser'] += relation.RetweetCount || 0;

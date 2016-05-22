@@ -231,6 +231,20 @@ var util = {
         }
         return match;
     },
+    URL2Domain: function(url) {
+        if(url.includes('.co.')) {
+            url = url.replace(/.*:\/\/([^\/]*\.)*([^\/]*)\.co\.([a-z]*)(\/.*|$)/i, '$2.co.$3');
+        } else {
+            url = url.replace(/.*:\/\/([^\/]*\.)*([^\/]*)\.([a-z]*)(\/.*|$)/i, '$2.$3');
+        }
+        url = url.toLowerCase();
+        
+        if(url in util.shortenedDomains) {
+            url = util.shortenedDomains[url];
+        }
+        
+        return url;
+    },
     langs: {
         'fr': 'French',
         'en': 'English',
@@ -346,6 +360,34 @@ var util = {
                 'as', 'if', 'so',
                 'de', 'en', 'und', 'la',
                 'how', 'what', 'when', 'where', 'who']),
+    shortenedDomains: {
+        'youtu.be': 'youtube.com',
+        'fb.me': 'facebook.com',
+        'wp.me': 'wordpress.com',
+        'b4in.com': 'beforeitsnews.com',
+        'b4in.info': 'beforeitsnews.com',
+        'ind.pn': 'independent.co.uk',
+        'presstv.ir': 'presstv.com',
+        'ptv.io': 'presstv.com',
+        'wapo.st': 'washingtonpost.com',
+        'wpo.st': 'washingtonpost.com',
+        'goo.gl': 'google.com',
+        'ln.is': 'linkis.com',
+        'f24.my': 'france24.com',
+        'bloom.bg': 'bloomberg.com',
+        'ln.is': 'linkis.com',
+        'reut.rs': 'reuters.com',
+        'ift.tt': 'ifttt.com',
+        'lnkd.in': 'linkedin.com',
+        'dtv.to': 'po.st',
+        'nyti.ms': 'nytimes.com',
+        'tmblr.co': 'tumblr.com',
+        'j.mp': 'bitly.com',
+        'bit.ly': 'bitly.com',
+        'ht.ly': 'bitly.com',
+        'wh.gov': 'whitehouse.gov',
+        'shr.lc': 'shareaholic.com',
+    },
 }
 
 function Counter() {
