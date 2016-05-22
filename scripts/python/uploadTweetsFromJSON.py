@@ -32,6 +32,19 @@ queries = {
                 "    Type, Source, ParentID, ParentText, ExpandedURL, MediaURL) "
                 "VALUES (%(ID)s, %(Timestamp)s, %(Lang)s, %(Text)s, %(TextStripped)s, %(Distinct)s, "
                 "    %(Type)s, %(Source)s, %(ParentID)s, %(ParentText)s, %(ExpandedURL)s, %(MediaURL)s) "),
+    'add_parenttweet': ("INSERT INTO ParentTweet "
+                "(ID, Timestamp, Text, ExpandedURL, "
+                "    Type, UserID, Screenname, UserVerified) "
+                "VALUES (%(ID)s, %(Timestamp)s, %(Text)s, %(ExpandedURL)s, "
+                "    %(Type)s, %(UserID)s, %(Screenname)s, %(UserVerified)s) "
+                "ON DUPLICATE KEY UPDATE "
+                "    Timestamp = COALESCE(Timestamp, %(Timestamp)s), "
+                "    Text = COALESCE(Text, %(Text)s), "
+                "    ExpandedURL = COALESCE(ExpandedURL, %(ExpandedURL)s), "
+                "    Type = COALESCE(Type, %(Type)s), "
+                "    UserID = COALESCE(UserID, %(UserID)s), "
+                "    Screenname = COALESCE(Screenname, %(Screenname)s), "
+                "    UserVerified = COALESCE(UserVerified, %(UserVerified)s); "),
     'add_tweetuser': ("INSERT IGNORE INTO TweetUser "
                 "(Tweet, UserID, Username, Screenname, CreatedAt, "
                 "    Description, Location, UTCOffset, Timezone, Lang, "
@@ -175,11 +188,16 @@ def uploadTweet(cursor, tweet, backfill=0):
     # Remove Fields that confuse mysql.connector and are not used
     matched_subsets  = tweet['Subsets']
     tweet['Subsets'] = None
+    parent = tweet['Parent']
     tweet['Parent']  = None
     
     # Push tweet's data to database
     cursor.execute(queries['add_tweet'], tweet)
     cursor.execute(queries['add_tweetuser'], tweet)
+    if(parent):
+        parent['Subsets'] = None
+        parent['Parent'] = None
+        cursor.execute(queries['add_parentweet'], parent)
 
     # Also add to event
     tweetIn = {
@@ -588,7 +606,7 @@ def parseTweetJSON(data):
         
         tweet['ParentID'] = data['quoted_status_id_str']
         if('quoted_status' in data):
-            tweet['Parent'] = data['quoted_status']
+            tweet['Parent'] = parseTweetJSON(data['quoted_status'])
             if(tweet['ExpandedURL'] is None):
                 tweet['ExpandedURL'] = getExpandedURL(data['quoted_status'])
                 
@@ -600,11 +618,25 @@ def parseTweetJSON(data):
         tweet['ParentID'] = data['in_reply_to_status_id_str']
         if(tweet['ExpandedURL'] is None):
             tweet['ExpandedURL'] = getExpandedURL(data)
+            
+        p_id_timestamp = int(tweet['ParentID']) / pow(2,22) + 1288834974657
+        p_created_at = datetime.fromtimestamp(p_id_timestamp / 1000)
+        p_timestamp_exact = datetime.strftime(p_created_at, '%Y-%m-%d %H:%M:%S')
+        tweet['Parent'] = {
+            'ID': tweet['ParentID'],
+            'Timestamp': p_timestamp_exact,
+            'Text': None,
+            'ExpandedURL': None,
+            'Type': None,
+            'UserID': data['in_reply_to_user_id_str'],
+            'Screenname': data['in_reply_to_screen_name'],
+            'UserVerified': None
+        }
         # AFAIK no record of tweet being replied to is available
     elif("retweeted_status" in data and (data['retweeted_status']) is not None):
         tweet['Type'] = 'retweet'
         
-        tweet['Parent'] = data['retweeted_status']
+        tweet['Parent'] = parseTweetJSON(data['retweeted_status'])
         if(tweet['ExpandedURL'] is None):
             tweet['ExpandedURL'] = getExpandedURL(data['retweeted_status'])
             

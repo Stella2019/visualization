@@ -8,12 +8,13 @@ from pprint import pprint
 #mongoexport -h z --db <dbname> --collection <colname> --out <colname>.json
 
 # User Parameters
-db_name = 'Boston'
-rumor_i = 1
+db_name = 'Sydney Siege'
+rumor_i = 4
 period = 1
 existing_collection = True
-upload_codes = True
-upload_inrumor = True
+upload_codes = False
+upload_inrumor = False
+add_parent_tweet = True
 
 # Databases
 mongoDBs = {
@@ -108,6 +109,11 @@ with open(config_file) as config_file:
     )
 cursor = connection.cursor(dictionary=True)
 
+# Enforce UTF-8 for the connection.
+cursor.execute('SET NAMES utf8mb4')
+cursor.execute("SET CHARACTER SET utf8mb4")
+cursor.execute("SET character_set_connection=utf8mb4")
+
 # Load Collection
 collection = {
     'id': event_id,
@@ -165,7 +171,7 @@ with codecs.open(filename, 'r', 'utf-8') as data_file:
             if('Unterminated string' in str(inst)):
                 line_incomplete = line
             else:
-                print(n_tweets + inst)
+                print(str(n_tweets) + ' ' + str(inst))
                 print(rm_unicode(line[:50]))
             continue
         
@@ -180,6 +186,10 @@ with codecs.open(filename, 'r', 'utf-8') as data_file:
             exists = cursor.fetchone()
             if(not exists or not exists['ID']):
                 continue
+            if(add_parent_tweet and 'Parent' in tweet and tweet['Parent']):
+                tweet['Parent']['Subsets'] = None
+                tweet['Parent']['Parent'] = None
+                cursor.execute(queries['add_parenttweet'], tweet['Parent'])
         else:
             uploadTweet(cursor, tweet)
             

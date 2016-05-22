@@ -6,7 +6,7 @@ import mysql.connector
 
 event = -9
 subset = 1100
-feature = 'Cluster' # Cluster, BotLabel, Truthy
+feature = 'BotLabel' # Cluster, BotLabel, Truthy
 
 # Queries
 #query = ("INSERT INTO UserLabel "
@@ -42,7 +42,7 @@ def main():
     cursor = database.cursor()
     
     folder = 'C:\\Users\\anied\\Google Drive\\Grad School\\MisInfo Group\\Twitter Bots\\'
-    filename = 'ManualAnnotation_20160516_0858.tsv'
+    filename = 'ManualAnnotation_20160520_1516.tsv'
     if(feature == 'Truthy'):
         filename = 'bot_scores_all_crisis_actor.csv'
     elif (feature == 'Cluster'):
@@ -50,7 +50,10 @@ def main():
     
     counted = 0
     with open(folder + filename, 'r') as csvfile:
-        csvrows = csv.reader(csvfile, delimiter=',') # , or \t
+        delim = '\t'
+        if(feature == 'Truthy' or feature == 'Cluster'):
+            delim = ','
+        csvrows = csv.reader(csvfile, delimiter=delim)
         for row in csvrows:
 
 
@@ -61,17 +64,17 @@ def main():
             if(feature == 'BotLabel'):
                 botnet = row[5]
                 bot = 'Bot'
-                if(botnet == 'Unknowable' or len(botnet) == 0): bot = 'Unlabeled';
-                if(botnet == 'No'): bot = 'Human';
-                if('Probably' in botnet or 'Hybrid' == botnet): bot = 'Uncertain';
-                if('TRS' in botnet): bot = 'TRS';
+                if(botnet == 'Unknowable' or len(botnet) == 0): bot = 'Unlabeled'
+                if(botnet == 'No'): bot = 'Human'
+                if('Probably' in botnet or 'Hybrid' == botnet): bot = 'Uncertain'
+                if('TRS' in botnet): bot = 'TRS'
 
                 data['UserID'] = row[0]
                 data['Screenname'] = row[1][:25]
                 data['Sample'] = row[2][:25]
                 data['Cluster'] = row[3][:25]
     #           data['Cluster2'] = row[4][:25]
-                data['Bot'] = bot,
+                data['Bot'] = bot
                 data['Botnet'] = botnet[:25]
                 data['Status'] = row[6][:10] or 'Active'
                 data['Profile'] = row[7][:45]
