@@ -214,7 +214,12 @@ CollectionManager.prototype = {
     },
     parseEventsFile: function (data) {
         // Add events (collections)
-        this.events_arr = JSON.parse(data);
+        try {
+            this.events_arr = JSON.parse(data);
+        } catch(err) {
+            console.error(data);
+            throw(err);
+        }
         this.events_arr.sort(util.compareCollections);
         this.events_arr.reverse();
         

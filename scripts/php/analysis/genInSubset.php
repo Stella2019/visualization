@@ -33,7 +33,7 @@
             $match = $_REQUEST["lang"];
         } else if(isset($_REQUEST["text_regex"])) {
             $feature = 'Text';
-            $match = $_REQUEST["text_regex"];
+            $match = $_REQUEST["text"];
         } else if(isset($_REQUEST["usercluster"])) {
             $match = $_REQUEST["usercluster"];
             $feature = 'User.' . $_REQUEST["clustertype"] . 'Cluster';
@@ -157,8 +157,8 @@
         $conds[] = "LOWER(Tweet.ExpandedURL) REGEXP '" . $_REQUEST["url"] . "'";
     if(isset($_REQUEST["lang"]))
         $conds[] = "Tweet.Lang = '" . $_REQUEST["lang"] . "'";
-    if(isset($_REQUEST["text_regex"])) {
-        foreach(explode(' & ', $_REQUEST["text_regex"]) as $term) {
+    if(isset($_REQUEST["text"])) {
+        foreach(explode(' & ', $_REQUEST["text"]) as $term) {
             $conds[] = "LOWER(Tweet.Text) REGEXP '" . $term . "'";
         }
     }

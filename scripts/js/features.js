@@ -24,7 +24,7 @@ function FeatureDistribution() {
             'URLs':         ['Expanded URL Domain', 'Expanded URL', 'Media URL'],
             'Origin':       ['Screenname / User ID', 'Parent Tweet', 'Source'],
             'Temporal':     ['Time Posted (PT)', 'User\'s Timezone'],
-            'Mentions':     ['Users Retweeted', 'Users Replied', 'Users Quoted', 'Users Otherwise Mentioned'],
+            'Mentions':     ['Users Retweeted', 'Users Replied', 'Users Quoted', 'Users Otherwise Mentioned', 'Parent Verified'],
         },
         'User Based': {
             'Activity':     ['Tweets', 'Tweets Per Day', 'Median Interval Between Tweets', 'Deviation Interval Between Tweets', 'Normal Deviation Interval Between Tweets'],
@@ -50,6 +50,8 @@ function FeatureDistribution() {
             }, this);
         }, this);
     }, this);
+    
+    this.screenname2ID = {};
     
     // Page Objects
     this.body = [];
@@ -233,11 +235,19 @@ FeatureDistribution.prototype = {
                 default: 1,
                 isnumeric: true
             }),
+            'Extra Data': new Option({
+                title: 'Extra Data',
+                labels: ['None', 'User', 'Parent Tweet', 'User & Parent'],
+                ids: ['', 'u', 'p', 'up'],
+                default: 1,
+                isnumeric: true
+            }),
             'Upload Limit': new Option({
                 title: 'Upload Limit / User',
                 labels: ['10', '100', 'All'],
                 ids:    [ 1e1,   1e2,   1e5],
                 default: 1,
+                render: false,
                 isnumeric: true
             })
         };
@@ -417,6 +427,7 @@ FeatureDistribution.prototype = {
         }
         var collection_type = args[0];
         var collection_id = args[1];
+        var extradata = this.ops['Download']['Extra Data'].get();
         
         // Initialize the data storage
         var data = {};
@@ -465,7 +476,8 @@ FeatureDistribution.prototype = {
             url: 'tweets/get',
             post: {
                 collection: collection_type,
-                collection_id: collection_id
+                collection_id: collection_id,
+                extradata: extradata,
             },
             quantity: 'count',
             resolution: this.ops['Download']['Chunk Size'].get(),
@@ -591,7 +603,7 @@ FeatureDistribution.prototype = {
             set.counter['Tweet Based__Whole Text__Text'].incr(tweet['Text']);
             set.counter['Tweet Based__Whole Text__Text Stripped'].incr(tweet['TextStripped']);
             set.counter['Tweet Based__Text Other__Language'].incr(util.subsetName({feature: 'Lang', match: tweet['Lang'].toLowerCase()}));
-            set.counter['Tweet Based__Text Other__User Language'].incr(util.subsetName({feature: 'Lang', match: tweet['UserLang'].toLowerCase()}));
+            set.counter['Tweet Based__Text Other__User Language'].incr(util.subsetName({feature: 'Lang', match: (tweet['UserLang'] || '').toLowerCase()}));
             set.counter['Tweet Based__Text Other__Using Pipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
             set.counter['Tweet Based__URLs__Expanded URL Domain'].incr(tweet['Expanded URL Domain']);
             set.counter['Tweet Based__URLs__Expanded URL'].incr(tweet['ExpandedURL']);
@@ -649,40 +661,70 @@ FeatureDistribution.prototype = {
                 }
             });
             
+            // Parent Tweet & User Mentions
+            var parentVerified = tweet['ParentVerified'];
+            if(parentVerified == undefined) {
+                set.counter['Tweet Based__Mentions__Parent Verified'].not_applicable++;
+            } else {
+                set.counter['Tweet Based__Mentions__Parent Verified'].incr(parentVerified);
+            }
+            
             // User Mentions
             if(tweet['Text']) {
-                var already_mentioned = new Set();
+                var direct_mentions = new Set();
                 
-                // Retweets
-                var rts = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi);
-                if(rts) {
-                    rts.forEach(function(mention) {
-                        already_mentioned.add(mention.slice(4));
-                        set.counter['Tweet Based__Mentions__Users Retweeted'].incr(mention.slice(4));
-                    });
-                } else {
+                if('ParentScreenname' in tweet) {
                     set.counter['Tweet Based__Mentions__Users Retweeted'].not_applicable++;
-                }
-
-                // Replies
-                var res = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi);
-                if(res) {
-                    res.forEach(function(mention) {
-                        already_mentioned.add(mention.slice(1));
-                        set.counter['Tweet Based__Mentions__Users Replied'].incr(mention.slice(1));
-                    });
-                } else {
                     set.counter['Tweet Based__Mentions__Users Replied'].not_applicable++;
+                    set.counter['Tweet Based__Mentions__Users Quoted'].not_applicable++;
+                    
+                    if(tweet['ParentScreenname']) {
+                        this.screenname2ID[tweet['ParentScreenname'].toLowerCase()] = tweet['ParentUserID'];
+                        
+                        direct_mentions.add((tweet['ParentScreenname'] || '').toLowerCase());
+                        if(tweet['Type'] == 'retweet') {
+                            set.counter['Tweet Based__Mentions__Users Retweeted'].incr(tweet['ParentScreenname']);
+                            set.counter['Tweet Based__Mentions__Users Retweeted'].not_applicable--;
+                        } else if(tweet['Type'] == 'reply') {
+                            set.counter['Tweet Based__Mentions__Users Replied'].incr(tweet['ParentScreenname']);
+                            set.counter['Tweet Based__Mentions__Users Replied'].not_applicable--;
+                        } else if(tweet['Type'] == 'quote') {
+                            set.counter['Tweet Based__Mentions__Users Quoted'].incr(tweet['ParentScreenname']);
+                            set.counter['Tweet Based__Mentions__Users Quoted'].not_applicable--;
+                        } else {
+                            console.log('Original tweet with a parent screenname, what?' + tweet['ParentScreenname'] + ' ' + tweet['Text']);
+                        }
+                    }
+                } else {
+                    // Retweets
+                    var rts = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi);
+                    if(rts) {
+                        rts.forEach(function(mention) {
+                            direct_mentions.add(mention.slice(4).toLowerCase());
+                            set.counter['Tweet Based__Mentions__Users Retweeted'].incr(mention.slice(4));
+                        });
+                    } else {
+                        set.counter['Tweet Based__Mentions__Users Retweeted'].not_applicable++;
+                    }
+
+                    // Replies
+                    var res = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi);
+                    if(res) {
+                        res.forEach(function(mention) {
+                            direct_mentions.add(mention.slice(1).toLowerCase());
+                            set.counter['Tweet Based__Mentions__Users Replied'].incr(mention.slice(1));
+                        });
+                    } else {
+                        set.counter['Tweet Based__Mentions__Users Replied'].not_applicable++;
+                    }
                 }
 
-                // TODO find a way for quotes or include in other program
-                
                 // Otherwise mentions
-                var mentions = tweet['Text'].match(/@[A-Za-z_0-9]*/gi) || [];
-                mentions = mentions.filter(mention => !already_mentioned.has(mention.slice(1)));
+                var mentions = (tweet['Text'].match(/@[A-Za-z_0-9]*/gi) || []).map(m => m.slice(1).toLowerCase());
+                mentions = mentions.filter(m => !direct_mentions.has(m));
                 if(mentions && mentions.length > 0) {
                     mentions.forEach(function(mention) {
-                        set.counter['Tweet Based__Mentions__Users Otherwise Mentioned'].incr(mention.slice(1));
+                        set.counter['Tweet Based__Mentions__Users Otherwise Mentioned'].incr(mention);
                     });
                 } else {
                     set.counter['Tweet Based__Mentions__Users Otherwise Mentioned'].not_applicable++;
@@ -694,6 +736,11 @@ FeatureDistribution.prototype = {
 //            set.tweets_arr[set.counted] = tweet.ID; // TODO
     },
     countUser: function(set, tweet) {
+        if(!tweet['UserID']) {
+            return;
+        }
+        
+        this.screenname2ID[tweet['Screenname'].toLowerCase()] = tweet['UserID'];
         var userscreenid = tweet['Screenname'] + ' - ' + tweet['UserID'];
         var newUser = set.counter['Tweet Based__Origin__Screenname / User ID'].get(userscreenid) == 1;
         var user = {};
@@ -781,6 +828,7 @@ FeatureDistribution.prototype = {
                 'UsersRetweeted': new Counter(),
                 'UsersReplied': new Counter(),
                 'UsersQuoted': new Counter(),
+                'UsersSimplyMentioned': new Counter(),
                 Mentions: 0,
                 SimpleMentions: 0,
                 'MentionsOfUser': 0, // These features are gotten by doing the mention script
@@ -1015,34 +1063,54 @@ FeatureDistribution.prototype = {
         
         // Users mentioned
         if(tweet['Text']) {
-            var mentions = tweet['Text'].match(/@[A-Za-z_0-9]*/gi) || [];
+            var direct_mentions = new Set();
+            if('ParentScreenname' in tweet) {
+                if(tweet['ParentScreenname']) {
+                    direct_mentions.add((tweet['ParentScreenname'] || '').toLowerCase());
+                    if(tweet['Type'] == 'retweet') {
+                        user['UsersRetweeted'].incr(tweet['ParentScreenname']);
+                    } else if(tweet['Type'] == 'reply') {
+                        user['UsersReplied'].incr(tweet['ParentScreenname']);
+                    } else if(tweet['Type'] == 'quote') {
+                        user['UsersQuoted'].incr(tweet['ParentScreenname']);
+                    }
+                }
+            } else {
+                // Retweets
+                var rts = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi) || [];
+                if(rts) {
+                    rts.forEach(function(mention) {
+                        direct_mentions.add(mention.slice(4).toLowerCase());
+                        user['UsersRetweeted'].incr(mention.slice(4));
+                    });
+                }
+
+                // Replies
+                var res = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi) || [];
+                if(res) {
+                    res.forEach(function(mention) {
+                        direct_mentions.add(mention.slice(1).toLowerCase());
+                        user['UsersReplied'].incr(mention.slice(1));
+                    });
+                }
+            }
+            
+            var mentions = (tweet['Text'].match(/@[A-Za-z_0-9]*/gi) || []).map(m => m.slice(1).toLowerCase());
             if(mentions) {
                 mentions.forEach(function(mention) {
-                    user['UsersMentioned'].incr(mention.slice(1));
+                    user['UsersMentioned'].incr(mention);
                 });
             }
-
-            // Retweets
-            rts = tweet['Text'].match(/^RT @[A-Za-z_0-9]*/gi) || [];
-            if(rts) {
-                rts.forEach(function(mention) {
-                    user['UsersRetweeted'].incr(mention.slice(4));
-                });
-            }
-
-            // Replies
-            res = tweet['Text'].match(/^@[A-Za-z_0-9]*/gi) || [];
-            if(res) {
-                res.forEach(function(mention) {
-                    user['UsersReplied'].incr(mention.slice(1));
+            var simple_mentions = mentions.filter(m => !direct_mentions.has(m));
+            if(simple_mentions) {
+                simple_mentions.forEach(function(mention) {
+                    user['UsersSimplyMentioned'].incr(mention);
                 });
             }
             
             // Add counters to user
             user['Mentions'] += mentions.length;
-            user['SimpleMentions'] += mentions.length - rts.length - res.length;
-
-            // TODO find a way for quotes or include in other program
+            user['SimpleMentions'] += simple_mentions.length;
         }
     },
     featureIsQuantitative: function(feature) {
@@ -1756,19 +1824,18 @@ FeatureDistribution.prototype = {
         
         var upload_limit = this.ops['Download']['Upload Limit'].get();
         
-        // Get known UserIDs
-        var screenname2ID = {};
-        Object.keys(set.users).forEach(function(userID) {
-            var user = set.users[userID];
-            screenname2ID[user.Screenname] = userID;
-        });
-        
         // Build list of user tuples
         var relations = [];
         Object.keys(set.users).forEach(function(userID) {
             var user = set.users[userID];
-            user['UsersMentioned'].top(upload_limit).forEach(function(entry) {
-                var mentionID = screenname2ID[entry.key];
+            var otherusers = user['UsersMentioned'].top(upload_limit);
+            otherusers.concat(user['UsersRetweeted'].top(upload_limit));
+            otherusers.concat(user['UsersReplied'].top(upload_limit));
+            otherusers.concat(user['UsersQuoted'].top(upload_limit));
+            otherusers = util.lunique(otherusers.map(u => u.key));
+            
+            otherusers.forEach(function(otheruser) {
+                var mentionID = this.screenname2ID[otheruser.toLowerCase()];
                 if(!mentionID) {
                     mentionID = -1 * util.mod(entry.key.hashCode(), 1e9);
                 } 
@@ -1776,24 +1843,21 @@ FeatureDistribution.prototype = {
                 var relation = {
                     ActiveUserID: userID,
                     SecondUserID: mentionID,
-                    MentionCount: entry.value,
-                    RetweetCount: user['UsersRetweeted'].get(entry.key),
-                    ReplyCount: user['UsersReplied'].get(entry.key),
-                    JustMentionCount: entry.value,
-//                    QuoteCount: 0//user['UsersQuoted'].get(entry.key)
+                    MentionCount: user['UsersMentioned'].get(otheruser),
+                    RetweetCount: user['UsersRetweeted'].get(otheruser),
+                    ReplyCount: user['UsersReplied'].get(otheruser),
+                    JustMentionCount: user['UsersSimplyMentioned'].get(otheruser),
+                    QuoteCount: user['UsersQuoted'].get(otheruser)
                 }
-                
-                relation.JustMentionCount -= relation.RetweetCount;
-                relation.JustMentionCount -= relation.ReplyCount;
                 
                 // Add these stats to other user
                 if(mentionID > 0) {
                     var userB = set.users[mentionID];
-                    userB['MentionsOfUser'] += relation.MentionCount;
+                    userB['MentionsOfUser'] += relation.MentionCount || 0;
                     userB['RetweetsOfUser'] += relation.RetweetCount || 0;
                     userB['RepliesOfUser'] += relation.ReplyCount || 0;
-//                    userB['QuotesOfUser'] += relation.QuoteCount;
-                    userB['SimpleMentionsOfUser'] += relation.JustMentionCount;
+                    userB['QuotesOfUser'] += relation.QuoteCount || 0;
+                    userB['SimpleMentionsOfUser'] += relation.JustMentionCount || 0;
                 }
                 
                 // TODO Not included, yet
@@ -1803,8 +1867,8 @@ FeatureDistribution.prototype = {
 //                  'FractionMutualFollowers', 'FractionMutualFollowing', 'FractionsMutualConnections'
                 
                 relations.push(relation);
-            });
-        });
+            }, this);
+        }, this);
         
         // Start upload
         
@@ -1864,13 +1928,6 @@ FeatureDistribution.prototype = {
         if(!set) return;
         
         var upload_limit = this.ops['Download']['Upload Limit'].get();
-        
-        // Get known UserIDs
-        var screenname2ID = {};
-        Object.keys(set.users).forEach(function(userID) {
-            var user = set.users[userID];
-            screenname2ID[user.Screenname] = userID;
-        });
         
         // Build list of user tuples
         var userIDs = Object.keys(set.users);
@@ -1963,13 +2020,6 @@ FeatureDistribution.prototype = {
         if(!set) return;
         
         var upload_limit = this.ops['Download']['Upload Limit'].get();
-        
-        // Get known UserIDs
-        var screenname2ID = {};
-        Object.keys(set.users).forEach(function(userID) {
-            var user = set.users[userID];
-            screenname2ID[user.Screenname] = userID;
-        });
         
         // Build list of user tuples
         var userIDs = Object.keys(set.users);
