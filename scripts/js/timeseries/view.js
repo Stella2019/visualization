@@ -299,6 +299,7 @@ TimeseriesView.prototype = {
         var post = {
             collection: args.collection,
             collection_id: args[args.collection + '_id'],
+            extradata: 'u',
         };
         
         if(args['tweet_min']) { // Bound tweets in time
@@ -512,8 +513,10 @@ TimeseriesView.prototype = {
                         if(d['Distinct'] == '1')
                             content += 'distinct ';
                         content += d['Type'];
-                        if(d['Origin'])
-                            content += ' of <a href="https://twitter.com/emcomp/status/' + d['Origin'] + '" target="_blank">#' + d['Origin'] + '</a>'
+                        if(d['ParentID'])
+                            content += ' of <a href="https://twitter.com/emcomp/status/' + d['ParentID'] + '" target="_blank">#' + d['ParentID'] + '</a>'
+                        if(d['ExpandedURL'])
+                            content += ' <a href="' + d['ExpandedURL'] + '" target="_blank">link</a>'
                         if(d['Count'] && d['Count'] > 1)
                             content += ', ' + (d['Count'] - 1) + " repeats";
                         return content;

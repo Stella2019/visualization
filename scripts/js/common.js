@@ -367,7 +367,7 @@ var util = {
         'b4in.com': 'beforeitsnews.com',
         'b4in.info': 'beforeitsnews.com',
         'ind.pn': 'independent.co.uk',
-        'presstv.ir': 'presstv.com',
+        'presstv.info': 'presstv.com',
         'ptv.io': 'presstv.com',
         'wapo.st': 'washingtonpost.com',
         'wpo.st': 'washingtonpost.com',
