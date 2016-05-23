@@ -251,6 +251,10 @@ TimeseriesModel.prototype = {
                 return val + datapoints[1][i] + datapoints[2][i] + datapoints[3][i];
             }));
             
+            // Add other information
+            var subset_info = this.app.collection.subsets[id];
+            Object.keys(subset_info).forEach(key => { series[key] = subset_info[key]; });
+            
             series.ID = id;
             series.Label = 'Subset ' + id;
             series.color = cols(id);
@@ -407,6 +411,8 @@ TimeseriesModel.prototype = {
             triggers.emit('timeseries:stack', this.focus);
             triggers.emit('timeseries:stack', this.context);
             return;
+        } else if(typeof(chart) == 'string' && ['focus', 'context'].includes(chart)) {
+            chart = this[chart];
         }
         
         var plot_type = this.app.ops['View']['Plot Type'].get();
@@ -424,6 +430,8 @@ TimeseriesModel.prototype = {
         
         // Only stack plots being shown
         var series_to_plot = series.filter(series => series.shown);
+        var sorter = this.app.legend.getSeriesSorter();
+        series_to_plot.sort(sorter);
         
         if(plot_type == "percent") {
             data_100 = series_to_plot.map(function(series) {

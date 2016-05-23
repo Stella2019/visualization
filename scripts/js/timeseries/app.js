@@ -145,13 +145,36 @@ Timeseries.prototype = {
                 callback: triggers.emitter('timeseries:ready')
             }),
             Order: new Option({
-                title: "Order Legend by",
-                labels: ["Original", "Alphabet", "Volume Visible", 'Volume Overall'],
-                ids:    ["orig", "alpha", 'volume shown', 'volume'],
+                title: "Order by",
+                labels: ["Feature Name", "Rumor Name", "Subset ID", "Subset Name", "Volume Visible", 'Volume Overall'],
+                ids:    ['feature', 'rumor', 'subset id', 'subset name', 'volume shown', 'volume total'],
+                default: 0,
+                callback: function() {
+                    triggers.emit('legend:order');
+                    triggers.emit('timeseries:stack', 'focus');
+//                    triggers.emit('chart:render series');
+                }
+            }),
+            Order2: new Option({
+                title: "then by",
+                labels: ["Feature Name", "Rumor Name", "Subset ID", "Subset Name", "Volume Visible", 'Volume Overall'],
+                ids:    ['feature', 'rumor', 'subset id', 'subset name', 'volume shown', 'volume total'],
+                default: 1,
+                callback: function() {
+                    triggers.emit('legend:order');
+                    triggers.emit('timeseries:stack', 'focus');
+//                    triggers.emit('chart:render series');
+                }
+            }),
+            Order3: new Option({
+                title: "then by",
+                labels: ["Feature Name", "Rumor Name", "Subset ID", "Subset Name", "Volume Visible", 'Volume Overall'],
+                ids:    ['feature', 'rumor', 'subset id', 'subset name', 'volume shown', 'volume total'],
                 default: 3,
                 callback: function() {
                     triggers.emit('legend:order');
-                    triggers.emit('chart:render series');
+                    triggers.emit('timeseries:stack', 'focus');
+//                    triggers.emit('chart:render series');
                 }
             }),
             'Color Scale': new Option({

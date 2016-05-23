@@ -210,28 +210,34 @@ TimeseriesLegend.prototype = {
         
         data_entries.exit().remove();
     },
+    getSeriesSorter: function() {
+        var sorters = {
+            feature: (A, B) => d3.ascending(A.Feature, B.Feature),
+            rumor: (A, B) => d3.ascending(A.Rumor == '0' ? '' : A.rumor.Name, B.Rumor == '0' ? '' : B.rumor.Name),
+            'subset id': (A, B) => d3.ascending(parseInt(A.ID), parseInt(B.ID)),
+            'subset name': (A, B) => d3.ascending(A.DisplayMatch, B.DisplayMatch),
+            'volume shown': (A, B) => d3.descending(A.sum ? A.sum : A.data ? A.data.sum : 0, B.sum ? B.sum : B.data ? B.data.sum : 0),
+            'volume total': (A, B) => d3.descending(parseInt(A.Tweets), parseInt(B.Tweets))
+        };
+        
+        var order  = this.app.ops['Series']['Order'].get();
+        var order2 = this.app.ops['Series']['Order2'].get();
+        var order3 = this.app.ops['Series']['Order3'].get();
+        return (A, B) => sorters[order](A, B) || sorters[order2](A, B) || sorters[order3](A, B);
+    },
     orderSeries: function(feature) {
-        if(!feature) { this.features_arr.forEach(triggers.emitter('legend:order').bind(this));
+        if(!feature) { 
+            this.features_arr.forEach(triggers.emitter('legend:order').bind(this));
             // Do a grand sorting of the features?
             
             return;
         }
         
-        // Find the way to sort the series
-        var order = this.app.ops['Series']['Order'].get();
-        var sortID = (A, B) => d3.ascending(A.ID, B.ID);
-        var sortF = sortID;
-        if(order == 'alpha') {
-            sortF = (A, B) => d3.ascending(A.DisplayMatchWithRumor, B.DisplayMatchWithRumor) || sortID(A, B);
-        } else if(order == 'volume') {
-            sorfF = (A, B) => d3.descending(A.data ? A.data.sum : 0, B.data ? B.data.sum : 0) || sortID(A, B);
-        } else if(order == 'volume shown') {
-            sortF = (A, B) => d3.descending(parseInt(A.Tweets), parseInt(B.Tweets)) || sortID(A, B);
-        }
+        var sort_function = this.getSeriesSorter();
         
         // Sort them in the lists, in space, and on the graph (harder)
-        feature.subsets.sort(sortF);
-        feature.div.selectAll('.legend_entry').sort(sortF);
+        feature.subsets.sort(sort_function);
+        feature.div.selectAll('.legend_entry').sort(sort_function);
         
         triggers.emit('legend:color scale', feature);
     },

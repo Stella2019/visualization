@@ -763,7 +763,7 @@ FeatureDistribution.prototype = {
             var desc = (tweet.UserDescription || '').toLowerCase();
             desc = desc.replace(/[^\w']+/g, ' ');
             desc = desc.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
-            var desc_words = desc.split(' ').filter(function(word) { return word.length > 0; });
+            var desc_words = util.lunique(desc.split(' ').filter(function(word) { return word.length > 0; }));
             if(desc_words.length == 0) {
                 desc_words = [tweet.UserDescription];
             }

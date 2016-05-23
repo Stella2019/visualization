@@ -211,6 +211,8 @@ TimeseriesChart.prototype = {
         && this.id == 'focus';
         var ymax_op = this.app.ops['View']['Y Max'];
         var series_plotted = this.series_arr.filter(series => series.shown);
+        var sorter = this.app.legend.getSeriesSorter();
+        series_plotted.sort(sorter);
         
         // Set the Y Domain
         var y_min = 0;
