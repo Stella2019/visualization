@@ -12,8 +12,8 @@ TimeseriesView.prototype = {
     },
     setTriggers: function() {
         triggers.on('event_updated', this.setTitle.bind(this));
-        $(window).on('resize', this.setChartHeights.bind(this));
-        triggers.on('chart:plan resize', this.setChartHeights.bind(this));
+        $(window).on('resize', this.setChartSizes.bind(this));
+        triggers.on('chart:plan resize', this.setChartSizes.bind(this));
         triggers.on('chart:context time', this.setContextTime.bind(this));
         triggers.on('chart:resolution change', this.setContextTime.bind(this));
         triggers.on('chart:focus time', this.setFocusTime.bind(this));
@@ -57,28 +57,39 @@ TimeseriesView.prototype = {
             .html('<small>' + event.Type + ':</small> ' + 
                   event.Label);
     },
-    setChartHeights: function(event) {
+    setChartSizes: function(event) {
         // Get constraints
         var page = window.innerHeight;
         var header = parseInt(d3.select('.header').style('height'));
         var footer = parseInt(d3.select('.footer').style('height'));
         
+        var focus_height_manual = this.app.ops['Axes']['Height Toggle'].is(1);
+        var width_manual = this.app.ops['Axes']['Width Toggle'].is(1);
+        
         // Minimum heights
-        var focus = 200;
-        var context = 120;
+        var focus_height = focus_height_manual ? parseInt(this.app.ops['Axes']['Height'].get()) : 200;
+        var context_height = 120;
+        var width = width_manual ? parseInt(this.app.ops['Axes']['Width'].get()) : parseInt(d3.select('.header').style('width'));
         
         // Fill extra space
         // -10 because of page margins I haven't been able to resolve
         // -30 for the padding on the top & bottom
-        var extra_space = page - header - footer - focus - context - 10 - 30;
+        var extra_space = page - header - footer - focus_height - context_height - 10 - 30;
         if(extra_space > 0) {
-            var extra_focus = Math.floor(extra_space * 0.75);
-            focus += extra_focus;
-            context += extra_space - extra_focus;
+            var extra_focus = focus_height_manual ? 0 : Math.floor(extra_space * 0.75);
+            focus_height += extra_focus;
+            context_height += extra_space - extra_focus;
         }
         
         // Send an event
-        triggers.emit('chart:resize', [focus, context]);
+        if(!focus_height_manual) {
+            this.app.ops['Axes']['Height'].updateInInterface(focus_height);
+        }
+        if(!width_manual) {
+            this.app.ops['Axes']['Width'].updateInInterface(width);
+        }
+        triggers.emit('focus:resize', [focus_height, width]);
+        triggers.emit('context:resize', [context_height, width]);
     },
     buildTimeWindow: function() { // Legacy, not actually used right now
         var container = d3.select(".ui-bottom").append("div")

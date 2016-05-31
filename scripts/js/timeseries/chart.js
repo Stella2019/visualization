@@ -50,14 +50,12 @@ function TimeseriesChart(app, id) {
     
     this.init();
 }
-
 TimeseriesChart.prototype = {
     init: function() {
         this.setTriggers();
     },
     setTriggers: function() {
         triggers.on('chart:build', this.build.bind(this));
-        triggers.on('chart:resize', this.adjustSize.bind(this));
         triggers.on('chart:shape', this.setShape.bind(this));
         triggers.on('chart:y-scale', this.setYScale.bind(this));
         
@@ -66,10 +64,13 @@ TimeseriesChart.prototype = {
         triggers.on('chart:render series', this.renderSeries.bind(this));
         
         // Specific chart functions
+        triggers.on(this.id + ':resize', this.adjustSize.bind(this));
         triggers.on(this.id + ':time_window', this.setTimeWindow.bind(this));
         triggers.on(this.id + ':set series', this.setSeries.bind(this));
         triggers.on(this.id + ':place series', this.placeSeries.bind(this));
         triggers.on(this.id + ':render series', this.renderSeries.bind(this));
+        
+        triggers.on(this.id + ':render y-axis', this.setYAxes.bind(this));
     },
     build: function() {
         this.container = d3.select('#' + this.id + '-container');
@@ -107,17 +108,14 @@ TimeseriesChart.prototype = {
         
         this.yAxis_element = this.plotarea.append('g').attr('class', 'y axis');
     },
-    adjustSize: function(page_sizes) {
+    adjustSize: function(sizes) {
         if(!this.container || this.container.length == 0) {
             return;
         }
-        if(!page_sizes) {
-            throw Error();
-        }
         
         // Recompute width and height
-        this.canvas_width  = parseInt(this.container.style('width'));
-        this.canvas_height = page_sizes ? page_sizes[this.id == 'context' ? 1 : 0] : 200;
+        this.canvas_width  = sizes == undefined ? parseInt(this.container.style('width')) : sizes[1];
+        this.canvas_height = sizes == undefined ? 200 : sizes[0];
         this.svg.style({
             height: this.canvas_height, 
             width: this.canvas_width, 
@@ -136,8 +134,8 @@ TimeseriesChart.prototype = {
         // Update elements
 //        this.y_label.attr("y", 0)//- this.left)
 //            .attr("x", 0 - (this.height / 2));
-        this.plotarea.attr("transform", 
-                      "translate(" + this.left + "," + this.top + ")");
+        this.plotarea.attr("transform",
+                           "translate(" + this.left + "," + this.top + ")");
         this.xAxis_element
             .attr('transform', 'translate(0,' + this.height + ')')
             .call(this.xAxis);
@@ -146,9 +144,6 @@ TimeseriesChart.prototype = {
         
         // Update renders?
         triggers.emit(this.id + ':render series');
-        
-//        console.log('size', this.height, this.width, this.canvas_width, this.canvas_height);
-        // TODO
     },
 //    updateOptionalAttributes: function() {
 //        this.area.interpolate(this.ops.shape.get());
@@ -175,41 +170,39 @@ TimeseriesChart.prototype = {
             .attr("height", this.height + 7);
     },
     setYScale: function() {
-        var scale = this.app.ops['View']['Y Scale'];
+        var scale = this.app.ops['Axes']['Y Scale'].get();
+        var ticks_per_200 = 6;
+        if(this.app.ops['Axes']['Y Ticks Toggle'].is(1) && this.app.ops['Axes']['Y Ticks'].get() != undefined && this.app.ops['Axes']['Y Ticks'].get() != '') {
+            ticks_per_200 = this.app.ops['Axes']['Y Ticks'].get();
+        } else {
+            this.app.ops['Axes']['Y Ticks'].updateInInterface(ticks_per_200);
+        }
+        var ticks = ticks_per_200 * this.height / 200;
+        this.yAxis.ticks(ticks);
+        
         if(scale == 'linear') {
             this.y = d3.scale.linear()
                 .range([this.height, 0]);
-            this.yAxis.scale(this.y)
-                .tickFormat(null);
         } else if(scale == 'pow') {
             this.y = d3.scale.sqrt()
                 .range([this.height, 0]);
-            this.yAxis.scale(this.y)
-                .tickFormat(null);
         } else if(scale == 'log') {
             this.y = d3.scale.log()
                 .clamp(true)
                 .range([this.height, 0]);
-            this.yAxis.scale(this.y)
-                .tickFormat(this.y.tickFormat(10, ",.0f"));
         }
-        if(this.app.ops['View']['Chart Size'].is('Small')) {
-            var feat = this.app.legend.features["Code"];
-            feat.color = d3.scale.category10()
-                    .domain(feat.subsets.map(d => d.ID));
-            this.xAxis.ticks(8);
-            this.yAxis.ticks(4);
-        } else {
-            this.xAxis.ticks(null);
-        }
+        
     },
     setYAxes: function() {
+        // Set Y Scale // TODO refractor so it makes more sense
+        this.setYScale();
+        
         // Get Properties
-        var scale = this.app.ops['View']['Y Scale'].get();
+        var scale = this.app.ops['Axes']['Y Scale'].get();
         var plottype = this.app.ops['View']['Plot Type'].get();
-        var ymax_manual = this.app.ops['View']['Y Max Toggle'].is('true')
+        var ymax_manual = this.app.ops['Axes']['Y Max Toggle'].is(1)
         && this.id == 'focus';
-        var ymax_op = this.app.ops['View']['Y Max'];
+        var ymax_op = this.app.ops['Axes']['Y Max'];
         var series_plotted = this.series_arr.filter(series => series.shown);
         var sorter = this.app.legend.getSeriesSorter();
         series_plotted.sort(sorter);
@@ -244,7 +237,9 @@ TimeseriesChart.prototype = {
 //                if(options['View']['Total Line'].is("true"))
 //                    y_max = Math.max(y_max, biggest_totalpoint);
             }
-            ymax_op.updateInInterface(y_max);
+            if(this.id == 'focus') {
+                ymax_op.updateInInterface(y_max);
+            }
         }
 
         this.y.domain([y_min, y_max])
@@ -253,18 +248,58 @@ TimeseriesChart.prototype = {
 //            .range([this.height, 0]);
 
         if(scale == 'log') {
-            this.yAxis.scale(this.y)
-                .tickFormat(this.y.tickFormat(10, ",.0f"));
-        } else if(y_max > 5e12) {
-            this.yAxis.tickFormat(x => x / 1e12 + 'T');
-        } else if(y_max > 5e9) {
-            this.yAxis.tickFormat(x => x / 1e9 + 'G');
-        } else if(y_max > 5e6) {
-            this.yAxis.tickFormat(x => x / 1e6 + 'M');
-        } else if(y_max > 5e3) {
-            this.yAxis.tickFormat(x => x / 1e3 + 'K');
+            var ticks = this.yAxis.ticks()[0];
+            var log_max = Math.log(y_max) / Math.LN10;
+            var tickformat = d3.format('s');
+            
+            // Find the y-axis scale by trying a few.
+            var scales = [[], [], [], []];
+            for (var e = 0; e <= Math.ceil(log_max); e++) { // For each power of 10 until the max
+                if(e % 3 == 0 && Math.pow(10, e) <= y_max)
+                    scales[0].push(Math.pow(10, e));
+                if(Math.pow(10, e) <= y_max) {
+                    scales[1].push(Math.pow(10, e));
+                    scales[2].push(Math.pow(10, e));
+                    scales[3].push(Math.pow(10, e));
+                }
+                if(Math.pow(10, e) * 2 <= y_max) {
+                    scales[2].push(Math.pow(10, e) * 2);
+                    scales[3].push(Math.pow(10, e) * 2);
+                }
+                if(Math.pow(10, e) * 3 <= y_max)
+                    scales[3].push(Math.pow(10, e) * 3);
+                if(Math.pow(10, e) * 4 <= y_max)
+                    scales[3].push(Math.pow(10, e) * 4);
+                if(Math.pow(10, e) * 5 <= y_max) {
+                    scales[2].push(Math.pow(10, e) * 5);
+                    scales[3].push(Math.pow(10, e) * 5);
+                }
+                if(Math.pow(10, e) * 6 <= y_max)
+                    scales[3].push(Math.pow(10, e) * 6);
+                if(Math.pow(10, e) * 7 <= y_max)
+                    scales[3].push(Math.pow(10, e) * 7);
+                if(Math.pow(10, e) * 8 <= y_max)
+                    scales[3].push(Math.pow(10, e) * 8);
+                if(Math.pow(10, e) * 9 <= y_max)
+                    scales[3].push(Math.pow(10, e) * 9);
+            }
+            
+            // Choose the scale that is closest
+            if(Math.abs(scales[0].length - ticks) < Math.abs(scales[1].length - ticks)) {
+                this.yAxis.tickValues(scales[0]);
+            } else if(Math.abs(scales[1].length - ticks) < Math.abs(scales[2].length - ticks)) {
+                this.yAxis.tickValues(scales[1]);
+            } else if(Math.abs(scales[2].length - ticks) < Math.abs(scales[3].length - ticks)) {
+                this.yAxis.tickValues(scales[2]);
+            } else {
+                this.yAxis.tickValues(scales[3]);
+            }
+            this.yAxis.scale(this.y).tickFormat(d3.format('s'));
+            
         } else {
-            this.yAxis.tickFormat(null);
+            this.yAxis.scale(this.y)
+                .tickValues(null)
+                .tickFormat(d3.format('s'));
         }
         
         // Create y Axises
@@ -371,5 +406,15 @@ TimeseriesChart.prototype = {
             .style("stroke", series => series.stroke)
             .attr("d", series => series.shown ? this.area(series.values) : '');
 //            .attr("d", function(d) { return this.area(d.values)}.bind(this));
+    },
+    customTimezone: function() {
+        TS.focus.xAxis.tickFormat(d => 'Nov ' + (d.getDate() + 1));
+        TS.focus.xAxis.tickValues([new Date('2014-11-13 15:00:00'), new Date('2015-11-14 15:00:00'), new Date('2015-11-15 15:00:00'), new Date('2015-11-16 15:00:00'), new Date('2015-11-17 15:00:00'), new Date('2015-11-18 15:00:00')]);
+        
+        TS.focus.adjustSize([100, 50]);
+        TS.focus.yAxis.ticks(3);
+        
+        TS.focus.xAxis.tickValues([new Date('2014-12-14 17:00'), new Date('2014-12-14 23:00'), new Date('2014-12-15 05:00:00'), new Date('2014-12-15 11:00:00')]);
+        TS.focus.xAxis.tickFormat(d => { var hour = d.getHours(); console.log(hour); return (hour == 17 ? 'Dec 15 12:00' : hour == 23 ? '18:00' : hour == 5 ? 'Dec 16 00:00' : '06:00')})
     },
 };

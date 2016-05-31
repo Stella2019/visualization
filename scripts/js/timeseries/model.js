@@ -139,7 +139,9 @@ TimeseriesModel.prototype = {
                 op_shown.set(intersect);
             } else {
                 // Otherwise we will just put the new ones in!
-                op_shown.set(this.subset_ids.map(e => e));
+                // That are text // TODO cleanup
+                var text_subsets = this.app.collection.subsets_arr.filter(d => d.Feature == 'Text').map(d => parseInt(d.ID));
+                op_shown.set(text_subsets);
             }
             this.app.ops.recordState();
         }

@@ -35,6 +35,7 @@ function Options(app) {
     
     this.timefields = ['time_min', 'time_max'];
     this.state = {};
+    this.toggle_objects = [];
 };
 Options.prototype = {
     init: function() {
@@ -50,12 +51,7 @@ Options.prototype = {
         }.bind(this);
         
         // Style elements
-        if('TS' in window) {
-            this['View']['Y Max Toggle'].style();
-//            $(function () {
-//                $('[data-toggle="popover"]').popover()
-//            })
-        }
+        this.toggle_objects.forEach(d => { d.style(); });
         
         // Record the state
         this.recordState(true);
@@ -281,6 +277,9 @@ Options.prototype = {
         var option = ops[panel_name][option_name];
         var choice_name = util.simplify(panel_name) + '_' + util.simplify(option_name);
         
+        // Override allow custom entries
+        option.custom_entries_allowed = true;
+        
         // Set container
         var container = d3.select('#choose_' + choice_name);
         if(!container[0][0]) {
@@ -312,20 +311,22 @@ Options.prototype = {
         // Add toggle option        
         var op_toggle = new Option({
             title: "Save " + option.title + " State",
-            labels: ["Auto", "Manual"],
+            labels: ["Auto", "Man"],
             tooltips: ["Click to toggle manual mode", "Click to toggle automatic mode"],
-            ids:    ["false", "true"],
+            ids:    [0, 1],
             available: [0, 1],
             default: 0,
             callback: function() {
                 ops.recordState();
-                triggers.emit('focus:place series');
+                
+                option.callback();
             }
         });
+        this.toggle_objects.push(op_toggle);
             
         op_toggle['style'] = function() {
             d3.select('#input_' + choice_name)
-                .attr('disabled', this.get() == "true" ? null : true);
+                .attr('disabled', this.get() ? null : true);
             d3.select('#choice_' + choice_name + '_toggle')
                 .attr('class', 'btn btn-xs btn-default')
                 .attr('data-content', this.tooltips[this.indexCur()])
@@ -359,8 +360,7 @@ Options.prototype = {
                 'data-content': "Tooltip on bottom"
             })
             .on('click', function(d) {
-                var saving = !(op_toggle.get() == "true");
-                op_toggle.set(saving ? "true" : "false");
+                op_toggle.set(1 - op_toggle.get());
                 op_toggle.style();
             
                 op_toggle.callback();

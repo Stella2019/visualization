@@ -125,7 +125,7 @@ function Timeseries () {
 }
 Timeseries.prototype = {
     setOptions: function() {
-        this.ops.panels = ['Dataset', 'Series', 'View', 'Analysis'];
+        this.ops.panels = ['Dataset', 'Series', 'View', 'Axes', 'Analysis'];
         var options = this.ops;
         
         this.ops['Dataset'] = { };
@@ -241,34 +241,6 @@ Timeseries.prototype = {
                     triggers.emit('chart:render series');
                 }
             }),
-            'Y Scale': new Option({
-                title: "Y Scale",
-                labels: ["Linear",  "Power", "Log"],
-                ids:    ["linear",  "pow",   "log"],
-                default: 0,
-                callback: function() {
-                    triggers.emit('chart:y-scale');
-                    triggers.emit('chart:render series');
-                }
-            }),
-            'Y Max': new Option({
-                title: "Y Max",
-                labels: [0],
-                ids:    [0],
-                default: 0,
-                type: "textfieldautoman",
-                custom_entries_allowed: true,
-                callback: triggers.emitter('focus:place series')
-            }),
-            'Chart Size': new Option({
-                title: "Chart Size",
-                labels: ['Regular', 'Small'],
-                ids: ['regular', 'small'],
-                callback: function() {
-                    triggers.emit('chart:y-scale');
-                    triggers.emit('chart:render series');
-                }
-            }),
             'Time Min': new Option({
                 title: "Begin",
                 labels: ["2000-01-01 00:00"],
@@ -288,8 +260,65 @@ Timeseries.prototype = {
                 parent: '#chart-bottom',
                 render: false,
                 callback: triggers.emitter('chart:focus time')
-            })
+            }),
         };
+        this.ops['Axes'] = {
+            'Height': new Option({
+                title: "Height",
+                labels: [0],
+                ids:    [0],
+                type: "textfieldautoman",
+                callback: triggers.emitter('chart:plan resize')
+            }),
+            'Width': new Option({
+                title: "Width",
+                labels: [0],
+                ids:    [0],
+                type: "textfieldautoman",
+                callback: triggers.emitter('chart:plan resize')
+            }),
+            'Y Scale': new Option({
+                title: "Y Scale",
+                labels: ["Linear",  "Power", "Log"],
+                ids:    ["linear",  "pow",   "log"],
+                default: 0,
+                callback: function() {
+                    triggers.emit('chart:y-scale');
+//                    triggers.emit('chart:render series');
+//                    triggers.emit('focus:render y-axis')
+                    triggers.emit('focus:place series');
+                    triggers.emit('context:place series');
+                }
+            }),
+            'Y Max': new Option({
+                title: "Y Max",
+                labels: [0],
+                ids:    [0],
+                default: 0,
+                type: "textfieldautoman",
+                callback: triggers.emitter('focus:place series')
+            }),
+            'Y Ticks': new Option({
+                title: "Y Ticks",
+                labels: [0],
+                ids:    [0],
+                type: "textfieldautoman",
+                callback: function() {
+                    triggers.emit('chart:y-scale');
+                    triggers.emit('focus:place series');
+                    triggers.emit('context:place series');
+                }
+            }),
+            'UTC Offset': new Option({
+                title: "UTC Offset",
+                labels: ['US PT (-08:00)', 'US ET (-05:00)', 'GMT (+00:00)', 'CET (+01:00)', 'EET (+02:00)', 'Beijing (+08:00)', 'AET (+10:00)'],
+                ids: [-8, -5, 0, 1, 2, 8, 10],
+                callback: function() {
+                    triggers.emit('legend:color scale');
+                    triggers.emit('chart:render series');
+                }
+            }),
+        }
         this.ops['Analysis'] = {
             'Fetched Tweet Order': new Option({
                 title: 'Fetched Tweets Order',
