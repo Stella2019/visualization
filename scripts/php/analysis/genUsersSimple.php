@@ -24,13 +24,13 @@
 
     
     if($subset != "0" and $subset != 0) {
-        $query .= "JOIN InSubset InCollection " .
-                "	ON TweetUser.`Tweet` = InCollection.Tweet " .
-                "   AND InCollection.Subset = $subset ";
+        $query .= "JOIN InSubset TweetInCollection " .
+                "	ON TweetUser.`Tweet` = TweetInCollection.Tweet " .
+                "   AND TweetInCollection.Subset = $subset ";
     } else {
-        $query .= "JOIN InEvent InCollection " .
-                "	ON TweetUser.`Tweet` = InCollection.Tweet " .
-                "   AND InCollection.Event = $event ";
+        $query .= "JOIN InEvent TweetInCollection " .
+                "	ON TweetUser.`Tweet` = TweetInCollection.Tweet " .
+                "   AND TweetInCollection.Event = $event ";
     }
 
     $query .= "WHERE TweetUser.`Tweet` >= $tweet_min " .

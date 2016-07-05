@@ -73,7 +73,7 @@
     }
 
     // Setup query
-    $query = "INSERT IGNORE INTO InSubset " .
+    $query = "INSERT IGNORE INTO TweetInSubset " .
         "SELECT " .
         "	 " . $subset . " as 'Subset', " .
         "    Tweet.`ID` as 'Tweet', " .
@@ -89,19 +89,19 @@
         $conds[] = "Tweet.ID < " . $_REQUEST["tweet_max"];
 
     if(isset($_REQUEST["event"])) {
-        $query .= "JOIN InEvent " .
-                "	ON Tweet.`ID` = InEvent.Tweet ";
+        $query .= "JOIN TweetInEvent " .
+                "	ON Tweet.`ID` = TweetInEvent.Tweet ";
         
-        $conds[] = "InEvent.Event = " . $_REQUEST["event"];
+        $conds[] = "TweetInEvent.Event = " . $_REQUEST["event"];
     }
     if(isset($_REQUEST["superset"])) {
-        $query .= "JOIN InSubset " .
-                "	ON Tweet.`ID` = InSubset.Tweet ";
+        $query .= "JOIN TweetInSubset " .
+                "	ON Tweet.`ID` = TweetInSubset.Tweet ";
 
         $conds[] = "InSubset.Subset = " . $_REQUEST["superset"];
     }
     if(isset($_REQUEST["excludeset"])) {
-        $query .= "LEFT JOIN InSubset ExcludeSet " .
+        $query .= "LEFT JOIN TweetInSubset ExcludeSet " .
                 "	ON Tweet.`ID` = ExcludeSet.Tweet " .
                 "   AND ExcludeSet.Subset = " . $_REQUEST["excludeset"] . "  ";
 

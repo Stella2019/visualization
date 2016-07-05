@@ -29,18 +29,18 @@
         "    IF(InCollection.`Type` = 'retweet', 1, 0) as 'Retweets', " .
         "    IF(InCollection.`Type` = 'reply', 1, 0) as 'Replies', " .
         "    IF(InCollection.`Type` = 'quote', 1, 0) as 'Quotes', " .
-        "    InCollection.`Distinct` as 'Distinct', " .
+        "    TweetInCollection.`Distinct` as 'Distinct', " .
         "FROM TweetUser ";
 
     
     if($subset != "0" and $subset != 0) {
-        $query .= "JOIN InSubset InCollection " .
-                "	ON TweetUser.`Tweet` = InCollection.Tweet " .
-                "   AND InCollection.Subset = $subset ";
+        $query .= "JOIN TweetInSubset TweetInCollection " .
+                "	ON TweetUser.`Tweet` = TweetInCollection.Tweet " .
+                "   AND TweetInCollection.Subset = $subset ";
     } else {
-        $query .= "JOIN InEvent InCollection " .
-                "	ON TweetUser.`Tweet` = InCollection.Tweet " .
-                "   AND InCollection.Event = $event ";
+        $query .= "JOIN TweetInEvent TweetInCollection " .
+                "	ON TweetUser.`Tweet` = TweetInCollection.Tweet " .
+                "   AND TweetInCollection.Event = $event ";
     }
 
     $query .= "WHERE TweetUser.`Tweet` >= $tweet_min " .
@@ -53,11 +53,11 @@
         "User.`FollowingGainFirstToLast` = TweetUser.`FriendsCount` - User.'FollowingAtStart', " .
         "User.`ListedGainFirstToLast` = TweetUser.`ListedCount` - User.'ListedAtStart', " .
         "User.`FavoritesGainFirstToLast` = TweetUser.`FavoritesCount` as 'FavoritesAtStart', " .
-        "User.`Originals` = User.`Tweets` + IF(InCollection.`Type` = 'original', 1, 0), " .
-        "User.`Retweets` = User.`Tweets` + IF(InCollection.`Type` = 'retweet', 1, 0), " .
-        "User.`Replies` = User.`Tweets` + IF(InCollection.`Type` = 'reply', 1, 0), " .
-        "User.`Quotes` = User.`Tweets` + IF(InCollection.`Type` = 'quote', 1, 0), " .
-        "User.`Distinct` = User.`Tweets` + InCollection.`Distinct`; ";
+        "User.`Originals` = User.`Tweets` + IF(TweetInCollection.`Type` = 'original', 1, 0), " .
+        "User.`Retweets` = User.`Tweets` + IF(TweetInCollection.`Type` = 'retweet', 1, 0), " .
+        "User.`Replies` = User.`Tweets` + IF(TweetInCollection.`Type` = 'reply', 1, 0), " .
+        "User.`Quotes` = User.`Tweets` + IF(TweetInCollection.`Type` = 'quote', 1, 0), " .
+        "User.`Distinct` = User.`Tweets` + TweetInCollection.`Distinct`; ";
     
     $result = $mysqli->query($query);
      

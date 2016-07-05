@@ -62,10 +62,10 @@ queries = {
                 "    %(StartTime)s, %(StopTime)s, %(Server)s) "
                 "ON DUPLICATE KEY UPDATE `Keywords`=%(Keywords)s, `OldKeywords`=%(OldKeywords)s, "
                 "    `StartTime`=%(StartTime)s, `StopTime`=%(StopTime)s, `Server`=%(Server)s "),
-    'add_inevent': ("INSERT IGNORE INTO InEvent "
+    'add_inevent': ("INSERT IGNORE INTO TweetInEvent "
                   "(Tweet, Event, `Distinct`, Type) "
                   "VALUES (%(Tweet)s, %(Event)s, %(Distinct)s, %(Type)s) "),
-    'add_insubset': ("INSERT IGNORE INTO InSubset "
+    'add_insubset': ("INSERT IGNORE INTO TweetInSubset "
                    "(Tweet, Subset, `Distinct`, Type) "
                    "VALUES (%(Tweet)s, %(Subset)s, %(Distinct)s, %(Type)s) ")
 }

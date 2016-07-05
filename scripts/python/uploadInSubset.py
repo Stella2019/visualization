@@ -11,7 +11,7 @@ import parse_raw_JSON
 database = None
 
 # Queries
-query_add_tweet_to_subset = ("INSERT IGNORE INTO InSubset "
+query_add_tweet_to_subset = ("INSERT IGNORE INTO TweetInSubset "
              "(Tweet_ID, Event_ID)"
              "VALUES (%(Tweet_ID)s, %(Event_ID)s)")
 

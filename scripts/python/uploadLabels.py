@@ -6,7 +6,7 @@ import mysql.connector
 
 event = -9
 subset = 1100
-feature = 'BotLabel' # Cluster, BotLabel, Truthy
+feature = 'JustBot' # JustBot, Cluster, BotLabel, Truthy
 
 # Queries
 #query = ("INSERT INTO UserLabel "
@@ -14,6 +14,12 @@ feature = 'BotLabel' # Cluster, BotLabel, Truthy
 #        "VALUES (%(Event)s, %(Subset)s, %(UserID)s, %(Screenname)s, %(Bot)s, %(Botnet)s, %(Sample)s, %(Cluster)s, %(Cluster2)s, %(Profile)s, %(Status)s) "
 #        "ON DUPLICATE KEY UPDATE Screenname=%(Screenname)s, Bot=%(Bot)s, Botnet=%(Botnet)s, Sample=%(Sample)s, Cluster=%(Cluster)s, Cluster2=%(Cluster2)s, Profile=%(Profile)s, Status=%(Status)s;")
 query = ("UPDATE IGNORE UserLabel "
+    "SET Bot=%(Bot)s "
+    "WHERE Event = %(Event)s "
+    "    AND Subset = %(Subset)s "
+    "    AND UserID = %(UserID)s ;")
+if(feature == 'Truthy'):
+    query = ("UPDATE IGNORE UserLabel "
         "SET Screenname=%(Screenname)s, Bot=%(Bot)s, Botnet=%(Botnet)s, Sample=%(Sample)s, Cluster=%(Cluster)s, Profile=%(Profile)s, Status=%(Status)s "
         "WHERE Event = %(Event)s "
         "    AND Subset = %(Subset)s "
@@ -43,6 +49,8 @@ def main():
     
     folder = 'C:\\Users\\anied\\Google Drive\\Grad School\\MisInfo Group\\Twitter Bots\\'
     filename = 'ManualAnnotation_20160520_1516.tsv'
+    if(feature == 'JustBot'):
+        filename = 'Both Crisis Actors Graph\\SimpleBotLabels.csv'
     if(feature == 'Truthy'):
         filename = 'bot_scores_all_crisis_actor.csv'
     elif (feature == 'Cluster'):
@@ -61,6 +69,10 @@ def main():
                 'Event': event,
                 'Subset': subset,
             }
+            if(feature == 'JustBot'):
+                data['UserID'] = row[0]
+                data['Screenname'] = row[1][:25]
+                data['Bot'] = row[2]
             if(feature == 'BotLabel'):
                 botnet = row[5]
                 bot = 'Bot'

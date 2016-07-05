@@ -39,7 +39,7 @@
     $query .= join(", " , $projection);
 
     // Joins
-    $query .= " FROM In$collection TweetSet " .
+    $query .= " FROM TweetIn$collection TweetSet " .
         "LEFT JOIN Tweet ON Tweet.ID = TweetSet.Tweet ";
     if(isset($_REQUEST["extradata"]) and strpos($_REQUEST["extradata"], 'u') !== false) {
         $query .= "LEFT JOIN TweetUser ON TweetUser.Tweet = TweetSet.Tweet ";
