@@ -179,7 +179,7 @@ TimeseriesModel.prototype = {
     },
     parseTimeseries: function(id) {
         // Reenable the button to choose the event
-        if(id == 'event') {
+        if(id == 'Event') {
             d3.select('#choose_Dataset_Event button')
                 .attr('disabled', null);
         }
@@ -195,7 +195,7 @@ TimeseriesModel.prototype = {
         }
         
         // If event, get timestamps
-        if(id == 'event') {
+        if(id == 'Event') {
             // Get bounds
             this.time.min = util.date(this.download[0].Time);
             this.time.max = util.date(this.download[this.download.length - 1].Time);
@@ -241,9 +241,9 @@ TimeseriesModel.prototype = {
         if(!id) { // Then prepare them all!
             triggers.emit('timeseries:clear', 'focus'); // Not necessary though, TODO
             
-            triggers.emit('timeseries:ready', 'event');
+            triggers.emit('timeseries:ready', 'Event');
             this.subset_load.subsets.forEach(triggers.emitter('timeseries:ready'));
-        } else if(id == 'event' || !id) {
+        } else if(id == 'Event' || !id) {
             this.prepareContextSeries(id);
         } else {
             var datapoints = this['series_' + unit][id];
@@ -269,7 +269,7 @@ TimeseriesModel.prototype = {
     prepareContextSeries: function() {
         var unit = this.app.ops['Series']['Unit'].get();
         var type = this.app.ops['Series']['Tweet Types'].get();
-        var datapoints = this['series_' + unit].event;
+        var datapoints = this['series_' + unit].Event;
         var typecolors = ['red', 'yellow', 'green', 'blue'];
         
         triggers.emit('timeseries:clear', 'context');
@@ -280,7 +280,7 @@ TimeseriesModel.prototype = {
                 return val + datapoints[1][i] + datapoints[2][i] + datapoints[3][i];
             }));
             
-            series.ID = 'event';
+            series.ID = 'Event';
             series.Label = 'Whole Event';
             series.color = '#000';
             series.chart = 'context';
