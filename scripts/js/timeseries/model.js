@@ -74,13 +74,13 @@ TimeseriesModel.prototype = {
     loadTimeseries: function(id) {
         var type;
         if(typeof(id) == 'number') {
-            type = 'subset';
+            type = 'Subset';
         } else {
             // If there is no event information, end
             if (!this.app.collection.event || !('ID' in this.app.collection.event)) {
                 return;
             }
-            type = 'event';
+            type = 'Event';
             id = this.app.collection.event.ID;
         }
         if(this.streamTimeseries)
@@ -89,7 +89,7 @@ TimeseriesModel.prototype = {
         // Clear the raw data objects
         this.download = [];
         
-        if(type == 'event') {
+        if(type == 'Event') {
             d3.select('#choose_Dataset_Event button')
                 .attr('disabled', true);
         }
@@ -108,7 +108,7 @@ TimeseriesModel.prototype = {
             time_res: 3,
             failure_msg: 'Error loading data',
             progress_text: 'Getting ' + type + ' ' + id + ' Timeseries',
-            on_finish: triggers.emitter('timeseries:loaded', type == 'event' ? 'event' : id),
+            on_finish: triggers.emitter('timeseries:loaded', type == 'Event' ? 'Event' : id),
             on_chunk_finish: function(file_data) {
                 file_data = d3.csv.parse(file_data);
                 this.download = this.download.concat(file_data);

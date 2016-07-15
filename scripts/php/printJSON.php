@@ -3,7 +3,8 @@
     function getName($item) {
         return $item->name;
     }
-
+    
+    $mysqli->query("SET CHARACTER SET utf8;");
     $result = $mysqli->query($query);
     
     // Print query as CSV

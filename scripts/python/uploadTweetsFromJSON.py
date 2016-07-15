@@ -99,7 +99,6 @@ def main():
                         help="Path to file/folder where the collections are to be processed.")
     global options
     options = parser.parse_args()
-    options.database = 'misinfo_analysis'
     
     connectToServer()
     
@@ -188,7 +187,7 @@ def uploadTweet(cursor, tweet, backfill=0):
     # Remove Fields that confuse mysql.connector and are not used
     matched_subsets  = tweet['Subsets']
     tweet['Subsets'] = None
-    parent = tweet['Parent']
+    parent = tweet['Parent'] if 'Parent' in tweet else None
     tweet['Parent']  = None
     
     # Push tweet's data to database
@@ -197,7 +196,7 @@ def uploadTweet(cursor, tweet, backfill=0):
     if(parent):
         parent['Subsets'] = None
         parent['Parent'] = None
-        cursor.execute(queries['add_parentweet'], parent)
+        cursor.execute(queries['add_parenttweet'], parent)
 
     # Also add to event
     tweetIn = {
@@ -321,9 +320,12 @@ def populateSubsets():
         
     return subsets # for external programs using this
     
-def checkSubsetsAgainstDatabase(connection=serverStorage):
+def checkSubsetsAgainstDatabase(connection=None):
     global subsets
     
+    if(connection is None):
+        connection = serverStorage
+        
     # Get subsets as defined by server
     cursor = connection.cursor(dictionary=True)
     event = {
@@ -462,6 +464,15 @@ def connectToServer():
             host=config["storage"]["host"],
             database=config["storage"]["database"]
         )
+        
+        cursor = serverStorage.cursor(dictionary=True)
+
+        # Enforce UTF-8 for the connection.
+        cursor.execute('SET NAMES utf8mb4')
+        cursor.execute("SET CHARACTER SET utf8mb4")
+        cursor.execute("SET character_set_connection=utf8mb4")
+        
+        cursor.close()
             
 def printNested(obj, level=0):
     if(type(obj) is dict):
