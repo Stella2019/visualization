@@ -946,6 +946,7 @@ Tooltip.prototype = {
 };
 
 triggers = {
+    verbose: false,
     events: {},
     on: function (eventName, fn) {
         this.events[eventName] = this.events[eventName] || [];
@@ -964,9 +965,11 @@ triggers = {
     emit: function (eventName, data) {
         if (this.events[eventName]) {
             this.events[eventName].forEach(function(fn) {
+                if(this.verbose)
+                    console.log('Triggered: ' + eventName + '\nCall:      ' + fn.name);
                 fn(data);
 //                setTimeout(function() { fn(data); }, 1);
-            });
+            }, this);
         }
     },
     emitter: function(eventName, parameter) {

@@ -2,7 +2,7 @@
     include '../connect.php';
 
     $query = "" .
-        "CALL RumorCodes(" . $_POST['rumor_id']. ", " . $_POST['period']. ")";
+        "CALL get_codes_inrumor_inperiod(" . $_POST['rumor_id']. ", " . $_POST['period']. ")";
 
     include '../printJSON.php';
 ?>

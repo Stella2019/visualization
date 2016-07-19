@@ -78,6 +78,11 @@ Options.prototype = {
         // Figure out what options should be different
         var changed = [];
         Object.keys(state).forEach(function(panel_name) {
+            if(!(panel_name in this)) {
+                console.log('Option panel specified in URLf does not exist: ' + panel_name);
+                return;
+            }
+            
             var panel = this[panel_name];
             var panel_state = state[panel_name];
             
@@ -797,13 +802,13 @@ Options.prototype = {
             label: "Index",
             url: "index.html"
         },{
-            label: "Collection Overview",
+            label: "Collections",
             url: "status.html"
         },{
             label: "Timeseries",
             url: "timeseries.html"
         },{
-            label: "<span class='text-danger'>Coding</span> (not working)",
+            label: "Coding Report",
             url: "coding.html"
         },{
             label: "Features",
