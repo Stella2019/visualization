@@ -651,11 +651,11 @@ Connection.prototype = {
             try {
                 json_data = JSON.parse(raw_data);
             } catch(err) {
-                console.error('JSON parsing error for ' + url, raw_data);
+                console.error('JSON parsing error for ' + url, fields, raw_data);
                 return;
             }
             callback(json_data);
-        }
+        };
         this.php(url, fields, json_callback, error_callback);
     },
     startStream: function () {

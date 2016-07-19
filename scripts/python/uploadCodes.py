@@ -4,7 +4,7 @@ import json, re, argparse
 from pprint import pprint
 import mysql.connector
 import gspread # installed via pip install gspread
-from oauth2client.client import SignedJwtAssertionCredentials
+from oauth2client.service_account import ServiceAccountCredentials
 import uploadTweetsFromJSON
 
 serverCapture = None
@@ -16,10 +16,10 @@ queries = {
     'get_coder': ("SELECT * FROM Coder "
                    "WHERE ShortName = %(name)s ; "),
     'push_code': ("REPLACE INTO TweetCode "
-                   "(Rumor, Period, Tweet, Coder, "
+                   "(Rumor, Period, Tweet, Coder, `Primary`, "
                    " Uncodable, Unrelated, Affirm, Deny, Neutral, "
                    " Implicit, Ambiguity, Uncertainty, Difficult) "
-                   "VALUES (%(Rumor)s, %(Period)s, %(Tweet)s, %(Coder)s, "
+                   "VALUES (%(Rumor)s, %(Period)s, %(Tweet)s, %(Coder)s, %(Primary)s, "
                    " %(Uncodable)s, %(Unrelated)s, %(Affirm)s, %(Deny)s, %(Neutral)s, "
                    " %(Implicit)s, %(Ambiguity)s, %(Uncertainty)s, %(Difficult)s); "),
     'push_mongotweet': ("INSERT INTO MongoTweet "
@@ -104,6 +104,7 @@ def main():
                 code['Period']    = options.period
                 
                 # Get codes form spreadsheet
+                code['Primary'] = 'No Code'
                 codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Implicit', 'Ambiguity', 'Uncertainty', 'Difficult']
                 for item in codes:
                     if(item in code):
@@ -112,6 +113,12 @@ def main():
                         code[item] = bool(code[item.lower()])
                     else:
                         code[item] = 0
+                    
+                    if(item in ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'] and code[item]):
+                        if(code['Primary'] == 'No Code'):
+                            code['Primary'] = item
+                        else:
+                            code['Primary'] = 'Too many codes'
                 
                 # Get Text
                 if('text' in code):
@@ -167,7 +174,7 @@ def connectToServer():
             
         global googleAPI
         scope = ['https://spreadsheets.google.com/feeds']
-        credentials = SignedJwtAssertionCredentials(config["google_api"]['client_email'], config["google_api"]['private_key'].encode(), scope)
+        credentials = ServiceAccountCredentials.from_json_keyfile_name('../../google.conf', scope)
         googleAPI = gspread.authorize(credentials)
 
 if __name__ == "__main__":

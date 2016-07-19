@@ -71,62 +71,52 @@ Coding.prototype = {
         
     },
     setTriggers: function() {
+        // Debugging
         triggers.verbose = true;
+        
+        // Page management
         triggers.on('build_page', this.buildPage.bind(this));
         triggers.on('toggle_pane', this.togglePane.bind(this));
         
+        // Initial Data
         triggers.on('overview_data: get', this.getOverviewData.bind(this));
         triggers.on('overview_data: collected', this.checkOverviewData.bind(this));
         triggers.on('build_options', this.buildOptions.bind(this));
         triggers.on('rumor: choose', this.chooseRumor.bind(this));
+        
+        // Codes
         triggers.on('codes: parse', this.parseCodes.bind(this));
         /*triggers.on('parse_other_tweets', this.parseOtherDatasetTweets.bind(this));*/
         triggers.on('codes: compile', this.compileReport.bind(this));
         triggers.on('codes: processed', this.IRRTable.bind(this));
         triggers.on('codes: processed', this.fillMatrices.bind(this));
-        triggers.on('codes: processed', this.fillTweetList.bind(this));
+        
+        // Tweet Details: text, type, distinct, url
         triggers.on('tweet details: get', this.getTweetDetails.bind(this));
         triggers.on('tweet details: parse', this.parseTweetDetails.bind(this));
+        triggers.on('tweet details: processed', this.fillTweetList.bind(this));
+        triggers.on('tweet details: processed', this.tweetTypeTable.bind(this));
+//        triggers.on('tweet details: processed', this.countNGrams.bind(this, 'All'));
     },
     getOverviewData: function() {
-        this.connection.php('coding/getCoders', {}, function(d) {
-            try {
-                this.coders = JSON.parse(d);
-            } catch(err) {
-                console.log(file_data);
-                return;
-            }
+        this.connection.phpjson('coding/getCoders', {}, function(d) {
+            this.coders = d;
             triggers.emit('overview_data: collected');
         }.bind(this));
             
-        this.connection.php('collection/getEvent', {}, function(file_data) {
-            try {
-                this.events = JSON.parse(file_data);
-            } catch(err) {
-                console.log(file_data);
-                return;
-            }
+        this.connection.phpjson('collection/getEvent', {}, function(d) {
+            this.events = d;
             triggers.emit('overview_data: collected');
         }.bind(this));
 
-        this.connection.php('collection/getRumor', {}, function(file_data) {
-            try {
-                this.rumors = JSON.parse(file_data);
-            } catch(err) {
-                console.log(file_data);
-                return;
-            }
+        this.connection.phpjson('collection/getRumor', {}, function(d) {
+            this.rumors = d;
             triggers.emit('overview_data: collected');
         }.bind(this));
 
         // Get the number of codes for each rumor
-        this.connection.php('coding/rumorPeriodCounts', {}, function(file_data) {
-            try {
-                this.rumor_period_counts = JSON.parse(file_data);
-            } catch(err) {
-                console.log(file_data);
-                return;
-            }
+        this.connection.phpjson('coding/rumorPeriodCounts', {}, function(d) {
+            this.rumor_period_counts = d;
             triggers.emit('overview_data: collected');
         }.bind(this));
     },
@@ -808,9 +798,7 @@ Coding.prototype = {
         // Display data
         this.code_agreement_arr = code_agreement_arr;
         triggers.emit('codes: processed');
-        if(this.ops['Tweet Types']['Tweet Details'].is('true')) {
-            triggers.emit('tweet details: get');
-        }
+        triggers.emit('tweet details: get');
     },
     IRRTable: function() {
         triggers.emit('toggle_pane', 'Reliability');
@@ -1462,35 +1450,25 @@ Coding.prototype = {
         
         // Wait otherwise some page elements may be stuck
         setTimeout(function() {
-            
-             this.connection.php('coding/getTweets', post, triggers.emit('tweet details: parse'));
+            this.connection.phpjson('coding/getTweets', post, triggers.emitter('tweet details: parse'));
         }.bind(this), 1000);
-       
     },
-    parseTweetDetails: function(file_data) {
-        var tweetsDB;
-        try {
-            tweetsDB = JSON.parse(file_data);
-        } catch(err) {
-            console.log(file_data);
-            return;
-        }
-        
+    parseTweetDetails: function(tweetDetails) {
         // Add information to the tweets
-        tweetsDB.forEach(function(tweetDB) {
-            var tweet = this.tweets[tweetDB.ID];
+        tweetDetails.forEach(function(tweetDetail) {
+            var tweet = this.tweets[tweetDetail.ID];
             if(tweet) {
-                tweet.Type = tweetDB.Type;
-                tweet.ExpandedURL = tweetDB.ExpandedURL;
+                tweet.Text = tweetDetail.Text;
+                tweet.Type = tweetDetail.Type;
+                tweet.ExpandedURL = tweetDetail.ExpandedURL;
             } else {
-//                console.log('Somethings wrong mapping tweets, couldn\'t find ID ' + tweetDB.ID);
+//                console.log('Somethings wrong mapping tweets, couldn\'t find ID ' + tweetDetail.ID);
             }
         }, this);
         
-        this.tweetTypeTable();
-        if(!this.ops['N-Grams']['Subset'].is('All'))
-            this.countNGrams(this.ops['N-Grams']['Subset'].get());
-        this.countNGrams('All');
+//        if(!this.ops['N-Grams']['Subset'].is('All'))
+//            this.countNGrams(this.ops['N-Grams']['Subset'].get());
+        triggers.emit('tweet details: processed');
     },
     tweetTypeTable: function() {
         triggers.emit('toggle_pane', 'Tweet Types');
