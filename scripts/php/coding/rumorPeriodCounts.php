@@ -4,7 +4,7 @@
 
     $query = "" .
         "SELECT Rumor, Period, COUNT(*) as 'Count'" .
-        "FROM Code " . 
+        "FROM TweetCode " . 
         "GROUP BY Rumor, Period;";
 
     include '../printJSON.php';
