@@ -171,7 +171,15 @@ def connectToServer():
             host=config["storage"]["host"],
             database=config["storage"]["database"]
         )
-            
+        
+        # Enforce UTF-8 for the connection.
+        cursor = serverStorage.cursor(dictionary=True)
+        cursor.execute('SET NAMES utf8mb4')
+        cursor.execute("SET CHARACTER SET utf8mb4")
+        cursor.execute("SET character_set_connection=utf8mb4")
+        cursor.close()
+        
+        # Connect to Google Drive API
         global googleAPI
         scope = ['https://spreadsheets.google.com/feeds']
         credentials = ServiceAccountCredentials.from_json_keyfile_name('../../google.conf', scope)
