@@ -645,6 +645,19 @@ Connection.prototype = {
             error: error_callback
         });
     },
+    phpjson: function(url, fields, callback, error_callback) {
+        var json_callback = function(raw_data) {
+            var json_data;
+            try {
+                json_data = JSON.parse(raw_data);
+            } catch(err) {
+                console.error('JSON parsing error for ' + url, raw_data);
+                return;
+            }
+            callback(json_data);
+        }
+        this.php(url, fields, json_callback, error_callback);
+    },
     startStream: function () {
         this.chunks = [];
         this.chunk_index = 0;

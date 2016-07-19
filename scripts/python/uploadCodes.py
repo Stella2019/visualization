@@ -2,7 +2,6 @@
 
 import json, re, argparse
 from pprint import pprint
-from server_messenger import ServerMessenger
 import mysql.connector
 import gspread # installed via pip install gspread
 from oauth2client.client import SignedJwtAssertionCredentials
@@ -16,7 +15,7 @@ googleAPI = None
 queries = {
     'get_coder': ("SELECT * FROM Coder "
                    "WHERE ShortName = %(name)s ; "),
-    'push_code': ("REPLACE INTO Code "
+    'push_code': ("REPLACE INTO TweetCode "
                    "(Rumor, Period, Tweet, Coder, "
                    " Uncodable, Unrelated, Affirm, Deny, Neutral, "
                    " Implicit, Ambiguity, Uncertainty, Difficult) "
@@ -37,17 +36,30 @@ def main():
                         help="Increase output verbosity")
     parser.add_argument("-c", "--config", required=False, default='../../local.conf',
                         help='Name of configuration file')
-    parser.add_argument("-r", "--rumor_id", required=False, default='0',
-                        help='Which rumor to choose')
     parser.add_argument("-e", "--event_name", required=False, default='Event',
                         help='Name of the Event')
     parser.add_argument("-q", "--rumor_name", required=False, default='Rumor',
                         help='Name of the Rumor')
+    parser.add_argument("-r", "--rumor_id", required=False, default='0',
+                        help='Which rumor to choose')
     parser.add_argument("-p", "--period", required=False, type=int, default=0,
                         help='Number for the period')
+    parser.add_argument("-n", "--period_name", required=False, default=0,
+                        help='Name for the period')
     
     global options
     options = parser.parse_args()
+    
+    # Fill parameters that may not have been filled in the command line
+    if(not options.event_name):
+        options.event_name = input('What is the Name of the Event? ')
+    if(not options.rumor_name):
+        options.rumor_name = input('What is the Name of the Rumor? ')
+    if(not options.rumor_id):
+        options.rumor_id   = input('What is the ID   of the Rumor? ')
+    if(not options.period):
+        options.period = int(input('What is the #   of the Period? '))
+    
 
     connectToServer()
     cursor = serverStorage.cursor(dictionary=True)
@@ -57,6 +69,8 @@ def main():
 #    rumor_name = "Hadley" # Crisis Actors Bot Prediction
     periods = ['Training 4', 'Training 3', 'Training 2', 'Training', 'Coding', 'Adjudication', 'AuxAdjud'];
     period_name = periods[options.period + 4];
+    if('period_name' in options):
+        period_name = options.period_name
     
 #    rumor_id = 10
 #    period_id = -1
@@ -84,19 +98,20 @@ def main():
             codes = worksheet.get_all_records()
             
             for code in codes:
+                # Get general information
                 code['Coder']     = coder_id
                 code['Rumor']     = options.rumor_id
                 code['Period']    = options.period
-                code['Uncodable'] = bool(code['Uncodable']) if 'Uncodable' in code else 0
-                code['Unrelated'] = bool(code['Unrelated']) if 'Unrelated' in code else 0
-                code['Affirm']    = bool(code['Affirm'])    if 'Affirm' in code else 0
-                code['Deny']      = bool(code['Deny'])      if 'Deny' in code else 0
-                code['Neutral']   = bool(code['Neutral'])   if 'Neutral' in code else 0
-                code['Implicit']  = bool(code['Implicit'])  if 'Implicit' in code else 0
-                code['Ambiguity'] = bool(code['Ambiguity']) if 'Ambiguity' in code else 0
-                code['Uncertainty'] = bool(code['Uncertainty']) if 'Uncertainty' in code else 0
-                code['Difficult'] = bool(code['Difficult']) if 'Difficult' in code else 0
                 
+                # Get codes form spreadsheet
+                codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral', 'Implicit', 'Ambiguity', 'Uncertainty', 'Difficult']
+                for item in codes:
+                    if(item in code):
+                        code[item] = bool(code[item])
+                    elif(item.lower() in code):
+                        code[item] = bool(code[item.lower()])
+                    else:
+                        code[item] = 0
                 
                 # Get Text
                 if('text' in code):
@@ -116,9 +131,9 @@ def main():
                     code['Tweet'] = code['id']
                 # note: all integers are long in python3
                 if(isinstance(code['Tweet'], str)):
-                    code['Tweet'] = int(float(code['Tweet'].replace(',','')));
+                    code['Tweet'] = int(float(code['Tweet'].replace(',','')))
                 if(isinstance(code['Tweet'], float)):
-                    code['Tweet'] = int(float(code['Tweet']));
+                    code['Tweet'] = int(float(code['Tweet']))
                 
                 # Determine if it is backfill
                 code['Backfill'] = 0

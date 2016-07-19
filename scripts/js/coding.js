@@ -428,7 +428,7 @@ Coding.prototype = {
             period: this.ops['Dataset']['Period'].get()
         };
 
-        this.connection.php('coding/get', post, triggers.emitter('codes: parse'));
+        this.connection.phpjson('coding/get', post, triggers.emitter('codes: parse'));
     },
     /*getOtherDatasetTweets: function() {
         var post = {
@@ -485,13 +485,8 @@ Coding.prototype = {
         // Count ngrams!
         this.countNGrams(false, this.otherset_id);
     },*/
-    parseCodes: function(file_data) {
-        try {
-            this.raw_codes = JSON.parse(file_data);
-        } catch(err) {
-            console.log(file_data);
-            return;
-        }
+    parseCodes: function(json_data) {
+        this.raw_codes = json_data;
         
         // Only enable the coders that coded for the rumor
         var unique_coders = this.raw_codes.reduce(function(set, code) {
