@@ -22,7 +22,7 @@ queries = {
                    "VALUES (%(Rumor)s, %(Period)s, %(Tweet)s, %(Coder)s, %(Primary)s, "
                    " %(Uncodable)s, %(Unrelated)s, %(Affirm)s, %(Deny)s, %(Neutral)s, "
                    " %(Implicit)s, %(Ambiguity)s, %(Uncertainty)s, %(Difficult)s); "),
-    'push_mongotweet': ("INSERT INTO MongoTweet "
+    'push_mongotweet': ("INSERT INTO TweetInMongo "
                      "(Rumor, Tweet, Text, MongoID, Backfill) "
                      "VALUES (%(Rumor)s, %(Tweet)s, %(Text)s, %(MongoID)s, %(Backfill)s) "
                      "ON DUPLICATE KEY UPDATE MongoID=GREATEST(%(MongoID)s, MongoID)"),
