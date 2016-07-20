@@ -36,46 +36,28 @@ def main():
                         help="Increase output verbosity")
     parser.add_argument("-c", "--config", required=False, default='../../local.conf',
                         help='Name of configuration file')
-    parser.add_argument("-e", "--event_name", required=False, default='Event',
-                        help='Name of the Event')
-    parser.add_argument("-q", "--rumor_name", required=False, default='Rumor',
-                        help='Name of the Rumor')
+    parser.add_argument("-i", "--identifier", required=False, default='Event Rumor Period',
+                        help='Identifier of all filenames, usually: <Event> <Rumor> <Period>')
     parser.add_argument("-r", "--rumor_id", required=False, default='0',
                         help='Which rumor to choose')
     parser.add_argument("-p", "--period", required=False, type=int, default=0,
-                        help='Number for the period')
-    parser.add_argument("-n", "--period_name", required=False, default=0,
-                        help='Name for the period')
+                        help='Number for the period, < 0 = Training, 0 = Coding, > 0 = Adjudication, 5 = Final')
+    parser.add_argument("-a", "--adjudicator_user", action="store_true",
+                        help='Flag to use the adjudicator user instead of finding it from the file name')
     
     global options
     options = parser.parse_args()
-    
-    # Fill parameters that may not have been filled in the command line
-    if(not options.event_name):
-        options.event_name = input('What is the Name of the Event? ')
-    if(not options.rumor_name):
-        options.rumor_name = input('What is the Name of the Rumor? ')
-    if(not options.rumor_id):
-        options.rumor_id   = input('What is the ID   of the Rumor? ')
-    if(not options.period):
-        options.period = int(input('What is the #   of the Period? '))
-    
 
     connectToServer()
     cursor = serverStorage.cursor(dictionary=True)
-    
+
+    # Enforce UTF-8 for the connection.
+    cursor.execute('SET NAMES utf8mb4')
+    cursor.execute("SET CHARACTER SET utf8mb4")
+    cursor.execute("SET character_set_connection=utf8mb4")
+
     # Set parameters
-#    event_name = "Sydney Siege" # Umpqua Paris
-#    rumor_name = "Hadley" # Crisis Actors Bot Prediction
-    periods = ['Training 4', 'Training 3', 'Training 2', 'Training', 'Coding', 'Adjudication', 'AuxAdjud'];
-    period_name = periods[options.period + 4];
-    if('period_name' in options):
-        period_name = options.period_name
-    
-#    rumor_id = 10
-#    period_id = -1
-    
-    search_title = ' ' + options.event_name + ' ' + options.rumor_name + ' ' + period_name
+    periods = ['Training 4', 'Training 3', 'Training 2', 'Training', 'Coding', 'Adjudication', 'Aux1', 'Aux2', 'Aux3', 'Final'];
     
     # Open spreadsheets
 #    spreadsheet = googleAPI.open('Conrad Umpqua Crisis Actors Coding Sheet')
@@ -84,15 +66,20 @@ def main():
         title = None
         for entry in sheet._feed_entry:
             if(entry.text and 
-               search_title in entry.text and 
+               options.identifier in entry.text and 
                (options.period is not -1 or not any(num in entry.text for num in ['2', '3', '4', '5']))):
                 title = entry.text
                 
         if(title):
             name = title.split(' ')[0]
-            print(name)
-            cursor.execute(queries['get_coder'], {'name': name})
-            coder_id = cursor.fetchone()['ID']
+            if(options.adjudicator_user):
+                name = 'Adjudicator'
+                print(name)
+                coder_id = 0
+            else:
+                print(name)
+                cursor.execute(queries['get_coder'], {'name': name})
+                coder_id = cursor.fetchone()['ID']
             
             worksheet = sheet.get_worksheet(0)
             codes = worksheet.get_all_records()
@@ -171,13 +158,6 @@ def connectToServer():
             host=config["storage"]["host"],
             database=config["storage"]["database"]
         )
-        
-        # Enforce UTF-8 for the connection.
-        cursor = serverStorage.cursor(dictionary=True)
-        cursor.execute('SET NAMES utf8mb4')
-        cursor.execute("SET CHARACTER SET utf8mb4")
-        cursor.execute("SET character_set_connection=utf8mb4")
-        cursor.close()
         
         # Connect to Google Drive API
         global googleAPI

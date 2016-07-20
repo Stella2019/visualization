@@ -180,8 +180,8 @@ Coding.prototype = {
             }),
             Period: new Option({
                 title: 'Period',
-                labels: ['Adjudicated', 'Auxiliary Adjudication', 'Coding', 'Training 1', 'Training 2', 'Training 3', 'Training 4'],
-                ids:    [1, 2, 0, -1, -2, -3, -4],
+                labels: ['Final', 'Auxiliary Coding 3', 'Auxiliary Coding 2', 'Auxiliary Coding 1', 'Adjudicated', 'Coding', 'Training 1', 'Training 2', 'Training 3', 'Training 4'],
+                ids:    [5, 4, 3, 2, 1, 0, -1, -2, -3, -4],
                 isnumeric: true,
                 default: 1,
                 type: "dropdown",
