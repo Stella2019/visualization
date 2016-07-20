@@ -66,20 +66,17 @@ def main():
         title = None
         for entry in sheet._feed_entry:
             if(entry.text and 
-               options.identifier in entry.text and 
-               (options.period is not -1 or not any(num in entry.text for num in ['2', '3', '4', '5']))):
+               options.identifier in entry.text):
                 title = entry.text
                 
         if(title):
+            coder_id = 0
             name = title.split(' ')[0]
             if(options.adjudicator_user):
-                name = 'Adjudicator'
-                print(name)
-                coder_id = 0
-            else:
-                print(name)
-                cursor.execute(queries['get_coder'], {'name': name})
-                coder_id = cursor.fetchone()['ID']
+                name = 'Adjudicator' 
+            print(name)
+            cursor.execute(queries['get_coder'], {'name': name})
+            coder_id = cursor.fetchone()['ID']
             
             worksheet = sheet.get_worksheet(0)
             codes = worksheet.get_all_records()
@@ -143,6 +140,8 @@ def main():
     
     if(serverStorage is not None):
         serverStorage.close()
+        
+    return True
                         
 def connectToServer():
     if(options.verbose): print("    Connecting to Captures Database")
