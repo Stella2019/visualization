@@ -772,9 +772,13 @@ Connection.prototype = {
         this.progress.update(this.chunk_index + 1, progress_text);
 
         if(this.quantity == 'count')  { // Makes a LOT of assumptions about the data
-            var lastTweetStart = file_data.lastIndexOf('"ID":"');
-            if(lastTweetStart >= 0)
-                this.lastTweet = new BigNumber(file_data.slice(lastTweetStart + 6, lastTweetStart + 24));
+            if(this.post.json) {
+                this.lastTweet = new BigNumber(file_data[file_data.length - 1].ID);
+            } else {
+                var lastTweetStart = file_data.lastIndexOf('"ID":"');
+                if(lastTweetStart >= 0)
+                    this.lastTweet = new BigNumber(file_data.slice(lastTweetStart + 6, lastTweetStart + 24));
+            }
         }
         this.on_chunk_finish(file_data);
 
