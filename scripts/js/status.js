@@ -968,7 +968,7 @@ StatusReport.prototype = {
         // Prepare statement
         var post = {
             Collection: d.Level == 1 ? 'event' : 'subset',
-            ID: d.ID
+            ID: d.ID,
         }
         var row = '.row_' + (d.Level == 1 ? 'event' : 'subset') + '_' + d.ID;
         
@@ -982,21 +982,8 @@ StatusReport.prototype = {
         prog_bar.start();
         
         // Start the recount
-        this.connection.php('collection/recount', post, function(result) {
-            if(result.includes('Error')) {
-                prog_bar.update(100, 'Error');
-                console.error(result);
-                return;
-            }
-            
-            // Update values
-            try {
-                result = JSON.parse(result)[0];
-            } catch (exception) {
-                prog_bar.update(100, 'Error');
-                console.error(result);
-                return;
-            }
+        this.connection.phpjson('collection/recount', post, function(result) {     
+            result = result[0];
             
             this.quantities.forEach(function (quantity) {
                 d[quantity] = parseInt(result[quantity]) || 0;
@@ -1008,15 +995,20 @@ StatusReport.prototype = {
 
             // Remove loading sign
             prog_bar.end();
-        }.bind(this));
+        }.bind(this),
+        function(badresult) {
+            console.log(badresult);
+            prog_bar.update(100, 'Error');
+        });
     },
     computeTimeseries: function(d) {
         var row = '.row_' + (d.Level == 1 ? 'event' : 'subset') + '_' + d.ID;
         var args = {
             url: 'timeseries/compute',
             post: {
-                Collection: d.Level == 1 ? 'event' : 'subset',
-                ID: d.ID
+                Collection: d.Level == 1 ? 'Event' : 'Subset',
+                ID: d.ID,
+                json: true,
             },
             quantity: 'tweet',
             min: d.FirstTweet,
@@ -1025,24 +1017,9 @@ StatusReport.prototype = {
             progress_text: ' ',
             progress_style: 'full',
             on_chunk_finish: function(result) {
-                if(result.includes('Error')) {
-//                    this.progress.update(100, 'Error');
-                    console.error(result);
-                    return;
-                }
-
-                // Update values
-                try {
-                    result = JSON.parse(result)[0];
-                } catch (exception) {
-                    console.error(result);
-                    return;
-                }
-                
-                d['Minutes'] = parseInt(result['Minutes']);
+                d['Minutes'] = parseInt(result[0]['Minutes']);
                 
                 triggers.emit('update_counts', row);
-                
             }
         }
         

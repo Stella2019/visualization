@@ -71,11 +71,11 @@ FeatureDistribution.prototype = {
     },
     setTriggers: function() {
         
-        triggers.on('event:updated', this.toggleLoadButtons.bind(this, 'event'));
-        triggers.on('subset:updated', this.toggleLoadButtons.bind(this, 'subset'));
+        triggers.on('event:updated', this.toggleLoadButtons.bind(this, 'Event'));
+        triggers.on('subset:updated', this.toggleLoadButtons.bind(this, 'Subset'));
         
-        triggers.on('event2:updated', this.toggleLoadButtons.bind(this, 'event2'));
-        triggers.on('subset2:updated', this.toggleLoadButtons.bind(this, 'subset2'));
+        triggers.on('event2:updated', this.toggleLoadButtons.bind(this, 'Event2'));
+        triggers.on('subset2:updated', this.toggleLoadButtons.bind(this, 'Subset2'));
         
         triggers.on('counters:count', this.countFeatures.bind(this));
         triggers.on('counters:place', this.placeCounts.bind(this));
@@ -378,20 +378,20 @@ FeatureDistribution.prototype = {
     },
     toggleLoadButtons: function(collection) {
         if(!collection) {
-            this.toggleLoadButtons('subset');
-            this.toggleLoadButtons('subset2');
+            this.toggleLoadButtons('Subset');
+            this.toggleLoadButtons('Subset2');
             return;
         }
         
         // Get name of set
         var cmp = collection.includes('2');
         var collection_type = cmp ? collection.slice(0, -1) : collection;
-        var collection_id = this.dataset[collection] ? this.dataset[collection].ID : undefined;
+        var collection_id = this.dataset[collection.toLowerCase()] ? this.dataset[collection.toLowerCase()].ID : undefined;
         var setname = collection_type + ' ' + collection_id;
-        if(!collection_id && collection_type == 'subset') { // elevate to event set
-            collection_type = 'event';
+        if(!collection_id && collection_type == 'Subset') { // elevate to event set
+            collection_type = 'Event';
             collection = collection_type + (cmp ? '2' : '');
-            collection_id = this.dataset[collection] ? this.dataset[collection].ID : undefined;
+            collection_id = this.dataset[collection.toLowerCase()] ? this.dataset[collection.toLowerCase()].ID : undefined;
             setname = collection_type + ' ' + collection_id;
         }
         if (!collection_id) {
@@ -441,15 +441,15 @@ FeatureDistribution.prototype = {
                 users: {},
                 counted: 0
             };
-            if(collection_type == 'subset') {
-                data.subset = this.dataset['subsets'][data.id] || this.dataset['subsets2'][data.id];
-                data.event = this.dataset['events'][data.subset.Event];
-                data.label = (data.event.DisplayName || data.event.Name) + ' - ' + data.subset.Feature + ' - ' + util.subsetName(data.subset);
-                data.FirstTweet = data.subset['FirstTweet'];
+            if(collection_type == 'Subset') {
+                data.SubsetEntry = this.dataset['subsets'][data.id] || this.dataset['subsets2'][data.id];
+                data.EventEntry = this.dataset['events'][data.SubsetEntry.Event];
+                data.label = (data.EventEntry.DisplayName || data.EventEntry.Name) + ' - ' + data.SubsetEntry.Feature + ' - ' + util.subsetName(data.SubsetEntry);
+                data.FirstTweet = data.SubsetEntry['FirstTweet'];
             } else {
-                data.event = this.dataset['events'][data.id];
-                data.label = data.event.DisplayName || data.event.Name;
-                data.FirstTweet = data.event['FirstTweet'];
+                data.EventEntry = this.dataset['events'][data.id];
+                data.label = data.EventEntry.DisplayName || data.EventEntry.Name;
+                data.FirstTweet = data.EventEntry['FirstTweet'];
             }
             this.data[setname] = data;
         } else {
@@ -465,9 +465,9 @@ FeatureDistribution.prototype = {
         var limit = this.ops['Download']['Limit'].get();
         if(limit == 1e10) {
             if(data.subset) {
-                limit = parseInt(data.subset.Tweets);
+                limit = parseInt(data.SubsetEntry.Tweets);
             } else {
-                limit = parseInt(data.event.Tweets);
+                limit = parseInt(data.EventEntry.Tweets);
             }
         }
         
@@ -478,6 +478,7 @@ FeatureDistribution.prototype = {
                 collection: collection_type,
                 collection_id: collection_id,
                 extradata: extradata,
+                json: true,
             },
             quantity: 'count',
             resolution: this.ops['Download']['Chunk Size'].get(),
@@ -501,15 +502,7 @@ FeatureDistribution.prototype = {
         this.abortLoadTweets(setname);
         delete this.data[setname];
     },
-    parseNewTweets: function(setname, file_data) {
-        var newTweets;
-        try {
-            newTweets = JSON.parse(file_data);
-        } catch(err) {
-            console.error(file_data);
-            throw(err);
-        }
-        
+    parseNewTweets: function(setname, newTweets) {        
         // End early if no more data
         if(newTweets.length == 0) {
             this.abortLoadTweets(setname);
@@ -756,7 +749,7 @@ FeatureDistribution.prototype = {
             creation.setSeconds(0);
             creation.setMinutes(0);
             creation.setHours(0);
-            var firstTweet = util.twitterID2Timestamp(set.event.FirstTweet);
+            var firstTweet = util.twitterID2Timestamp(set.EventEntry.FirstTweet);
             var age = Math.floor((firstTweet.getTime() - creation.getTime()) / 24 / 60 / 60 / 1000);
 
             // Get user's description's unigrams
@@ -1129,10 +1122,10 @@ FeatureDistribution.prototype = {
     },
     placeCounts: function() {
         // Get appropriate set names
-        var setname = this.dataset.subset ? 'subset ' + this.dataset.subset.ID : 
-                                            'event '  + this.dataset.event.ID;
-        var comparesetname = this.dataset.subset2 ? 'subset '  + this.dataset.subset2.ID :
-                             this.dataset.event2  ? 'event '   + this.dataset.event2.ID : '';
+        var setname = this.dataset.subset ? 'Subset ' + this.dataset.subset.ID : 
+                                            'Event '  + this.dataset.event.ID;
+        var comparesetname = this.dataset.subset2 ? 'Subset '  + this.dataset.subset2.ID :
+                             this.dataset.event2  ? 'Event '   + this.dataset.event2.ID : '';
         
         // Get set and comparison set
         var set = this.data[setname];
@@ -1377,7 +1370,7 @@ FeatureDistribution.prototype = {
                 var partially_found = false;
 
                 // Check all keywords that they line up
-                set.event.Keywords.forEach(function(keyword) { 
+                set.EventEntry.Keywords.forEach(function(keyword) { 
                     var keyword_parts = keyword.split(' ');
                     var words_found = words.filter(function(word) {
                         return keyword_parts.includes(word);
@@ -1390,7 +1383,7 @@ FeatureDistribution.prototype = {
                 if(found) {
                     entry['In Capture Keywords'] = 'Final Keyword';
                 } else {
-                    set.event.OldKeywords.forEach(function(keyword) { 
+                    set.EventEntry.OldKeywords.forEach(function(keyword) { 
                         var keyword_parts = keyword.split(' ');
                         var words_found = words.filter(function(word) {
                             return keyword_parts.includes(word);
@@ -1510,8 +1503,8 @@ FeatureDistribution.prototype = {
     showCounts: function() {
         var count_quantity = this.ops['Display']['Count Quantity'].get();
         var cmp_quantity = this.ops['Display']['Cmp Quantity'].get();
-        var comparesetname = this.dataset.subset2 ? 'subset '  + this.dataset.subset2.ID :
-                             this.dataset.event2  ? 'event '   + this.dataset.event2.ID : '';
+        var comparesetname = this.dataset.subset2 ? 'Subset '  + this.dataset.subset2.ID :
+                             this.dataset.event2  ? 'Event '   + this.dataset.event2.ID : '';
         var cmp = comparesetname ? this.data[comparesetname] : '';
         
         // Set classes
@@ -1555,10 +1548,10 @@ FeatureDistribution.prototype = {
     },
     inspectUser: function(row) {
         // Just gets primary set now
-        var setname = this.dataset.subset ? 'subset ' + this.dataset.subset.ID : 
-                                            'event '  + this.dataset.event.ID;
-        var cmpsetname = this.dataset.subset2 ? 'subset '  + this.dataset.subset2.ID :
-                         this.dataset.event2  ? 'event '   + this.dataset.event2.ID : '';
+        var setname = this.dataset.subset ? 'Subset ' + this.dataset.subset.ID : 
+                                            'Event '  + this.dataset.event.ID;
+        var cmpsetname = this.dataset.subset2 ? 'Subset '  + this.dataset.subset2.ID :
+                         this.dataset.event2  ? 'Event '   + this.dataset.event2.ID : '';
         
         // Get data
         var userID = row.Token.split(' - ')[1];
@@ -1777,8 +1770,8 @@ FeatureDistribution.prototype = {
         var user = set.users[userID];
         
         var post = {
-            Event: set.event.ID,
-            Subset: 'subset' in set ? set.subset.ID : 0,
+            Event: set.EventEntry.ID,
+            Subset: 'Subset' in set ? set.subset.ID : 0,
         };
         
         ['UserID', 'Screenname',
@@ -1905,8 +1898,8 @@ FeatureDistribution.prototype = {
         var relation = set.usermention_upload.relations[index];
         
         var post = relation;
-        post.Event = set.event.ID;
-        post.Subset = 'subset' in set ? set.subset.ID : 0;
+        post.Event = set.EventEntry.ID;
+        post.Subset = 'SubsetEntry' in set ? set.SubsetEntry.ID : 0;
         
         // Configure functions
         var failure = function(msg) { // Failure
@@ -1996,8 +1989,8 @@ FeatureDistribution.prototype = {
         var lexicon_entry = set.user_lex_upload.lexicon[index];
         
         var post = lexicon_entry;
-        post.Event = set.event.ID;
-        post.Subset = 'subset' in set ? set.subset.ID : 0;
+        post.Event = set.EventEntry.ID;
+        post.Subset = 'SubsetEntry' in set ? set.SubsetEntry.ID : 0;
         post.Term = post.Term.slice(0, 20).replace(/'/g, "\\'");
         
         // Configure functions
@@ -2187,8 +2180,8 @@ FeatureDistribution.prototype = {
         var relation = set.user_lexical_relations_upload.relations[index];
         
         var post = relation;
-        post.Event = set.event.ID;
-        post.Subset = 'subset' in set ? set.subset.ID : 0;
+        post.Event = set.EventEntry.ID;
+        post.Subset = 'SubsetEntry' in set ? set.SubsetEntry.ID : 0;
         
         // Configure functions
         var failure = function(msg) { // Failure
@@ -2272,8 +2265,8 @@ FeatureDistribution.prototype = {
         var record = set.user_sources_upload.records[index];
         
         var post = record;
-        post.Event = set.event.ID;
-        post.Subset = 'subset' in set ? set.subset.ID : 0;
+        post.Event = set.EventEntry.ID;
+        post.Subset = 'SubsetEntry' in set ? set.SubsetEntry.ID : 0;
         
         // Configure functions
         var failure = function(msg) { // Failure

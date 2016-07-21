@@ -650,12 +650,13 @@ Connection.prototype = {
             var json_data;
             try {
                 json_data = JSON.parse(raw_data);
+                callback(json_data);
             } catch(err) {
                 console.error('JSON parsing error for ' + url, fields, raw_data);
-                return;
+                error_callback(raw_data);
             }
-            callback(json_data);
         };
+        
         this.php(url, fields, json_callback, error_callback);
     },
     startStream: function () {
@@ -740,9 +741,15 @@ Connection.prototype = {
         this.post[this.quantity + '_max'] = this.chunks[this.chunk_index + 1];
         }
 
-        this.php(this.url, this.post,
-                     this.chunk_success.bind(this),
-                     this.chunk_failure.bind(this));
+        if(this.post.json) {
+            this.phpjson(this.url, this.post,
+                         this.chunk_success.bind(this),
+                         this.chunk_failure.bind(this));
+        } else {
+            this.php(this.url, this.post,
+                         this.chunk_success.bind(this),
+                         this.chunk_failure.bind(this));
+        }
     },
     chunk_success: function (file_data) {
         if (file_data.includes('<b>Notice</b>') || file_data.includes('<b>Error</b>')) {
