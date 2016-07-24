@@ -55,7 +55,8 @@ queries = {
                 "    %(UserStatusesCount)s, %(UserFollowersCount)s, %(UserFriendsCount)s, "
                 "    %(UserListedCount)s, %(UserFavouritesCount)s, %(UserVerified)s) "
                 "ON DUPLICATE KEY UPDATE "
-                "    FavouritesCount = %(UserFavouritesCount)s "),
+                "    FavouritesCount = %(UserFavouritesCount)s, "
+                "    UserID = %(UserID)s "),
     'add_event': ("INSERT INTO Event "
                 "(ID, Name, Description, Keywords, OldKeywords, StartTime, StopTime, Server) "
                 "VALUES (%(ID)s, %(Name)s, %(Description)s, %(Keywords)s, %(OldKeywords)s, "
@@ -562,9 +563,10 @@ def compareSubsets(data):
 def parseTweetJSON(data):
     start = time.time()
     
-    if(type(data) is str):
+    if(type(data) is str or type(data) is unicode):
         data = json.loads(data)
-    text = data['text']
+    
+    text = data['text'] if 'text' in data else ''
 
     # Strip text of tweet for basic form of text without URLs, user mentions, etc.
     text_stripped = stripTweetText.strip(text)
@@ -660,7 +662,7 @@ def parseTweetJSON(data):
     if("user" in data):
         user = data['user']
         tweet['UserVerified']       = 1                        if 'verified'         in user and user['verified'] else 0
-        tweet['UserID']             = user['id_str']           if 'id_str'           in user else None
+        tweet['UserID']             = user['id_str']           if 'id_str'           in user else (user['id'] if 'id' in user else None)
         tweet['Username']           = user['name']             if 'name'             in user else None
         tweet['Screenname']         = user['screen_name']      if 'screen_name'      in user else None
         tweet['UserLang']           = user['lang']             if 'lang'             in user else None

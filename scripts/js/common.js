@@ -646,15 +646,19 @@ Connection.prototype = {
         });
     },
     phpjson: function(url, fields, callback, error_callback) {
+        if(!error_callback)
+            error_callback = function() {};
+        
         var json_callback = function(raw_data) {
             var json_data;
             try {
                 json_data = JSON.parse(raw_data);
-                callback(json_data);
             } catch(err) {
-                console.error('JSON parsing error for ' + url, fields, raw_data);
+                console.error('JSON parsing error for ' + url, fields, err);
                 error_callback(raw_data);
+                return;
             }
+            callback(json_data);
         };
         
         this.php(url, fields, json_callback, error_callback);

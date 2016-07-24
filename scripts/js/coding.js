@@ -30,7 +30,6 @@ function Coding() {
         primary: 5
     };
     this.nnn = 0;
-    this.ngrams = {};
 }
 Coding.prototype = {
     init: function() {
@@ -42,7 +41,7 @@ Coding.prototype = {
     },
     buildPage: function() {
         
-        this.ops.panels = ['Dataset', 'Reliability', 'Matrices', 'Tweets', 'Tweet Types'/*, 'N-Grams'*/];
+        this.ops.panels = ['Dataset', 'Reliability', 'Matrices', 'Tweets', 'Tweet Types'];
         
         var divs = d3.select('body')
             .append('div')
@@ -72,7 +71,7 @@ Coding.prototype = {
     },
     setTriggers: function() {
         // Debugging
-        triggers.verbose = true;
+//        triggers.verbose = true;
         
         // Page management
         triggers.on('build_page', this.buildPage.bind(this));
@@ -86,7 +85,6 @@ Coding.prototype = {
         
         // Codes
         triggers.on('codes: parse', this.parseCodes.bind(this));
-        /*triggers.on('parse_other_tweets', this.parseOtherDatasetTweets.bind(this));*/
         triggers.on('codes: compile', this.compileReport.bind(this));
         triggers.on('codes: processed', this.IRRTable.bind(this));
         triggers.on('codes: processed', this.fillMatrices.bind(this));
@@ -96,7 +94,6 @@ Coding.prototype = {
         triggers.on('tweet details: parse', this.parseTweetDetails.bind(this));
         triggers.on('tweet details: processed', this.fillTweetList.bind(this));
         triggers.on('tweet details: processed', this.tweetTypeTable.bind(this));
-//        triggers.on('tweet details: processed', this.countNGrams.bind(this, 'All'));
     },
     getOverviewData: function() {
         this.connection.phpjson('coding/getCoders', {}, function(d) {
@@ -284,103 +281,6 @@ Coding.prototype = {
         };
         var subsets = tweet_codes.map(x => 'Coded: ' + x);
         subsets[0] = 'All';
-        /*this.ops['N-Grams'] = {
-            Show: new Option({
-                title: 'Show',
-                labels: ["No", "Yes"],
-                ids:    ["false", "true"],
-                default: 0,
-                type: "toggle",
-                callback: triggers.emitter('toggle_pane', ['N-Grams', 1000])
-            }),
-            TopX: new Option({
-                title: "Top",
-                labels: ['10', '20', '100', '200', '1000'],
-                ids:    ['10', '20', '100', '200', '1000'],
-                default: 1,
-                callback: this.NGramList.bind(this)
-            }),
-            Filter: new Option({
-                title: "Filter",
-                labels: ['None', 'Redundant Tweets'],
-                ids:    ['none', 'redun'],
-                default: 1,
-                callback: this.countNGrams.bind(this)
-            }),
-            'Exclude Stopwords': new Option({
-                title: "Stopwords",
-                styles: ["btn btn-sm btn-default", "btn btn-sm"],
-                labels: ["Include",
-                         "Exclude"],
-                ids:    ['false', 'true'],
-                default: 1,
-                type: 'toggle',
-                callback: this.NGramList.bind(this)
-            }),
-            Tables: new Option({
-                title: "Tables",
-                labels: ['n-grams', 'n-grams & co-occur', 'n-grams, co & tweets', 'n-grams, co & urls', 'All'],
-                ids:    ['n', 'nc', 'nct', 'ncu', 'nctu'],
-                default: 1,
-                callback: this.NGramList.bind(this)
-            }),
-            TF: new Option({
-                title: "Term Frequency",
-                labels: ['&sum; Has', '&sum; Count'],
-                ids:    ['has', 'count'],
-                default: 0,
-                breakbefore: true,
-                callback: this.NGramList.bind(this)
-            }),
-            'TF Modifier': new Option({
-                title: "TF Modifier",
-                labels: ['Raw', 'Fraction', 'Percent', 'Log'],
-                ids:    ['raw', 'fraction', 'percent', 'log'],
-                default: 0,
-                callback: this.NGramList.bind(this)
-            }),
-            Subset: new Option({
-                title: "In",
-                labels: subsets,
-                ids:    subsets,
-                default: 0,
-                callback: this.countNGrams.bind(this)
-            }),
-            DF: new Option({
-                title: "Doc Frequency",
-                labels: ['None', '&sum; Has', '&sum; Count'],
-                ids:    ['none', 'has', 'count'],
-                default: 0,
-                breakbefore: true,
-                callback: this.NGramList.bind(this)
-            }),
-            'IDF': new Option({
-                title: "Inverse",
-                labels: ['1 / DF', '#Docs / DF', 'Log(#Docs / DF)'],
-                ids:    ['inv', 'ratio', 'log-ratio'],
-                default: 0,
-                callback: this.NGramList.bind(this)
-            }),
-            Document: new Option({
-                title: "Document",
-                labels: rumor_labels,
-                ids:    rumor_ids,
-                available: rumor_available,
-                default: 0,
-                callback: function(d) { 
-                    this.countNGrams(this.ops['N-Grams']['DocumentSubset'].get(),
-                                       this.ops['N-Grams']['Document'].get()) }.bind(this)
-            }),
-            DocumentSubset: new Option({
-                title: "In",
-                labels: subsets,
-                ids:    subsets,
-                default: 0,
-                callback: function(d) {
-                    coding.countNGrams(this.ops['N-Grams']['DocumentSubset'].get(), 
-                                       this.ops['N-Grams']['Document'].get()) }.bind(this)
-            })
-        };*/
         
         // Start drawing
         this.ops.init();
@@ -420,61 +320,6 @@ Coding.prototype = {
 
         this.connection.phpjson('coding/get', post, triggers.emitter('codes: parse'));
     },
-    /*getOtherDatasetTweets: function() {
-        var post = {
-            rumor_id: this.ops['N-Grams']['Document'].get(),
-            period: this.ops['Dataset']['Period'].get()
-        };
-        
-        this.connection.php('coding/get', post, triggers.emitter('parse_other_tweets'));
-    },
-    parseOtherDatasetTweets: function(file_data) {
-        var otherset_codes = [];
-        try {
-            otherset_codes = JSON.parse(file_data);
-        } catch(err) {
-            console.log(file_data);
-            return;
-        }
-        
-        this.otherset_id = this.ops['N-Grams']['Document'].get();
-        this.otherset_tweets = {};
-        this.otherset_tweets_arr = [];
-        otherset_codes.forEach(function(code) {
-            if(!(code.Tweet in this.otherset_tweets)) {
-                var newTweet = {
-                    Text: code.Text,
-                    Tweet_ID: code.Tweet,
-                    Votes: {Count: 1}
-                };
-                this.otherset_tweets[code.Tweet] = newTweet;
-                this.otherset_tweets_arr.push(newTweet);
-            } else {
-                this.otherset_tweets[code.Tweet].Votes.Count++;
-            }
-        });
-        
-//        // Add votes for each to the tweets
-//        otherset_codes.forEach(function(code) {
-//            if(code.Tweet in this.otherset_tweets) {
-//                tweet = this.otherset_tweets[code.Tweet];
-//                tweet.Votes.Coders.push(parseInt(code.Coder));
-//                tweet.Votes.Count++;
-//                tweet.Votes.Primary.push(code.Primary);
-//                if(code.Primary == 'No Code')
-//                    tweet.Votes['No Code'].push(parseInt(code.Coder));
-//                
-//                this.code_list.any.forEach(function(c) {
-//                    if(code[c] == '1') {
-//                        tweet.Votes[c].push(parseInt(code.Coder));
-//                    }
-//                });
-//            }
-//        });
-        
-        // Count ngrams!
-        this.countNGrams(false, this.otherset_id);
-    },*/
     parseCodes: function(json_data) {
         this.raw_codes = json_data;
         
@@ -655,7 +500,7 @@ Coding.prototype = {
                 if(primary_icoder >= 0 && primary_iplur >= 0)
                     this.codes_x_codes[primary_icoder][primary_iplur]++;
                        
-                tweet.Votes.Coders.map(function(coder2, ic2) {
+                tweet.Votes.Coders.forEach(function(coder2, ic2) {
                     var primary2 = tweet.Votes['Primary'][ic2];
                     this.coders_x_coders_possible[coder1 - 1][coder2 - 1]++;
                     if(primary1 == primary2 && primary1 != 'No Code')
@@ -663,9 +508,12 @@ Coding.prototype = {
                     
                     var uncertainty2 = tweet.Votes['Uncertainty'].includes(coder2);
                     if(uncertainty2)// || uncertainty2)
-                        this.coders_x_coders_uncertainty_first[coder1 - 1][coder2 - 1]++ // any
-                    if(uncertainty1 && uncertainty2)
-                        this.coders_x_coders_uncertainty_both[coder1 - 1][coder2 - 1]++ // all
+                        this.coders_x_coders_uncertainty_first[coder1 - 1][coder2 - 1]++; // any
+                    if(uncertainty1 && uncertainty2) {
+                        this.coders_x_coders_uncertainty_both[coder1 - 1][coder2 - 1]++; // all
+                        if(coder1 != coder2)
+                            this.coders_x_coders_uncertainty_both[coder1 - 1][coder1 - 1]++; // all
+                    }
                 }, this)
             }, this)
         }, this);
@@ -1029,96 +877,7 @@ Coding.prototype = {
             }.bind(this));
         
         /* Uncertainty coder matrix */
-        matrix = this.ops['Reliability']['Coder'].available.map(function (i) {
-            var row = this.ops['Reliability']['Coder'].available.map(function (j) {
-                if(i == 0) {
-                    return { 
-                        FullName: this.ops['Reliability']['Coder'].labels[j],
-                        label: coder_names[j] 
-                    };
-                }
-                if(j == 0) {
-                    return { 
-                        FullName: this.ops['Reliability']['Coder'].labels[i],
-                        label: coder_names[i] 
-                    };
-                }
-                var entry = {
-                    Agreed: this.coders_x_coders_uncertainty_both[i - 1][j - 1],
-                    Tweets: this.coders_x_coders_uncertainty_first[i - 1][j - 1]
-                }
-                if(entry['Tweets'] == 0){
-                    entry['label'] = '-';
-                } else if(i == j){
-                    entry['label'] = '-';
-                } else {
-                    var percent = entry['Agreed'] / entry['Tweets'] * 100;
-                    entry['Percent'] = Math.floor(percent * 10) / 10 + '%';
-                    entry['label'] = Math.floor(percent) + '';
-                }
-                return entry;
-            }, this);
-            if(i == 0) {
-                row.push({FullName: 'Combined', label: '&sum;'});
-            } else {
-                var entry = {
-                    Agreed: d3.sum(this.coders_x_coders_uncertainty_both[i - 1], function(val, j) { return j != i - 1 ? val : 0 }),
-                    Tweets: d3.sum(this.coders_x_coders_uncertainty_first[i - 1], function(val, j) { return j != i - 1 ? val : 0 })
-                }
-                if(entry['Tweets'] == 0){
-                    entry['label'] = '';
-                } else {
-                    var percent = entry['Agreed'] / entry['Tweets'] * 100;
-                    entry['Percent'] = Math.round(percent, -1) + '%';
-                    entry['label'] = Math.floor(percent) + '';
-                }
-                row.push(entry);
-            }
-            return row;
-        }, this);
-        
-        // Make Table
-        
-        var uncertainty_div = div.append('div')
-            .html('Coder Agreement on Uncertainty Codes<br ><small>When at least one Uncertainty code, same color scale</small>')
-            .attr('class', 'col-sm-4')
-            .append('div')
-            .attr('class', 'matrix-table-div');
-        
-        uncertainty_div.append('span')
-            .html('Coder coded uncertain<br />');
-        
-        uncertainty_div.append('span')
-            .text('Other coder agreed')
-            .attr('class', 'ylabel');
-        
-        uncertainty_div.append('table')
-            .selectAll('tr')
-            .data(matrix)
-            .enter()
-            .append('tr')
-            .selectAll('td')
-            .data(function(d) { return d; })
-            .enter()
-            .append('td')
-            .html(function(d) { return d.label; })
-            .style('background-color', function(d) {
-                if('Percent' in d) return color(d.label);
-                if('-' == d.label) return '#CCC';
-                return 'white';
-            })
-            .on('mouseover', function(d) {
-                var info = JSON.parse(JSON.stringify(d));
-                delete info['label'];
-                this.tooltip.setData(info);
-                this.tooltip.on();
-            }.bind(this))
-            .on('mousemove', function(d) {
-                this.tooltip.move(d3.event.x, d3.event.y);
-            }.bind(this))
-            .on('mouseout', function(d) {
-                this.tooltip.off();
-            }.bind(this));
+        this.buildUncertaintyMatrix();
         
         
         /* Code matrix */
@@ -1178,6 +937,221 @@ Coding.prototype = {
 //                if(d.max < 0) return 'white';
 //                return color2(d.val / d.max * 100);
 //            });
+    },
+    buildUncertaintyMatrix() {
+        // Get parameters
+        var coder_names = this.ops['Reliability']['Coder'].labels.map(function(name, i) {
+            if(this.ops['Matrices']['Order'].is("anonymous"))
+                return i + " ";
+            
+            return name.split(' ').map(word => word[0]).join('');
+        }, this);
+        var i_coders = this.ops['Reliability']['Coder'].available.filter(x => x != 0);
+        var coder_labels_all = this.ops['Reliability']['Coder'].labels;
+        var anon = this.ops['Matrices']['Order'].is("anonymous");
+        var n_coders = i_coders.length;
+        var n_rows = 1 /* title */
+                       + n_coders /* pairwise agreement */
+                       + 1 /* overall agreement */;
+        var n_cols = 1 /* title */
+                       + n_coders /* pairwise agreement */
+                       + 1 /* overall agreement */ 
+                       + 1 /* blank cell */ 
+                       + 3 /* count: personal, others, direction */;
+        var u_matrix = util.zeros(n_rows).map(x => util.zeros(n_cols).map(y => {
+            return {label: '_', style: 'u_cell_plain', tooltip: {}, color: ''};
+        }));
+        var div = d3.select('#lMatrices_body')
+            .attr('class', 'row');
+        var color_domain = [0, 50, 75, 90, 100];
+        var color_range = ["#000000", "#ff9896", "#dbdb8d", "#98df8a", "#aec7e8"];
+        var color = d3.scale.linear()
+            .domain(color_domain)
+            .range(color_range);
+//            .range(["black", "red", "yellow", "green", "blue"]);
+        
+        // Add labels
+        var coder_labels = i_coders.map(i_coder => { return anon ? i_coder :
+                coder_labels_all[i_coder].split(' ').map(word => word[0]).join(''); });
+        i_coders.forEach((i_coder, i_row) => {
+            var full_name = coder_labels_all[i_coder];
+            var label = coder_labels[i_row];
+            
+            u_matrix[0][i_row + 1].label = label;
+            u_matrix[i_row + 1][0].label = label;
+            u_matrix[0][i_row + 1].tooltip = {'Full Name': full_name, 'Coder': 'Choose Uncertainty'};
+            u_matrix[i_row + 1][0].tooltip = {'Full Name': full_name, 'Coder': 'Agreed with Col'};
+        });
+        u_matrix[n_coders + 1][0].label = 'B/C';
+        u_matrix[n_coders + 1][0].tooltip = {'Both / Coder': ''};
+        u_matrix[0][n_coders + 1].label = 'B/O';
+        u_matrix[0][n_coders + 1].tooltip = {'Both / Others': ''};
+        u_matrix[0][n_coders + 3].label = 'B';
+        u_matrix[0][n_coders + 3].tooltip = {'# Pairwise relations when': 'Both Choose'};
+        u_matrix[0][n_coders + 4].label = 'C';
+        u_matrix[0][n_coders + 4].tooltip = {'# Pairwise relations when': 'Coder Choose'};
+        u_matrix[0][n_coders + 5].label = 'O';
+        u_matrix[0][n_coders + 5].tooltip = {'# Pairwise relations when': 'Other Choose'};
+        
+        // Add pairwise agreement
+        var pairwise_fracs = [];
+        i_coders.forEach((i_coder, i_row) => i_coders.forEach((j_coder, i_col) => {
+            var cell = u_matrix[i_row + 1][i_col + 1];
+            var agreed = this.coders_x_coders_uncertainty_both[i_coder - 1][j_coder - 1];
+            var first_coder = this.coders_x_coders_uncertainty_first[i_coder - 1][j_coder - 1];
+            var second_coder = this.coders_x_coders_uncertainty_first[j_coder - 1][i_coder - 1];
+            var fraction = i_coder != j_coder ? agreed / first_coder || 0 : 0;
+            if(i_coder != j_coder) {
+                cell.tooltip[coder_labels[i_col] + ' & ' + coder_labels[i_row] + ' Found Uncertain'] = agreed;
+            }
+            cell.tooltip[coder_labels[i_col] + ' Found Uncertain'] = first_coder;
+            if(i_coder != j_coder) {
+                cell.tooltip[coder_labels[i_row] + ' Found Uncertain'] = second_coder;
+                cell.tooltip['Percent Agreement with ' + coder_labels[i_col]] = Math.floor(fraction * 1000) / 10 + '%';
+                pairwise_fracs.push({f: fraction, cell: cell});
+            }
+            cell.label = fraction ? Math.floor(fraction * 100) : '-';
+//            cell.color = fraction ? color(fraction * 100) : '#CCC';
+            cell.style = 'u_cell_pairwise';
+        }, this), this);
+        
+        // Mark notable pairwise 
+        var pairwise_low = d3.mean(pairwise_fracs, d => d.f) - Math.sqrt(d3.variance(pairwise_fracs, d => d.f));
+        var pairwise_high = d3.mean(pairwise_fracs, d => d.f) + Math.sqrt(d3.variance(pairwise_fracs, d => d.f));
+        pairwise_fracs.forEach(function(cell) {
+            if(cell.f < pairwise_low)
+                cell.cell.style += ' u_cell_toolow';
+            else if(cell.f > pairwise_high)
+                cell.cell.style += ' u_cell_toohigh'; 
+            else if(cell.f < 0.75)
+                cell.cell.style += ' u_cell_lt75'; 
+            else if(cell.f > 0.90)
+                cell.cell.style += ' u_cell_gt90'; 
+        });
+        
+        // Add summary agreement
+        var COUNTERNAMES = {count_both: 0, count_self: 1, count_others: 2,
+                            frac_both_self: 3, frac_both_other: 4};
+        var counters = util.zeros(5).map(i => { return {list: [], low: 0, high: 1}});
+        i_coders.forEach((i_coder, i_row) => {
+            // This match is ratchet and should be redone for code clarity but it should work
+            var self__choose_double = this.coders_x_coders_uncertainty_both[i_coder - 1][i_coder - 1]; // == self + double
+            var self__choose = this.coders_x_coders_uncertainty_first[i_coder - 1][i_coder - 1]; // weirdddd loop
+            var both__choose = d3.sum(this.coders_x_coders_uncertainty_both[i_coder - 1]) - self__choose_double;            
+            var other_choose = d3.sum(this.coders_x_coders_uncertainty_first[i_coder - 1]) - self__choose;      
+            var self__choose = d3.sum(this.coders_x_coders_uncertainty_first, d => d[i_coder - 1]) - self__choose;
+            var frac_both_coder = both__choose / self__choose;
+            var frac_both_other = both__choose / other_choose;
+            
+            var cell_both_coder = u_matrix[n_coders + 1][i_row + 1];
+            cell_both_coder.label = frac_both_coder ? Math.floor(frac_both_coder * 100) : '-';
+//            cell_both_coder.color = frac_both_coder ? color(frac_both_coder * 100) : '#CCC';
+            cell_both_coder.tooltip[coder_labels[i_row] + ' & Others Found Uncertain'] = both__choose;
+            cell_both_coder.tooltip[coder_labels[i_row] + ' Found Uncertain'] = self__choose;
+            cell_both_coder.tooltip['Percent ' + coder_labels[i_row] + ' Agreed with Others'] = Math.floor(frac_both_coder * 1000) / 10 + '%'; 
+            cell_both_coder.style = 'u_cell_coltotal';
+            
+            var cell_both_other = u_matrix[i_row + 1][n_coders + 1];   
+            cell_both_other.label = frac_both_other ? Math.floor(frac_both_other * 100) : '-';
+//            cell_both_other.color = frac_both_other ? color(frac_both_other * 100) : '#CCC';
+            cell_both_other.tooltip[coder_labels[i_row] + ' & Others Found Uncertain'] = both__choose;
+            cell_both_other.tooltip['Others Found Uncertain'] = other_choose;
+            cell_both_other.tooltip['Percent ' + coder_labels[i_row] + ' Agreed with Others'] = Math.floor(frac_both_other * 1000) / 10 + '%';
+            cell_both_other.style = 'u_cell_rowtotal';
+            
+            // Add counts
+            u_matrix[i_row + 1][n_coders + 3].label = both__choose;
+            u_matrix[i_row + 1][n_coders + 4].label = self__choose;
+            u_matrix[i_row + 1][n_coders + 5].label = other_choose;
+            
+            counters[COUNTERNAMES.count_both].list.push(both__choose);
+            counters[COUNTERNAMES.count_self].list.push(self__choose);
+            counters[COUNTERNAMES.count_others].list.push(other_choose);
+            counters[COUNTERNAMES.frac_both_self].list.push(frac_both_coder);
+            counters[COUNTERNAMES.frac_both_other].list.push(frac_both_other);
+        }, this);
+        
+        // Add summaries this math was wrong so I choose to add up from above
+//        var one_choose = d3.sum(this.coders_x_coders_uncertainty_first, d => d3.sum(d)) / 2; //433
+//        var both_choose = (d3.sum(this.coders_x_coders_uncertainty_both, d => d3.sum(d)) - one_choose) / 2; // 304
+        var total_both__choose = d3.sum(counters[COUNTERNAMES.count_both].list);
+        var total_self__choose = d3.sum(counters[COUNTERNAMES.count_self].list);
+        var total_other_choose = d3.sum(counters[COUNTERNAMES.count_others].list);
+        var fraction_both = total_both__choose / total_self__choose;
+        
+        u_matrix[n_coders + 1][n_coders + 1].label = Math.floor(fraction_both * 100);
+        u_matrix[n_coders + 1][n_coders + 1].tooltip['Both Choose'] = total_both__choose;
+        u_matrix[n_coders + 1][n_coders + 1].tooltip['One Choose'] = total_self__choose;
+        u_matrix[n_coders + 1][n_coders + 1].tooltip['Percent Both'] = Math.floor(fraction_both * 1000) / 10 + '%';
+        u_matrix[n_coders + 1][n_coders + 1].style = fraction_both < 0.75 ? 'u_cell_lt75' : 
+                                                     fraction_both > 0.90 ? 'u_cell_gt90' : '';
+        u_matrix[n_coders + 1][n_coders + 3].label = total_both__choose;
+        u_matrix[n_coders + 1][n_coders + 4].label = total_self__choose;
+        u_matrix[n_coders + 1][n_coders + 5].label = total_other_choose;
+        
+        // Add color for high variance
+        counters.forEach(counter => {
+            counter.low = d3.mean(counter.list) - Math.sqrt(d3.variance(counter.list));
+            counter.high = d3.mean(counter.list) + Math.sqrt(d3.variance(counter.list));
+        });
+        i_coders.forEach(function(i_coder, i_row) {
+             counters.forEach((counter, i_measure) => {
+                 var cell = i_measure <= COUNTERNAMES.count_others ? 
+                     u_matrix[i_row + 1][n_coders + 3 + i_measure] :
+                     i_measure == COUNTERNAMES.frac_both_self ?
+                     u_matrix[n_coders + 1][i_row + 1] :
+                     u_matrix[i_row + 1][n_coders + 1];
+                 if(counter.list[i_row] < counter.low)
+                     cell.style += ' u_cell_toolow';
+                 else if(counter.list[i_row] > counter.high)
+                     cell.style += ' u_cell_toohigh';
+                 else if(counter.list[i_row] < 0.75 && i_measure > COUNTERNAMES.count_others)
+                     cell.style += ' u_cell_lt75';
+                 else if(counter.list[i_row] > 0.90 && i_measure > COUNTERNAMES.count_others)
+                     cell.style += ' u_cell_gt90';
+             });
+        });
+        
+        // Make Table
+        var uncertainty_div = div.append('div')
+            .attr('class', 'col-sm-4')
+            .html('Pairwise Coder Agreement on Uncertainty<br />');
+        
+        uncertainty_div.append('small')
+            .html('Colors: ')
+            .selectAll('span')
+            .data([{label: 'Lowest', style: 'u_cell_toolow u_cell_colorscale'},
+                   {label: '< 75', style: 'u_cell_lt75 u_cell_colorscale'},
+                   {label: '> 90', style: 'u_cell_gt90 u_cell_colorscale'},
+                   {label: 'Highest', style: 'u_cell_toohigh u_cell_colorscale'}])
+            .enter()
+            .append('span')
+            .text(d => d.label)
+            .attr('class', d => d.style);
+            
+        var matrix_div = uncertainty_div.append('div')
+            .attr('class', 'matrix-table-div');
+        
+        matrix_div.append('span')
+            .html('Coder coded uncertain<br />');
+        
+        matrix_div.append('span')
+            .text('Other coder agreed')
+            .attr('class', 'ylabel');
+        
+        matrix_div.append('table')
+            .selectAll('tr')
+            .data(u_matrix)
+            .enter()
+            .append('tr')
+            .selectAll('td')
+            .data(d => d)
+            .enter()
+            .append('td')
+            .html(d => d.label)
+            .attr('class', d => 'u_cell ' + d.style)
+            .style('background-color', d => d.color);
+        this.tooltip.attach('.u_cell', d => d.tooltip);
     },
     fillTweetList: function() {
         triggers.emit('toggle_pane', 'Tweets');
@@ -1466,8 +1440,6 @@ Coding.prototype = {
             }
         }, this);
         
-//        if(!this.ops['N-Grams']['Subset'].is('All'))
-//            this.countNGrams(this.ops['N-Grams']['Subset'].get());
         triggers.emit('tweet details: processed');
     },
     tweetTypeTable: function() {
@@ -1572,304 +1544,6 @@ Coding.prototype = {
             .attr('class', 'table_bar');
         
     },
-    countNGrams: function(subset, document) {
-//        console.log('1', subset, document);
-        subset = subset || this.ops['N-Grams']['Subset'].get();
-        document = document || this.ops['Dataset']['Rumor'].get();
-        var different_doc = document != this.ops['Dataset']['Rumor'].get();
-//        console.log('2', subset, document, different_doc);
-        if(different_doc) {
-            subset = this.ops['N-Grams']['DocumentSubset'].get();
-//            console.log('3', subset, document, this.otherset_id);
-            
-            // If we haven't already loaded the data, load it
-            if(!('otherset_id' in this) || this.otherset_id != document) {
-//                console.log('4', subset, document, this.otherset_id);
-                this.getOtherDatasetTweets();
-                return; // wait for that to finish
-            }
-        }
-        
-        // Make structures
-        var label = document + ': ' + subset;
-        this.ngrams[label] = {};
-        var ngrams = this.ngrams[label];
-        
-        ngrams.nTweets = 0;
-        ngrams.CoOccurs = 0
-        ngrams.TweetCounter = new Counter();
-        ngrams.URLCounter = new Counter();
-        ngrams.CoOccurCounter = new Counter();
-        ngrams.nGrams = d3.range(3).map(function(d) {
-            return 0;
-        });
-        ngrams.NGramCounter = d3.range(3).map(function(d) {
-            return new Counter();
-        });
-        
-        // Document Frequency
-//        ngrams.TweetHasCounter = new Counter();
-//        ngrams.URLHasCounter = new Counter();
-        ngrams.CoOccurHasCounter = new Counter();
-        ngrams.NGramHasCounter = d3.range(3).map(function(d) {
-            return new Counter();
-        });
-        
-        var tweets = different_doc ? this.otherset_tweets_arr : this.tweets_arr;
-        if(subset != 'All') {
-            var codes = [subset.slice(subset.lastIndexOf(':') + 2)];
-            if(subset.includes(' Related'))
-                    codes = ['Affirm', 'Deny', 'Neutral'];
-//            if(subset == 'Primary')
-//                    codes = ['Uncodable', 'Unrelated', 'Affirm', 'Deny', 'Neutral'];
-            tweets = tweets.filter(function(tweet) {
-                return codes.reduce(function(found, code) {
-                    return found || tweet.Plurality[code];
-                }, false);
-            });
-        }
-        
-        // Add up ngrams
-        var redundantTweetsOK = this.ops['N-Grams']['Filter'].is('none');
-        tweets.forEach(function(tweet) {
-            tweet.TextNoURL = tweet.Text.replace(/http\S+/g, ' ');
-
-            ngrams.nTweets += 1;
-            
-            var newTweet = !ngrams.TweetCounter.has(tweet.TextNoURL);
-            var newURL = !ngrams.URLCounter.has(tweet.ExpandedURL);
-            
-            ngrams.TweetCounter.incr(tweet.TextNoURL);
-            ngrams.URLCounter.incr(tweet.ExpandedURL);
-
-            if(newTweet || newURL || redundantTweetsOK) { // Aggressive redundancy check
-                var text = tweet.TextNoURL.toLowerCase();
-                text = text.replace(/[^\w']+/g, ' ');
-                text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
-                var words = text.split(' ');
-                var tweetgrams = [new Set(), new Set(), new Set(), new Set()];
-
-                words.forEach(function(word, wi) {
-                    if(word) {
-                        var gram = word;
-                        ngrams.NGramCounter[0].incr(gram);
-                        if(!tweetgrams[0].has(gram)) {
-                            tweetgrams[0].add(gram);
-                            ngrams.nGrams[0] += 1;
-                            ngrams.NGramHasCounter[0].incr(gram);
-                        }
-                        if(words[wi + 1]) {
-                            gram += " " + words[wi + 1];
-                            ngrams.NGramCounter[1].incr(gram);
-                            if(!tweetgrams[1].has(gram)) {
-                                tweetgrams[1].add(gram);
-                                ngrams.nGrams[1] += 1;
-                                ngrams.NGramHasCounter[1].incr(gram);
-                            }
-                            if(words[wi + 2]) {
-                                gram += " " + words[wi + 2];
-                                ngrams.NGramCounter[2].incr(gram);
-                                if(!tweetgrams[2].has(gram)) {
-                                    tweetgrams[2].add(gram);
-                                    ngrams.nGrams[2] += 1;
-                                    ngrams.NGramHasCounter[2].incr(gram);
-                                }
-                            }
-                        }
-                        for(var wj = wi + 1; wj < words.length; wj++) { 
-                            gram = word + ' & ' + words[wj];
-                            if(words[wj] < word)
-                                gram = words[wj] + ' & ' + word;
-                            // Add co-occurance
-                            if(words[wj]) {
-                                ngrams.CoOccurCounter.incr(gram);
-                                if(!tweetgrams[3].has(gram)) {
-                                    tweetgrams[3].add(gram);
-                                    ngrams.CoOccurs += 1;
-                                    ngrams.CoOccurHasCounter.incr(gram);
-                                }
-                            }
-                        }
-                    }
-                });
-            } // New Tweet or New URL
-        });
-        
-        this.NGramList();
-    },
-    NGramList: function() {
-        triggers.emit('toggle_pane', 'N-Grams');
-        
-        var tf_mod = this.ops['N-Grams']['TF Modifier'].get();
-        var idf = this.ops['N-Grams']['IDF'].get();
-        var tables = this.ops['N-Grams']['Tables'].get();
-        var subset = this.ops['N-Grams']['Subset'].get();
-        var set = this.ops['Dataset']['Rumor'].get();
-        var ngrams = this.ngrams[set + ": " + subset];
-        var div = d3.select('#lN_Grams_body');
-        div.selectAll('*').remove();
-
-        var labels = ['Unigrams', 'Bigrams', 'Trigrams'];
-        if(tables.includes('c')) labels.push('Co-Occurance');
-        if(tables.includes('t')) labels.push('Tweets');
-        if(tables.includes('u')) labels.push('URLs');
-        
-        var n = parseInt(this.ops['N-Grams']['TopX'].get());
-        var has = this.ops['N-Grams']['TF'].is('has') ? 'Has' : '';
-        var counters = ngrams['NGram' + has + 'Counter'].map(function(d) { return d; }); 
-        if(tables.includes('c')) counters.push(ngrams['CoOccur' + has + 'Counter']);
-        if(tables.includes('t')) counters.push(ngrams.TweetCounter);
-        if(tables.includes('u')) counters.push(ngrams.URLCounter);
-        
-        var raw_lists = counters.map(function(counter, i_counter) {
-            if(this.ops['N-Grams']['Exclude Stopwords'].is("true") && i_counter < 4) {
-                return counter.top_no_stopwords(n);
-            } else {
-                return counter.top(n);
-            }
-        });
-        
-        // Add more fields
-        var ngrams_document, counter_document;
-        if(!this.ops['N-Grams']['DF'].is('none')) {
-            var dsubset = this.ops['N-Grams']['DocumentSubset'].get();
-            var dset = this.ops['N-Grams']['Document'].get();
-            var dhas = this.ops['N-Grams']['DF'].is('has') ? 'Has' : '';
-            
-            ngrams_document = this.ngrams[dset + ': ' + dsubset]; // change this for rumors
-            counters_document = ngrams_document['NGram' + dhas + 'Counter'].map(function(d) { return d; }); 
-            
-            if(tables.includes('c')) counters_document.push(ngrams_document['CoOccur' + dhas + 'Counter']);
-            if(tables.includes('t')) counters_document.push(ngrams_document.TweetCounter);
-            if(tables.includes('u')) counters_document.push(ngrams_document.URLCounter);
-        }
-        var quantity = ngrams_document == undefined ? 'Term Frequency' : 'TF-IDF';
-
-        var lists = raw_lists.map(function(list, ilist) {
-            list = list.map(function(entry) {
-                var newEntry = { Term: entry.key };
-                if(tf_mod != 'raw') {
-                    newEntry['Raw Count'] = entry.value;
-                    newEntry['Term Frequency'] = tf_mod == 'log' ? 1 + Math.log(entry.value) :
-                                             tf_mod == 'percent' ? entry.value / ngrams.nTweets * 100 :
-                                            tf_mod == 'fraction' ? (entry.value / ngrams.nTweets || 0) : 0;
-                } else {
-                    newEntry['Term Frequency'] = entry.value;
-                }
-                if(ngrams_document) {
-                    newEntry['Document Frequency'] = counters_document[ilist].has(entry.key) || 0;
-                    newEntry['IDF'] = this.ops['N-Grams']['IDF'].is('inv') ? 1 / (newEntry['Document Frequency'] || 0.5) :
-                                      this.ops['N-Grams']['IDF'].is('ratio') ? ngrams_document.nTweets / (newEntry['Document Frequency'] || 1) :
-                                      Math.log(ngrams_document.nTweets / (newEntry['Document Frequency'] || 1));
-                    newEntry['TF-IDF'] = newEntry['Term Frequency'] * newEntry['IDF'];
-                }
-                return newEntry;
-            });
-            
-            // Sory by the value we care about
-            list.sort(function(a, b) { return b[quantity] - a[quantity]; });
-            
-            // Convert values to strings with appropriate decimals
-            list.forEach(function(entry) {
-                Object.keys(entry).forEach(function(key) {
-                    if(Math.floor(entry[key]) == entry[key]) {
-                        // nothing
-                    } else if(entry[key] < 10) {
-                        entry[key] = entry[key].toFixed(2)
-                    } else if(entry[key] < 100) {
-                        entry[key] = entry[key].toFixed(1)
-                    } else if(entry[key] >= 100) {
-                        entry[key] = entry[key].toFixed(0)
-                    }
-//                    if(key.includes('log') ['Fraction', 'Log TF', 'IDF', 'Log IDF'].includes(key)) {
-//                        entry[key] = entry[key].toFixed(2)
-//                    } else if(['Percent', 'TF-IDF'].includes(key)) {
-//                        entry[key] = entry[key].toFixed(1)
-//                    }
-                }) 
-            })
-            
-            return list;
-        });
-        
-        div.append('table')
-            .style('width', '100%')
-            .append('tr')
-            .selectAll('td')
-            .data(lists)
-            .enter()
-            .append('td')
-            .attr('class', 'ngram_table_container')
-            .style('width', 100 / labels.length + '%')
-            .append('table')
-            .attr('class', 'ngram_table')
-            .each(function(d, i) {
-                var header = d3.select(this).append('tr');
-                header.append('th')
-                    .attr('class', 'ngram_count_label')
-                    .text(labels[i]);
-            
-                header.append('th')
-                    .attr('class', 'ngram_count_count')
-                    .html('TF');
-                if(ngrams_document) {
-                    header.append('th')
-                        .attr('class', 'ngram_count_count')
-                        .html('DF');
-                    header.append('th')
-                        .attr('class', 'ngram_count_count')
-                        .html('TF-IDF');
-                }
-
-                d3.select(this)
-                    .selectAll('tr.ngram_count')
-                    .data(d)
-                    .enter()
-                    .append('tr')
-                    .attr('class', 'ngram_count');
-            });
-        
-        div.selectAll('.ngram_count')
-            .append('td')
-            .attr('class', 'ngram_count_label')
-            .text(function(d) { return d['Term']; });
-        
-        
-        div.selectAll('.ngram_count')
-            .append('td')
-            .attr('class', 'ngram_count_count')
-            .text(function(d) { 
-                return d['Term Frequency'];
-            });
-        
-        if(ngrams_document) {
-            div.selectAll('.ngram_count')
-                .append('td')
-                .attr('class', 'ngram_count_count')
-                .text(function(d) { 
-                    return d['Document Frequency'];
-                });
-
-            div.selectAll('.ngram_count')
-                .append('td')
-                .attr('class', 'ngram_count_count')
-                .text(function(d) { 
-                    return d['TF-IDF'];
-                });
-        }
-        
-        div.selectAll('td.ngram_count_label, td.ngram_count_count')
-            .on('mouseover', function(d) {
-                this.tooltip.setData(d);
-                this.tooltip.on();
-            })
-            .on('mousemove', function() {
-                this.tooltip.move(d3.event.x, d3.event.y);
-            })
-            .on('mouseout', function() {
-                this.tooltip.off();
-            });
-    }
 };
 
 function initialize() {
