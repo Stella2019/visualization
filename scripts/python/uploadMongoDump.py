@@ -8,10 +8,10 @@ from pprint import pprint
 #mongoexport -h z --db <dbname> --collection <colname> --out <colname>.json
 
 # User Parameters
-db_name = 'Sydney Siege'
-rumor_i = 4
+db_name = 'Westjet'
+rumor_i = 0
 period = 1
-existing_collection = True
+existing_collection = False
 upload_codes = False
 upload_inrumor = False
 add_parent_tweet = True
@@ -34,7 +34,7 @@ mongoDBs = {
         'rumor_offset': 10
     },
     'Westjet': {
-        'files': ['hijacking'],#, 'signal'],
+        'files': ['tweets'],#['hijacking'],#, 'signal'],
         'event_id': -4,
         'rumor_offset': 8
     },

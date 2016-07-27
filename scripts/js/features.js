@@ -594,7 +594,7 @@ FeatureDistribution.prototype = {
             set.counter['Tweet Based__Categories__Distinct'].incr(tweet['Distinct']);
             set.counter['Tweet Based__Whole Text__Text'].incr(tweet['Text']);
             set.counter['Tweet Based__Whole Text__Text Stripped'].incr(tweet['TextStripped']);
-            set.counter['Tweet Based__Text Other__Language'].incr(util.subsetName({feature: 'Lang', match: tweet['Lang'].toLowerCase()}));
+            set.counter['Tweet Based__Text Other__Language'].incr(util.subsetName({feature: 'Lang', match: (tweet['Lang'] || '').toLowerCase()}));
             set.counter['Tweet Based__Text Other__User Language'].incr(util.subsetName({feature: 'Lang', match: (tweet['UserLang'] || '').toLowerCase()}));
             set.counter['Tweet Based__Text Other__Using Pipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
             if(tweet['Expanded URL Domain']) {

@@ -27,11 +27,14 @@ queries = {
     'add_subset': ("INSERT INTO Subset "
                  "(Event, Rumor, Superset, Feature, `Match`, Notes) "
                  "VALUES (%(Event)s, %(Rumor)s, %(Superset)s, %(Feature)s, %(Match)s, %(Notes)s) "),
-    'add_tweet': ("INSERT IGNORE INTO Tweet "
+    'add_tweet': ("INSERT INTO Tweet "
                 "(ID, Timestamp, Lang, Text, TextStripped, `Distinct`, "
                 "    Type, Source, ParentID, ParentText, ExpandedURL, MediaURL) "
                 "VALUES (%(ID)s, %(Timestamp)s, %(Lang)s, %(Text)s, %(TextStripped)s, %(Distinct)s, "
-                "    %(Type)s, %(Source)s, %(ParentID)s, %(ParentText)s, %(ExpandedURL)s, %(MediaURL)s) "),
+                "    %(Type)s, %(Source)s, %(ParentID)s, %(ParentText)s, %(ExpandedURL)s, %(MediaURL)s) "
+                "ON DUPLICATE KEY UPDATE "
+                "    Type = %(Type)s, "
+                "    `Distinct` = %(Distinct)s "),
     'add_parenttweet': ("INSERT INTO ParentTweet "
                 "(ID, Timestamp, Text, ExpandedURL, "
                 "    Type, UserID, Screenname, UserVerified) "
@@ -41,7 +44,7 @@ queries = {
                 "    Timestamp = COALESCE(Timestamp, %(Timestamp)s), "
                 "    Text = COALESCE(Text, %(Text)s), "
                 "    ExpandedURL = COALESCE(ExpandedURL, %(ExpandedURL)s), "
-                "    Type = COALESCE(Type, %(Type)s), "
+                "    Type = %(Type)s, "
                 "    UserID = COALESCE(UserID, %(UserID)s), "
                 "    Screenname = COALESCE(Screenname, %(Screenname)s), "
                 "    UserVerified = COALESCE(UserVerified, %(UserVerified)s); "),
@@ -63,12 +66,21 @@ queries = {
                 "    %(StartTime)s, %(StopTime)s, %(Server)s) "
                 "ON DUPLICATE KEY UPDATE `Keywords`=%(Keywords)s, `OldKeywords`=%(OldKeywords)s, "
                 "    `StartTime`=%(StartTime)s, `StopTime`=%(StopTime)s, `Server`=%(Server)s "),
-    'add_inevent': ("INSERT IGNORE INTO TweetInEvent "
+    'add_inevent': ("INSERT INTO TweetInEvent "
                   "(Tweet, Event, `Distinct`, Type) "
-                  "VALUES (%(Tweet)s, %(Event)s, %(Distinct)s, %(Type)s) "),
-    'add_insubset': ("INSERT IGNORE INTO TweetInSubset "
+                  "VALUES (%(Tweet)s, %(Event)s, %(Distinct)s, %(Type)s) "
+                "ON DUPLICATE KEY UPDATE "
+                "    Type = %(Type)s, "
+                "    `Distinct` = %(Distinct)s "),
+    'add_insubset': ("INSERT INTO TweetInSubset "
                    "(Tweet, Subset, `Distinct`, Type) "
-                   "VALUES (%(Tweet)s, %(Subset)s, %(Distinct)s, %(Type)s) ")
+                   "VALUES (%(Tweet)s, %(Subset)s, %(Distinct)s, %(Type)s) "
+                "ON DUPLICATE KEY UPDATE "
+                "    Type = %(Type)s, "
+                "    `Distinct` = %(Distinct)s ")
+    
+    
+#                "    Type = COALESCE(Type, %(Type)s), "
 }
 
 def main():
@@ -646,7 +658,9 @@ def parseTweetJSON(data):
             'UserVerified': None
         }
         # AFAIK no record of tweet being replied to is available
-    elif("retweeted_status" in data and (data['retweeted_status']) is not None):
+    elif("retweeted_status" in data and (data['retweeted_status']) is not None
+        and (('id' in data['retweeted_status'] and data['retweeted_status']['id'] != 0)
+        or ("id_str" in data['retweeted_status'] and data['retweeted_status']['id_str'] != ''))):
         tweet['Type'] = 'retweet'
         
         tweet['Parent'] = parseTweetJSON(data['retweeted_status'])
@@ -655,6 +669,8 @@ def parseTweetJSON(data):
             
         if('id' in data['retweeted_status']):
             tweet['ParentID'] = data['retweeted_status']['id']
+        elif('id_str' in data['retweeted_status']):
+            tweet['ParentID'] = data['retweeted_status']['id_str']
         if('text' in data['retweeted_status']):
             tweet['ParentText'] = data['retweeted_status']['text']
         
