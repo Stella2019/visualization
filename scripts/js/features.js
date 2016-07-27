@@ -744,7 +744,7 @@ FeatureDistribution.prototype = {
         if(newUser) {
             set.nUsers += 1;
 
-            var creation = util.date(tweet['UserCreatedAt']);
+            var creation = util.date(tweet['UserCreatedAt'] || util.formatDate(new Date()));
             creation.setMilliseconds(0);
             creation.setSeconds(0);
             creation.setMinutes(0);
@@ -865,7 +865,7 @@ FeatureDistribution.prototype = {
             set.users[user.UserID] = user;
 
             set.counter['User Based__Identity__Username'].incr(user['Username']);
-            set.counter['User Based__Identity__Lang'].incr(util.subsetName({feature: 'Lang', match: user['Lang'].toLowerCase()}));
+            set.counter['User Based__Identity__Lang'].incr(util.subsetName({feature: 'Lang', match: (user['Lang'] || '').toLowerCase()}));
             set.counter['User Based__Identity__Verified'].incr(user['Verified']);
             set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
             set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
