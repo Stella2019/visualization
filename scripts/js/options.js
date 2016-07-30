@@ -184,7 +184,6 @@ Options.prototype = {
         
         var container = d3.select(set.parent).append("div")
             .attr("class", "choice")
-            .style("text-transform", "capitalize")
             .html(" " + set.title + ": ")
             .append("div")
                 .attr("id", superId)
@@ -258,10 +257,7 @@ Options.prototype = {
         
         // Make container
         var container = d3.select(set.parent).append("div")
-            .attr("class", "choice")
-            .style("display", "inline-table")
-            .style("vertical-align", "top")
-            .style("text-transform", "capitalize")
+            .attr("class", "choice choice-inline-table")
             .append("div")
                 .attr("id", superId)
                 .attr("class", "input-group input-group-sm");
@@ -289,10 +285,7 @@ Options.prototype = {
         var container = d3.select('#choose_' + choice_name);
         if(!container[0][0]) {
             container = d3.select('#panel_' + util.simplify(panel_name)).append("div")
-                .attr("class", "choice")
-                .style("display", "inline-table")
-                .style("vertical-align", "top")
-                .style("text-transform", "capitalize")
+                .attr("class", "choice choice-inline-table")
                 .append("div")
                     .attr("id", "choose_" + choice_name)
                     .attr("class", "input-group input-group-xs");
@@ -385,10 +378,7 @@ Options.prototype = {
         // Make container
         var superId = "choose_" + option;
         var container = d3.select(set.parent).append("div")
-            .attr("class", "choice")
-            .style("display", "inline-table")
-            .style("vertical-align", "top")
-            .style("text-transform", "capitalize")
+            .attr("class", "choice choice-inline-table")
             .append("div")
                 .attr("id", superId)
                 .attr("class", "input-group input-group-sm");
@@ -437,7 +427,6 @@ Options.prototype = {
         if(!container[0][0]) {
             container = d3.select(set.parent).append("div")
                 .attr("class", "choice")
-                .style("text-transform", "capitalize")
                 .append("div")
                     .attr("id", superId)
                     .attr("class", "dropdown");
@@ -455,7 +444,6 @@ Options.prototype = {
             
             list_open.append('span')
                 .attr('class', 'current')
-                .style('text-transform', 'capitalize')
                 .html('Label');
 
             list_open.append('text')
@@ -792,11 +780,16 @@ Options.prototype = {
         
         // Pages
         var pages_panel = this.sidebar.append('div')
-            .attr('id', 'panel_pages')
+            .attr('id', 'panel_lPages')
             .attr('class', 'sidepanel');
         
         pages_panel.append('h4')
-            .html('Pages')
+            .data(['Pages'])
+            .html(d => d + ' <span class="menu-open-icon"></span>')
+            .on('click', d => {
+                var pane = d3.select('#panel_' + util.simplify(d));
+                pane.classed('closed', !pane.classed('closed'));
+            });
         
         var pages = [{
             label: "Index",
@@ -839,11 +832,16 @@ Options.prototype = {
         
         this.panels.forEach(function(panel_name) {
             var panel_div = this.sidebar.append('div')
-                .attr('id', 'panel_' + util.simplify(panel_name))
+                .data([panel_name])
+                .attr('id', d => 'panel_' + util.simplify(d))
                 .attr('class', 'sidepanel');
 
             panel_div.append('h4')
-                .html(panel_name);
+                .html(d => d + ' <span class="menu-open-icon"></span>')
+                .on('click', d => {
+                    var pane = d3.select('#panel_' + util.simplify(d));
+                    pane.classed('closed', !pane.classed('closed'));
+                });
 
             var panel = this[panel_name];
             Object.keys(panel).forEach(function(option_name) {
@@ -882,8 +880,7 @@ Options.prototype = {
         if(!container[0][0]) {
             container = d3.select('#panel_' + util.simplify(panel_name)).append("div")
                 .attr("class", "choice" + (option.breakbefore ? ' choice-break-before' : ''))
-                .style("display", option.hidden ? 'none' : 'inline-block')
-                .style("text-transform", "capitalize")
+                .style("display", option.hidden ? 'none' : null)
                 .append("div")
                     .attr("id", "choose_" + util.simplify(panel_name) + '_' + util.simplify(option_name))
                     .attr("class", "dropdown");
@@ -927,7 +924,6 @@ Options.prototype = {
             
             list_open.append('span')
                 .attr('class', 'current')
-                .style('text-transform', 'capitalize')
                 .html('Label');
 
             list_open.append('text')
@@ -1000,7 +996,6 @@ Options.prototype = {
             container = d3.select('#panel_' + util.simplify(panel_name)).append("div")
                 .attr("class", "choice" + (option.breakbefore ? ' choice-break-before' : ''))
                 .style("display", option.hidden ? 'none' : 'inline-block')
-                .style("text-transform", "capitalize")
                 .append("div")
                     .attr("id", "choose_" + util.simplify(panel_name) + '_' + util.simplify(option_name))
                     .attr("class", "form-group");
