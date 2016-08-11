@@ -795,17 +795,20 @@ Options.prototype = {
             label: "Index",
             url: "index.html"
         },{
-            label: "Collections",
-            url: "status.html"
+            label: "Datasets",
+            url: "dataset_table.html"
         },{
             label: "Timeseries",
             url: "timeseries.html"
         },{
-            label: "Coding Report",
-            url: "coding.html"
+            label: "Annotated Tweets",
+            url: "annotated_tweets.html"
         },{
             label: "Features",
             url: "features.html"
+        },{
+            label: "Laboratory",
+            url: "http://misinfo.somelab.net/"
         }]
             
         pages_panel.append('ul')
