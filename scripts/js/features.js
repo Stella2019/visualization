@@ -1830,6 +1830,7 @@ FeatureDistribution.prototype = {
             otherusers.concat(user['UsersRetweeted'].top(upload_limit));
             otherusers.concat(user['UsersReplied'].top(upload_limit));
             otherusers.concat(user['UsersQuoted'].top(upload_limit));
+            otherusers.concat(user['UsersSimplyMentioned'].top(upload_limit));
             otherusers = util.lunique(otherusers.map(u => u.key));
             
             otherusers.forEach(function(otheruser) {

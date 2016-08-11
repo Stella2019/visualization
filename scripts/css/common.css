@@ -19,7 +19,7 @@
 .sidebar {
     position: fixed;
     width: 200px;
-    border-right: solid 5px #eee;
+/*    border-right: solid 5px #eee;*/
     background: white;
     top: 0px;
     left: -175px;
@@ -33,10 +33,12 @@
 }
 .sidebar .sidepanel {
     position: relative;
+/*    margin-bottom: 20px;*/
 }
 .sidebar h4, .legend h4 {
     padding: 5px;
-    border-bottom: 1px solid #e5e5e5;
+    cursor: pointer;
+/*    border-bottom: 1px solid #e5e5e5;*/
 }
 .sidebar .section-title {
     position: absolute;
@@ -64,15 +66,29 @@
     font-size: 12px
 }
 
+.menu-open-icon {
+    font-family: 'Glyphicons Halflings';
+    font-size: .75em;
+}
+.menu-open-icon:before {
+    content: "\e259"
+}
+.sidepanel.closed .menu-open-icon:before {
+    content: "\e257"
+}
+
 #choices {
     max-height: 150px;
 /*    overflow: scroll;*/
 }
 
 .choice {
-    display: inline-block;
+    display: flex;
     padding: 2px;
-    width: 100%
+    width: 100%;
+    height: auto;
+/*    transition-duration: height 1s;*/
+    text-transform: capitalize;
 }
 .choice-break-before {
     border-top: solid 1px #ddd;
@@ -87,6 +103,16 @@
     max-width: 100%;
     white-space: normal;
     float: right;
+}
+.choice-inline-table {
+    display: inline-table;
+    vertical-align: top;
+}
+.sidepanel.closed .choice, .sidepanel.closed ul {
+    transform: scaleY(0);
+    padding: 0px;
+    height: 0px;
+    display: flex;
 }
 
 .input-group-addon.primary {
