@@ -19,24 +19,72 @@
     <script src="lib/bootstrap-3.3.6-dist/js/bootstrap.min.js"></script>
     
     <!-- Internal -->
-    <link rel="stylesheet" type="text/css" href="scripts/css/common.css">
+    <link rel="stylesheet" type="text/css" href="src/css/common.css">
 </head>
 <body>
 
-    <div id="body" class='container'>
+    <div class='container'>
         <div class='page-header'>
             <h2>Misinfo Analysis Webpages</h2>
         </div>
-        <ul class="nav nav-pills">
-            <li role="presentation">
-                <a href="dataset_table.html" target="_blank">Table of Datasets</a></li>
-            <li role="presentation">
-                <a href="timeseries.html" target="_blank">Timeseries Charts</a></li>
-            <li role="presentation">
-                <a href="annotated_tweets.html" target="_blank">Annotated Tweets Reliability Report</a></li>
-            <li role="presentation">
-                <a href="features.html" target="_blank">Feature Distribution Tables</a></li>
-        </ul>
+        <div class="row">
+            <div class="col-xs-6 col-sm-4 col-md-3">
+                <div class="thumbnail">
+                    <a href='dataset_table.html' target="_blank">
+                        <img src="img/PageScreencap_DatasetTable_20160811.png" alt="Screencapture of the Dataset Table Webpage">
+                    </a>
+                    <div class="caption">
+                        <h3>Dataset Table</h3>
+                        <p>Overview of the collections of tweets made and the established subsets of data, based on text matches, rumors, user features, and more.</p>
+                        <p>
+                            <a href="dataset_table.html" class="btn btn-primary" role="button" target="_blank">Open</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xs-6 col-sm-4 col-md-3">
+                <div class="thumbnail">
+                    <a href='timeseries.html' target="_blank">
+                        <img src="img/PageScreencap_Timeseries_20160811.png" alt="Screencapture of the Timeseries Webpage">
+                    </a>
+                    <div class="caption">
+                        <h3>Timeseries Charts</h3>
+                        <p>A chart showing the number of tweets over time for every event and its subsets. It can be modified to show other metrics or break down the metrics by things like tweet type or distinctness. You can also click bars in the timeseries to get a list of the tweets at that particular point of time.</p>
+                        <p>
+                            <a href="timeseries.html" class="btn btn-primary" role="button" target="_blank">Open</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xs-6 col-sm-4 col-md-3">
+                <div class="thumbnail">
+                    <a href='annotated_tweets.html' target="_blank">
+                        <img src="img/PageScreencap_AnnotatedTweets_20160811.png" alt="Screencapture of the Annotated Tweets Report Webpage">
+                    </a>
+                    <div class="caption">
+                        <h3>Annotated Tweets Report</h3>
+                        <p>An report for each set of tweets that has been manually annotated as affirming or denying rumors. This also shows codes for uncertainty, neutral, unrelated, and uncodable. This webpage shows a table of interrater reliability by code, matrices showing patterns in coding, and a table of all tweets and their codes.</p>
+                        <p>
+                            <a href="annotated_tweets.html" class="btn btn-primary" role="button" target="_blank">Open</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xs-6 col-sm-4 col-md-3">
+                <div class="thumbnail">
+                    <a href='features.html' target="_blank">
+                        <img src="img/PageScreencap_Features_20160811.png" alt="Screencapture of the Feature Distribution Tables Webpage">
+                    </a>
+                    <div class="caption">
+                        <h3>Feature Distribution Tables</h3>
+                        <p>This webpage shows a number of tables that count the occurance of many different features of tweets for each event and subset of tweets within an event. It provides many counters to help provide insights in the content of tweets, types of users, and other features of the collection of tweets. It can also be used to compare two collections.</p>
+                        <p>
+                            <a href="features.html" class="btn btn-primary" role="button" target="_blank">Open</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
 </body>
