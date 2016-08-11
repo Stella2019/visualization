@@ -637,7 +637,7 @@ Connection.prototype = {
             error_callback = function() {};
         
         $.ajax({
-            url: 'scripts/php/' + url + '.php',
+            url: 'src/php/' + url + '.php',
             type: "POST",
             data: fields,
             cache: false,
