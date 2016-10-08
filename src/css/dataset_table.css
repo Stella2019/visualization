@@ -86,3 +86,7 @@ th:hover .glyphicon-hiddenclick {
 .row_subset .cell-label .value {
     padding-left: 50px;
 }
+
+.new-collection-button {
+    margin: 10px;
+}

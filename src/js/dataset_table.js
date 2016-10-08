@@ -33,6 +33,9 @@ StatusReport.prototype = {
         triggers.on('new_counts',         this.computeAggregates.bind(this));
         triggers.on('update_counts',      this.updateTableCounts.bind(this));
         triggers.on('refresh_visibility', this.setVisibility.bind(this));
+        
+        triggers.on('dataset table:build', this.buildTable.bind(this));
+        triggers.on('new dataset:build', this.buildNewDatasetOption.bind(this));
     },
     getData: function() {
         var datasets = 3;
@@ -87,155 +90,9 @@ StatusReport.prototype = {
         this.features_arr = [];
         
         // Link all of the data
-        this.events_arr.forEach(function(event) {
-            // Add fields
-            event.ID = parseInt(event.ID);
-            event.Label = event.DisplayName || event.Name;
-            event.Level = 1;
-            this.quantities.forEach(function (quantity) {
-                event[quantity] = parseInt(event[quantity]) || 0;
-            });
-            event['FirstTweet'] = event['FirstTweet'] ? new BigNumber(event['FirstTweet']) : new BigNumber('0');
-            event['LastTweet']  = event['LastTweet']  ? new BigNumber(event['LastTweet'])  : new BigNumber('0');
-            
-            // Add to event type list (or make new event type list)
-            var type = event.Type;
-            var event_type;
-            if(type in this.event_types) {
-                event_type = this.event_types[type];
-                event_type.events_arr.push(event);
-            } else {
-                event_type = {
-                    Level: 0,
-                    Label: type,
-                    events_arr: [event]
-                }
-                event_type['Event Type'] = event_type;
-                this.event_types[type] = event_type;
-                this.event_types_arr.push(event_type);
-            }
-            
-            // Add children
-            var event_rumor = {
-                Event: event.ID,
-                ID: 0,
-                Name: 'All Tweets in Event',
-                Definition: '',
-                Query: '',
-                StartTime: event.StartTime,
-                StopTime:  event.StopTime,
-                Active: '1'
-            }
-            event.rumors = {0: event_rumor};
-            event.rumors_arr = [event_rumor];
-            this.rumors_arr.push(event_rumor);
-            
-            this.quantities.forEach(function (quantity) {
-                event_rumor[quantity] = event[quantity];
-            });
-            event_rumor['FirstTweet'] = event['FirstTweet'];
-            event_rumor['LastTweet']  = event['LastTweet'];
-            
-            // Add ancestors
-            event['Event']      = event; // weird but makes things easier
-            event['Event Type'] = event_type;
-            
-            // Add to indiced object
-            this.events[event.ID] = event;
-        }, this);
-        
-        this.rumors_arr.forEach(function(rumor) {
-            rumor.ID = parseInt(rumor.ID);
-            rumor.Level = 2;
-            rumor.Label = rumor.Name;
-            rumor.features =  {};
-            rumor.features_arr = [];
-            
-            // Add rumor to Event
-            rumor.Event_ID = rumor.Event;
-            var event = this.events[rumor.Event_ID];
-            if(!(rumor.ID in event.rumors)) {
-                event.rumors[rumor.ID] = rumor;
-                event.rumors_arr.push(rumor);
-            }
-            
-            // Add ancestors
-            rumor['Rumor']      = rumor;
-            rumor['Event']      = event;
-            rumor['Event Type'] = event['Event Type'];
-            
-            // Add to indiced object
-            this.rumors[event.ID + '_' + rumor.ID] = rumor;
-        }, this);
-        
-        this.subsets_arr.forEach(function(subset) {
-            // Add fields
-            subset.ID = parseInt(subset.ID);
-            subset.Label = util.subsetName(subset);
-//            subset.Label = subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
-            subset.Level = 4;
-            this.quantities.forEach(function (quantity) {
-                subset[quantity] = parseInt(subset[quantity]) || 0;
-            });
-            subset['FirstTweet'] = subset['FirstTweet'] ? new BigNumber(subset['FirstTweet']) : new BigNumber('0');
-            subset['LastTweet']  = subset['LastTweet']  ? new BigNumber(subset['LastTweet'])  : new BigNumber('0');
-            
-            // Get ancestors
-            subset.Event_ID = subset.Event;
-            var event = this.events[subset.Event_ID];
-            var rumor = event.rumors[subset.Rumor];
-            
-            // If it is actually a rumor subset, add data to the rumor
-            if(subset.Feature == 'Rumor') {
-                if(this.Match in this.rumors) {
-                    subset.Label = this.rumors[this.Match].Label;
-                }
-                
-                var actual_rumor = event.rumors[subset.Match];
-                this.quantities.forEach(function (quantity) {
-                    actual_rumor[quantity] = parseInt(subset[quantity]) || 0;
-                });
-                actual_rumor['FirstTweet'] = subset['FirstTweet'] ? new BigNumber(subset['FirstTweet']) : new BigNumber('0');
-                actual_rumor['LastTweet']  = subset['LastTweet']  ? new BigNumber(subset['LastTweet'])  : new BigNumber('0');
-            } else if(subset.Feature == 'Event') {
-                if(this.Match in this.events) {
-                    subset.Label = this.events[this.Match].Label;
-                }
-            }
-            
-            // Add to feature in rumor
-            var feature;
-            if(subset.Feature in rumor.features) {
-                feature = rumor.features[subset.Feature];
-                feature.subsets[subset.Match] = subset;
-                feature.subsets_arr.push(subset);
-            } else {
-                feature = {
-                    Level: 3,
-                    Label: subset.Feature,
-                    Rumor: rumor,
-                    Event: event,
-                    'Event Type': event['Event Type'],
-                    subsets: {},
-                    subsets_arr: [subset]
-                }
-                feature['Feature'] = feature;
-                feature.subsets[subset.Match] = subset;
-                rumor.features[subset.Feature] = feature;
-                rumor.features_arr.push(feature);
-                this.features_arr.push(feature);
-            }
-            
-            // Add to ancestors
-            subset['Subset']     = subset;
-            subset['Feature']    = feature;
-            subset['Rumor']      = rumor;
-            subset['Event']      = event;
-            subset['Event Type'] = event['Event Type'];
-            
-            // Add to indiced object
-            this.subsets[subset.ID] = subset;
-        }, this);
+        this.events_arr.forEach(this.configureRawEventObject, this);
+        this.rumors_arr.forEach(this.configureRawRumorObject, this);
+        this.subsets_arr.forEach(this.configureRawSubsetObject, this);
         
         // Add children columns
         this.event_types_arr.sort(function(a, b) {
@@ -280,6 +137,165 @@ StatusReport.prototype = {
         });
         
         this.buildOptions();
+    },
+    configureRawEventObject: function(event) {
+        // Add fields
+        event.ID = parseInt(event.ID);
+        event.Label = event.DisplayName || event.Name;
+        event.Level = 1;
+        this.quantities.forEach(function (quantity) {
+            event[quantity] = parseInt(event[quantity]) || 0;
+        });
+        event['FirstTweet'] = event['FirstTweet'] ? new BigNumber(event['FirstTweet']) : new BigNumber('0');
+        event['LastTweet']  = event['LastTweet']  ? new BigNumber(event['LastTweet'])  : new BigNumber('0');
+        
+        // Add to event type list (or make new event type list)
+        var type = event.Type;
+        var event_type;
+        if(type in this.event_types) {
+            event_type = this.event_types[type];
+            event_type.events_arr.push(event);
+        } else {
+            event_type = {
+                Level: 0,
+                Label: type,
+                events_arr: [event]
+            }
+            event_type['Event Type'] = event_type;
+            this.event_types[type] = event_type;
+            this.event_types_arr.push(event_type);
+        }
+
+        // Add children
+        var event_rumor = {
+            Event: event.ID,
+            ID: 0,
+            Name: 'All Tweets in Event',
+            Definition: '',
+            Query: '',
+            StartTime: event.StartTime,
+            StopTime:  event.StopTime,
+            Active: '1'
+        }
+        event.rumors = {0: event_rumor};
+        event.rumors_arr = [event_rumor];
+        this.rumors_arr.push(event_rumor);
+        event.subsets_arr = [];
+
+        this.quantities.forEach(function (quantity) {
+            event_rumor[quantity] = event[quantity];
+        });
+        event_rumor['FirstTweet'] = event['FirstTweet'];
+        event_rumor['LastTweet']  = event['LastTweet'];
+
+        // Add ancestors
+        event['Event']      = event; // weird but makes things easier
+        event['Event Type'] = event_type;
+
+        // Add to indiced object
+        this.events[event.ID] = event;
+    },
+    configureRawRumorObject: function(rumor) {
+        rumor.ID = parseInt(rumor.ID);
+        rumor.Level = 2;
+        rumor.Label = rumor.Name;
+        rumor.features =  {};
+        rumor.features_arr = [];
+        rumor.subsets_arr = [];
+
+        // Add rumor to Event
+        rumor.Event_ID = rumor.Event;
+        var event = this.events[rumor.Event_ID];
+        if(!(rumor.ID in event.rumors)) {
+            event.rumors[rumor.ID] = rumor;
+            event.rumors_arr.push(rumor);
+        }
+
+        // Add ancestors
+        rumor['Rumor']      = rumor;
+        rumor['Event']      = event;
+        rumor['Event Type'] = event['Event Type'];
+
+        // Add to indiced object
+        this.rumors[event.ID + '_' + rumor.ID] = rumor;
+    },
+    configureRawSubsetObject: function(subset) {
+        // Add fields
+        subset.ID = parseInt(subset.ID);
+        subset.Label = util.subsetName(subset);
+        subset.FeatureMatch = util.subsetName({
+            feature: subset.Feature,
+            match: subset.Match,
+            includeFeature: true
+        });
+//            subset.Label = subset.Match.replace(/\\W/g, '<span style="color:#ccc">_</span>');
+        subset.Level = 4;
+        this.quantities.forEach(function (quantity) {
+            subset[quantity] = parseInt(subset[quantity]) || 0;
+        });
+        subset['FirstTweet'] = subset['FirstTweet'] ? new BigNumber(subset['FirstTweet']) : new BigNumber('0');
+        subset['LastTweet']  = subset['LastTweet']  ? new BigNumber(subset['LastTweet'])  : new BigNumber('0');
+
+        // Get ancestors
+        subset.Event_ID = subset.Event;
+        var event = this.events[subset.Event_ID];
+        var rumor = event.rumors[subset.Rumor];
+
+        // If it is actually a rumor subset, add data to the rumor
+        if(subset.Feature == 'Rumor') {
+            if(this.Match in this.rumors) {
+                subset.Label = this.rumors[this.Match].Label;
+                subset.FeatureMatch = 'Rumor: ' + subset.Label
+            }
+
+            var actual_rumor = event.rumors[subset.Match];
+            this.quantities.forEach(function (quantity) {
+                actual_rumor[quantity] = parseInt(subset[quantity]) || 0;
+            });
+            actual_rumor['FirstTweet'] = subset['FirstTweet'] ? new BigNumber(subset['FirstTweet']) : new BigNumber('0');
+            actual_rumor['LastTweet']  = subset['LastTweet']  ? new BigNumber(subset['LastTweet'])  : new BigNumber('0');
+        } else if(subset.Feature == 'Event') {
+            if(this.Match in this.events) {
+                subset.Label = this.events[this.Match].Label;
+            }
+        }
+
+        // Add to feature in rumor
+        var feature;
+        if(subset.Feature in rumor.features) {
+            feature = rumor.features[subset.Feature];
+            feature.subsets[subset.Match] = subset;
+            feature.subsets_arr.push(subset);
+        } else {
+            feature = {
+                Level: 3,
+                Label: subset.Feature,
+                Rumor: rumor,
+                Event: event,
+                'Event Type': event['Event Type'],
+                subsets: {},
+                subsets_arr: [subset]
+            }
+            feature['Feature'] = feature;
+            feature.subsets[subset.Match] = subset;
+            rumor.features[subset.Feature] = feature;
+            rumor.features_arr.push(feature);
+            this.features_arr.push(feature);
+        }
+        
+        // Add to subset list in event
+        rumor.subsets_arr.push(subset);
+        event.subsets_arr.push(subset);
+
+        // Add to ancestors
+        subset['Subset']     = subset;
+        subset['Feature']    = feature;
+        subset['Rumor']      = rumor;
+        subset['Event']      = event;
+        subset['Event Type'] = event['Event Type'];
+
+        // Add to indiced object
+        this.subsets[subset.ID] = subset;
     },
     computeAggregates: function() {
         this.features_arr.forEach(function(d) {
@@ -438,9 +454,8 @@ StatusReport.prototype = {
         
         // Also make the modal
         triggers.emit('modal:build');
-        
-        //status....
-        this.buildTable();
+        triggers.emit('dataset table:build');
+        triggers.emit('new dataset:build');
     },
     buildTable: function() {
         var columns = ['ID', 'Collection',
@@ -838,12 +853,13 @@ StatusReport.prototype = {
         triggers.emit('refresh_visibility');
     },
     edit: function(d) {
+        console.log(d);
         if(d.Level == 1) { // Event
             this.dataset.event = d;
-            triggers.emit('edit_window:open', 'event');
-        } else if(d.Level == 3) { // Subset
+            triggers.emit('edit collection:open', 'event');
+        } else if(d.Level == 4) { // Subset
             this.dataset.subset = d;
-            triggers.emit('edit_window:open', 'subset');
+            triggers.emit('edit collection:open', 'subset');
         }
     },
     clickSort: function(order, option) {
@@ -1052,6 +1068,29 @@ StatusReport.prototype = {
 
         console.log(info);
         return info;
+    },
+    buildNewDatasetOption: function() {
+        var div = d3.select('#body').append('div');
+        
+        div.append('button')
+            .attr('class', 'btn btn-default new-collection-button')
+            .text('New Event')
+            .on('click', triggers.emitter('edit collection:new', 'event'));
+        
+        div.append('button')
+            .attr('class', 'btn btn-default new-collection-button')
+            .text('New Subset')
+            .on('click', triggers.emitter('edit collection:new', 'subset'));
+        
+        div.append('button')
+            .attr('class', 'btn btn-default new-collection-button')
+            .text('Add Tweets to Event')
+            .on('click', triggers.emitter('alert', 'Sorry this button doesn\'t work yet'));
+        
+        div.append('button')
+            .attr('class', 'btn btn-default new-collection-button')
+            .text('Add Tweets to Subset')
+            .on('click', triggers.emitter('alert', 'Sorry this button doesn\'t work yet'));
     }
 };
 

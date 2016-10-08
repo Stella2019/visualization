@@ -6,6 +6,7 @@ function CollectionManager(app, args) {
     this.flag_subset_menu = false;
     this.flag_sidebar = true;
     this.flag_allow_edits = true;
+    this.flag_allow_new = true;
     this.flag_secondary_event = false;
     this.flag_time_window = true;
     
@@ -39,6 +40,8 @@ function CollectionManager(app, args) {
     
     this.init();
     
+    /* Edit Window constants */
+    this.editing = {};
     this.edit_window_fields = {
         omitted: ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes',
                  'DistinctTweets', 'DistinctOriginals', 'DistinctRetweets', 'DistinctReplies', 'DistinctQuotes',
@@ -50,6 +53,139 @@ function CollectionManager(app, args) {
         date: ['StartTime', 'StopTime'],
         textarea: ['Description', 'Definition'],
         query: ['Query']
+    };
+    
+    this.fieldValues = {
+        Timezone: [
+            {label: 'UTC-10, Hawaii', value: -10*60*60},
+            {label: 'UTC-09, Alaska', value: -9*60*60},
+            {label: 'UTC-08, US West', value: -8*60*60},
+            {label: 'UTC-07, US Mountain <small>US West DST</small>', value: -7*60*60},
+            {label: 'UTC-06, US Central & Mexico <small>US Mountain DST</small>', value: -6*60*60},
+            {label: 'UTC-05, US East & NW South America <small>US Central DST</small>', value: -5*60*60},
+            {label: 'UTC-04, Altantic & Venezuela <small>US East DST</small>', value: -4*60*60},
+            {label: 'UTC-03, Brazil <small>Atlantic DST</small>', value: -3*60*60},
+            {label: 'UTC-02, <small>Brazil DST</small>', value: -2*60*60},
+            {label: 'UTC+00, Western Europe & Africa', value: 0*60*60},
+            {label: 'UTC+01, Central Europe & Africa <small>Western Europe DST</small>', value: 1*60*60},
+            {label: 'UTC+02, Eastern Europe, South Africa <small>Central Europe DST</small>', value: 2*60*60},
+            {label: 'UTC+03, Russia - Moscow, East Africa <small>Eastern Europe DST</small>', value: 3*60*60},
+            {label: 'UTC+03.5, Iran', value: 3.5*60*60},
+            {label: 'UTC+04, Urals', value: 4*60*60},
+            {label: 'UTC+04.5, Afghanistan <small>Iran DST</small>', value: 4.5*60*60},
+            {label: 'UTC+05, Central Asia', value: 5*60*60},
+            {label: 'UTC+05.5, India', value: 5.5*60*60},
+            {label: 'UTC+06, Kazakhstan', value: 6*60*60},
+            {label: 'UTC+07, Siberia, SE Asia', value: 7*60*60},
+            {label: 'UTC+08, China', value: 8*60*60},
+            {label: 'UTC+09, Japan', value: 9*60*60},
+            {label: 'UTC+10, Australia - Sydney', value: 10*60*60},
+            {label: 'UTC+11, <small>Australia - Sydney DST</small>', value: 11*60*60}
+        ], 
+        TweetSource: [
+            {label: 'Capture Client', value: 'Capture Client'},
+            {label: 'Combination of other Events', value: 'Combination of other Events'},
+            {label: 'Analysis Set', value: 'Analysis Set'},
+            {label: 'Old Collection', value: 'Old Collection'},
+            {label: 'Other', value: 'Other'}
+        ]};
+    this.fieldValues.Timezone.forEach(d => d.label += ' (' + d.value + ')');
+    
+    this.collection_fields = {
+        event: [
+            {label: 'ID',                 name: 'ID',          type: 'Text',     final: true},
+            {label: 'Event Type',         name: 'Type',        type: 'Enum',     list: function() {
+                 // Hack only used by dataset_table.js
+                return SR.event_types_arr.map(d => {
+                    return {label: d.Label, value: d.Label};
+                });
+            }},
+            {label: 'Name (Displayed)',   name: 'DisplayName', type: 'Text'},
+            {label: 'Name (Original)',    name: 'Name',        type: 'Text',     final: true, new_editable: true},
+            {label: 'Description',        name: 'Description', type: 'Textarea'},
+            {label: 'Final Keywords',     name: 'Keywords',    type: 'Textarea', final: true, new_editable: true},
+            {label: 'Temporary Keywords', name: 'OldKeywords', type: 'Textarea', final: true},
+            {label: 'Capture Start',      name: 'StartTime',   type: 'Date'},
+            {label: 'Capture Stop',       name: 'StopTime',    type: 'Date'},
+            {label: 'Timezone',           name: 'UTCOffset',   type: 'Enum',     list: this.fieldValues.Timezone},
+            {label: 'Tweet Source',       name: 'TweetSource', type: 'Enum',     list: this.fieldValues.TweetSource},
+            {label: 'Server',             name: 'Server',      type: 'String',   final: true},
+            {label: 'Active',             name: 'Active',      type: 'Boolean'},
+            // Provide Statistics?
+        ],
+        subset: [
+            {label: 'ID',       name: 'ID',       type: 'Text',     final: true},
+            {label: 'Event',    name: 'Event',    type: 'Enum',     list: function() {
+                // Hack only used by dataset_table.js
+                var list = SR.events_arr.map(d => {
+                    return {label: d.Label + ' (' + d.ID + ')', value: d.ID};
+                });
+                list.unshift({label: 'No Event (0)', value: 0});
+                return list;
+            }},
+            {label: 'Rumor',    name: 'Rumor',    type: 'Enum',     list: function() {
+                // Hack only used by dataset_table.js
+                var list = SR.rumors_arr.map(d => {
+                    return {label: d.Label + ' (' + d.ID + ')', value: d.ID};
+                });
+                list.unshift({label: 'No Rumor (0)', value: 0});
+                return list;
+            }},
+            {label: 'Superset', name: 'Superset', type: 'Enum',     list: function() {
+                 // Hack only used by dataset_table.js
+                var list = SR.subsets_arr.map(d => {
+                    return {label: d.FeatureMatch + ' (' + d.ID + ')', value: d.ID};
+                });
+                list.unshift({label: 'No Superset (0)', value: 0});
+                return list;
+            }},
+            {label: 'Feature',  name: 'Feature', type: 'Enum',     list: function() {
+                 // Hack only used by dataset_table.js
+                return util.lunique(SR.features_arr.map(d => d.Label))
+                    .map(d => {
+                        return {label: d, value: d};
+                    });
+            }},
+            {label: 'Match',    name: 'Match',    type: 'Text'},
+            {label: 'Notes',    name: 'Notes',    type: 'Text'}
+        ]
+    };
+    
+    this.blank_collection = {
+        'event': {
+            Label: "New Collection",
+            ID: 0,
+            Type: "",
+            DisplayName: "",
+            Name: "",
+            Description: "",
+            Keywords: "",
+            OldKeywords: "",
+            StartTime: util.formatDate(new Date()),
+            StopTime: util.formatDate(new Date()),
+            Server: "ad hoc",
+            Active: 1,
+            FirstTweet: 0, LastTweet: 0,
+            Tweets: 0, DistinctTweets: 0,
+            Originals: 0, DistinctOriginals: 0,
+            Retweets: 0, DistinctRetweets: 0,
+            Replies: 0, DistinctReplies: 0,
+            Quotes: 0, DistinctQuotes: 0,
+            Minutes: 0,
+            TweetSource: "",
+            UTCOffset: -28800
+        },
+        'subset': {
+            Label: 'New Subset',
+            ID: '',
+            Event: '',
+            Rumor: '',
+            Superset: '',
+            Feature: '',
+            Match: '',
+            Notes: '',
+            Feature: ''
+        }
     }
 }
 CollectionManager.prototype = {
@@ -87,10 +223,11 @@ CollectionManager.prototype = {
 
         // Editing Windows
         if(this.flag_allow_edits) {
-            triggers.on('edit_window:open', this.editWindow.bind(this));
-            triggers.on('edit_window:changed', this.editWindowChanged.bind(this));
-            triggers.on('edit_window:update', this.updateCollection.bind(this));
-            triggers.on('edit_window:verify update', this.verifyCollectionUpdate.bind(this));
+            triggers.on('edit collection:new', this.editWindow.bind(this, 'new'));
+            triggers.on('edit collection:open', this.editWindow.bind(this, 'existing'));
+            triggers.on('edit collection:changed', this.editWindowChanged.bind(this));
+            triggers.on('edit collection:update', this.updateCollection.bind(this));
+            triggers.on('edit collection:verify update', this.verifyCollectionUpdate.bind(this));
         }
         
         // Time Setter
@@ -131,7 +268,7 @@ CollectionManager.prototype = {
             })
         };
         if(this.flag_allow_edits) {
-            this.ops['Event'].edit = triggers.emitter('edit_window:open', 'event');
+            this.ops['Event'].edit = triggers.emitter('edit collection:open', 'event');
         }
         if(this.flag_subset_menu) {
             dropdowns.push('Subset');
@@ -144,7 +281,7 @@ CollectionManager.prototype = {
                 callback: triggers.emitter('subset:set')
             });
             if(this.flag_allow_edits) {
-                this.ops['Subset'].edit = triggers.emitter('edit_window:open', 'subset');
+                this.ops['Subset'].edit = triggers.emitter('edit collection:open', 'subset');
             }
         }
         if(this.flag_secondary_event) {
@@ -157,7 +294,7 @@ CollectionManager.prototype = {
                 callback: triggers.emitter('event2:set')
             });
             if(this.flag_allow_edits) {
-                this.ops['Event2'].edit = triggers.emitter('edit_window:open', 'event2');
+                this.ops['Event2'].edit = triggers.emitter('edit collection:open', 'event2');
             }
             
             if(this.flag_subset_menu) {
@@ -170,7 +307,7 @@ CollectionManager.prototype = {
                     callback: triggers.emitter('subset2:set')
                 });
                 if(this.flag_allow_edits) {
-                    this.ops['Subset2'].edit = triggers.emitter('edit_window:open', 'subset2');
+                    this.ops['Subset2'].edit = triggers.emitter('edit collection:open', 'subset2');
                 }
             }
         }
@@ -307,7 +444,7 @@ CollectionManager.prototype = {
         $("#edit_form").serializeArray().forEach(function(x) { fields[x.name] = x.value; });
         console.log(fields);
         
-        this.app.connection.php('collection/update', fields, triggers.emitter('edit_window:verify update')); // add a callback
+        this.app.connection.php('collection/update', fields, triggers.emitter('edit collection:verify update')); // add a callback
     },
     verifyCollectionUpdate: function(message) {
         if(message.includes('Success')) {
@@ -320,8 +457,20 @@ CollectionManager.prototype = {
             // Unlock Match/Fetch buttons
             d3.selectAll('.edit-window-routine')
                 .attr('disabled', null);
+            
+            // TODO refresh the dataset table when we have created a new set
         } else {
             console.error(message);
+            if(message.indexOf('Error: Data truncated for column \'TweetSource\'') > 0) {
+                // TODO provide a richer error description
+//                var badFieldName = '`TweetSource`=';
+//                var badFieldStart = message.indexOf(badFieldName);
+//                var badFieldValue = message.substring(badFieldStart + badFieldName.length,
+//                                                      message.indexOf("'", badFieldStart + badFieldName.length));
+                alert("Invalid value for 'TweetSource', " +
+                      "must be on the list: [" + this.fieldValues.TweetSource.map(d => d.value).join(', ') + "]");
+            }
+            // TODO handle other errors like other bad fields
         }
     },
     loadRumors: function () {
@@ -676,7 +825,7 @@ CollectionManager.prototype = {
             .attr('class', 'form-group');
         
         divs.append('label')
-            .attr('for', function(d) { return 'edit_load_time_' + d.label; })
+            .attr('for', d => 'edit_load_time_' + d.label)
             .attr('class', 'col-sm-3 control-label')
             .text(function(d) { return d.label });
         
@@ -704,10 +853,10 @@ CollectionManager.prototype = {
             .attr({
                 class: 'form-control',
                 type: 'datetime-local',
-                id: function(d) { return 'edit_load_time_' + d.label; },
-                value: function(d) { return util.formDate(d.time); },
-                min: function(d) { return util.formDate(d.min); },
-                max: function(d) { return util.formDate(d.max); }
+                id: d => 'edit_load_time_' + d.label,
+                value: d => util.formDate(d.time),
+                min: d => util.formDate(d.min),
+                max: d => util.formDate(d.max)
             })
             .on('change', function(d) {
                 var ops_dataset = this.ops;
@@ -762,18 +911,37 @@ CollectionManager.prototype = {
         
         triggers.emit('modal:open');
     },
-    editWindow: function(option) {
+    editWindow: function(state, collection_type) {
+        // Save an object about the editing status
+        this.editing = {
+            state: state,
+            collection_type: collection_type,
+            fields: [],
+            collection_object: undefined
+        };
+        // They the object that we are editing, otherwise make a new one
+        var collection_object = this[collection_type];
         
-        var info = this[option];
-        if(!info || !('ID' in info)) {
+        if(state == 'new') {
+            collection_object = util.copyObject(this.blank_collection[collection_type]);
+            if(collection_type == '') {
+                collection_object.ID = d3.min(SR.events_arr, d => d.ID) - 1;
+            } else {
+                collection_object.ID = d3.max(SR.subsets_arr, d => d.ID) + 1;
+            }
+        } else if(!collection_object || !('ID' in collection_object)) {
             triggers.emit('alert', 'No information');
             return;
-        }
+        } /*else if(collection_type == 'subset') {
+            triggers.emit('alert', 'Sorry I\' still working on editing subsets');
+            return;
+        }*/
+        this.editing.collection_object = collection_object;
         
         // Set modal
         var modal = this.app.modal;
         triggers.emit('modal:reset');
-        triggers.emit('modal:title', '<small>Configure ' + option + ':</small> ' + (info.Label));
+        triggers.emit('modal:title', '<small>Configure ' + collection_type + ':</small> ' + (collection_object.Label));
         
         // Append form
         var form = modal.body.append('form')
@@ -787,105 +955,70 @@ CollectionManager.prototype = {
                 return false; 
             });
         
-        var keys = [];
-        Object.keys(info).forEach(function(key) {
-            var value = info[key];
-            if (!this.edit_window_fields.omitted.includes(key) && 
-               (typeof(value) == 'string' || typeof(value) == 'number' || value == null || value instanceof Date) ) {
-                keys.push(key);
-            }
-        }, this);
+        // Gather fields
+        this.editing.fields = this.collection_fields[collection_type].map(field => {
+            return {
+                label: field.label,
+                name: field.name,
+                value: collection_object[field.name],
+                type: field.type,
+                final: field.final && !(state == 'new' && field.new_editable),
+                list: field.list == undefined ? null :
+                    typeof(field.list) == 'function' ? field.list() : field.list
+            };
+        });
         
-        var divs = form.selectAll('div.form-group')
-            .data(keys)
+        var field_divs = form.selectAll('div.form-group.newv')
+            .data(this.editing.fields)
             .enter()
             .append('div')
-            .attr('class', 'form-group');
+            .attr('class', 'form-group newv');
         
-        divs.append('label')
-            .attr('for', function(d) { return 'edit_input_' + d; })
+        field_divs.append('label')
+            .attr('for', d => 'collection_edit_' + d.name)
             .attr('class', 'col-sm-3 control-label')
-            .text(function(d) {
-                // Convert CamelCase to Camel Case
-                if(d.includes('ID'))
-                    return d.replace('_', ' ');
-                else
-                    return d.replace(/([A-Z])/g, " $1");
-            });
+            .text(d => d.label);
         
-        divs.append('div')
-            .attr('class', function(d) { 
-                if(this.edit_window_fields.id.includes(d))
-                    return 'col-sm-9 edit-box edit-box-id';
-                else if(this.edit_window_fields.text.includes(d))
-                    return 'col-sm-9 edit-box edit-box-textfield';
-                else if(this.edit_window_fields.date.includes(d))
-                    return 'col-sm-9 edit-box edit-box-date';
-                else if(this.edit_window_fields.textarea.includes(d))
-                    return 'col-sm-9 edit-box edit-box-textarea';
-                else if(this.edit_window_fields.query.includes(d))
-                    return 'col-sm-9 edit-box edit-box-query';
-                else // Non editable
-                    return 'col-sm-9 edit-box edit-box-static';
-            }.bind(this));
-        
-        form.selectAll('.edit-box-id')
+        field_divs.append('div')
+            .attr('class', d => 'col-sm-9 edit-box edit-box-' + d.type)
             .append('input')
             .attr({
-                class: 'form-control',
-                type: 'text',
-                id: function(d) { return 'edit_input_' + d; },
-                name: function(d) { return d.toLowerCase(); },
-                value: function(d) { return info[d]; },
-                readonly: function(d) { return info[d] ? false : true; }
+                class: d => 'form-control' + (d.type == 'Enum' ? ' typeahead' : ''),
+                type: d => d.type == 'Date' ? 'datetime-local' : 'text',
+                id: d => 'collection_edit_' + d.name,
+                name: d => d.name,
+                value: d => d.type == 'Date' && d.value ? ((d.value instanceof Date) ?
+                    util.formatDate(d.value) : d.value).replace(' ', 'T') :
+                    d.value,
+                readonly: d => d.final ? true : null,
+                'data-provide': d => d.type == 'List' ? 'typeahead' : null
             });
         
-        form.selectAll('.edit-box-textfield')
-            .append('input')
+        // Convert textarea inputs to textareas;
+        var textareas = field_divs.selectAll('.edit-box-Textarea');
+        textareas.selectAll('input').remove();
+        textareas.append('textarea')
             .attr({
                 class: 'form-control',
-                type: 'text',
-                id: function(d) { return 'edit_input_' + d; },
-                name: function(d) { return d; },
-                placeholder: function(d) { return info[d]; }
-            });
+                type: d => d.type == 'Date' ? 'datetime-local' : 'text',
+                id: d => 'collection_edit_' + d.name,
+                name: d => d.name,
+                placeholder: d => d.value,
+                value: d => d.value,
+                readonly: d => d.final ? true : null
+            })
+            .text(d => d.value);
         
-        form.selectAll('.edit-box-textarea')
-            .append('textarea')
-            .attr({
-                class: 'form-control',
-                type: 'text',
-                id: function(d) { return 'edit_input_' + d; },
-                name: function(d) { return d; },
-                rows: 3,
-                placeholder: function(d) { return info[d]; }
-            });
+        // Add enumerated options for appropriate fields
+        this.editing.fields.forEach(this.editWindowConfigureEnum.bind(this));
         
-        form.selectAll('.edit-box-date') // TODO fix problem with display
-            .append('input')
-            .attr({
-                class: 'form-control',
-                type: 'datetime-local',
-                id: function(d) { return 'edit_input_' + d; },
-                name: function(d) { return d; },
-                value: function(d) {
-                    if(info[d] instanceof Date)
-                        return util.formatDate(info[d]).replace(' ', 'T');
-                }
-            });
-        
-        if(keys.includes('Query'))
-            this.queryEditCreate(form, info);
-        
-        form.selectAll('.edit-box-static')
-            .append('p')
-            .attr('class', 'form-control-static')
-            .text(function(d) { return info[d]; });
+//        if(keys.includes('Query'))
+//            this.queryEditCreate(form, collection_object);
         
         form.append('input')
             .attr({
                 name: 'type',
-                value: option,
+                value: collection_type,
                 class: 'hidden'
             });
         
@@ -896,18 +1029,15 @@ CollectionManager.prototype = {
                 id: 'edit-window-save',
                 class: 'btn btn-default'
             })
-            .text('Update')
-            .on('click', triggers.emitter('edit_window:update'));
+            .text(state == 'new' ? 'Create ' + collection_type : 'Update')
+            .on('click', triggers.emitter('edit collection:update'));
         
-//        disp.newPopup('#edit-window-save')
-//            .set('content', 'Otherwise won\'t save changes');
-        
-        if(option == 'rumor') {
-            this.editWindowRumorOptions(modal);
-        }
+//        if(collection_type == 'rumor') {
+//            this.editWindowRumorOptions(modal);
+//        }
         
         form.selectAll('input')
-            .on('input', triggers.emitter('edit_window:changed'));
+            .on('input', triggers.emitter('edit collection:changed'));
         
         triggers.emit('modal:open');
     },
@@ -1010,7 +1140,41 @@ CollectionManager.prototype = {
             })
             .html('<span class="glyphicon glyphicon-download-alt"></span> All');
     },
-    editWindowChanged: function() {
+    editWindowChanged: function(field) {
+        if(this.editing.collection_type == 'subset' && ['Event', 'Rumor'].includes(field.label)) {
+            console.log('Editing Event, should update rumors & subsets');
+            var event_id = document.getElementById('collection_edit_Event').value;
+            var rumor_id = document.getElementById('collection_edit_Rumor').value;
+            var event = event_id ? SR.events[event_id] : SR;
+            var addRumorLabelToSubsetName = event_id != "" && rumor_id == "";
+            var subset_list = event_id == "" ? SR.subsets_arr :
+                              rumor_id != "" ? event.rumors[rumor_id].subsets_arr : event.subsets_arr;
+            
+            if(field.label == 'Event') {
+                // Change the rumor list to JUST be for this event
+                var rumor_field = this.editing.fields.filter(d => d.label == 'Rumor')[0];
+                var rumor_list = event.rumors_arr.map(d => { 
+                    return {label: d.Label + ' (' + d.ID + ')', value: d.ID};
+                });
+                rumor_field.list = rumor_list;
+                $('#collection_edit_' + rumor_field.name).typeahead('destroy');
+                this.editWindowConfigureEnum(rumor_field);
+            }
+            
+            // Change the superset list to JUST be for this event (and rumor)
+            var superset_field = this.editing.fields.filter(d => d.label == 'Superset')[0];
+            var superset_list = subset_list.map(function(d) { 
+                return {
+                    label: (addRumorLabelToSubsetName ? "<small><em>" + d.Rumor.Label + "</em></small> " : "") +
+                           d.FeatureMatch + ' (' + d.ID + ')',
+                    value: d.ID
+                };
+            });
+            superset_field.list = superset_list;
+            $('#collection_edit_' + superset_field.name).typeahead('destroy');
+            this.editWindowConfigureEnum(superset_field);
+        }
+        
         // Indicate that the collection is to be updated
         d3.select('#edit-window-save')
             .attr('class', 'btn btn-primary');
@@ -1019,4 +1183,44 @@ CollectionManager.prototype = {
         d3.selectAll('.edit-window-routine')
             .attr('disabled', '');
     },
+    editWindowConfigureEnum: function(field) {
+        if(field.name == 'rumor')
+            console.log(field);
+        if(field.type == 'Enum') {
+            var bh_choices = new Bloodhound({
+                datumTokenizer: d => d.label.split(/[\W_]+/g),
+                queryTokenizer: d => d.split(/[\W_]+/g),
+                local: field.list,
+            });
+
+            bh_choices.initialize();
+
+            // Initialize Autocompleting Input
+            $('#collection_edit_' + field.name).typeahead({
+                hint: false,
+                highlight: true,
+                minLength: 0
+            }, {
+                name: 'collection_edit_' + field.name,
+                limit: 100,
+                display: 'value',
+                source: (q, sync) => q === '' ? 
+                    sync(bh_choices.all()) :
+                    bh_choices.search(q, sync),
+                matcher: item => this.query == '' || item.indexOf(this.query) >= 0,
+                templates: {
+                    empty: '<div class="tt-suggestion"><em>No Match</em></div>',
+                    suggestion: function(d) {
+                        return '<div class="tt-suggestion">' + d.label + '</div>'; 
+                    }
+                }
+            });
+
+            // Add happening on select
+            $('#collection_edit_' + field.name).bind('typeahead:selected', function(ev, suggestion) {
+                // Mark it as changed
+                triggers.emit('edit collection:changed', field);
+            }.bind(this));
+        }
+    }
 };

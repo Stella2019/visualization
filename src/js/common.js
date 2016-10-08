@@ -245,6 +245,9 @@ var util = {
         
         return url;
     },
+    copyObject: function(object) {
+        return JSON.parse(JSON.stringify(object));
+    },
     langs: {
         'fr': 'French',
         'en': 'English',

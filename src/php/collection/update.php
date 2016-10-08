@@ -1,26 +1,41 @@
 <?php
     include '../connect.php';
     
+    $eventfields_updatable = array('Type', 'DisplayName', 'Description',
+                         'StartTime', 'StopTime', 'UTCOffset',
+                         'Active', 'TweetSource');
+    $eventfields = array('ID', 'Name', 'Keywords', 
+                         'Type', 'DisplayName', 'Description',
+                         'StartTime', 'StopTime', 'UTCOffset',
+                         'Active', 'TweetSource');
+    $subsetfields = array('Name', 'Query', 'Definition',
+                         'StartTime', 'StopTime');
     $query = "";
 
     if($_REQUEST["type"] == 'event') {
-        $query .= " UPDATE Event";
-        $query .= " SET";
-            
-        $changed = array();
-        if(isset($_REQUEST["Type"]) and !empty($_REQUEST["Type"]))
-            array_push($changed, " `Type`='" . $_REQUEST["Type"] . "'");
-        if(isset($_REQUEST["DisplayName"]) and !empty($_REQUEST["DisplayName"]))
-            array_push($changed, " `DisplayName`='" . $_REQUEST["DisplayName"] . "'");
-        if(isset($_REQUEST["Description"]) and !empty($_REQUEST["Description"]))
-            array_push($changed, " `Description`='" . $_REQUEST["Description"] . "'");
-        if(isset($_REQUEST["StartTime"]) and !empty($_REQUEST["StartTime"]))
-            array_push($changed, " `StartTime`='" . $_REQUEST["StartTime"] . "'");
-        if(isset($_REQUEST["StopTime"]) and !empty($_REQUEST["StopTime"]))
-            array_push($changed, " `StopTime`='" . $_REQUEST["StopTime"] . "'");
-        if(isset($_REQUEST["Active"]) and !empty($_REQUEST["Active"]))
-            array_push($changed, " `Active`=" . $_REQUEST["Active"] . " ");
+        // Start Insert statement
+        $query .= " INSERT INTO Event ";
+        $query .= " (`" . join('`, `', $eventfields) . "`)";
         
+        // Add all eventfields (if this is a new event)
+        $fields = array();
+        foreach($eventfields as $field) {
+            if(isset($_REQUEST[$field])) {
+                 array_push($fields, "'$_REQUEST[$field]'");
+            } else {
+                 array_push($fields, "''");
+            }
+        }
+        $query .= " VALUES (" .join(',', $fields). ")";
+        
+        // Update existing event if that's the case
+        $query .= " ON DUPLICATE KEY UPDATE ";
+        $changed = array();
+        foreach($eventfields_updatable as $field) {
+            if(isset($_REQUEST[$field])) {
+                 array_push($changed, " `$field`='$_REQUEST[$field]'");
+            }
+        }
         $query .= join(',', $changed);
     } else if($_REQUEST["type"] == 'rumor') {
         $query .= " UPDATE Rumor";
@@ -39,9 +54,9 @@
             array_push($changed, " `StopTime`='" . $_REQUEST["StopTime"] . "'");
         
         $query .= join(',', $changed);
+        
+        $query .= " WHERE ID=" . $_REQUEST["ID"];
     }
-    
-    $query .= " WHERE ID=" . $_REQUEST["id"];
 
     echo $query;
 
