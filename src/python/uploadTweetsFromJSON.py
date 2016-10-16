@@ -29,9 +29,9 @@ queries = {
                  "VALUES (%(Event)s, %(Rumor)s, %(Superset)s, %(Feature)s, %(Match)s, %(Notes)s) "),
     'add_tweet': ("INSERT INTO Tweet "
                 "(ID, Timestamp, Lang, Text, TextStripped, `Distinct`, "
-                "    Type, Source, ParentID, ParentText, ExpandedURL, MediaURL) "
+                "    Type, Source, ParentID, ExpandedURL, MediaURL) "
                 "VALUES (%(ID)s, %(Timestamp)s, %(Lang)s, %(Text)s, %(TextStripped)s, %(Distinct)s, "
-                "    %(Type)s, %(Source)s, %(ParentID)s, %(ParentText)s, %(ExpandedURL)s, %(MediaURL)s) "
+                "    %(Type)s, %(Source)s, %(ParentID)s, %(ExpandedURL)s, %(MediaURL)s) "
                 "ON DUPLICATE KEY UPDATE "
                 "    Type = %(Type)s, "
                 "    `Distinct` = %(Distinct)s "),

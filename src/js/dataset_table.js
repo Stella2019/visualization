@@ -1091,6 +1091,26 @@ StatusReport.prototype = {
             .attr('class', 'btn btn-default new-collection-button')
             .text('Add Tweets to Subset')
             .on('click', triggers.emitter('alert', 'Sorry this button doesn\'t work yet'));
+        
+        div.append('button')
+            .attr('id', 'tweet-transfer')
+            .attr('class', 'btn btn-default new-collection-button')
+            .text('Transfer Tweets')
+            .on('click', this.transferTweets.bind(this));
+    },
+    transferTweets: function () {
+        
+        var connection = new Connection({
+            url: 'tweets/transferTweets',
+            post: {},
+            min : 0, 
+            max: 1000,
+            quantity: 'count',
+            progress_text: '{cur} / {max}',
+            on_chunk_finish: function(d) { console.log(d); }
+        });
+        
+        connection.startStream();
     }
 };
 

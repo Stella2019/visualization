@@ -900,7 +900,7 @@ standardConnections = {
             conns.push(conn);
         }
         
-        return conns
+        return conns;
     }
 };
 
