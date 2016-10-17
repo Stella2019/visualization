@@ -20,7 +20,7 @@ function StatusReport() {
     this.quantities = ['Tweets', 'DistinctTweets', 
                        'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
                        'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
-                       'Minutes'];
+                       'Minutes', 'Users'];
 }
 StatusReport.prototype = {
     init: function() {
@@ -306,7 +306,8 @@ StatusReport.prototype = {
             
             ['Tweets', 'DistinctTweets', 
               'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
-              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 'Minutes'].forEach(function(count) {
+              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
+              'Minutes', 'Users'].forEach(function(count) {
                 d[count] = d3.sum(children, function(e) { return e[count] || 0; });
             });
             
@@ -324,7 +325,8 @@ StatusReport.prototype = {
         this.event_types_arr.forEach(function(d) {
             ['Tweets', 'DistinctTweets', 
               'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
-              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 'Minutes'].forEach(function(count) {
+              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
+              'Minutes', 'Users'].forEach(function(count) {
                 d[count] = d3.sum(d.children, function(e) { return e[count] || 0; });
             });
             
@@ -346,7 +348,7 @@ StatusReport.prototype = {
         
         var orders = ['ID', 'Collection', 'Tweets', 
                       'Originals', 'Retweets', 'Replies', 'Quotes', 
-                      'First Tweet', 'Last Tweet', 'Minutes'];
+                      'First Tweet', 'Last Tweet', 'Minutes', 'Users'];
         this.ops['Columns'] = {
             Distinct: new Option({
                 title: 'Distinct?',
@@ -460,7 +462,7 @@ StatusReport.prototype = {
     buildTable: function() {
         var columns = ['ID', 'Collection',
                        'Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes', 
-                       'First Tweet', 'Last Tweet', 'Minutes', 
+                       'First Tweet', 'Last Tweet', 'Minutes',  'Users',
                        'Open'];// <span class="glyphicon glyphicon-new-window"></span>
         
         d3.select('#table-container').selectAll('*').remove();
@@ -668,6 +670,12 @@ StatusReport.prototype = {
             .attr('class', 'cell-minutes cell-count');
         minute_cells.append('span').attr('class', 'value');
         
+        var user_cells = table_body.selectAll('tr')
+            .append('td')
+            .append('div')
+            .attr('class', 'cell-users cell-count');
+        user_cells.append('span').attr('class', 'value');
+        
 //        table_body.selectAll('.row_type .cell-minutes, .row_feature .cell-minutes').append('span') // hidden one to help alignment
 //            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
         table_body.selectAll('.row_type .cell-minutes, .row_rumor .cell-minutes, .row_feature .cell-minutes').append('span') // hidden one to help alignment
@@ -675,6 +683,12 @@ StatusReport.prototype = {
         table_body.selectAll('.row_event .cell-minutes, .row_subset .cell-minutes').append('span')
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
             .on('click', this.computeTimeseries.bind(this));
+        
+        table_body.selectAll('.row_type .cell-users, .row_rumor .cell-users, .row_feature .cell-users, .row_subset .cell-users').append('span') // hidden one to help alignment
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
+        table_body.selectAll('.row_event .cell-users').append('span')
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
+            .on('click', this.computeUsers.bind(this));
         
         // Buttons
         table_body.selectAll('tr')
@@ -831,7 +845,7 @@ StatusReport.prototype = {
                         start = parseInt(start.replace(/ /g, ''));
                     }
                 }
-                var interpol = d3.interpolate(start || 0, d.Minutes || 0);
+                var interpol = d3.interpolate(start || 0, d['Minutes'] || 0);
 
                 return function (value) {
                     if(typeof(value) == 'string') {
@@ -847,6 +861,26 @@ StatusReport.prototype = {
                     } else {
                         this.textContent = util.formatThousands(value);
                     }
+                };
+            });
+        
+        // Users
+        table_body.selectAll(".cell-users .value")
+            .transition()
+            .duration(1000)
+            .tween("text", function (d) {
+                var start = this.textContent;
+                if(typeof(start) == 'string') {
+                    start = parseInt(start.replace(/ /g, ''));
+                }
+                var interpol = d3.interpolate(start || 0, d['Users'] || 0);
+
+                return function (value) {
+                    if(typeof(value) == 'string') {
+                        value = parseInt(value.replace(/ /g, ''));
+                    }
+                    value = Math.round(interpol(value));
+                    this.textContent = util.formatThousands(value);
                 };
             });
         
@@ -1034,6 +1068,31 @@ StatusReport.prototype = {
             progress_style: 'full',
             on_chunk_finish: function(result) {
                 d['Minutes'] = parseInt(result[0]['Minutes']);
+                
+                triggers.emit('update_counts', row);
+            }
+        }
+        
+        var conn = new Connection(args);
+        conn.startStream();
+    },
+    computeUsers: function(d) {
+        var row = '.row_' + (d.Level == 1 ? 'event' : 'subset') + '_' + d.ID;
+        var args = {
+            url: 'analysis/computeUsers',
+            post: {
+                Collection: d.Level == 1 ? 'Event' : 'Subset',
+                ID: d.ID,
+                json: true,
+            },
+            quantity: 'tweet',
+            min: d.FirstTweet,
+            max: d.LastTweet,
+            progress_div: row + ' .cell-users',
+            progress_text: ' ',
+            progress_style: 'full',
+            on_chunk_finish: function(result) {
+                d['Users'] = parseInt(result[0]['Users']);
                 
                 triggers.emit('update_counts', row);
             }
