@@ -793,8 +793,7 @@ Connection.prototype = {
         this.chunk_index = this.chunk_index + 1;
         this.startChunk();
     },
-    chunk_failure: function (a, b, c) {
-        console.error(a, b, c);
+    chunk_failure: function (error, status, statusText) {
         triggers.emit('alert', this.failure_msg);
         this.progress.end();
     },
