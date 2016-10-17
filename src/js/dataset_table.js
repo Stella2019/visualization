@@ -1088,6 +1088,7 @@ StatusReport.prototype = {
             quantity: 'tweet',
             min: d.FirstTweet,
             max: d.LastTweet,
+            resolution: 0.25,
             progress_div: row + ' .cell-users',
             progress_text: ' ',
             progress_style: 'full',
