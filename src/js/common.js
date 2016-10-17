@@ -580,7 +580,7 @@ function Connection(args) {
                           'progress_div', 'progress_text', 'progress_style',
                           'quantity', 'min', 'max',
                           'failure_msg',
-                          'on_chunk_finish', 'on_finish']
+                          'on_chunk_finish', 'on_finish', 'on_timeout']
 
     // Save args  
     if(args) {
@@ -612,6 +612,11 @@ function Connection(args) {
     this.failure_msg     = this.failure_msg     || 'Problem with data stream';
     this.on_chunk_finish = this.on_chunk_finish || function () {};
     this.on_finish       = this.on_finish       || function () {};
+    this.on_timeout      = this.on_timeout      || function (errorMsg) {
+        console.error('Timeout', errorMsg, this.post);
+        triggers.emit('alert', 'Timeout. Check console error log for details.');
+        this.progress.end();
+    }.bind(this);
     
     // Convert min & max to dates if they are inputted as tweets
     if(this.quantity != 'count') {
@@ -794,9 +799,13 @@ Connection.prototype = {
         this.startChunk();
     },
     chunk_failure: function (error, status, statusText) {
-        console.error('Error in PHP request', statusText, this.post, error, status);
-        triggers.emit('alert', this.failure_msg);
-        this.progress.end();
+        if(error.includes('Maximum execution time') || error.includes('Gateway Time-out')) {
+            this.on_timeout(error);
+        } else {
+            console.error('Error in PHP request', statusText, this.post, error, status);
+            triggers.emit('alert', this.failure_msg);
+            this.progress.end();
+        }
     },
     stop: function() {
         this.chunk_index = -100;

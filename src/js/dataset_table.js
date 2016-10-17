@@ -684,9 +684,9 @@ StatusReport.prototype = {
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
             .on('click', this.computeTimeseries.bind(this));
         
-        table_body.selectAll('.row_type .cell-users, .row_rumor .cell-users, .row_feature .cell-users, .row_subset .cell-users').append('span') // hidden one to help alignment
+        table_body.selectAll('.row_type .cell-users, .row_rumor .cell-users, .row_feature .cell-users').append('span') // hidden one to help alignment
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
-        table_body.selectAll('.row_event .cell-users').append('span')
+        table_body.selectAll('.row_event .cell-users, .row_subset .cell-users').append('span')
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
             .on('click', this.computeUsers.bind(this));
         
@@ -1086,9 +1086,9 @@ StatusReport.prototype = {
                 json: true,
             },
             quantity: 'tweet',
-            min: d.FirstTweet,
+            min: new BigNumber("690677822923370496"),//d.FirstTweet,
             max: d.LastTweet,
-            resolution: 0.25,
+            resolution: 0.1, //0.25
             progress_div: row + ' .cell-users',
             progress_text: ' ',
             progress_style: 'full',
