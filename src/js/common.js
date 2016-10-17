@@ -794,6 +794,7 @@ Connection.prototype = {
         this.startChunk();
     },
     chunk_failure: function (error, status, statusText) {
+        console.error('Error in PHP request', statusText, this.post, error, status);
         triggers.emit('alert', this.failure_msg);
         this.progress.end();
     },
