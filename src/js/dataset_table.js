@@ -1077,6 +1077,18 @@ StatusReport.prototype = {
         conn.startStream();
     },
     computeUsers: function(d) {
+        var conn = this.connection.phpjson(
+            'analysis/getUserLastCounted',
+            {
+                Collection: d.Level == 1 ? 'Event' : 'Subset',
+                ID: d.ID,
+            },
+            this.computeUserStream.bind(this, d)
+        );
+    },
+    computeUserStream: function(d, lastTweet) {
+        var firstTweet = lastTweet && lastTweet['MAX(LastTweetID)'] ? BigNumber(lastTweet['MAX(LastTweetID)']) : d.FirstTweet;
+        
         var row = '.row_' + (d.Level == 1 ? 'event' : 'subset') + '_' + d.ID;
         var args = {
             url: 'analysis/computeUsers',
@@ -1086,9 +1098,9 @@ StatusReport.prototype = {
                 json: true,
             },
             quantity: 'tweet',
-            min: new BigNumber("690677822923370496"),//d.FirstTweet,
+            min: firstTweet,
             max: d.LastTweet,
-            resolution: 0.1, //0.25
+            resolution: 0.05, //0.25
             progress_div: row + ' .cell-users',
             progress_text: ' ',
             progress_style: 'full',

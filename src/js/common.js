@@ -662,7 +662,7 @@ Connection.prototype = {
             try {
                 json_data = JSON.parse(raw_data);
             } catch(err) {
-                console.error('JSON parsing error for ' + url, fields, err);
+                console.error('JSON parsing error for ' + url, fields, err, raw_data);
                 error_callback(raw_data);
                 return;
             }
