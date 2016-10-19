@@ -1087,7 +1087,7 @@ StatusReport.prototype = {
         );
     },
     computeUserStream: function(d, lastTweet) {
-        var firstTweet = lastTweet && lastTweet['MAX(LastTweetID)'] ? BigNumber(lastTweet['MAX(LastTweetID)']) : d.FirstTweet;
+        var firstTweet = lastTweet != undefined && lastTweet[0] && 'MAX(LastTweetID)' in lastTweet[0] ? new BigNumber(lastTweet[0]['MAX(LastTweetID)']) : d.FirstTweet;
         
         var row = '.row_' + (d.Level == 1 ? 'event' : 'subset') + '_' + d.ID;
         var args = {
