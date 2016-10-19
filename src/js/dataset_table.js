@@ -1100,7 +1100,7 @@ StatusReport.prototype = {
             quantity: 'tweet',
             min: firstTweet,
             max: d.LastTweet,
-            resolution: 0.05, //0.25
+            resolution: 0.25,
             progress_div: row + ' .cell-users',
             progress_text: ' ',
             progress_style: 'full',
@@ -1110,6 +1110,7 @@ StatusReport.prototype = {
                 triggers.emit('update_counts', row);
             }
         }
+        console.debug(lastTweet, args);
         
         var conn = new Connection(args);
         conn.startStream();
