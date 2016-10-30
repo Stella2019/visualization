@@ -39,7 +39,7 @@
     $query .= join(", " , $projection);
 
     // Joins
-    $query .= " FROM TweetIn$collection TweetSet " .
+    $query .= " FROM TweetIn{$collection} TweetSet " .
         "LEFT JOIN Tweet ON Tweet.ID = TweetSet.Tweet ";
     if(isset($_REQUEST["extradata"]) and strpos($_REQUEST["extradata"], 'u') !== false) {
         $query .= "LEFT JOIN TweetUser ON TweetUser.Tweet = TweetSet.Tweet ";
@@ -50,7 +50,7 @@
 
     // Add conditionals
     $conds = array();
-    $conds[] = "TweetSet.$collection=$collection_id ";
+    $conds[] = "TweetSet.${collection}=${collection_id} ";
     if(isset($_REQUEST["tweet_min"]))
         $conds[] = "Tweet.ID >= " . $_REQUEST["tweet_min"] . " ";
     if(isset($_REQUEST["tweet_max"]))

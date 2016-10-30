@@ -100,7 +100,7 @@ TimeseriesModel.prototype = {
             url: 'timeseries/get',
             post: {
                 collection: type,
-                id: id
+                collection_id: id
             },
             quantity: 'time',
             min: new Date(this.app.ops['Dataset']['Time Min'].date),

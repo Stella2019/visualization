@@ -90,3 +90,8 @@ th:hover .glyphicon-hiddenclick {
 .new-collection-button {
     margin: 10px;
 }
+
+#contextMenu {
+  position: absolute;
+  display:none;
+}

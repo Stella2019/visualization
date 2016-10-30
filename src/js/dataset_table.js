@@ -1,8 +1,9 @@
-function StatusReport() {
+function DatasetTable() {
     this.connection = new Connection();
     this.ops = new Options(this);
     this.dataset = new CollectionManager(this, {name: 'dataset', flag_sidebar: false});
     this.tooltip = new Tooltip();
+    this.contextmenu = new ContextMenu();
     this.modal = new Modal();
     
     this.hierarchy = ['Event Type', 'Event', 'Rumor', 'Feature', 'Subset'];
@@ -22,11 +23,12 @@ function StatusReport() {
                        'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
                        'Minutes', 'Users'];
 }
-StatusReport.prototype = {
+DatasetTable.prototype = {
     init: function() {
         this.setTriggers();
         this.getData();
         this.tooltip.init();
+        this.contextmenu.init();
     },
     setTriggers: function() {
         triggers.on('sort_elements', function() { this.clickSort(false, 'maintain_direction'); }.bind(this));
@@ -522,6 +524,48 @@ StatusReport.prototype = {
             });
         })
         
+        // Add right click context menu to event & subset rows
+        this.contextmenu.attach('.row_event, .row_subset', function(set) {
+            var collectionType = (set.Level == 1 ? 'Event' : 'Subset')
+            var countText_Tweets = set.Tweets ? 'Recount' : 'Count';
+            var countText_Timeseries = set.Minutes ? 'Recount' : 'Count';
+            var countText_Users = set.Users ? 'Recount' : 'Count';
+            
+            var menu_options = [{
+                label: collectionType + ' ' + set.ID
+            },{
+                label: '<span class="glyphicon glyphicon-edit"></span> Edit',
+                action: this.edit.bind(this, set)
+            },{
+                divider: true
+            },{
+//            },{
+//                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Tweets + ' Tweets',
+//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
+//            },{
+//                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Timeseries + ' Timeseries',
+//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
+//            },{
+//                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Users + ' Users',
+//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
+//            },{
+//                divider: true
+            },{
+                label: '<span class="glyphicon glyphicon-download-alt"></span> Tweets',
+                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'tweets')
+            },{
+                label: '<span class="glyphicon glyphicon-download-alt"></span> Timeseries',
+                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'timeseries')
+            },{
+                label: '<span class="glyphicon glyphicon-download-alt"></span> Users',
+                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'users')
+            },{
+                label: '<span class="glyphicon glyphicon-download-alt"></span> Users + Details',
+                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'users_details')
+            },];
+            return menu_options;
+        }.bind(this));
+        
         // ID & Label
         table_body.selectAll('tr')
             .append('td')
@@ -549,6 +593,7 @@ StatusReport.prototype = {
             .attr('class', 'glyphicon glyphicon-chervon-left glyphicon-hiddenclick')
             .style('margin-left', '0px');
         
+        // Add tool tips
         this.tooltip.attach('.cell-label', function(set) {
             if(set['Level'] == 0) {
                 return {
@@ -1183,12 +1228,88 @@ StatusReport.prototype = {
         });
         
         connection.startStream();
-    }
+    },
+    fetchDataToDownload: function(collectionType, collectionID, dataType) {
+        
+        var url = dataType == 'tweets' ? 'tweets/get' :
+                  dataType == 'timeseries' ? 'timeseries/get' :
+                  dataType == 'users' ? 'tweets/getUsers' : 'tweets/getUsers';
+        var post = {
+            collection: collectionType,
+            collection_id: collectionID,
+            csv: true,
+            limit: 100000,
+        };
+        if(dataType == 'users_details')
+            post.extradata = 'u';
+        if(dataType == 'users_details')
+            post.extradata = 'u';
+        
+        var fileName = dataType + '_' + collectionType + '_' + collectionID + '.csv';
+        
+        this.connection.php(url, post, 
+                            this.handleDataForDownload.bind(this, fileName),
+                            triggers.emitter('alert','Unable to retreive tweets'));
+    },
+    handleDataForDownload: function(fileName, stringData) {
+        console.log(stringData);
+        var data = d3.csv.parse(stringData);
+        
+        // Distinct checker, ignored for now
+//        var tweet_text_unique = new Set();
+//        var tweets_unique = [];
+        
+        data.forEach(function(datum) {
+            if('Text' in datum)
+                datum.Text = datum.Text.replace(/(?:\r\n|\r|\n)/g, ' ');
+            if('Description' in datum)
+                datum.Description = datum.Description.replace(/(?:\r\n|\r|\n)/g, ' ');
+//            var text_no_url = tweet.Text.replace(/(?:http\S+)/g, ' ');
+//            
+//            if(tweet_text_unique.has(text_no_url)) {
+//                tweet.Distinct = 0;
+//            } else {
+//                tweet_text_unique.add(text_no_url);
+//                if(tweets_unique.length < 100) {
+//                    tweets_unique.push(tweet);
+//                }
+//            }
+        });
+        
+        this.download(d3.csv.format(data), fileName, 'text/csv');
+    },
+    download: function(content, fileName, mimeType) {
+        var a = document.createElement('a');
+        var fileName = fileName || 'data.csv';
+        var mimeType = mimeType || 'text/csv'; // 'application/octet-stream';
+
+        if (navigator.msSaveBlob) { // IE10
+            return navigator.msSaveBlob(new Blob([content], { type: mimeType }), fileName);
+        } else if ('download' in a) { //html5 A[download]
+            a.href = 'data:' + mimeType + ',' + encodeURIComponent(content);
+            a.setAttribute('download', fileName);
+            document.body.appendChild(a);
+            setTimeout(function() {
+                a.click();
+                document.body.removeChild(a);
+            }, 66);
+            return true;
+        } else { //do iframe dataURL download (old ch+FF):
+            var f = document.createElement('iframe');
+            document.body.appendChild(f);
+            f.src = 'data:' + mimeType + ',' + encodeURIComponent(content);
+
+            setTimeout(function() {
+                document.body.removeChild(f);
+            }, 333);
+            return true;
+        }
+    },
 };
 
 function initialize() {
-    SR = new StatusReport();
+    DT = new DatasetTable();
     
-    SR.init();
+    DT.init();
 }
 window.onload = initialize;

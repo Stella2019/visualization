@@ -96,7 +96,7 @@ function CollectionManager(app, args) {
             {label: 'ID',                 name: 'ID',          type: 'Text',     final: true},
             {label: 'Event Type',         name: 'Type',        type: 'Enum',     list: function() {
                  // Hack only used by dataset_table.js
-                return SR.event_types_arr.map(d => {
+                return DT.event_types_arr.map(d => {
                     return {label: d.Label, value: d.Label};
                 });
             }},
@@ -117,7 +117,7 @@ function CollectionManager(app, args) {
             {label: 'ID',       name: 'ID',       type: 'Text',     final: true},
             {label: 'Event',    name: 'Event',    type: 'Enum',     list: function() {
                 // Hack only used by dataset_table.js
-                var list = SR.events_arr.map(d => {
+                var list = DT.events_arr.map(d => {
                     return {label: d.Label + ' (' + d.ID + ')', value: d.ID};
                 });
                 list.unshift({label: 'No Event (0)', value: 0});
@@ -125,15 +125,15 @@ function CollectionManager(app, args) {
             }},
             {label: 'Rumor',    name: 'Rumor',    type: 'Enum',     list: function() {
                 // Hack only used by dataset_table.js
-                var list = SR.rumors_arr.map(d => {
+                var list = DT.rumors_arr.map(d => {
                     return {label: d.Label + ' (' + d.ID + ')', value: d.ID};
                 });
                 list.unshift({label: 'No Rumor (0)', value: 0});
                 return list;
             }},
             {label: 'Superset', name: 'Superset', type: 'Enum',     list: function() {
-                 // Hack only used by dataset_table.js
-                var list = SR.subsets_arr.map(d => {
+                 // Hack DT used by dataset_table.js
+                var list = DT.subsets_arr.map(d => {
                     return {label: d.FeatureMatch + ' (' + d.ID + ')', value: d.ID};
                 });
                 list.unshift({label: 'No Superset (0)', value: 0});
@@ -141,7 +141,7 @@ function CollectionManager(app, args) {
             }},
             {label: 'Feature',  name: 'Feature', type: 'Enum',     list: function() {
                  // Hack only used by dataset_table.js
-                return util.lunique(SR.features_arr.map(d => d.Label))
+                return util.lunique(DT.features_arr.map(d => d.Label))
                     .map(d => {
                         return {label: d, value: d};
                     });
@@ -925,9 +925,9 @@ CollectionManager.prototype = {
         if(state == 'new') {
             collection_object = util.copyObject(this.blank_collection[collection_type]);
             if(collection_type == '') {
-                collection_object.ID = d3.min(SR.events_arr, d => d.ID) - 1;
+                collection_object.ID = d3.min(DT.events_arr, d => d.ID) - 1;
             } else {
-                collection_object.ID = d3.max(SR.subsets_arr, d => d.ID) + 1;
+                collection_object.ID = d3.max(DT.subsets_arr, d => d.ID) + 1;
             }
         } else if(!collection_object || !('ID' in collection_object)) {
             triggers.emit('alert', 'No information');
@@ -1145,9 +1145,9 @@ CollectionManager.prototype = {
             console.log('Editing Event, should update rumors & subsets');
             var event_id = document.getElementById('collection_edit_Event').value;
             var rumor_id = document.getElementById('collection_edit_Rumor').value;
-            var event = event_id ? SR.events[event_id] : SR;
+            var event = event_id ? DT.events[event_id] : SR;
             var addRumorLabelToSubsetName = event_id != "" && rumor_id == "";
-            var subset_list = event_id == "" ? SR.subsets_arr :
+            var subset_list = event_id == "" ? DT.subsets_arr :
                               rumor_id != "" ? event.rumors[rumor_id].subsets_arr : event.subsets_arr;
             
             if(field.label == 'Event') {

@@ -985,6 +985,109 @@ Tooltip.prototype = {
     }
 };
 
+function ContextMenu() {
+    this.div = {};
+    this.info = {};
+    this.data = [];
+}
+ContextMenu.prototype = {
+    init: function() {
+        this.div = d3.select('body')
+            .append('div')
+            .attr('id', 'context-menu')
+            .attr('class', 'tooltip dropdown clearfix')
+            .style('pointer-events', 'auto')
+            .style('display', 'none')
+            .on('mouseover', function() {
+                d3.event.stopPropagation();
+            })
+            .on('mousemove', function() {
+                d3.event.stopPropagation();
+            })
+            .on('mouseout', function() {
+                d3.event.stopPropagation();
+            }); // menu frame
+    },
+    setData: function(options) {
+        // Add close option
+        options.push({divider: true});
+        options.push({
+            label: '<span class="glyphicon glyphicon-remove"></span> Close',
+            action: this.off.bind(this)
+        });
+        
+        // Clear & set new parameters
+        this.data = options;
+        this.div.selectAll('*').remove();
+
+        var list = this.div.append('ul')
+            .attr({
+                role: 'menu',
+                class: "dropdown-menu",
+                'aria-labelledby': "dropdownMenu"
+            })
+            .style({
+                display: 'block',
+                'margin-bottom': '5px',
+                'font-size': '1em'
+            });
+        
+        list.selectAll('li')
+            .data(options)
+            .enter().append('li')
+            .attr('class', option => option.divider ? 'divider' : 'menu-action');
+        
+        list.selectAll('li.menu-action')
+            .append('a')
+            .attr('tabindex', -1)
+            .style('cursor', 'pointer')
+            .html(option => option.label)
+            .on('click', function(option) {
+                d3.event.stopPropagation();
+                if(option.action) {
+                    option.action();
+//                    this.off(); // automatically close it?
+                }
+            }.bind(this));
+    },
+    on: function() {
+        this.div
+            .transition(200)
+            .style('opacity', 1)
+            .style('display', 'block');
+    },
+    move: function(x, y) {
+        var height = parseInt(this.div.style('height'));
+        var pageHeight = document.documentElement.clientHeight;
+        if(y + height > pageHeight) {
+            y += pageHeight - (y + height)
+        }
+        
+        this.div
+            .style({
+                left: x + 20 + "px",
+                top: y + "px"
+            });
+    },
+    off: function() {
+        this.div
+            .transition(200)
+            .style('opacity', 0)
+            .each('end', function(d) { 
+                d3.select(this).style('display', 'none');
+        });
+    },
+    attach: function(id, data_transform) {
+        d3.selectAll(id)
+            .on('contextmenu', function(data) {
+                this.setData(data_transform(data))
+                this.move(d3.event.x, d3.event.y);
+                this.on();
+                d3.event.preventDefault();
+            }.bind(this));
+    }
+};
+
 triggers = {
     verbose: false,
     events: {},
