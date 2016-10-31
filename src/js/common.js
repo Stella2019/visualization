@@ -633,6 +633,8 @@ function Connection(args) {
         } else if(this.max instanceof BigNumber) {
             this.max = util.twitterID2Timestamp(this.max.toNumber());
         }
+        // Add one more tick to max so we can get the last #
+        this.max.setMinutes(this.max.getMinutes() + 60 * this.resolution)
     }
 }
 Connection.prototype = {
@@ -739,6 +741,8 @@ Connection.prototype = {
             // End prematurely
             this.progress.end();
             return;
+        } else if (this.chunk_index == this.chunks.length - 2) { // This is the LAST chunk
+            this.post['inclusive_max'] = true;
         }
 
         // Define what it's loading
@@ -799,10 +803,10 @@ Connection.prototype = {
         this.startChunk();
     },
     chunk_failure: function (error, status, statusText) {
-        if(error.includes('Maximum execution time') || error.includes('Gateway Time-out')) {
+        if(error && error.includes && (error.includes('Maximum execution time') || error.includes('Gateway Time-out'))) {
             this.on_timeout(error);
         } else {
-            console.error('Error in PHP request', statusText, this.post, error, status);
+            console.error('Error in PHP request', statusText, this.url, this.post, error, status);
             triggers.emit('alert', this.failure_msg);
             this.progress.end();
         }

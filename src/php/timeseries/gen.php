@@ -7,6 +7,7 @@
     $event_id = $_POST["event_id"];
     $time_min = $_POST["time_min"];
     $time_max = $_POST["time_max"];
+    $lt = (isset($_REQUEST["inclusive_max"]) ? '<=' : '<');
     if(isset($_POST["rumor_id"])) {
         $collection_id = $_POST["rumor_id"];
         $collection_type = 'Rumor';                    
@@ -45,7 +46,7 @@
         "        ON TinC.Tweet_ID = Tweet.ID " .
         "        AND TinC." . $collection_type . "_ID = " . $collection_id . " " .
         "    WHERE Tweet.Timestamp >= '" . $time_min . "' " .
-        "        AND Tweet.Timestamp < '" . $time_max . "' ";
+        "        AND Tweet.Timestamp $lt '" . $time_max . "' ";
 
     if($collection_type != 'Rumor') {
         foreach(explode(',', $search_text) as $term) {

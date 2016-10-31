@@ -23,10 +23,11 @@
 
     // Add conditionals
     $conds = array();
+    $lt = (isset($_REQUEST["inclusive_max"]) ? '<=' : '<');
     if(isset($_REQUEST["time_min"]))
         $conds[] = "Tweet.Timestamp >= '" . $_REQUEST["time_min"] . "'";
     if(isset($_REQUEST["time_max"]))
-        $conds[] = "Tweet.Timestamp < '" . $_REQUEST["time_max"] . "'";
+        $conds[] = "Tweet.Timestamp $lt '" . $_REQUEST["time_max"] . "'";
     if(isset($_REQUEST["type"]))
         $conds[] = "Tweet.Type IN ('" . $_REQUEST["type"] . "')";
     if(isset($_REQUEST["distinct"]))

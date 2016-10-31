@@ -8,7 +8,7 @@
     $subset = $_REQUEST['subset'];
     $tweet_min = $_REQUEST['tweet_min'];
     $tweet_max = $_REQUEST['tweet_max'];
-
+    $lt = (isset($_REQUEST["inclusive_max"]) ? '<=' : '<');
 
     $query = "INSERT INTO UserSimple " .
         "(`Event`, `Subset`, `UserID`, `Screenname`, `Tweets`, `FirstTweet`, `LastTweet`) " .
@@ -34,7 +34,7 @@
     }
 
     $query .= "WHERE TweetUser.`Tweet` >= $tweet_min " .
-        "AND TweetUser.`Tweet` <  $tweet_max " .
+        "AND TweetUser.`Tweet` $lt $tweet_max " .
         "ON DUPLICATE KEY UPDATE " .
         "UserSimple.`LastTweet` = TweetUser.`Tweet`, " .
         "UserSimple.`Tweets` = UserSimple.`Tweets` + 1; ";

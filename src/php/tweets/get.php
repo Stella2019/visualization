@@ -51,14 +51,15 @@
     // Add conditionals
     $conds = array();
     $conds[] = "TweetSet.${collection}=${collection_id} ";
+    $lt = (isset($_REQUEST["inclusive_max"]) ? '<=' : '<');
     if(isset($_REQUEST["tweet_min"]))
         $conds[] = "Tweet.ID >= " . $_REQUEST["tweet_min"] . " ";
     if(isset($_REQUEST["tweet_max"]))
-        $conds[] = "Tweet.ID < " . $_REQUEST["tweet_max"] . " ";
+        $conds[] = "Tweet.ID $lt " . $_REQUEST["tweet_max"] . " ";
     if(isset($_REQUEST["time_min"]))
         $conds[] = "Tweet.Timestamp >= '" . $_REQUEST["time_min"] . "'";
     if(isset($_REQUEST["time_max"]))
-        $conds[] = "Tweet.Timestamp < '" . $_REQUEST["time_max"] . "'";
+        $conds[] = "Tweet.Timestamp $lt '" . $_REQUEST["time_max"] . "'";
     if(isset($_REQUEST["type"]))
         $conds[] = "Tweet.Type IN ('" . $_REQUEST["type"] . "')";
     if(isset($_REQUEST["distinct"]))

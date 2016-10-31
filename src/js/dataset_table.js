@@ -465,7 +465,7 @@ DatasetTable.prototype = {
         var columns = ['ID', 'Collection',
                        'Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes', 
                        'First Tweet', 'Last Tweet', 'Minutes',  'Users',
-                       'Open'];// <span class="glyphicon glyphicon-new-window"></span>
+                       /*'Open'*/];// <span class="glyphicon glyphicon-new-window"></span>
         
         d3.select('#table-container').selectAll('*').remove();
         var table = d3.select('#table-container')
@@ -502,22 +502,22 @@ DatasetTable.prototype = {
             event_type.events_arr.forEach(function(event) {
                 event.row = table_body.append('tr')
                     .data([event])
-                    .attr('class', function(d) { return 'row_event row_haschildren row_event_' + d.ID; });
+                    .attr('class', d => 'row_event row_haschildren row_event_' + d.ID);
                 
                 event.rumors_arr.forEach(function(rumor) {
                     rumor.row = table_body.append('tr')
                         .data([rumor])
-                        .attr('class', function(d) { return 'row_rumor row_haschildren row_rumor_' + d.ID; });
+                        .attr('class', d => 'row_rumor row_haschildren row_rumor_' + d.ID);
                     
                     rumor.features_arr.forEach(function(feature) {
                         feature.row = table_body.append('tr')
                             .data([feature])
-                            .attr('class', function(d) { return 'row_feature row_haschildren'; });
+                            .attr('class', d => 'row_feature row_haschildren');
 
                         feature.subsets_arr.forEach(function(subset) {
                             subset.row = table_body.append('tr')
                                 .data([subset])
-                                .attr('class', function(d) { return 'row_subset row_subset_' + d.ID; });
+                                .attr('class', d => 'row_subset row_subset_' + d.ID);
                         });
                     });
                 });
@@ -525,46 +525,7 @@ DatasetTable.prototype = {
         })
         
         // Add right click context menu to event & subset rows
-        this.contextmenu.attach('.row_event, .row_subset', function(set) {
-            var collectionType = (set.Level == 1 ? 'Event' : 'Subset')
-            var countText_Tweets = set.Tweets ? 'Recount' : 'Count';
-            var countText_Timeseries = set.Minutes ? 'Recount' : 'Count';
-            var countText_Users = set.Users ? 'Recount' : 'Count';
-            
-            var menu_options = [{
-                label: collectionType + ' ' + set.ID
-            },{
-                label: '<span class="glyphicon glyphicon-edit"></span> Edit',
-                action: this.edit.bind(this, set)
-            },{
-                divider: true
-            },{
-//            },{
-//                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Tweets + ' Tweets',
-//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
-//            },{
-//                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Timeseries + ' Timeseries',
-//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
-//            },{
-//                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Users + ' Users',
-//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
-//            },{
-//                divider: true
-            },{
-                label: '<span class="glyphicon glyphicon-download-alt"></span> Tweets',
-                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'tweets')
-            },{
-                label: '<span class="glyphicon glyphicon-download-alt"></span> Timeseries',
-                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'timeseries')
-            },{
-                label: '<span class="glyphicon glyphicon-download-alt"></span> Users',
-                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'users')
-            },{
-                label: '<span class="glyphicon glyphicon-download-alt"></span> Users + Details',
-                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'users_details')
-            },];
-            return menu_options;
-        }.bind(this));
+        this.contextmenu.attach('.row_event, .row_subset', this.prepareCollectionContextMenu.bind(this));
         
         // ID & Label
         table_body.selectAll('tr')
@@ -594,48 +555,7 @@ DatasetTable.prototype = {
             .style('margin-left', '0px');
         
         // Add tool tips
-        this.tooltip.attach('.cell-label', function(set) {
-            if(set['Level'] == 0) {
-                return {
-                    ID:           set['ID'],
-                    'Event Type': set['Label'],
-                    Events:       set['events_arr'] ? set['events_arr'].map(function(event) { return event['Label']; }) : null
-                }
-            } else if(set['Level'] == 1) {
-                return {
-                    ID:           set['ID'],
-                    Event:        set['Label'],
-                    'Event Type': set['Event Type']['Label'],
-                    Rumors:       set['rumors_arr'] ? set['rumors_arr'].map(function(event) { return event['Label']; }) : null
-                }
-            } else if(set['Level'] == 2) {
-                return {
-                    ID:           set['ID'],
-                    Rumor:        set['Label'],
-                    Event:        set['Event']['Label'],
-                    'Event Type': set['Event Type']['Label'],
-                    Features:     set['features_arr'] ? set['features_arr'].map(function(event) { return event['Label']; }) : null
-                }
-            } else if(set['Level'] == 3) {
-                return {
-                    ID:           set['ID'],
-                    Feature:      set['Label'],
-                    Rumor:        set['Rumor']['Label'],
-                    Event:        set['Event']['Label'],
-                    'Event Type': set['Event Type']['Label']
-                }
-            } else {
-                return {
-                    ID:           set['ID'],
-                    Match:        set['Match'],
-                    Feature:      set['Feature']['Label'],
-                    Rumor:        set['Rumor']['Label'],
-                    Event:        set['Event']['Label'],
-                    'Event Type': set['Event Type']['Label']
-                }
-            }
-        });
-        
+        this.tooltip.attach('.cell-label', this.prepareCollectionTooltip.bind(this));
         
         // Counts
         ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
@@ -736,14 +656,14 @@ DatasetTable.prototype = {
             .on('click', this.computeUsers.bind(this));
         
         // Buttons
-        table_body.selectAll('tr')
-            .append('td')
-            .attr('class', 'cell_options')
-        
-        table_body.selectAll('.row_event .cell_options, .row_subset .cell_options')
-            .append('span')
-            .attr('class', 'glyphicon glyphicon-edit glyphicon-hoverclick')
-            .on('click', this.edit.bind(this));
+//        table_body.selectAll('tr')
+//            .append('td')
+//            .attr('class', 'cell_options')
+//        
+//        table_body.selectAll('.row_event .cell_options, .row_subset .cell_options')
+//            .append('span')
+//            .attr('class', 'glyphicon glyphicon-edit glyphicon-hoverclick')
+//            .on('click', this.edit.bind(this));
 
 //        table_body.selectAll('.row_event .cell_options')
 //            .append('span')
@@ -766,6 +686,87 @@ DatasetTable.prototype = {
         
         // Set the counts
         triggers.emit('new_counts');
+    },
+    prepareCollectionContextMenu: function(set) { 
+        var collectionType = (set.Level == 1 ? 'Event' : 'Subset')
+        var countText_Tweets = set.Tweets ? 'Recount' : 'Count';
+        var countText_Timeseries = set.Minutes ? 'Recount' : 'Count';
+        var countText_Users = set.Users ? 'Recount' : 'Count';
+
+        var menu_options = [{
+                label: collectionType + ' ' + set.ID
+            },{
+                label: '<span class="glyphicon glyphicon-edit"></span> Edit',
+                action: this.edit.bind(this, set) // Gets the original db collection object, as opposed to our modified version
+            },{
+                divider: true
+            },{
+    //            },{
+    //                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Tweets + ' Tweets',
+    //                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
+    //            },{
+    //                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Timeseries + ' Timeseries',
+    //                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
+    //            },{
+    //                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Users + ' Users',
+    //                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
+    //            },{
+    //                divider: true
+            },{
+                label: '<span class="glyphicon glyphicon-download-alt"></span> Tweets',
+                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'tweets')
+            },{
+                label: '<span class="glyphicon glyphicon-download-alt"></span> Timeseries',
+                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'timeseries')
+            },{
+                label: '<span class="glyphicon glyphicon-download-alt"></span> Users',
+                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'users')
+            },{
+                label: '<span class="glyphicon glyphicon-download-alt"></span> Users + Details',
+                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'users_details')
+            }];
+        return menu_options;
+    },
+    prepareCollectionTooltip: function(collection) {
+        if(collection['Level'] == 0) {
+            return {
+                ID:           collection['ID'],
+                'Event Type': collection['Label'],
+                Events:       collection['events_arr'] ? collection['events_arr'].map(function(event) { return event['Label']; }) : null
+            }
+        } else if(collection['Level'] == 1) {
+            return {
+                ID:           collection['ID'],
+                Event:        collection['Label'],
+                'Event Type': collection['Event Type']['Label'],
+                Rumors:       collection['rumors_arr'] ? collection['rumors_arr'].map(function(event) { return event['Label']; }) : null
+            }
+        } else if(collection['Level'] == 2) {
+            return {
+                ID:           collection['ID'],
+                Rumor:        collection['Label'],
+                Event:        collection['Event']['Label'],
+                'Event Type': collection['Event Type']['Label'],
+                Features:     collection['features_arr'] ? collection['features_arr'].map(function(event) { return event['Label']; }) : null
+            }
+        } else if(collection['Level'] == 3) {
+            return {
+                ID:           collection['ID'],
+                Feature:      collection['Label'],
+                Rumor:        collection['Rumor']['Label'],
+                Event:        collection['Event']['Label'],
+                'Event Type': collection['Event Type']['Label']
+            }
+        } else {
+            return {
+                ID:           collection['ID'],
+                Match:        collection['Match'],
+                Feature:      collection['Feature']['Label'],
+                Rumor:        collection['Rumor']['Label'],
+                Event:        collection['Event']['Label'],
+                'Event Type': collection['Event Type']['Label']
+            }
+        }
     },
     setVisibility_children: function(d, show_children) {
         var list_op = this.ops['Rows']['Level ' + d.Level + ' Showing Children'];
@@ -931,13 +932,25 @@ DatasetTable.prototype = {
         
         triggers.emit('refresh_visibility');
     },
-    edit: function(d) {
-        console.log(d);
-        if(d.Level == 1) { // Event
-            this.dataset.event = d;
+    edit: function(collection) {
+        if(collection.Level == 1) { // Event
+            this.dataset.event = collection;
             triggers.emit('edit collection:open', 'event');
-        } else if(d.Level == 4) { // Subset
-            this.dataset.subset = d;
+        } else if(collection.Level == 4) { // Subset
+            // If the object is modified, change how some of the fields are handled
+            if('Event_ID' in collection) {
+                collection = {
+                    ID: collection.ID,
+                    Event: collection.Event.ID,
+                    Rumor: collection.Rumor.ID,
+                    Superset: collection.Superset,
+                    Feature: collection.Feature.Label,
+                    Match: collection.Match,
+                    Notes: collection.Notes
+                };
+            }
+            
+            this.dataset.subset = collection;
             triggers.emit('edit collection:open', 'subset');
         }
     },
