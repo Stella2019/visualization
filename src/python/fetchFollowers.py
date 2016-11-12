@@ -14,10 +14,12 @@ config_file = '../../local.conf'
 follower_list_cap = 20000
 
 # Data storage
-storage = False;
-cursor = False;
-twitter_api = False;
+storage = False
+cursor = False
+twitter_api = False
 users_to_fetch = []
+
+cancelled = False
 
 # Load server
 def main():
@@ -45,8 +47,8 @@ def iterateThroughFollowerList():
             print('Fetching Followers ({0: 5d}/{1: 5d}): {2:.0f}'.format(user_index, n_users, user_id))
             
             # Rate Limit
-            requests_needed = math.floor(user['Followers'] / 5000) + 1
-            while(checkRateLimit() < requests_needed):
+            requests_needed = min(math.floor(user['Followers'] / 5000) + 1, 5)
+            while(checkRateLimit() < requests_needed and not cancelled):
                 print('Rate Limited, waiting\t\t\t\t\t\t')
                 count_down(5)
             
@@ -76,9 +78,16 @@ def fetchUsersFollowers(user_id):
             print("Unauthorized (Error 401) - probably a protected user") # Rate limit error
             ids.append('<Protected>')
             return ids
+        if('404' in str(err)): # Unauthorized error
+            print("Not found (Error 404) - user has probably been deleted/removed") # Rate limit error
+            ids.append('<Removed>')
+            return ids
             
         print(err)
         count_down(1)
+    except KeyboardInterrupt:
+        cancelled = True
+        exit()
     return ids
 
 def submitFollowerListToStorage(user_id, follower_ids):
@@ -91,6 +100,9 @@ def submitFollowerListToStorage(user_id, follower_ids):
     elif(follower_ids[-1] == '<Protected>'):
         del follower_ids[-1]
         user_status = 'Protected'
+    elif(follower_ids[-1] == '<Removed>'):
+        del follower_ids[-1]
+        user_status = 'Removed'
     else:
         user_status = 'Retrieved'
         
@@ -120,11 +132,12 @@ def count_down(minutes):
     try:
         for i in range(minutes * 60,0,-1):
             time.sleep(1)
-            time_str = '\tTime until next request: {0:02.0f}:{1:05.0f}               \r'.format(math.floor(i/60), i%60)
+            time_str = '\tTime until next request: {0:02.0f}:{1:02.0f}               \r'.format(math.floor(i/60), i%60)
             sys.stdout.write(time_str + ' ')
             sys.stdout.flush()
     except KeyboardInterrupt:
         print('Cancelled')
+        cancelled = True
         exit()
     
 def exit():

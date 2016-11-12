@@ -326,10 +326,10 @@ def populateSubsets():
         subset['Feature'] = 'User.Verified'
         subset['Match'] = str(verified)
         subsets.append(subset.copy())
-    for verified in [1, 0]:
-        subset['Feature'] = 'Parent.User.Verified'
-        subset['Match'] = str(verified)
-        subsets.append(subset.copy())
+#    for verified in [1, 0]:
+#        subset['Feature'] = 'Parent.User.Verified'
+#        subset['Match'] = str(verified)
+#        subsets.append(subset.copy())
         
     return subsets # for external programs using this
     
