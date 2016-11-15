@@ -74,11 +74,11 @@ def fetchUsersFollowers(user_id):
             print(err) 
             count_down(wait_time)
             return fetchUsersFollowers(user_id)
-        if('401' in str(err)): # Unauthorized error
+        if('401' in str(err) or 'Not authorized' in str(err)): # Unauthorized error
             print("Unauthorized (Error 401) - probably a protected user") # Rate limit error
             ids.append('<Protected>')
             return ids
-        if('404' in str(err)): # Unauthorized error
+        if('404' in str(err) or 'does not exist' in str(err)): # Unauthorized error
             print("Not found (Error 404) - user has probably been deleted/removed") # Rate limit error
             ids.append('<Removed>')
             return ids
