@@ -664,11 +664,11 @@ DatasetTable.prototype = {
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
             .on('click', this.computeTimeseries.bind(this));
         
-        table_body.selectAll('.row_type .cell-Users, .row_rumor .cell-Users, .row_feature .cell-Users').append('span') // hidden one to help alignment
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
-        table_body.selectAll('.row_event .cell-Users, .row_subset .cell-Users').append('span')
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
-            .on('click', this.computeUsers.bind(this));
+//        table_body.selectAll('.row_type .cell-Users, .row_rumor .cell-Users, .row_feature .cell-Users').append('span') // hidden one to help alignment
+//            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
+//        table_body.selectAll('.row_event .cell-Users, .row_subset .cell-Users').append('span')
+//            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
+//            .on('click', this.computeUsers.bind(this));
         
         // Set initial visibility
         this.event_types_arr.forEach(function(d) { 
@@ -692,18 +692,28 @@ DatasetTable.prototype = {
                 action: this.edit.bind(this, set) // Gets the original db collection object, as opposed to our modified version
             },{
                 divider: true
+//            },{
+//                label: '<span class="glyphicon glyphicon-refresh"></span> Make Tweet List',
+//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
             },{
-    //            },{
-    //                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Tweets + ' Tweets',
-    //                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
-    //            },{
-    //                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Timeseries + ' Timeseries',
-    //                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
-    //            },{
-    //                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Users + ' Users',
-    //                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
-    //            },{
-    //                divider: true
+                label: '<span class="glyphicon glyphicon-signal"></span> Make Timeseries',
+                action: this.computeTimeseries.bind(this, set)
+            },{
+                label: '<span class="glyphicon glyphicon-signal"></span> Make User List',
+                action: this.computeUsers.bind(this, set)
+//            },{
+//                divider: true
+//            },{
+//                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Tweets + ' Tweets',
+//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
+//            },{
+//                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Timeseries + ' Timeseries',
+//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
+            },{
+                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Users + ' Users',
+                action:  this.countUsers.bind(this, set)
+            },{
+                divider: true
             },{
                 label: '<span class="glyphicon glyphicon-download-alt"></span> Tweets',
                 action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'tweets')
@@ -784,7 +794,7 @@ DatasetTable.prototype = {
         this.ops.recordState(false);
 
         // Set the chevron to point the right direction
-        d.row.select('.cell-label .glyphicon')
+        d.row.select('.cell-Collection .glyphicon')
             .classed('glyphicon-chevron-down', show_children)
             .classed('glyphicon-chevron-left', !show_children);
         
@@ -1134,7 +1144,7 @@ DatasetTable.prototype = {
             quantity: 'tweet',
             min: d.FirstTweet,
             max: d.LastTweet,
-            progress_div: row + ' .cell-minutes',
+            progress_div: row + ' .cell-Minutes',
             progress_text: ' ',
             progress_style: 'full',
             on_chunk_finish: function(result) {
@@ -1147,9 +1157,26 @@ DatasetTable.prototype = {
         var conn = new Connection(args);
         conn.startStream();
     },
+    countUsers: function(dataset) {
+        var row = '.row_' + (dataset.Level == 1 ? 'event' : 'subset') + '_' + dataset.ID;
+        var conn = this.connection.phpjson(
+            'users/countInCollection',
+            {
+                Collection: dataset.Level == 1 ? 'Event' : 'Subset',
+                ID: dataset.ID,
+            },
+            function(result) {
+                dataset['Users'] = parseInt(result[0]['Users']);
+                dataset['Users2orMoreTweets'] = parseInt(result[0]['Users2orMoreTweets']);
+                dataset['Users10orMoreTweets'] = parseInt(result[0]['Users10orMoreTweets']);
+                
+                triggers.emit('update_counts', row);
+            }
+        );
+    },
     computeUsers: function(d) {
         var conn = this.connection.phpjson(
-            'analysis/getUserLastCounted',
+            'users/getUserLastCounted',
             {
                 Collection: d.Level == 1 ? 'Event' : 'Subset',
                 ID: d.ID,
@@ -1157,26 +1184,28 @@ DatasetTable.prototype = {
             this.computeUserStream.bind(this, d)
         );
     },
-    computeUserStream: function(d, lastTweet) {
-        var firstTweet = lastTweet != undefined && lastTweet[0] && 'MAX(LastTweetID)' in lastTweet[0] && lastTweet[0]['MAX(LastTweetID)'] ? new BigNumber(lastTweet[0]['MAX(LastTweetID)']) : d.FirstTweet;
+    computeUserStream: function(dataset, lastTweet) {
+        var firstTweet = lastTweet != undefined && lastTweet[0] && 'MAX(LastTweetID)' in lastTweet[0] && lastTweet[0]['MAX(LastTweetID)'] ? new BigNumber(lastTweet[0]['MAX(LastTweetID)']) : dataset.FirstTweet;
         
-        var row = '.row_' + (d.Level == 1 ? 'event' : 'subset') + '_' + d.ID;
+        var row = '.row_' + (dataset.Level == 1 ? 'event' : 'subset') + '_' + dataset.ID;
         var args = {
-            url: 'analysis/computeUsers',
+            url: 'users/computeUsersInCollection',
             post: {
-                Collection: d.Level == 1 ? 'Event' : 'Subset',
-                ID: d.ID,
+                Collection: dataset.Level == 1 ? 'Event' : 'Subset',
+                ID: dataset.ID,
                 json: true,
             },
             quantity: 'tweet',
             min: firstTweet,
-            max: d.LastTweet,
+            max: dataset.LastTweet,
             resolution: 0.25,
-            progress_div: row + ' .cell-users',
+            progress_div: row + ' .cell-Users',
             progress_text: ' ',
             progress_style: 'full',
             on_chunk_finish: function(result) {
-                d['Users'] = parseInt(result[0]['Users']);
+                dataset['Users'] = parseInt(result[0]['Users']);
+                dataset['Users2orMoreTweets'] = parseInt(result[0]['Users2orMoreTweets']);
+                dataset['Users10orMoreTweets'] = parseInt(result[0]['Users10orMoreTweets']);
                 
                 triggers.emit('update_counts', row);
             }

@@ -10,7 +10,7 @@
     $tweet_min = $_REQUEST['tweet_min'];
     $tweet_max = $_REQUEST['tweet_max'];
 
-    $query = "CALL compute_${collection}_timeseries" . 
+    $query = "CALL compute_timeseries_for_${collection}" . 
         "($collection_id, $tweet_min, $tweet_max);";
 
     include '../printJSON.php';
