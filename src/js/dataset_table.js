@@ -641,6 +641,18 @@ DatasetTable.prototype = {
             });
         }, this);
         
+       
+        // Tooltip with user starts
+        this.tooltip.attach('.cell-Users, .cell-Users2orMoreTweets, .cell-Users10orMoreTweets', function(dataset) {
+            return {
+                Users: dataset['Users'],
+                '2+ Tweets': dataset['Users2orMoreTweets'],
+                '10+ Tweets': dataset['Users10orMoreTweets'],
+                '% 2+ Tweets':  Math.floor(dataset['Users2orMoreTweets'] / dataset['Users'] * 10000) / 100 + '%',
+                '% 10+ Tweets':  Math.floor(dataset['Users10orMoreTweets'] / dataset['Users'] * 10000) / 100 + '%'
+            }
+        });
+        
         
         this.tooltip.attach('.cell-FirstTweet, .cell-LastTweet', function(set) {
             return {
