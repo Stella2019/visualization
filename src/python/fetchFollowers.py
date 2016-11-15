@@ -26,7 +26,7 @@ def main():
     connectToServer()
     checkUsersToFetch()
     iterateThroughFollowerList()
-    exit()
+    closeConnections()
 
 # Every so often check MySQL for new followers to fetch
 def checkUsersToFetch():
@@ -54,17 +54,23 @@ def iterateThroughFollowerList():
             
             # Get & push follower list
             follower_ids = fetchUsersFollowers(user_id)
+            if(cancelled):
+                return []
             submitFollowerListToStorage(user_id, follower_ids)
             time.sleep(1)
 
 # Grab a user's followers
 def fetchUsersFollowers(user_id):
+    if(cancelled):
+        return []
     ids = []
     try:
         for page in tweepy.Cursor(twitter_api.followers_ids, user_id=user_id).pages():
             ids.extend(page)
-            if len(ids) > follower_list_cap:
+            if len(ids) >= (follower_list_cap + 2400):
                 ids.append('<Capped>')
+                break
+            elif len(ids) > follower_list_cap:
                 break
     #except tweepy.RateLimitError:
     #    count_down(wait_time)
@@ -86,8 +92,10 @@ def fetchUsersFollowers(user_id):
         print(err)
         count_down(1)
     except KeyboardInterrupt:
+        global cancelled
         cancelled = True
-        exit()
+        closeConnections()
+        return []
     return ids
 
 def submitFollowerListToStorage(user_id, follower_ids):
@@ -137,10 +145,11 @@ def count_down(minutes):
             sys.stdout.flush()
     except KeyboardInterrupt:
         print('Cancelled')
+        global cancelled
         cancelled = True
-        exit()
+        closeConnections()
     
-def exit():
+def closeConnections():
     cursor.close()
     storage.close()
 
