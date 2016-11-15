@@ -31,7 +31,7 @@ def main():
 # Every so often check MySQL for new followers to fetch
 def checkUsersToFetch():
     print ('check users to fetch')
-    query = "SELECT * FROM FetchingUserFollowersStatus WHERE Status='Pending' ORDER BY `Priority` DESC"
+    query = "SELECT * FROM FetchingUserFollowersQueue WHERE Status='Pending' ORDER BY `Priority` DESC"
     cursor.execute(query)
     
     global users_to_fetch
@@ -120,7 +120,7 @@ def submitFollowerListToStorage(user_id, follower_ids):
             
 def updateUserStatus(user_id, status, followers_retrieved):
     print('\t\t\t\t\t\t {2:d} {1:s}'.format(user_id, status, followers_retrieved))
-    query = "UPDATE FetchingUserFollowersStatus SET `Status`=%(Status)s, `LastUpdated`=NOW(), `FollowersRetrieved`=%(FollowersRetrieved)s WHERE `UserID` = %(UserID)s"
+    query = "UPDATE FetchingUserFollowersQueue SET `Status`=%(Status)s, `RetrievalDate`=NOW(), `FollowersRetrieved`=%(FollowersRetrieved)s WHERE `UserID` = %(UserID)s"
     cursor.execute(query, {'UserID': user_id, 'Status': status, 'FollowersRetrieved': followers_retrieved})
 
 def uploadFollowers(user_id, follower_ids):
