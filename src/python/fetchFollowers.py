@@ -66,9 +66,9 @@ def fetchUsersFollowers(user_id):
             if len(ids) > follower_list_cap:
                 ids.append('<Capped>')
                 break
-    except tweepy.RateLimitError:
-        count_down(wait_time)
-        return fetchUsersFollowers(user_id)
+    #except tweepy.RateLimitError:
+    #    count_down(wait_time)
+    #    return fetchUsersFollowers(user_id)
     except tweepy.error.TweepError as err:
         if('429' in str(err)): # Rate limit error
             print(err) 
@@ -113,7 +113,7 @@ def submitFollowerListToStorage(user_id, follower_ids):
 def updateUserStatus(user_id, status, followers_retrieved):
     print('\t\t\t\t\t\t {2:d} {1:s}'.format(user_id, status, followers_retrieved))
     query = "UPDATE FetchingUserFollowersStatus SET `Status`=%(Status)s, `LastUpdated`=NOW(), `FollowersRetrieved`=%(FollowersRetrieved)s WHERE `UserID` = %(UserID)s"
-    cursor.execute(query, {'UserID': user_id, 'Status': status, 'FollowersRetrieved': followers_retrieved});
+    cursor.execute(query, {'UserID': user_id, 'Status': status, 'FollowersRetrieved': followers_retrieved})
 
 def uploadFollowers(user_id, follower_ids):
     if(len(follower_ids) == 0):

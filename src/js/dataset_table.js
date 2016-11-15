@@ -21,7 +21,23 @@ function DatasetTable() {
     this.quantities = ['Tweets', 'DistinctTweets', 
                        'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
                        'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
-                       'Minutes', 'Users'];
+                       'Minutes', 'Users', 'Users2orMoreTweets', 'Users2orMoreTweets'];
+    this.column_headers = [
+        {Label: 'ID', ID: 'ID', Group: 'Standard'},
+        {Label: 'Collection', ID: 'Collection', Group: 'Standard'},
+        {Label: 'Tweets', ID: 'Tweets', Group: 'Standard', count: true},
+        {Label: 'Originals', ID: 'Originals', Group: 'Tweet Types', count: true},
+        {Label: 'Retweets', ID: 'Retweets', Group: 'Tweet Types', count: true},
+        {Label: 'Replies', ID: 'Replies', Group: 'Tweet Types', count: true},
+        {Label: 'Quotes', ID: 'Quotes', Group: 'Tweet Types', count: true},
+        {Label: 'First Tweet', ID: 'FirstTweet', Group: 'Time'},
+        {Label: 'Last Tweet', ID: 'LastTweet', Group: 'Time'},
+        {Label: 'Timeseries<br />Minutes', ID: 'Minutes', Group: 'Time', count: true},
+        {Label: 'Users', ID: 'Users', Group: 'Standard', count: true},
+        {Label: 'w/ 2+ Tweets', ID: 'Users2orMoreTweets', Group: 'Users', count: true},
+        {Label: 'w/ 10+ Tweets', ID: 'Users10orMoreTweets', Group: 'Users', count: true},
+//        {Label: 'Open', Quantity: '', Group: 'Standard'}
+    ];
 }
 DatasetTable.prototype = {
     init: function() {
@@ -34,7 +50,8 @@ DatasetTable.prototype = {
         triggers.on('sort_elements', function() { this.clickSort(false, 'maintain_direction'); }.bind(this));
         triggers.on('new_counts',         this.computeAggregates.bind(this));
         triggers.on('update_counts',      this.updateTableCounts.bind(this));
-        triggers.on('refresh_visibility', this.setVisibility.bind(this));
+        triggers.on('refresh_visibility', this.setVisibility_Rows.bind(this));
+        triggers.on('toggle columns', this.setVisibility_Columns.bind(this));
         
         triggers.on('dataset table:build', this.buildTable.bind(this));
         triggers.on('new dataset:build', this.buildNewDatasetOption.bind(this));
@@ -352,6 +369,30 @@ DatasetTable.prototype = {
                       'Originals', 'Retweets', 'Replies', 'Quotes', 
                       'First Tweet', 'Last Tweet', 'Minutes', 'Users'];
         this.ops['Columns'] = {
+            'Tweet Type Counts': new Option({
+                title: 'Tweet Types',
+                labels: ['Hidden', 'Shown'],
+                ids:    ['hidden', 'shown'],
+                default: 0,
+                type: "toggle",
+                callback: triggers.emitter('toggle columns')
+            }),
+            'Dates': new Option({
+                title: 'Dates',
+                labels: ['Hidden', 'Shown'],
+                ids:    ['hidden', 'shown'],
+                default: 0,
+                type: "toggle",
+                callback: triggers.emitter('toggle columns')
+            }),
+            'Repeat Users': new Option({
+                title: 'Repeat Users',
+                labels: ['Hidden', 'Shown'],
+                ids:    ['hidden', 'shown'],
+                default: 0,
+                type: "toggle",
+                callback: triggers.emitter('toggle columns')
+            }),
             Distinct: new Option({
                 title: 'Distinct?',
                 labels: ['Show All', 'Only Distinct'],
@@ -412,10 +453,10 @@ DatasetTable.prototype = {
             }),
             Empties: new Option({
                 title: 'Empty Rows',
-                labels: ['Show', 'Hide'],
-                ids:    ['table-row', 'none'],
-                default: 1,
-                type: "dropdown",
+                labels: ['Hide', 'Show'],
+                ids:    ['none', 'table-row'],
+                default: 0,
+                type: "toggle",
                 callback: triggers.emitter('refresh_visibility')
             }),
             'Level 0 Showing Children': new Option({
@@ -462,29 +503,21 @@ DatasetTable.prototype = {
         triggers.emit('new dataset:build');
     },
     buildTable: function() {
-        var columns = ['ID', 'Collection',
-                       'Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes', 
-                       'First Tweet', 'Last Tweet', 'Minutes',  'Users',
-                       /*'Open'*/];// <span class="glyphicon glyphicon-new-window"></span>
-        
         d3.select('#table-container').selectAll('*').remove();
         var table = d3.select('#table-container')
             .append('table')
             .attr('id', 'status_table')
-            .attr('class', 'table table-sm')
+            .attr('class', 'table table-sm');
         
         table.append('thead')
             .append('tr')
             .selectAll('th')
-            .data(columns)
+            .data(this.column_headers)
             .enter()
             .append('th')
             .append('div')
-            .attr('class', function(d) {
-                if(d == 'Open') return null;
-                return 'col-sortable col-' + util.simplify(d); 
-            })
-            .html(function(d) { return d.replace('Distinct ', ''); });
+            .attr('class', d => 'col-sortable col-' + d.ID)
+            .html(d => d.Label);
         
         table.selectAll('.col-sortable')
             .on('click', this.clickSort.bind(this))
@@ -527,43 +560,47 @@ DatasetTable.prototype = {
         // Add right click context menu to event & subset rows
         this.contextmenu.attach('.row_event, .row_subset', this.prepareCollectionContextMenu.bind(this));
         
+        // Add all of the cells
+        this.column_headers.forEach(function(column) {
+            table_body.selectAll('tr')
+                .append('td')
+                .append('div')
+                .attr('class', 'cell-' + column.ID + (column.count ? ' cell-count' : ''));
+        })
+        
         // ID & Label
-        table_body.selectAll('tr')
-            .append('td')
+        table_body.selectAll('.cell-ID')
             .html(function(d) { return [1, 2, 4].includes(d.Level) ? d.ID : ''; })
         
-        table_body.selectAll('tr')
-            .append('td')
-            .append('div')
-            .attr('class', 'cell-label')
+        table_body.selectAll('.cell-Collection')
             .append('span')
             .attr('class', 'value')
             .html(function(d) { return d.Label; });
         
         var level_names = ['events', 'rumors', 'features', 'matches', 'N/A'];
-        table_body.selectAll('.row_haschildren .cell-label')
-            .on('click', this.setVisibility_children.bind(this))
+        table_body.selectAll('.row_haschildren .cell-Collection')
+            .on('click', this.setVisibility_Rows_children.bind(this))
             .append('small')
             .attr('class', 'glyphicon-hiddenclick')
             .html(function(d) { 
                 return d.children.length + (d.Level == 1 ? -1 : 0) + ' ' + level_names[d.Level]; 
             });
         
-        table_body.selectAll('.row_haschildren .cell-label')
+        table_body.selectAll('.row_haschildren .cell-Collection')
             .append('span')
             .attr('class', 'glyphicon glyphicon-chervon-left glyphicon-hiddenclick')
             .style('margin-left', '0px');
         
         // Add tool tips
-        this.tooltip.attach('.cell-label', this.prepareCollectionTooltip.bind(this));
+        this.tooltip.attach('.cell-Collection', this.prepareCollectionTooltip.bind(this));
         
-        // Counts
+        // Values
+        table_body.selectAll('.cell-count')
+            .append('span').attr('class', 'value');
+        
+        // Attach Tooltips
+        // To Tweet & Tweet Types
         ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
-            table_body.selectAll('tr')
-                .append('td')
-            .append('div')
-                .attr('class', 'cell-' + type + ' cell-count')
-                .append('span').attr('class', 'value');
             
             // Tooltip with summary starts
             this.tooltip.attach('.cell-' + type, function(set) {
@@ -604,23 +641,8 @@ DatasetTable.prototype = {
             });
         }, this);
         
-        // Append the recalculate button
-//        table_body.selectAll('.row_type .cell-Tweets, .row_feature .cell-Tweets').append('span') // hidden one to help alignment
-//            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
-        table_body.selectAll('.row_type .cell-Tweets, .row_rumor .cell-Tweets, .row_feature .cell-Tweets').append('span') // hidden one to help alignment
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
-        table_body.selectAll('.row_event .cell-Tweets, .row_subset .cell-Tweets').append('span')
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
-            .on('click', this.recount.bind(this));
         
-        // Times (use glyphicon-time or glyphicon-refresh)
-        table_body.selectAll('tr')
-            .append('td')
-            .attr('class', 'cell-firstdate');
-        table_body.selectAll('tr')
-            .append('td')
-            .attr('class', 'cell-lastdate');
-        this.tooltip.attach('.cell-firstdate, .cell-lastdate', function(set) {
+        this.tooltip.attach('.cell-FirstTweet, .cell-LastTweet', function(set) {
             return {
                 'First Tweet': set['FirstTweet'],
                 'Last Tweet':  set['LastTweet'],
@@ -629,63 +651,33 @@ DatasetTable.prototype = {
             };
         });
         
-        var minute_cells = table_body.selectAll('tr')
-            .append('td')
-            .append('div')
-            .attr('class', 'cell-minutes cell-count');
-        minute_cells.append('span').attr('class', 'value');
-        
-        var user_cells = table_body.selectAll('tr')
-            .append('td')
-            .append('div')
-            .attr('class', 'cell-users cell-count');
-        user_cells.append('span').attr('class', 'value');
-        
-//        table_body.selectAll('.row_type .cell-minutes, .row_feature .cell-minutes').append('span') // hidden one to help alignment
-//            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden');
-        table_body.selectAll('.row_type .cell-minutes, .row_rumor .cell-minutes, .row_feature .cell-minutes').append('span') // hidden one to help alignment
+        // Add buttons to click to recount // TODO replace with context menu buttons
+        table_body.selectAll('.row_type .cell-Tweets, .row_rumor .cell-Tweets, .row_feature .cell-Tweets').append('span') // hidden one to help alignment
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
-        table_body.selectAll('.row_event .cell-minutes, .row_subset .cell-minutes').append('span')
+        table_body.selectAll('.row_event .cell-Tweets, .row_subset .cell-Tweets').append('span')
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
+            .on('click', this.recount.bind(this));
+        
+        table_body.selectAll('.row_type .cell-Minutes, .row_rumor .cell-Minutes, .row_feature .cell-Minutes').append('span') // hidden one to help alignment
+            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
+        table_body.selectAll('.row_event .cell-Minutes, .row_subset .cell-Minutes').append('span')
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
             .on('click', this.computeTimeseries.bind(this));
         
-        table_body.selectAll('.row_type .cell-users, .row_rumor .cell-users, .row_feature .cell-users').append('span') // hidden one to help alignment
+        table_body.selectAll('.row_type .cell-Users, .row_rumor .cell-Users, .row_feature .cell-Users').append('span') // hidden one to help alignment
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
-        table_body.selectAll('.row_event .cell-users, .row_subset .cell-users').append('span')
+        table_body.selectAll('.row_event .cell-Users, .row_subset .cell-Users').append('span')
             .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
             .on('click', this.computeUsers.bind(this));
         
-        // Buttons
-//        table_body.selectAll('tr')
-//            .append('td')
-//            .attr('class', 'cell_options')
-//        
-//        table_body.selectAll('.row_event .cell_options, .row_subset .cell_options')
-//            .append('span')
-//            .attr('class', 'glyphicon glyphicon-edit glyphicon-hoverclick')
-//            .on('click', this.edit.bind(this));
-
-//        table_body.selectAll('.row_event .cell_options')
-//            .append('span')
-//            .attr('class', 'glyphicon glyphicon-signal glyphicon-hoverclick')
-//            .style('margin-left', '5px')
-//            .on('click', this.openTimeseries);
-        
-//        table_body.selectAll('.row_rumor .cell_options')
-//            .append('span')
-////            .attr('class', 'btn btn-xs btn-default')
-//            .text('Codes')
-//            .attr('class', 'glyphicon-hoverclick')
-//            .style('margin-left', '5px')
-//            .on('click', this.openCodingReport);
-        
         // Set initial visibility
         this.event_types_arr.forEach(function(d) { 
-            this.setVisibility_children(d, 'perserve'); 
+            this.setVisibility_Rows_children(d, 'perserve'); 
         }.bind(this), this);
         
         // Set the counts
         triggers.emit('new_counts');
+        triggers.emit('toggle columns');
     },
     prepareCollectionContextMenu: function(set) { 
         var collectionType = (set.Level == 1 ? 'Event' : 'Subset')
@@ -768,7 +760,7 @@ DatasetTable.prototype = {
             }
         }
     },
-    setVisibility_children: function(d, show_children) {
+    setVisibility_Rows_children: function(d, show_children) {
         var list_op = this.ops['Rows']['Level ' + d.Level + ' Showing Children'];
         var list = list_op.get();
         
@@ -803,10 +795,10 @@ DatasetTable.prototype = {
             child.row.classed('not_shown', !show_children)
                 .style('display', show_child ? 'table-row' : 'none');
             if('children' in child)
-                this.setVisibility_children(child, show_children ? 'perserve' : false);
+                this.setVisibility_Rows_children(child, show_children ? 'perserve' : false);
         }, this)
     },
-    setVisibility: function() {
+    setVisibility_Rows: function() {
         var table_body = d3.select('tbody');
         
         table_body.selectAll('tr')
@@ -819,6 +811,25 @@ DatasetTable.prototype = {
             .style('display', 'none');
         
         triggers.emit('sort_elements');
+    },
+    setVisibility_Columns: function() {
+        var table_head = d3.select('thead');
+        var table_body = d3.select('tbody');
+        var column_group_visibility = {
+            Standard: true,
+            'Tweet Types': this.ops['Columns']['Tweet Type Counts'].is('shown'),
+            Time: this.ops['Columns']['Dates'].is('shown'),
+            Users: this.ops['Columns']['Repeat Users'].is('shown')
+        };
+        
+        this.column_headers.forEach(function(column, i) {
+            var column_display = column_group_visibility[column.Group] ?
+                null : 'none';
+            table_head.select('tr th:nth-child(' + (i+1) + ')')
+                .style('display', column_display);
+            table_body.selectAll('tr td:nth-child(' + (i+1) + ')')
+                .style('display', column_display);
+        }, this);
     },
     updateTableCounts: function(selector) {
         selector = selector || 'tbody';
@@ -856,7 +867,7 @@ DatasetTable.prototype = {
             .classed('row-zero', function(d) { return !(d.Tweets || d.Minutes || d.CodedTweets) ; });
         
         // Dates
-        table_body.selectAll('.cell-firstdate')
+        table_body.selectAll('.cell-FirstTweet')
             .html(function(d) {
                 if(!('FirstTweet') in d || d['FirstTweet'] == 0 || d['FirstTweet'] == 1e20) return '';
                 if(date_format == 'date') {
@@ -866,7 +877,7 @@ DatasetTable.prototype = {
                 }
                 return d.FirstTweet;
             });
-        table_body.selectAll('.cell-lastdate')
+        table_body.selectAll('.cell-LastTweet')
             .html(function(d) { 
                 if(!('LastTweet') in d || d['LastTweet'] == 0 || d['LastTweet'] == 1e20) return '';
                 if(date_format == 'date') {
@@ -879,7 +890,7 @@ DatasetTable.prototype = {
             });
         
         // Minutes
-        table_body.selectAll(".cell-minutes .value")
+        table_body.selectAll(".cell-Minutes .value")
             .transition()
             .duration(1000)
             .tween("text", function (d) {
@@ -910,25 +921,27 @@ DatasetTable.prototype = {
                 };
             });
         
-        // Users
-        table_body.selectAll(".cell-users .value")
-            .transition()
-            .duration(1000)
-            .tween("text", function (d) {
-                var start = this.textContent;
-                if(typeof(start) == 'string') {
-                    start = parseInt(start.replace(/ /g, ''));
-                }
-                var interpol = d3.interpolate(start || 0, d['Users'] || 0);
-
-                return function (value) {
-                    if(typeof(value) == 'string') {
-                        value = parseInt(value.replace(/ /g, ''));
+        // Update regular integer counts
+        ['Users','Users2orMoreTweets', 'Users10orMoreTweets'].forEach(function(quantity) {
+            table_body.selectAll(".cell-" + quantity + " .value")
+                .transition()
+                .duration(1000)
+                .tween("text", function (d) {
+                    var start = this.textContent;
+                    if(typeof(start) == 'string') {
+                        start = parseInt(start.replace(/ /g, ''));
                     }
-                    value = Math.round(interpol(value));
-                    this.textContent = util.formatThousands(value);
-                };
-            });
+                    var interpol = d3.interpolate(start || 0, d[quantity] || 0);
+
+                    return function (value) {
+                        if(typeof(value) == 'string') {
+                            value = parseInt(value.replace(/ /g, ''));
+                        }
+                        value = Math.round(interpol(value));
+                        this.textContent = util.formatThousands(value);
+                    };
+                });
+        }, this);
         
         triggers.emit('refresh_visibility');
     },
@@ -1222,11 +1235,12 @@ DatasetTable.prototype = {
             .text('Add Tweets to Subset')
             .on('click', triggers.emitter('alert', 'Sorry this button doesn\'t work yet'));
         
-        div.append('button')
-            .attr('id', 'tweet-transfer')
-            .attr('class', 'btn btn-default new-collection-button')
-            .text('Transfer Tweets')
-            .on('click', this.transferTweets.bind(this));
+        // Only here to move tweets from old version of the tweet table to new version if necessary
+//        div.append('button')
+//            .attr('id', 'tweet-transfer')
+//            .attr('class', 'btn btn-default new-collection-button')
+//            .text('Transfer Tweets')
+//            .on('click', this.transferTweets.bind(this));
     },
     transferTweets: function () {
         

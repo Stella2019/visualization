@@ -95,8 +95,8 @@ Options.prototype = {
                 option.set(option_value);
                 changed.push(panel_name + '__' + option_name);
                 
-                d3.select("#choose_" + util.simplify(panel_name) + "_" + util.simplify(option_name)).select('.current')
-                    .html(option.getLabel());
+                if("displayChoice" in option)
+                    option.displayChoice(option.indexCur())
             });
         }.bind(this));
 //        Object.keys(state).forEach(function(option) {
@@ -364,10 +364,12 @@ Options.prototype = {
                 op_toggle.callback();
             });
         
-        option.updateInInterface = function(d) {
+        option.displayChoice = function(d) {
             document.getElementById("input_" + choice_name)
                 .value = d;
-
+        }
+        option.updateInInterface = function(d) {
+            option.displayChoice(d);
             option.set(d);
             ops.recordState(true);
         };
@@ -862,7 +864,7 @@ Options.prototype = {
             panel = this[panel_name];
             option = panel[option_name];
         } catch(e) {
-            console.log('Option ' + option_name + ' does not exist');
+            console.error('Option "' + option_name + '" in panel "' + panel_name + '" does not exist.');
             return;
         }
         
@@ -870,11 +872,18 @@ Options.prototype = {
         if(!option.render) return;
         if(option.type && option.type == 'textfieldautoman') {
             this.buildTextToggle(panel_name, option_name);
-            return;
+        } else if(option.type && option.type == 'toggle') {
+            this.buildSidebarToggle(panel_name, option_name);
         } else if(option.type && option.type == 'dropdown_autocomplete') {
             this.buildDropdownAutocomplete(panel_name, option_name);
-            return;
+        } else {
+            this.buildSidebarDropdown(panel_name, option_name);
         }
+        
+    },
+    buildSidebarDropdown:  function(panel_name, option_name) {
+        var panel = this[panel_name];
+        var option = panel[option_name];
         
         // Make containers
         var container = d3.select('#choose_' + util.simplify(panel_name) + '_' + util.simplify(option_name));
@@ -960,21 +969,24 @@ Options.prototype = {
         elements.exit().remove(); // Remove former columns
         elements.select('a'); // Propagate any data that needs to be
         
-        option.updateInInterface = function(d) {
+        option.displayChoice = function(choice_index) {
             container.select('.current')
-                .html(option.labels[d]);
-
-            option.set(option.ids[d]);
+                .html(option.labels[choice_index]);
+        };
+        option.updateInInterface = function(choice_index) {
+            option.displayChoice(choice_index);
+            option.set(option.ids[choice_index]);
             this.recordState();
         }.bind(this);
         option.updateInInterface_id = function(d) {
             option.updateInInterface(option.indexOf(d));
-        }
-        option.click = function(d) {
-            option.updateInInterface(d);
-
+        };
+        option.click = function(choice_index) {
+            option.displayChoice(choice_index);
+            option.set(option.ids[choice_index]);
+            this.recordState();
             option.callback();
-        }
+        }.bind(this);;
         
         list.selectAll('a')
             .attr("id", function(d) { return option_name + "_" + option.ids[d]; })
@@ -983,9 +995,7 @@ Options.prototype = {
             })
             .on("click", option.click);
 
-        // Save the current value to the interface and the history
-        container.select('.current')
-            .html(option.labels[option.default]);
+        option.displayChoice(option.default);
     },
     buildDropdownAutocomplete: function(panel_name, option_name) {
         var panel = this[panel_name];
@@ -1187,5 +1197,77 @@ Options.prototype = {
 //        // Save the current value to the interface and the history
 //        container.select('.current')
 //            .html(option.labels[option.default]);
-    }
+    },
+    buildSidebarToggle:  function(panel_name, option_name) {
+        var panel = this[panel_name];
+        var option = panel[option_name];
+        
+        // Make containers
+        option.container = d3.select('#choose_' + util.simplify(panel_name) + '_' + util.simplify(option_name));
+        
+        // If it does not exist, create it
+        if(!option.container[0][0]) {
+            option.container = d3.select('#panel_' + util.simplify(panel_name)).append("div")
+                .attr("class", "choice" + (option.breakbefore ? ' choice-break-before' : ''))
+                .style("display", option.hidden ? 'none' : null)
+                .append("div")
+                    .attr("id", "choose_" + util.simplify(panel_name) + '_' + util.simplify(option_name))
+                    .attr("class", "sidebar-toggle");
+        }
+        
+        var list_open = option.container.select('button.dropdown-toggle')
+        if(!list_open[0][0]) {
+            option.container.append('div')
+                .attr('class', 'option-label')
+                .html(option.title);
+            
+            // Add list opener
+            option.button = option.container.append("button")
+                .attr({type: "button",
+                    class: 'btn btn-xs btn-default'});
+            
+            option.button.append('span')
+                .attr('class', 'current')
+                .html('Label');
+        }
+        
+        option.displayChoice = function(choice) {
+            if(choice == undefined)
+                choice = option.indexCur();
+            var choice_index = 0;
+            if(typeof(choice) == "string") 
+                choice_index = option.indexOf(choice);
+            else {
+                choice_index = choice;
+                choice = option.ids[choice_index];
+            }
+            var other_choice = option.ids[1 - choice_index];
+            
+            option.button
+                .data([other_choice])
+                .classed('btn-default', choice_index > 0);
+            option.container.select('.current')
+                .html(option.labels[choice_index]);
+        };
+        option.updateInInterface = function(choice) {
+            option.displayChoice(choice);
+            option.set(choice);
+            this.recordState();
+        }.bind(this);
+        option.updateInInterface_id = function(choice_id) {
+            option.updateInInterface(option.indexOf(choice_id));
+        }
+        option.click = function(choice) {
+            option.updateInInterface(choice);
+            option.displayChoice(choice);
+            option.set(option.ids[choice]);
+            this.recordState();
+
+            option.callback();
+        }.bind(this);
+        option.button.on("click", option.click);
+
+        // Save the current value to the interface
+        option.displayChoice(option.default);
+    },
 }
