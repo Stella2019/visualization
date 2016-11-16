@@ -37,6 +37,7 @@ function DatasetTable() {
         {Label: 'Users', ID: 'Users', Group: 'Users', count: true, sortable: true, always_display: true},
         {Label: 'w/ 2+ Tweets', ID: 'Users2orMoreTweets', Group: 'Users', count: true, sortable: true},
         {Label: 'w/ 10+ Tweets', ID: 'Users10orMoreTweets', Group: 'Users', count: true, sortable: true},
+        {Label: 'Dataset', ID: 'DatasetActions', Group: 'Actions'},
         {Label: 'Tweets', ID: 'TweetsActions', Group: 'Actions'},
         {Label: 'Timeseries', ID: 'TimeseriesActions', Group: 'Actions'},
         {Label: 'Users', ID: 'UsersActions', Group: 'Actions'},
@@ -582,8 +583,8 @@ DatasetTable.prototype = {
             });
         })
         
-        // Add right click context menu to event & subset rows
-        this.contextmenu.attach('.row_event, .row_subset', this.prepareCollectionContextMenu.bind(this));
+//        // Add right click context menu to event & subset rows
+//        this.contextmenu.attach('.row_event, .row_subset', this.prepareCollectionContextMenu.bind(this));
         
         // Add all of the cells
         this.column_headers.forEach(function(column) {
@@ -678,7 +679,6 @@ DatasetTable.prototype = {
             }
         });
         
-        
         this.tooltip.attach('.cell-FirstTweet, .cell-LastTweet', function(set) {
             return {
                 'First Tweet': set['FirstTweet'],
@@ -689,12 +689,13 @@ DatasetTable.prototype = {
         });
         
         // Add action buttons
+        this.addDatasetAction('DatasetActions', 'edit', this.edit, 'Edit the dataset');
         this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet');
         this.addDatasetAction('TweetsActions', 'download-alt',
                               dataset => this.fetchDataToDownload(dataset, 'tweets'),
                               'Download Tweets');
 //        this.addDatasetAction('TimeseriesActions', 'new-window', this.openCodingReport, 'Open Coding Report');
-        this.addDatasetAction('TimeseriesActions', 'signal', this.computeTimeseries, 'Build Timeseries Data');
+        this.addDatasetAction('TimeseriesActions', 'list', this.computeTimeseries, 'Build Timeseries Data');
         this.addDatasetAction('TimeseriesActions', 'refresh', this.countTimeseriesMinutes, 'Recount Timeseries Datapoints (Minutes)');
         this.addDatasetAction('TimeseriesActions', 'scissors action-deletion', this.clearTimeseries, 'Clear Saved Timeseries');
         this.addDatasetAction('TimeseriesActions', 'download-alt',
