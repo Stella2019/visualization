@@ -118,21 +118,22 @@ def fetchUsersFollowers(user_id):
         else: 
             ids.append('Followers: ' + str(user.followers_count))
     except tweepy.error.TweepError as err:
-        if('429' in str(err)): # Rate limit error
+        err = str(err)
+        if('429' in err or 'Rate limit' in err): # Rate limit error
             print('429: Rated Limited - wait and try again') 
             count_down(wait_time)
             return fetchUsersFollowers(user_id)
-        elif('401' in str(err) or 'Not authorized' in str(err)):
+        elif('401' in err or 'Not authorized' in err):
 #            print("401: Unauthorized - probably a protected user")
             return ['Protected']
-        elif('403' in str(err) or 'suspended' in str(err)):
+        elif('403' in err or 'suspended' in err):
 #            print("403: Forbidden - user has been suspended")
             return ['Suspended']
-        elif('404' in str(err) or 'does not exist' in str(err)):
+        elif('404' in err or 'does not exist' in err):
 #            print("404: Not found - user has been deleted/removed")
             return ['Removed']
         else:
-            print("!!! Unhandled Tweepy error: " + str(err))
+            print("!!! Unhandled Tweepy error: " + err)
             return ['Other']
     
     # Get follower IDs
@@ -147,12 +148,13 @@ def fetchUsersFollowers(user_id):
         else:
             ids.append('Retrieved')
     except tweepy.error.TweepError as err:
-        if('429' in str(err)): # Rate limit error
+        err = str(err)
+        if('429' in err or 'Rate limit' in err): # Rate limit error
             print('429: Rated Limited - wait and try again') 
             count_down(wait_time)
             return fetchUsersFollowers(user_id)
         else:
-            print("!!! Unhandled Tweepy error: " + str(err))
+            print("!!! Unhandled Tweepy error: " + err)
             count_down(1)
     except KeyboardInterrupt:
         print('** Cancelled **\t\t\t\t\t ')
