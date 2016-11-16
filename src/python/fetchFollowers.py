@@ -96,7 +96,7 @@ def iterateThroughFollowerList():
                 submitFollowerListToStorage(user_id, follower_ids)
                 time.sleep(1) # Small delay to avoid overwhelming the system
             except KeyboardInterrupt:
-                print('Cancelled\t\t\t\t\t\t\t\t\t ')
+                print('** Cancelled **\t\t\t\t\t ')
                 cancelled = True
                 closeConnections()
                 return
@@ -125,7 +125,7 @@ def fetchUsersFollowers(user_id):
         elif('401' in str(err) or 'Not authorized' in str(err)):
 #            print("401: Unauthorized - probably a protected user")
             return ['Protected']
-        elif('403' in str(err) or 'orbidden' in str(err)):
+        elif('403' in str(err) or 'suspended' in str(err)):
 #            print("403: Forbidden - user has been suspended")
             return ['Suspended']
         elif('404' in str(err) or 'does not exist' in str(err)):
@@ -155,6 +155,7 @@ def fetchUsersFollowers(user_id):
             print("!!! Unhandled Tweepy error: " + str(err))
             count_down(1)
     except KeyboardInterrupt:
+        print('** Cancelled **\t\t\t\t\t ')
         cancelled = True
         closeConnections()
         return []
