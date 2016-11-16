@@ -1201,6 +1201,7 @@ DatasetTable.prototype = {
             post: {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
                 ID: dataset.ID,
+                json: true,
             },
             quantity: 'tweet',
             min: dataset.FirstTweet,
