@@ -139,7 +139,7 @@ def fetchUsersFollowers(user_id):
     try:
         for page in tweepy.Cursor(twitter_api.followers_ids, user_id=user_id).pages():
             ids.extend(page)
-            if len(ids) > follower_list_cap + 1:
+            if len(ids) >= follower_list_cap + 1:
                 break
                 
         if(len(ids) < user.followers_count):
