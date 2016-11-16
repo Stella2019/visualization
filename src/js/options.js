@@ -1203,7 +1203,8 @@ Options.prototype = {
         var option = panel[option_name];
         
         // Make containers
-        option.container = d3.select('#choose_' + util.simplify(panel_name) + '_' + util.simplify(option_name));
+        var choice_id = "choose_" + util.simplify(panel_name) + '_' + util.simplify(option_name);
+        option.container = d3.select('#' + choice_id);
         
         // If it does not exist, create it
         if(!option.container[0][0]) {
@@ -1211,8 +1212,11 @@ Options.prototype = {
                 .attr("class", "choice" + (option.breakbefore ? ' choice-break-before' : ''))
                 .style("display", option.hidden ? 'none' : null)
                 .append("div")
-                    .attr("id", "choose_" + util.simplify(panel_name) + '_' + util.simplify(option_name))
+                    .attr("id", choice_id)
                     .attr("class", "sidebar-toggle");
+            
+            if(option.tooltip)
+                this.app.tooltip.attach('#' + choice_id, () => option.tooltip);
         }
         
         var list_open = option.container.select('button.dropdown-toggle')

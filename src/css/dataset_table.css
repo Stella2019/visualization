@@ -53,6 +53,12 @@ th:hover .glyphicon-hiddenclick {
     padding-left: 5px;
     margin-left: auto;
 }
+div .action_button:not(:first-child) {
+    padding-left: 5px;
+}
+div .action_button:not(:last-child) {
+    padding-right: 5px;
+}
 
 .row_haschildren .cell-label {
     cursor: pointer;

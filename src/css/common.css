@@ -294,6 +294,15 @@ button:focus {
     padding: 5px 5px 0px 5px;
     max-width: 300px;
 }
+.tooltip-string {
+    padding-bottom: 0px;
+    border-radius: 5px;
+    max-width: 200px;
+}
+.tooltip-string p {
+    margin: 2px;
+    text-transform: none;
+}
 
 .match_addon {
     color: #ccc;

@@ -933,22 +933,30 @@ Tooltip.prototype = {
             this.data = new_data;
             this.div.selectAll('*').remove();
 
-            // Create table
-            var rows = this.div.append('table')
-                .selectAll('tr')
-                .data(Object.keys(new_data))
-                .enter()
-                .append('tr');
+            if(typeof(new_data) == 'string') {
+                this.div.classed('tooltip-string', true);
+                
+                this.div.append('p').html(new_data);
+            } else { // Presuming object, the original tooltip
+                this.div.classed('tooltip-string', false);
+                
+                // Create table (if this it is a table)
+                var rows = this.div.append('table')
+                    .selectAll('tr')
+                    .data(Object.keys(new_data))
+                    .enter()
+                    .append('tr');
 
-            rows.append('th')
-                .html(function(d) { return d + ":"; });
+                rows.append('th')
+                    .html(function(d) { return d + ":"; });
 
-            rows.append('td')
-                .html(function(d) { 
-                    if(Array.isArray(new_data[d]))
-                        return new_data[d].join(', ');
-                    return new_data[d];
-                });
+                rows.append('td')
+                    .html(function(d) { 
+                        if(Array.isArray(new_data[d]))
+                            return new_data[d].join(', ');
+                        return new_data[d];
+                    });
+            }
         }
     },
     on: function() {

@@ -23,22 +23,23 @@ function DatasetTable() {
                        'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
                        'Minutes', 'Users', 'Users2orMoreTweets', 'Users10orMoreTweets'];
     this.column_headers = [
-        {Label: 'ID', ID: 'ID', Group: 'Standard'},
-        {Label: 'Collection', ID: 'Collection', Group: 'Standard'},
-        {Label: 'Tweets', ID: 'Tweets', Group: 'Standard', count: true},
-        {Label: 'Originals', ID: 'Originals', Group: 'Tweet Types', count: true},
-        {Label: 'Retweets', ID: 'Retweets', Group: 'Tweet Types', count: true},
-        {Label: 'Replies', ID: 'Replies', Group: 'Tweet Types', count: true},
-        {Label: 'Quotes', ID: 'Quotes', Group: 'Tweet Types', count: true},
-        {Label: 'First Tweet', ID: 'FirstTweet', Group: 'Time'},
-        {Label: 'Last Tweet', ID: 'LastTweet', Group: 'Time'},
-        {Label: 'Timeseries<br />Minutes', ID: 'Minutes', Group: 'Time', count: true},
-        {Label: 'Users', ID: 'Users', Group: 'Standard', count: true},
-        {Label: 'w/ 2+ Tweets', ID: 'Users2orMoreTweets', Group: 'Users', count: true},
-        {Label: 'w/ 10+ Tweets', ID: 'Users10orMoreTweets', Group: 'Users', count: true},
-//        {Label: 'Tweets', ID: 'TweetActions', Group: 'Actions'},
-//        {Label: 'Timeseries', ID: 'TimeseriesActions', Group: 'Actions'},
-//        {Label: 'Users', ID: 'UsersActions', Group: 'Actions'},
+        {Label: 'ID', ID: 'ID', Group: '', sortable: true, always_display: true},
+        {Label: 'Collection', ID: 'Collection', Group: '', sortable: true, always_display: true},
+        {Label: 'Tweets', ID: 'Tweets', Group: 'Tweets', count: true, sortable: true, always_display: true},
+        {Label: 'Distinct', ID: 'DistinctTweets', Group: 'Tweets', count: true, sortable: true},
+        {Label: 'Originals', ID: 'Originals', Group: 'Tweets', count: true, sortable: true},
+        {Label: 'Retweets', ID: 'Retweets', Group: 'Tweets', count: true, sortable: true},
+        {Label: 'Replies', ID: 'Replies', Group: 'Tweets', count: true, sortable: true},
+        {Label: 'Quotes', ID: 'Quotes', Group: 'Tweets', count: true, sortable: true},
+        {Label: 'First Tweet', ID: 'FirstTweet', Group: 'Time', sortable: true},
+        {Label: 'Last Tweet', ID: 'LastTweet', Group: 'Time', sortable: true},
+        {Label: 'Timeseries<br />Minutes', ID: 'Minutes', Group: 'Time', count: true, sortable: true, always_display: true},
+        {Label: 'Users', ID: 'Users', Group: 'Users', count: true, sortable: true, always_display: true},
+        {Label: 'w/ 2+ Tweets', ID: 'Users2orMoreTweets', Group: 'Users', count: true, sortable: true},
+        {Label: 'w/ 10+ Tweets', ID: 'Users10orMoreTweets', Group: 'Users', count: true, sortable: true},
+        {Label: 'Tweets', ID: 'TweetsActions', Group: 'Actions'},
+        {Label: 'Timeseries', ID: 'TimeseriesActions', Group: 'Actions'},
+        {Label: 'Users', ID: 'UsersActions', Group: 'Actions'},
 //        {Label: 'Open', Quantity: '', Group: 'Standard'}
     ];
 }
@@ -362,9 +363,7 @@ DatasetTable.prototype = {
     buildOptions: function() {
         this.ops.updateCollectionCallback = this.getData;
         
-        var orders = ['ID', 'Collection', 'Tweets', 
-                      'Originals', 'Retweets', 'Replies', 'Quotes', 
-                      'First Tweet', 'Last Tweet', 'Minutes', 'Users'];
+        var columns_sortable = this.column_headers.filter(d => d.sortable);
         this.ops['Columns'] = {
             'Tweet Type Counts': new Option({
                 title: 'Tweet Types',
@@ -372,6 +371,7 @@ DatasetTable.prototype = {
                 ids:    ['hidden', 'shown'],
                 default: 0,
                 type: "toggle",
+                tooltip: "Show or hide columns with the count of each specific type of tweet",
                 callback: triggers.emitter('toggle columns')
             }),
             'Dates': new Option({
@@ -380,6 +380,7 @@ DatasetTable.prototype = {
                 ids:    ['hidden', 'shown'],
                 default: 0,
                 type: "toggle",
+                tooltip: "Show or hide columns the start & end dates of the datasets",
                 callback: triggers.emitter('toggle columns')
             }),
             'Repeat Users': new Option({
@@ -388,6 +389,25 @@ DatasetTable.prototype = {
                 ids:    ['hidden', 'shown'],
                 default: 0,
                 type: "toggle",
+                tooltip: "Show or hide columns listing how many users tweeted more than once, and 10 or more times",
+                callback: triggers.emitter('toggle columns')
+            }),
+            'Actions': new Option({
+                title: 'Actions',
+                labels: ['Hidden', 'Shown'],
+                ids:    ['hidden', 'shown'],
+                default: 0,
+                type: "toggle",
+                tooltip: "Show or hide columns with buttons for actions on events & subsets",
+                callback: triggers.emitter('toggle columns')
+            }),
+            'Show Deletion': new Option({
+                title: 'Deletion',
+                labels: ['Hidden', 'Shown'],
+                ids:    ['hidden', 'shown'],
+                default: 0,
+                type: "toggle",
+                tooltip: "In Action columns, display option to clear timeseries and user list. Default: off to prevent accidents.",
                 callback: triggers.emitter('toggle columns')
             }),
             Distinct: new Option({
@@ -421,7 +441,7 @@ DatasetTable.prototype = {
                 default: 0,
                 type: "dropdown",
                 callback: triggers.emitter('update_counts')
-            })
+            }),
         };
         this.ops['Rows'] = {
             Hierarchical: new Option({
@@ -434,8 +454,8 @@ DatasetTable.prototype = {
             }),
             Order: new Option({
                 title: 'Order',
-                labels: orders,
-                ids:    orders,
+                labels: columns_sortable.map(d => d.Label),
+                ids:    columns_sortable.map(d => d.ID),
                 default: 1,
                 type: "dropdown",
                 callback: triggers.emitter('sort_elements')
@@ -606,7 +626,7 @@ DatasetTable.prototype = {
         
         // Attach Tooltips
         // To Tweet & Tweet Types
-        ['Tweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
+        ['Tweets', 'DistinctTweets', 'Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
             
             // Tooltip with summary starts
             this.tooltip.attach('.cell-' + type, function(set) {
@@ -647,7 +667,6 @@ DatasetTable.prototype = {
             });
         }, this);
         
-       
         // Tooltip with user starts
         this.tooltip.attach('.cell-Users, .cell-Users2orMoreTweets, .cell-Users10orMoreTweets', function(dataset) {
             return {
@@ -669,24 +688,28 @@ DatasetTable.prototype = {
             };
         });
         
-        // Add buttons to click to recount // TODO replace with context menu buttons
-        table_body.selectAll('.row_type .cell-Tweets, .row_rumor .cell-Tweets, .row_feature .cell-Tweets').append('span') // hidden one to help alignment
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
-        table_body.selectAll('.row_event .cell-Tweets, .row_subset .cell-Tweets').append('span')
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
-            .on('click', this.recount.bind(this));
-        
-        table_body.selectAll('.row_type .cell-Minutes, .row_rumor .cell-Minutes, .row_feature .cell-Minutes').append('span') // hidden one to help alignment
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
-        table_body.selectAll('.row_event .cell-Minutes, .row_subset .cell-Minutes').append('span')
-            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
-            .on('click', this.computeTimeseries.bind(this));
-        
-//        table_body.selectAll('.row_type .cell-Users, .row_rumor .cell-Users, .row_feature .cell-Users').append('span') // hidden one to help alignment
-//            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hidden'); // TODO allow rumors to recalculate
-//        table_body.selectAll('.row_event .cell-Users, .row_subset .cell-Users').append('span')
-//            .attr('class', 'glyphicon glyphicon-refresh glyphicon-hiddenclick')
-//            .on('click', this.computeUsers.bind(this));
+        // Add action buttons
+        this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet');
+        this.addDatasetAction('TweetsActions', 'download-alt',
+                              dataset => this.fetchDataToDownload(dataset, 'tweets'),
+                              'Download Tweets');
+//        this.addDatasetAction('TimeseriesActions', 'new-window', this.openCodingReport, 'Open Coding Report');
+        this.addDatasetAction('TimeseriesActions', 'signal', this.computeTimeseries, 'Build Timeseries Data');
+        this.addDatasetAction('TimeseriesActions', 'refresh', this.countTimeseriesMinutes, 'Recount Timeseries Datapoints (Minutes)');
+        this.addDatasetAction('TimeseriesActions', 'scissors action-deletion', this.clearTimeseries, 'Clear Saved Timeseries');
+        this.addDatasetAction('TimeseriesActions', 'download-alt',
+                              dataset => this.fetchDataToDownload(dataset, 'timeseries'),
+                              'Download Timeseries');
+//        this.addDatasetAction('TimeseriesActions', 'new-window', this.openTimeseries, 'Open Timeseries Chart in new window');
+        this.addDatasetAction('UsersActions', 'list', this.computeUserList, 'Build User List');
+        this.addDatasetAction('UsersActions', 'refresh', this.countUsers, 'Recount Users');
+        this.addDatasetAction('UsersActions', 'scissors action-deletion', this.clearUserList, 'Clear Saved User List');
+        this.addDatasetAction('UsersActions', 'download-alt',
+                              dataset => this.fetchDataToDownload(dataset, 'users'),
+                              'Download User List');
+        this.addDatasetAction('UsersActions', 'download',
+                              dataset => this.fetchDataToDownload(dataset, 'users_details'),
+                              'Download User List with User Profile Information');
         
         // Set initial visibility
         this.event_types_arr.forEach(function(d) { 
@@ -696,6 +719,21 @@ DatasetTable.prototype = {
         // Set the counts
         triggers.emit('new_counts');
         triggers.emit('toggle columns');
+    },
+    addDatasetAction: function(group, glyphicon, action, tooltip) {
+        d3.select('tbody').selectAll('.row_event .cell-' + group + ', .row_subset .cell-' + group).append('span')
+            .attr('class', 'glyphicon glyphicon-' + glyphicon + ' glyphicon-hoverclick action_button')
+            .on('click', action.bind(this))
+            .on('mouseover', function(d) {
+                this.tooltip.setData(tooltip);
+                this.tooltip.on();
+            }.bind(this))
+            .on('mousemove', function(d) {
+                this.tooltip.move(d3.event.x, d3.event.y);
+            }.bind(this))
+            .on('mouseout', function(d) {
+                this.tooltip.off();
+            }.bind(this));;
     },
     prepareCollectionContextMenu: function(set) { 
         var collectionType = (set.Level == 1 ? 'Event' : 'Subset')
@@ -708,45 +746,6 @@ DatasetTable.prototype = {
             },{
                 label: '<span class="glyphicon glyphicon-edit"></span> Edit',
                 action: this.edit.bind(this, set) // Gets the original db collection object, as opposed to our modified version
-            },{
-                divider: true
-//            },{
-//                label: '<span class="glyphicon glyphicon-refresh"></span> Make Tweet List',
-//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
-            },{
-                label: '<span class="glyphicon glyphicon-signal"></span> Make Timeseries',
-                action: this.computeTimeseries.bind(this, set)
-            },{
-                label: '<span class="glyphicon glyphicon-scissors"></span> Clear User List',
-                action: this.clearUserList.bind(this, set)
-            },{
-                label: '<span class="glyphicon glyphicon-signal"></span> Make User List',
-                action: this.computeUserList.bind(this, set)
-//            },{
-//                divider: true
-//            },{
-//                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Tweets + ' Tweets',
-//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
-//            },{
-//                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Timeseries + ' Timeseries',
-//                action: triggers.emitter('alert', 'Sorry I haven\'t moved over that function yet')
-            },{
-                label: '<span class="glyphicon glyphicon-refresh"></span> ' + countText_Users + ' Users',
-                action:  this.countUsers.bind(this, set)
-            },{
-                divider: true
-            },{
-                label: '<span class="glyphicon glyphicon-download-alt"></span> Tweets',
-                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'tweets')
-            },{
-                label: '<span class="glyphicon glyphicon-download-alt"></span> Timeseries',
-                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'timeseries')
-            },{
-                label: '<span class="glyphicon glyphicon-download-alt"></span> Users',
-                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'users')
-            },{
-                label: '<span class="glyphicon glyphicon-download-alt"></span> Users + Details',
-                action: this.fetchDataToDownload.bind(this, collectionType, set.ID, 'users_details')
             }];
         return menu_options;
     },
@@ -847,20 +846,24 @@ DatasetTable.prototype = {
         var table_head = d3.select('thead');
         var table_body = d3.select('tbody');
         var column_group_visibility = {
-            Standard: true,
-            'Tweet Types': this.ops['Columns']['Tweet Type Counts'].is('shown'),
+            Tweets: this.ops['Columns']['Tweet Type Counts'].is('shown'),
             Time: this.ops['Columns']['Dates'].is('shown'),
-            Users: this.ops['Columns']['Repeat Users'].is('shown')
+            Users: this.ops['Columns']['Repeat Users'].is('shown'),
+            Actions: this.ops['Columns']['Actions'].is('shown')
         };
         
         this.column_headers.forEach(function(column, i) {
-            var column_display = column_group_visibility[column.Group] ?
+            var column_display = column.always_display || column_group_visibility[column.Group] ?
                 null : 'none';
             table_head.select('tr th:nth-child(' + (i+1) + ')')
                 .style('display', column_display);
             table_body.selectAll('tr td:nth-child(' + (i+1) + ')')
                 .style('display', column_display);
         }, this);
+        
+        // Turn on/off deletion of data
+        table_body.selectAll('.action-deletion')
+            .style('display', this.ops['Columns']['Show Deletion'].is('shown') ? null : 'none')
     },
     updateTableCounts: function(selector) {
         selector = selector || 'tbody';
@@ -893,9 +896,26 @@ DatasetTable.prototype = {
                 });
         });
         
+        table_body.selectAll('.cell-DistinctTweets .value')
+            .html(function(dataset) {
+                var quantity = 'DistinctTweets';
+                var value = dataset[quantity];
+                if(!value)
+                    return '';
+                if(relative == 'raw') {
+                    return util.formatThousands(value);
+                }
+                var denom = relative == 'event'    ? (dataset['Level'] >= 2 ? dataset['Event']['Tweets'] : dataset['Tweets']) : 
+                            relative == 'type'     ? (dataset['Level'] >= 2 ? dataset['Event'][quantity] : dataset[quantity]) : 
+//                                relative == 'feature'  ? (dataset['Level'] >= 3 ? dataset['Feature Set'][quantity] : dataset[quantity]): 
+                            relative == 'subset'   ? dataset['Tweets'] : 
+                            relative == 'distinct' ? dataset[quantity] : 1;
+                return (value / denom * 100).toFixed(1);
+            });
+        
         // Set visibility of zero/non-zero rows
         table_body.selectAll('tr')
-            .classed('row-zero', function(d) { return !(d.Tweets || d.Minutes || d.CodedTweets) ; });
+            .classed('row-zero', function(d) { return !(d.Tweets || d.Minutes) ; });
         
         // Dates
         table_body.selectAll('.cell-FirstTweet')
@@ -1153,30 +1173,52 @@ DatasetTable.prototype = {
             prog_bar.update(100, 'Error');
         });
     },
-    computeTimeseries: function(d) {
-        var row = '.row_' + (d.Level == 1 ? 'event' : 'subset') + '_' + d.ID;
+    clearTimeseries: function(dataset) {
+        this.connection.phpjson(
+            'timeseries/clear',
+            {
+                Collection: dataset.Level == 1 ? 'Event' : 'Subset',
+                ID: dataset.ID,
+            },
+            this.countTimeseriesMinutes.bind(this, dataset)
+        );
+    },
+    countTimeseriesMinutes: function(dataset) {
+        this.connection.phpjson(
+            'timeseries/count',
+            {
+                Collection: dataset.Level == 1 ? 'Event' : 'Subset',
+                ID: dataset.ID,
+            },
+            this.updateTimeseriesMinutesDisplay.bind(this, dataset)
+        );
+    },
+    computeTimeseries: function(dataset) {
+        var row = '.row_' + (dataset.Level == 1 ? 'event' : 'subset') + '_' + dataset.ID;
         var args = {
             url: 'timeseries/compute',
             post: {
-                Collection: d.Level == 1 ? 'Event' : 'Subset',
-                ID: d.ID,
-                json: true,
+                Collection: dataset.Level == 1 ? 'Event' : 'Subset',
+                ID: dataset.ID,
             },
             quantity: 'tweet',
-            min: d.FirstTweet,
-            max: d.LastTweet,
+            min: dataset.FirstTweet,
+            max: dataset.LastTweet,
             progress_div: row + ' .cell-Minutes',
             progress_text: ' ',
             progress_style: 'full',
-            on_chunk_finish: function(result) {
-                d['Minutes'] = parseInt(result[0]['Minutes']);
-                
-                triggers.emit('update_counts', row);
-            }
+            on_chunk_finish: this.updateTimeseriesMinutesDisplay.bind(this, dataset)
         }
         
         var conn = new Connection(args);
         conn.startStream();
+    },
+    updateTimeseriesMinutesDisplay: function(dataset, result) {
+        var row = '.row_' + (dataset.Level == 1 ? 'event' : 'subset') + '_' + dataset.ID;
+        
+        dataset['Minutes'] = parseInt(result[0]['Minutes']);
+                
+        triggers.emit('update_counts', row);
     },
     countUsers: function(dataset) {
         this.connection.phpjson(
@@ -1318,23 +1360,22 @@ DatasetTable.prototype = {
         
         connection.startStream();
     },
-    fetchDataToDownload: function(collectionType, collectionID, dataType) {
+    fetchDataToDownload: function(dataset, dataType) {
         
+        var collectionType = (dataset.Level == 1 ? 'Event' : 'Subset');
         var url = dataType == 'tweets' ? 'tweets/get' :
                   dataType == 'timeseries' ? 'timeseries/get' :
                   dataType == 'users' ? 'tweets/getUsers' : 'tweets/getUsers';
         var post = {
             collection: collectionType,
-            collection_id: collectionID,
+            collection_id: dataset.ID,
             csv: true,
             limit: 100000,
         };
         if(dataType == 'users_details')
             post.extradata = 'u';
-        if(dataType == 'users_details')
-            post.extradata = 'u';
         
-        var fileName = dataType + '_' + collectionType + '_' + collectionID + '.csv';
+        var fileName = dataType + '_' + collectionType + '_' + dataset.ID + '.csv';
         
         this.connection.php(url, post, 
                             this.handleDataForDownload.bind(this, fileName),

@@ -1,8 +1,6 @@
 <?php
     include '../connect.php';
 
-    ini_set('max_execution_time', 300);
-
     # Get Variables
     if(!isset($_REQUEST['Collection']) or !isset($_REQUEST['ID'])) {
         die('<b>Error</b>: Need to provide collection and id.');
@@ -16,8 +14,8 @@
     assert("in_array('$collection', array('event', 'subset'))");
     assert("is_int($collection_id)");
 
-    // Execute Query
-    $query = "CALL count_users_in_$collection" . 
+    # Run Query
+    $query = "CALL clear_timeseries_for_${collection}" . 
         "($collection_id);";
 
     include '../printJSON.php';
