@@ -11,7 +11,7 @@ from pprint import pprint
 # Parameters
 wait_time = 15
 config_file = '../../local.conf'
-follower_list_cap = 20000
+follower_list_cap = 25000
 followers_per_packet = 5000
 users_reserved = 10
 
@@ -139,7 +139,7 @@ def fetchUsersFollowers(user_id):
     try:
         for page in tweepy.Cursor(twitter_api.followers_ids, user_id=user_id).pages():
             ids.extend(page)
-            if len(ids) > follower_list_cap:
+            if len(ids) > follower_list_cap + 1:
                 break
                 
         if(len(ids) < user.followers_count):
