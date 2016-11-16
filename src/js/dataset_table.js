@@ -21,7 +21,7 @@ function DatasetTable() {
     this.quantities = ['Tweets', 'DistinctTweets', 
                        'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
                        'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
-                       'Minutes', 'Users', 'Users2orMoreTweets', 'Users2orMoreTweets'];
+                       'Minutes', 'Users', 'Users2orMoreTweets', 'Users10orMoreTweets'];
     this.column_headers = [
         {Label: 'ID', ID: 'ID', Group: 'Standard'},
         {Label: 'Collection', ID: 'Collection', Group: 'Standard'},
@@ -36,6 +36,9 @@ function DatasetTable() {
         {Label: 'Users', ID: 'Users', Group: 'Standard', count: true},
         {Label: 'w/ 2+ Tweets', ID: 'Users2orMoreTweets', Group: 'Users', count: true},
         {Label: 'w/ 10+ Tweets', ID: 'Users10orMoreTweets', Group: 'Users', count: true},
+//        {Label: 'Tweets', ID: 'TweetActions', Group: 'Actions'},
+//        {Label: 'Timeseries', ID: 'TimeseriesActions', Group: 'Actions'},
+//        {Label: 'Users', ID: 'UsersActions', Group: 'Actions'},
 //        {Label: 'Open', Quantity: '', Group: 'Standard'}
     ];
 }
@@ -323,10 +326,7 @@ DatasetTable.prototype = {
                 children = [d.subsets['Uncodable'], d.subsets['Codable']];
             }
             
-            ['Tweets', 'DistinctTweets', 
-              'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
-              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
-              'Minutes', 'Users'].forEach(function(count) {
+            this.quantities.forEach(function(count) {
                 d[count] = d3.sum(children, function(e) { return e[count] || 0; });
             });
             
@@ -339,13 +339,10 @@ DatasetTable.prototype = {
             d.LastTweet         = d.LastTweet_Max;
             d.ID_Min            = d3.min(children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
             d.ID_Max            = d3.max(children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
-        });
+        }, this);
         
         this.event_types_arr.forEach(function(d) {
-            ['Tweets', 'DistinctTweets', 
-              'Originals', 'DistinctOriginals', 'Retweets', 'DistinctRetweets', 
-              'Replies', 'DistinctReplies', 'Quotes', 'DistinctQuotes', 
-              'Minutes', 'Users'].forEach(function(count) {
+            this.quantities.forEach(function(count) {
                 d[count] = d3.sum(d.children, function(e) { return e[count] || 0; });
             });
             
@@ -358,7 +355,7 @@ DatasetTable.prototype = {
             d.LastTweet         = d.LastTweet_Max;
             d.ID_Min            = d3.min(d.children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
             d.ID_Max            = d3.max(d.children, function(e) { return parseInt(e.ID)      || new BigNumber(0); });
-        });
+        }, this);
         
         triggers.emit('update_counts');
     },
@@ -452,13 +449,21 @@ DatasetTable.prototype = {
                 callback: triggers.emitter('sort_elements')
             }),
             Empties: new Option({
-                title: 'Empty Rows',
-                labels: ['Hide', 'Show'],
+                title: 'Uncounted Rows',
+                labels: ['Hidden', 'Shown'],
                 ids:    ['none', 'table-row'],
                 default: 0,
                 type: "toggle",
                 callback: triggers.emitter('refresh_visibility')
             }),
+//            Unopened: new Option({
+//                title: 'Unopened Rows',
+//                labels: ['Hidden', 'Shown'],
+//                ids:    ['none', 'table-row'],
+//                default: 0,
+//                type: "toggle",
+//                callback: triggers.emitter('refresh_visibility')
+//            }),
             'Level 0 Showing Children': new Option({
                 title: 'Event Types Showing Events',
                 labels: ['List'],
@@ -570,12 +575,13 @@ DatasetTable.prototype = {
         
         // ID & Label
         table_body.selectAll('.cell-ID')
-            .html(function(d) { return [1, 2, 4].includes(d.Level) ? d.ID : ''; })
+            .html(dataset => [1, 2, 4].includes(dataset.Level) && dataset.ID != 0 ? dataset.ID : '')
         
         table_body.selectAll('.cell-Collection')
             .append('span')
             .attr('class', 'value')
-            .html(function(d) { return d.Label; });
+            .style('margin-left', dataset => dataset.Level * 10 + 'px')
+            .html(dataset => dataset.Label);
         
         var level_names = ['events', 'rumors', 'features', 'matches', 'N/A'];
         table_body.selectAll('.row_haschildren .cell-Collection')
@@ -711,8 +717,11 @@ DatasetTable.prototype = {
                 label: '<span class="glyphicon glyphicon-signal"></span> Make Timeseries',
                 action: this.computeTimeseries.bind(this, set)
             },{
+                label: '<span class="glyphicon glyphicon-scissors"></span> Clear User List',
+                action: this.clearUserList.bind(this, set)
+            },{
                 label: '<span class="glyphicon glyphicon-signal"></span> Make User List',
-                action: this.computeUsers.bind(this, set)
+                action: this.computeUserList.bind(this, set)
 //            },{
 //                divider: true
 //            },{
@@ -1170,30 +1179,33 @@ DatasetTable.prototype = {
         conn.startStream();
     },
     countUsers: function(dataset) {
-        var row = '.row_' + (dataset.Level == 1 ? 'event' : 'subset') + '_' + dataset.ID;
-        var conn = this.connection.phpjson(
+        this.connection.phpjson(
             'users/countInCollection',
             {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
                 ID: dataset.ID,
             },
-            function(result) {
-                dataset['Users'] = parseInt(result[0]['Users']);
-                dataset['Users2orMoreTweets'] = parseInt(result[0]['Users2orMoreTweets']);
-                dataset['Users10orMoreTweets'] = parseInt(result[0]['Users10orMoreTweets']);
-                
-                triggers.emit('update_counts', row);
-            }
+            this.updateUserCountDisplay.bind(this, dataset)
         );
     },
-    computeUsers: function(d) {
-        var conn = this.connection.phpjson(
+    clearUserList: function(dataset) {
+        this.connection.phpjson(
+            'users/clearUsersInCollection',
+            {
+                Collection: dataset.Level == 1 ? 'Event' : 'Subset',
+                ID: dataset.ID,
+            },
+            this.countUsers.bind(this, dataset)
+        );
+    },
+    computeUserList: function(dataset) {
+        this.connection.phpjson(
             'users/getUserLastCounted',
             {
-                Collection: d.Level == 1 ? 'Event' : 'Subset',
-                ID: d.ID,
+                Collection: dataset.Level == 1 ? 'Event' : 'Subset',
+                ID: dataset.ID,
             },
-            this.computeUserStream.bind(this, d)
+            this.computeUserStream.bind(this, dataset)
         );
     },
     computeUserStream: function(dataset, lastTweet) {
@@ -1225,6 +1237,15 @@ DatasetTable.prototype = {
         
         var conn = new Connection(args);
         conn.startStream();
+    },
+    updateUserCountDisplay: function(dataset, queryResult) {
+        var row = '.row_' + (dataset.Level == 1 ? 'event' : 'subset') + '_' + dataset.ID;
+        
+        dataset['Users'] = parseInt(queryResult[0]['Users']);
+        dataset['Users2orMoreTweets'] = parseInt(queryResult[0]['Users2orMoreTweets']);
+        dataset['Users10orMoreTweets'] = parseInt(queryResult[0]['Users10orMoreTweets']);
+
+        triggers.emit('update_counts', row);
     },
     openTimeseries: function(d) {
         var state = JSON.stringify({event: d.ID});
