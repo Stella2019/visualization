@@ -327,7 +327,7 @@ Timeseries.prototype = {
                 ids:    ["prevalence", "time", "rand"],
                 default: 1,
                 type: "dropdown",
-                callback: triggers.emit('alert', 'Sorry this doesn\'t work right now')
+                callback: triggers.emitter('alert', 'Sorry this doesn\'t work right now')
             }),
         };
 //        this.ops['Dataset']['Autoload'] = new Option({

@@ -18,11 +18,13 @@
         
         // Add all eventfields (if this is a new event)
         $fields_provided = array();
-        $fields = array();
+        $field_values = array();
         foreach($eventfields as $field) {
             if(isset($_REQUEST[$field])) {
                 array_push($fields_provided, $field);
-                array_push($field_values, "'$_REQUEST[$field]'");
+                $value = $mysqli->real_escape_string($_REQUEST[$field]);
+//                $value = addslashes(addslashes($_REQUEST[$field]));
+                array_push($field_values, "'$value'");
             }
         }
         $query .= " (`" . join('`, `', $fields_provided) . "`)";
@@ -33,7 +35,8 @@
         $changed = array();
         foreach($eventfields_updatable as $field) {
             if(isset($_REQUEST[$field])) {
-                 array_push($changed, " `$field`='$_REQUEST[$field]'");
+                $value = $mysqli->real_escape_string($_REQUEST[$field]);
+                 array_push($changed, " `$field`='$value'");
             }
         }
         $query .= join(',', $changed);
