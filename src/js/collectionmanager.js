@@ -96,6 +96,7 @@ function CollectionManager(app, args) {
             {label: 'ID',                 name: 'ID',          type: 'Text',     final: true},
             {label: 'Event Type',         name: 'Type',        type: 'Enum',     list: function() {
                  // Hack only used by dataset_table.js
+                if(typeof(DT) == "undefined") return [];
                 return DT.event_types_arr.map(d => {
                     return {label: d.Label, value: d.Label};
                 });
@@ -117,6 +118,7 @@ function CollectionManager(app, args) {
             {label: 'ID',       name: 'ID',       type: 'Text',     final: true},
             {label: 'Event',    name: 'Event',    type: 'Enum',     list: function() {
                 // Hack only used by dataset_table.js
+                if(typeof(DT) == "undefined") return [];
                 var list = DT.events_arr.map(d => {
                     return {label: d.Label + ' (' + d.ID + ')', value: d.ID};
                 });
@@ -125,6 +127,7 @@ function CollectionManager(app, args) {
             }},
             {label: 'Rumor',    name: 'Rumor',    type: 'Enum',     list: function() {
                 // Hack only used by dataset_table.js
+                if(typeof(DT) == "undefined") return [];
                 var list = DT.rumors_arr.map(d => {
                     return {label: d.Label + ' (' + d.ID + ')', value: d.ID};
                 });
@@ -133,6 +136,7 @@ function CollectionManager(app, args) {
             }},
             {label: 'Superset', name: 'Superset', type: 'Enum',     list: function() {
                  // Hack DT used by dataset_table.js
+                if(typeof(DT) == "undefined") return [];
                 var list = DT.subsets_arr.map(d => {
                     return {label: d.FeatureMatch + ' (' + d.ID + ')', value: d.ID};
                 });
@@ -141,6 +145,7 @@ function CollectionManager(app, args) {
             }},
             {label: 'Feature',  name: 'Feature', type: 'Enum',     list: function() {
                  // Hack only used by dataset_table.js
+                if(typeof(DT) == "undefined") return [];
                 return util.lunique(DT.features_arr.map(d => d.Label))
                     .map(d => {
                         return {label: d, value: d};
@@ -441,8 +446,10 @@ CollectionManager.prototype = {
     },
     updateCollection: function() {
         var fields = {};
-        $("#edit_form").serializeArray().forEach(function(x) { fields[x.name] = x.value; });
-        console.log(fields);
+        $("#edit_form").serializeArray().forEach(function(x) { 
+            if(x.value != "")
+                fields[x.name] = x.value; 
+        });
         
         this.app.connection.php('collection/update', fields, triggers.emitter('edit collection:verify update')); // add a callback
     },

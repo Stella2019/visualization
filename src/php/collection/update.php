@@ -15,18 +15,18 @@
     if($_REQUEST["type"] == 'event') {
         // Start Insert statement
         $query .= " INSERT INTO Event ";
-        $query .= " (`" . join('`, `', $eventfields) . "`)";
         
         // Add all eventfields (if this is a new event)
+        $fields_provided = array();
         $fields = array();
         foreach($eventfields as $field) {
             if(isset($_REQUEST[$field])) {
-                 array_push($fields, "'$_REQUEST[$field]'");
-            } else {
-                 array_push($fields, "''");
+                array_push($fields_provided, $field);
+                array_push($field_values, "'$_REQUEST[$field]'");
             }
         }
-        $query .= " VALUES (" .join(',', $fields). ")";
+        $query .= " (`" . join('`, `', $fields_provided) . "`)";
+        $query .= " VALUES (" .join(',', $field_values). ")";
         
         // Update existing event if that's the case
         $query .= " ON DUPLICATE KEY UPDATE ";

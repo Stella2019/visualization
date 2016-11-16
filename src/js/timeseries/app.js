@@ -314,6 +314,7 @@ Timeseries.prototype = {
                 labels: ['US PT (-08:00)', 'US ET (-05:00)', 'GMT (+00:00)', 'CET (+01:00)', 'EET (+02:00)', 'Beijing (+08:00)', 'AET (+10:00)'],
                 ids: [-8, -5, 0, 1, 2, 8, 10],
                 callback: function() {
+                    triggers.emit('alert', 'Sorry this doesn\'t work right now')
                     triggers.emit('legend:color scale');
                     triggers.emit('chart:render series');
                 }
@@ -326,9 +327,17 @@ Timeseries.prototype = {
                 ids:    ["prevalence", "time", "rand"],
                 default: 1,
                 type: "dropdown",
-                callback: function() { /* nothing */ }
+                callback: triggers.emit('alert', 'Sorry this doesn\'t work right now')
             }),
         };
+//        this.ops['Dataset']['Autoload'] = new Option({
+//            title: 'Load',
+//            labels: ['Pause', 'Automatic'],
+//            ids: ['pause', 'automatic'],
+//            default: 1,
+//            type: 'toggle',
+//            callback: triggers.emit('autoload')
+//        });
         
         // Add dataset options
         triggers.emit('collectionManager:setOptions');
