@@ -12,7 +12,7 @@
     # Validation
     assert_options(ASSERT_BAIL, 1);
     assert("in_array('$collection', array('event', 'subset'))");
-    assert("is_int($collection_id)");
+    assert("is_numeric($collection_id)");
 
     # Execute Query
     $query = "CALL clear_users_in_${collection}(${collection_id});";

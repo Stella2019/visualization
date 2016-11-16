@@ -14,9 +14,9 @@
     # Validation
     assert_options(ASSERT_BAIL, 1);
     assert("in_array('$collection', array('event', 'subset'))");
-    assert("is_int($collection_id)");
-    assert("is_long($tweet_min)");
-    assert("is_long($tweet_max)");
+    assert("is_numeric($collection_id)");
+    assert("is_numeric($tweet_min)");
+    assert("is_numeric($tweet_max)");
 
     // Execute Query
     $query = "CALL compute_timeseries_for_${collection}" . 

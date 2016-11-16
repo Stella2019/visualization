@@ -12,7 +12,7 @@
     # Validation
     assert_options(ASSERT_BAIL, 1);
     assert("in_array('$collection', array('event', 'subset'))");
-    assert("is_int($collection_id)");
+    assert("is_numeric($collection_id)");
 
     # Run Query
     $query = "CALL clear_timeseries_for_${collection}" . 
