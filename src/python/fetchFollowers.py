@@ -129,7 +129,7 @@ def fetchUsersFollowers(user_id):
         elif('403' in err or 'suspended' in err):
 #            print("403: Forbidden - user has been suspended")
             return ['Suspended']
-        elif('404' in err or 'does not exist' in err):
+        elif('404' in err or 'does not exist' in err or 'not found' in err):
 #            print("404: Not found - user has been deleted/removed")
             return ['Removed']
         else:

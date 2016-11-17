@@ -603,7 +603,7 @@ def parseTweetJSON(data):
         'Type': 'original',
         'Timestamp': timestamp_exact,
         'ParentID': None,
-        'ParentText': None,
+#        'ParentText': None,
         'ExpandedURL': getExpandedURL(data),
         'MediaURL': getMediaURL(data),
         'Lang': data['lang'] if 'lang' in data else None,
@@ -635,8 +635,8 @@ def parseTweetJSON(data):
             if(tweet['ExpandedURL'] is None):
                 tweet['ExpandedURL'] = getExpandedURL(data['quoted_status'])
                 
-            if('text' in data['quoted_status']):
-                tweet['ParentText'] = data['quoted_status']['text']
+#            if('text' in data['quoted_status']):
+#                tweet['ParentText'] = data['quoted_status']['text']
     elif("in_reply_to_status_id_str" in data and data['in_reply_to_status_id_str'] is not None): 
         tweet['Type'] = 'reply'
         
@@ -671,8 +671,8 @@ def parseTweetJSON(data):
             tweet['ParentID'] = data['retweeted_status']['id']
         elif('id_str' in data['retweeted_status']):
             tweet['ParentID'] = data['retweeted_status']['id_str']
-        if('text' in data['retweeted_status']):
-            tweet['ParentText'] = data['retweeted_status']['text']
+#        if('text' in data['retweeted_status']):
+#            tweet['ParentText'] = data['retweeted_status']['text']
         
     # Users
     if("user" in data):
