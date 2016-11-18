@@ -43,14 +43,18 @@
     $conds = array();
     $conds[] = "TweetSet.${collection}ID=$collection_id ";
     $lt = (isset($_REQUEST["inclusive_max"]) ? '<=' : '<');
-    if(isset($_REQUEST["tweet_min"]))
-        $conds[] = "TweetSet.TweetID >= " . $_REQUEST["tweet_min"] . " ";
-    if(isset($_REQUEST["tweet_max"]))
-        $conds[] = "TweetSet.TweetID $lt " . $_REQUEST["tweet_max"] . " ";
-    if(isset($_REQUEST["time_min"]))
-        $conds[] = "tweetID_2_date(TweetSet.Tweet) >= '" . $_REQUEST["time_min"] . "'";
-    if(isset($_REQUEST["time_max"]))
-        $conds[] = "tweetID_2_date(TweetSet.Tweet) $lt '" . $_REQUEST["time_max"] . "'";
+//    if(isset($_REQUEST["tweet_min"]))
+//        $conds[] = "TweetSet.TweetID >= " . $_REQUEST["tweet_min"] . " ";
+//    if(isset($_REQUEST["tweet_max"]))
+//        $conds[] = "TweetSet.TweetID $lt " . $_REQUEST["tweet_max"] . " ";
+    if(isset($_REQUEST["user_min"]))
+        $conds[] = "TweetSet.UserID >= " . $_REQUEST["user_min"] . " ";
+    if(isset($_REQUEST["user_max"]))
+        $conds[] = "TweetSet.UserID $lt " . $_REQUEST["user_max"] . " ";
+//    if(isset($_REQUEST["time_min"]))
+//        $conds[] = "tweetID_2_date(TweetSet.Tweet) >= '" . $_REQUEST["time_min"] . "'";
+//    if(isset($_REQUEST["time_max"]))
+//        $conds[] = "tweetID_2_date(TweetSet.Tweet) $lt '" . $_REQUEST["time_max"] . "'";
 
     if(!empty($conds))
         $query .= " WHERE " . join(" AND " , $conds);
@@ -60,14 +64,14 @@
         $query .= " ORDER BY RAND(3)";
     }
 
-    $query .= " LIMIT ";
     if(isset($_REQUEST["limit"])) {
+        $query .= " ORDER BY TweetSet.UserID LIMIT ";
         if(isset($_REQUEST["offset"])) {
             $query .= $_REQUEST["offset"] . ',';
         }
         $query .= $_REQUEST["limit"];
     } else {
-        $query .= "5";
+        $query .= " LIMIT 5";
     }
 
     $query .= ";";

@@ -754,9 +754,14 @@ Connection.prototype = {
             if(this.lastTweet) {
                 if(this.lastTweet instanceof BigNumber) {
                     this.post[this.pk_query] = this.lastTweet.add(1).toString();
+                } else if(this.lastTweet instanceof Date) {
+                    var nextDate = new Date(this.lastTweet);
+                    nextDate.setSeconds(nextDate.getSeconds() + 1);
+                    this.post[this.pk_query] = util.formatDate(nextDate);
                 } else {
                     this.post[this.pk_query] = (this.lastTweet + 1) + "";
                 }
+                console.log(this.post, this.post[this.pk_query]);
             }
 //            this.post['offset'] = this.chunks[this.chunk_index];
         } else {
@@ -795,9 +800,14 @@ Connection.prototype = {
         this.progress.update(this.chunk_index + 1, progress_text);
 
         if(this.quantity == 'count')  { // Makes a LOT of assumptions about the data
-            if(this.post.json) {
+            if(this.post.json && file_data[file_data.length - 1]) {
                 this.lastTweet = file_data[file_data.length - 1][this.pk_table];
-                if(this.pk_query.includes('tweet')) this.lastTweet = new BigNumber(this.lastTweet);
+                if(this.pk_query.includes('time')) 
+                    this.lastTweet = util.date(this.lastTweet);
+                else if(this.pk_query.includes('tweet')) 
+                    this.lastTweet = new BigNumber(this.lastTweet);
+                else 
+                    this.lastTweet = parseInt(this.lastTweet);
             } else {
                 var lastTweetStart = file_data.lastIndexOf(this.pk_table + ':"');
                 if(lastTweetStart >= 0) {

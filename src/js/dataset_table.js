@@ -581,7 +581,7 @@ DatasetTable.prototype = {
                 event.rumors_arr.forEach(function(rumor) {
                     rumor.row = table_body.append('tr')
                         .data([rumor])
-                        .attr('class', d => 'row_rumor row_haschildren row_rumor_' + d.ID + (d.CollectionType == 'Rumor' ? ' row_subset_' + d.Subset_ID : ''));
+                        .attr('class', d => 'row_rumor row_haschildren row_rumor_' + d.ID + (d.CollectionType == 'Rumor' ? ' row_rumorwithsubset row_subset_' + d.Subset_ID : ''));
                     
                     rumor.features_arr.forEach(function(feature) {
                         if(feature.Label != 'Rumor') {
@@ -707,7 +707,7 @@ DatasetTable.prototype = {
         
         // Add action buttons
         this.addDatasetAction('DatasetActions', 'edit', this.edit, 'Edit the dataset');
-        this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet', ['event', 'rumor', 'subset']);
+        this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet', ['event', 'rumorwithsubset', 'subset']);
         this.addDatasetAction('TweetsActions', 'download-alt',
                               dataset => this.fetchDataToDownload(dataset, 'tweets'),
                               'Download Tweets');
@@ -1407,7 +1407,7 @@ DatasetTable.prototype = {
         var collection_id = dataset.ID;
         var url = dataType.includes('tweets') ? 'tweets/get' :
                   dataType.includes('timeseries') ? 'timeseries/get' :
-                  dataType.includes('users') ? 'tweets/getUsers' : 'tweets/getUsers';
+                  dataType.includes('users') ? 'users/get' : 'tweets/getUsers';
         var pk_query = dataType.includes('tweets') ? 'tweet_min' :
                   dataType.includes('timeseries') ? 'time_min' :
                   dataType.includes('users') ? 'user_min' : 'tweet_min';
@@ -1465,6 +1465,7 @@ DatasetTable.prototype = {
             this.endDownload();
         }
     
+        console.log(newData);
         $.merge(this.download.data, newData);
     },
     endDownload: function() {
@@ -1479,7 +1480,7 @@ DatasetTable.prototype = {
             data.forEach(function(datum) {
                 if('Text' in datum)
                     datum.Text = datum.Text.replace(/(?:\r\n|\r|\n)/g, ' ');
-                if('Description' in datum)
+                if('Description' in datum && datum.Description)
                     datum.Description = datum.Description.replace(/(?:\r\n|\r|\n)/g, ' ');
     //            var text_no_url = tweet.Text.replace(/(?:http\S+)/g, ' ');
     //            
@@ -1507,31 +1508,47 @@ DatasetTable.prototype = {
         };
     },
     fileDownload: function(content, fileName, mimeType) {
-        var a = document.createElement('a');
+//        var a = document.createElement('a');
         var fileName = fileName || 'data.csv';
-        var mimeType = mimeType || 'text/csv'; // 'application/octet-stream';
+        var mimeType = mimeType || 'text/csv'; // 'application/octet-stream'; // "application/csv;charset=utf-8;"
 
-        if (navigator.msSaveBlob) { // IE10
-            return navigator.msSaveBlob(new Blob([content], { type: mimeType }), fileName);
-        } else if ('download' in a) { //html5 A[download]
-            a.href = 'data:' + mimeType + ',' + encodeURIComponent(content);
-            a.setAttribute('download', fileName);
-            document.body.appendChild(a);
-            setTimeout(function() {
-                a.click();
-                document.body.removeChild(a);
-            }, 66);
-            return true;
-        } else { //do iframe dataURL download (old ch+FF):
-            var f = document.createElement('iframe');
-            document.body.appendChild(f);
-            f.src = 'data:' + mimeType + ',' + encodeURIComponent(content);
-
-            setTimeout(function() {
-                document.body.removeChild(f);
-            }, 333);
-            return true;
+        var blob = new Blob([ content ], {type : mimeType});
+        if (window.navigator.msSaveBlob) {
+            // FOR IE BROWSER
+            navigator.msSaveBlob(blob, fileName);
+        } else {
+            // FOR OTHER BROWSERS
+            var link = document.createElement("a");
+            var csvUrl = URL.createObjectURL(blob);
+            link.href = csvUrl;
+            link.style = "visibility:hidden";
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
+        
+//        if (navigator.msSaveBlob) { // IE10
+//            return navigator.msSaveBlob(new Blob([content], { type: mimeType }), fileName);
+//        } else if ('download' in a) { //html5 A[download]
+//            a.href = 'data:' + mimeType + ',' + encodeURIComponent(content);
+//            a.setAttribute('download', fileName);
+//            document.body.appendChild(a);
+//            setTimeout(function() {
+//                a.click();
+//                document.body.removeChild(a);
+//            }, 66);
+//            return true;
+//        } else { //do iframe dataURL download (old ch+FF):
+//            var f = document.createElement('iframe');
+//            document.body.appendChild(f);
+//            f.src = 'data:' + mimeType + ',' + encodeURIComponent(content);
+//
+//            setTimeout(function() {
+//                document.body.removeChild(f);
+//            }, 333);
+//            return true;
+//        }
     },
 };
 
