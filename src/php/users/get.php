@@ -43,10 +43,10 @@
     $conds = array();
     $conds[] = "TweetSet.${collection}ID=$collection_id ";
     $lt = (isset($_REQUEST["inclusive_max"]) ? '<=' : '<');
-    if(isset($_REQUEST["user_min"]))
-        $conds[] = "TweetSet.UserID >= " . $_REQUEST["user_min"] . " ";
-    if(isset($_REQUEST["user_max"]))
-        $conds[] = "TweetSet.UserID $lt " . $_REQUEST["user_max"] . " ";
+    if(isset($_REQUEST["tweet_min"]))
+        $conds[] = "TweetSet.TweetID >= " . $_REQUEST["tweet_min"] . " ";
+    if(isset($_REQUEST["tweet_max"]))
+        $conds[] = "TweetSet.TweetID $lt " . $_REQUEST["tweet_max"] . " ";
     if(isset($_REQUEST["time_min"]))
         $conds[] = "tweetID_2_date(TweetSet.Tweet) >= '" . $_REQUEST["time_min"] . "'";
     if(isset($_REQUEST["time_max"]))

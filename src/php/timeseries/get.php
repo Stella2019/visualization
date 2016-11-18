@@ -20,5 +20,9 @@
 //    $query = $query .
 //        " ORDER BY Time; ";
 
-    include '../printResults.php';
+    if(isset($_REQUEST["json"])) {
+        include '../printJSON.php';
+    } else {
+        include '../printResults.php';
+    }
 ?>

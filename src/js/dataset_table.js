@@ -43,6 +43,13 @@ function DatasetTable() {
         {Label: 'Users', ID: 'UsersActions', Group: 'Actions'},
 //        {Label: 'Open', Quantity: '', Group: 'Standard'}
     ];
+    
+    this.download = {
+        stream: false,
+        dataset: false,
+        data: [],
+        datatype: ''
+    };
 }
 DatasetTable.prototype = {
     init: function() {
@@ -124,9 +131,10 @@ DatasetTable.prototype = {
             if (a.Label > b.Label) return 1;
             return 0;
         });
-        this.event_types_arr.forEach(function(d, i) {
-            d.ID = i;
-            d.children = d.events_arr;
+        this.event_types_arr.forEach(function(event_type, i) {
+            event_type.CollectionType = 'EventType';
+            event_type.ID = i;
+            event_type.children = event_type.events_arr;
         });
         
         this.events_arr.forEach(function(event) {
@@ -140,7 +148,7 @@ DatasetTable.prototype = {
         });
         
         this.rumors_arr.forEach(function(rumor) {
-            rumor.children = rumor.features_arr;
+            rumor.children = rumor.features_arr.filter(f => f.Label != 'Rumor');
             
             rumor.features_arr.sort(function(a, b) {
                 if (a.ID < b.ID) return -1;
@@ -150,6 +158,7 @@ DatasetTable.prototype = {
         });
         
         this.features_arr.forEach(function(feature, i) {
+            feature.CollectionType = 'Feature';
             feature.children = feature.subsets_arr;
             feature.ID = feature.Event.ID * 100 + i;
             
@@ -167,6 +176,7 @@ DatasetTable.prototype = {
         event.ID = parseInt(event.ID);
         event.Label = event.DisplayName || event.Name;
         event.Level = 1;
+        event.CollectionType = 'Event';
         this.quantities.forEach(function (quantity) {
             event[quantity] = parseInt(event[quantity]) || 0;
         });
@@ -193,7 +203,7 @@ DatasetTable.prototype = {
         // Add children
         var event_rumor = {
             Event: event.ID,
-            ID: 0,
+            ID: event.ID - 10000,
             Name: 'All Tweets in Event',
             Definition: '',
             Query: '',
@@ -201,7 +211,8 @@ DatasetTable.prototype = {
             StopTime:  event.StopTime,
             Active: '1'
         }
-        event.rumors = {0: event_rumor};
+        event.rumors = {};
+        event.rumors[(event.ID - 10000)] = event_rumor;
         event.rumors_arr = [event_rumor];
         this.rumors_arr.push(event_rumor);
         event.subsets_arr = [];
@@ -222,6 +233,7 @@ DatasetTable.prototype = {
     configureRawRumorObject: function(rumor) {
         rumor.ID = parseInt(rumor.ID);
         rumor.Level = 2;
+        rumor.CollectionType = rumor.ID > 0 ? 'Rumor' : 'DefaultRumor';
         rumor.Label = rumor.Name;
         rumor.features =  {};
         rumor.features_arr = [];
@@ -241,12 +253,13 @@ DatasetTable.prototype = {
         rumor['Event Type'] = event['Event Type'];
 
         // Add to indiced object
-        this.rumors[event.ID + '_' + rumor.ID] = rumor;
+        this.rumors[rumor.ID] = rumor;
     },
     configureRawSubsetObject: function(subset) {
         // Add fields
         subset.ID = parseInt(subset.ID);
         subset.Label = util.subsetName(subset);
+        subset.CollectionType = 'Subset';
         subset.FeatureMatch = util.subsetName({
             feature: subset.Feature,
             match: subset.Match,
@@ -263,7 +276,8 @@ DatasetTable.prototype = {
         // Get ancestors
         subset.Event_ID = subset.Event;
         var event = this.events[subset.Event_ID];
-        var rumor = event.rumors[subset.Rumor];
+        var rumor_ID = subset.Rumor != "0" ? subset.Rumor : (parseInt(subset.Event_ID) - 10000);
+        var rumor = event.rumors[rumor_ID];
 
         // If it is actually a rumor subset, add data to the rumor
         if(subset.Feature == 'Rumor') {
@@ -278,6 +292,7 @@ DatasetTable.prototype = {
             });
             actual_rumor['FirstTweet'] = subset['FirstTweet'] ? new BigNumber(subset['FirstTweet']) : new BigNumber('0');
             actual_rumor['LastTweet']  = subset['LastTweet']  ? new BigNumber(subset['LastTweet'])  : new BigNumber('0');
+            actual_rumor['Subset_ID']  = subset.ID;
         } else if(subset.Feature == 'Event') {
             if(this.Match in this.events) {
                 subset.Label = this.events[this.Match].Label;
@@ -566,18 +581,20 @@ DatasetTable.prototype = {
                 event.rumors_arr.forEach(function(rumor) {
                     rumor.row = table_body.append('tr')
                         .data([rumor])
-                        .attr('class', d => 'row_rumor row_haschildren row_rumor_' + d.ID);
+                        .attr('class', d => 'row_rumor row_haschildren row_rumor_' + d.ID + (d.CollectionType == 'Rumor' ? ' row_subset_' + d.Subset_ID : ''));
                     
                     rumor.features_arr.forEach(function(feature) {
-                        feature.row = table_body.append('tr')
-                            .data([feature])
-                            .attr('class', d => 'row_feature row_haschildren');
+                        if(feature.Label != 'Rumor') {
+                            feature.row = table_body.append('tr')
+                                .data([feature])
+                                .attr('class', d => 'row_feature row_haschildren');
 
-                        feature.subsets_arr.forEach(function(subset) {
-                            subset.row = table_body.append('tr')
-                                .data([subset])
-                                .attr('class', d => 'row_subset row_subset_' + d.ID);
-                        });
+                            feature.subsets_arr.forEach(function(subset) {
+                                subset.row = table_body.append('tr')
+                                    .data([subset])
+                                    .attr('class', d => 'row_subset row_subset_' + d.ID);
+                            });
+                        }
                     });
                 });
             });
@@ -596,7 +613,7 @@ DatasetTable.prototype = {
         
         // ID & Label
         table_body.selectAll('.cell-ID')
-            .html(dataset => [1, 2, 4].includes(dataset.Level) && dataset.ID != 0 ? dataset.ID : '')
+            .html(dataset => [1, 2, 4].includes(dataset.Level) && dataset.CollectionType != 'DefaultRumor' ? dataset.ID : '')
         
         table_body.selectAll('.cell-Collection')
             .append('span')
@@ -690,11 +707,15 @@ DatasetTable.prototype = {
         
         // Add action buttons
         this.addDatasetAction('DatasetActions', 'edit', this.edit, 'Edit the dataset');
-        this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet');
+        this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet', ['event', 'rumor', 'subset']);
         this.addDatasetAction('TweetsActions', 'download-alt',
                               dataset => this.fetchDataToDownload(dataset, 'tweets'),
                               'Download Tweets');
-//        this.addDatasetAction('TimeseriesActions', 'new-window', this.openCodingReport, 'Open Coding Report');
+        this.addDatasetAction('TweetsActions', 'download',
+                              dataset => this.fetchDataToDownload(dataset, 'tweets_userprofiles'),
+                              'Download Tweets & User Profiles');
+//        this.addDatasetAction('TweetsActions', 'new-window', this.openCodingReport, 'Open Coding Report');
+//        this.addDatasetAction('TweetsActions', 'new-window', this.openFeatureReport, 'Open Feature Report');
         this.addDatasetAction('TimeseriesActions', 'list', this.computeTimeseries, 'Build Timeseries Data');
         this.addDatasetAction('TimeseriesActions', 'refresh', this.countTimeseriesMinutes, 'Recount Timeseries Datapoints (Minutes)');
         this.addDatasetAction('TimeseriesActions', 'scissors action-deletion', this.clearTimeseries, 'Clear Saved Timeseries');
@@ -709,8 +730,9 @@ DatasetTable.prototype = {
                               dataset => this.fetchDataToDownload(dataset, 'users'),
                               'Download User List');
         this.addDatasetAction('UsersActions', 'download',
-                              dataset => this.fetchDataToDownload(dataset, 'users_details'),
-                              'Download User List with User Profile Information');
+                              dataset => this.fetchDataToDownload(dataset, 'users_userprofiles'),
+                              'Download User List & User Profiles');
+        this.addDatasetAction('UsersActions', 'user', this.enqueueUsersToFetchFollowerQueue.bind(this), 'Fetch followers for users in this dataset by adding them to the queue for the FetchFollowers python script to download using the Twitter API', ['subset']);
         
         // Set initial visibility
         this.event_types_arr.forEach(function(d) { 
@@ -721,8 +743,10 @@ DatasetTable.prototype = {
         triggers.emit('new_counts');
         triggers.emit('toggle columns');
     },
-    addDatasetAction: function(group, glyphicon, action, tooltip) {
-        d3.select('tbody').selectAll('.row_event .cell-' + group + ', .row_subset .cell-' + group).append('span')
+    addDatasetAction: function(action_group, glyphicon, action, tooltip, dataset_types) {
+        if(dataset_types == undefined) dataset_types = ['subset', 'event'];
+        var selector = dataset_types.map(d => '.row_' + d + ' .cell-' + action_group).join(', ');
+        d3.select('tbody').selectAll(selector).append('span')
             .attr('class', 'glyphicon glyphicon-' + glyphicon + ' glyphicon-hoverclick action_button')
             .on('click', action.bind(this))
             .on('mouseover', function(d) {
@@ -751,36 +775,36 @@ DatasetTable.prototype = {
         return menu_options;
     },
     prepareCollectionTooltip: function(collection) {
-        if(collection['Level'] == 0) {
+        if(collection['CollectionType'] == 'Event Type') {
             return {
                 ID:           collection['ID'],
                 'Event Type': collection['Label'],
                 Events:       collection['events_arr'] ? collection['events_arr'].map(function(event) { return event['Label']; }) : null
-            }
-        } else if(collection['Level'] == 1) {
+            };
+        } else if(collection['CollectionType'] == 'Event') {
             return {
                 ID:           collection['ID'],
                 Event:        collection['Label'],
                 'Event Type': collection['Event Type']['Label'],
                 Rumors:       collection['rumors_arr'] ? collection['rumors_arr'].map(function(event) { return event['Label']; }) : null
-            }
-        } else if(collection['Level'] == 2) {
+            };
+        } else if(collection['CollectionType'] == 'Rumor') {
             return {
                 ID:           collection['ID'],
                 Rumor:        collection['Label'],
                 Event:        collection['Event']['Label'],
                 'Event Type': collection['Event Type']['Label'],
                 Features:     collection['features_arr'] ? collection['features_arr'].map(function(event) { return event['Label']; }) : null
-            }
-        } else if(collection['Level'] == 3) {
+            };
+        } else if(collection['CollectionType'] == 'Feature') {
             return {
                 ID:           collection['ID'],
                 Feature:      collection['Label'],
                 Rumor:        collection['Rumor']['Label'],
                 Event:        collection['Event']['Label'],
                 'Event Type': collection['Event Type']['Label']
-            }
-        } else {
+            };
+        } else if(collection['CollectionType'] == 'Subset') {
             return {
                 ID:           collection['ID'],
                 Match:        collection['Match'],
@@ -788,7 +812,9 @@ DatasetTable.prototype = {
                 Rumor:        collection['Rumor']['Label'],
                 Event:        collection['Event']['Label'],
                 'Event Type': collection['Event Type']['Label']
-            }
+            };
+        } else {
+            return "These subsets don't belong to any specific rumor.";
         }
     },
     setVisibility_Rows_children: function(d, show_children) {
@@ -1137,18 +1163,17 @@ DatasetTable.prototype = {
             }
         }
     },
-    recount: function(d) {
+    recount: function(dataset) {
         // Prepare statement
         var post = {
-            Collection: d.Level == 1 ? 'event' : 'subset',
-            ID: d.ID,
+            Collection: dataset.Level == 1 ? 'event' : 'subset',
+            ID: dataset.Subset_ID || dataset.ID,
         }
-        var row = '.row_' + (d.Level == 1 ? 'event' : 'subset') + '_' + d.ID;
         
         // Start loading sign
         var prog_bar = new Progress({
             'initial': 100,
-            'parent_id': row + ' .cell-Tweets',
+            'parent_id': this.datasetRowID(dataset) + ' .cell-Tweets',
             style: 'full', 
             text: ' '
         });
@@ -1159,12 +1184,12 @@ DatasetTable.prototype = {
             result = result[0];
             
             this.quantities.forEach(function (quantity) {
-                d[quantity] = parseInt(result[quantity]) || 0;
+                dataset[quantity] = parseInt(result[quantity]) || 0;
             });
-            d['FirstTweet'] = result['FirstTweet'] ? new BigNumber(result['FirstTweet']) : new BigNumber('0');
-            d['LastTweet']  = result['LastTweet']  ? new BigNumber(result['LastTweet'])  : new BigNumber('0');
+            dataset['FirstTweet'] = result['FirstTweet'] ? new BigNumber(result['FirstTweet']) : new BigNumber('0');
+            dataset['LastTweet']  = result['LastTweet']  ? new BigNumber(result['LastTweet'])  : new BigNumber('0');
             
-            triggers.emit('update_counts', row);
+            triggers.emit('update_counts', this.datasetRowID(dataset));
 
             // Remove loading sign
             prog_bar.end();
@@ -1195,7 +1220,6 @@ DatasetTable.prototype = {
         );
     },
     computeTimeseries: function(dataset) {
-        var row = '.row_' + (dataset.Level == 1 ? 'event' : 'subset') + '_' + dataset.ID;
         var args = {
             url: 'timeseries/compute',
             post: {
@@ -1206,7 +1230,7 @@ DatasetTable.prototype = {
             quantity: 'tweet',
             min: dataset.FirstTweet,
             max: dataset.LastTweet,
-            progress_div: row + ' .cell-Minutes',
+            progress_div: this.datasetRowID(dataset) + ' .cell-Minutes',
             progress_text: ' ',
             progress_style: 'full',
             on_chunk_finish: this.updateTimeseriesMinutesDisplay.bind(this, dataset)
@@ -1216,11 +1240,9 @@ DatasetTable.prototype = {
         conn.startStream();
     },
     updateTimeseriesMinutesDisplay: function(dataset, result) {
-        var row = '.row_' + (dataset.Level == 1 ? 'event' : 'subset') + '_' + dataset.ID;
-        
         dataset['Minutes'] = parseInt(result[0]['Minutes']);
                 
-        triggers.emit('update_counts', row);
+        triggers.emit('update_counts', this.datasetRowID(dataset));
     },
     countUsers: function(dataset) {
         this.connection.phpjson(
@@ -1255,7 +1277,6 @@ DatasetTable.prototype = {
     computeUserStream: function(dataset, lastTweet) {
         var firstTweet = lastTweet != undefined && lastTweet[0] && 'MAX(LastTweetID)' in lastTweet[0] && lastTweet[0]['MAX(LastTweetID)'] ? new BigNumber(lastTweet[0]['MAX(LastTweetID)']) : dataset.FirstTweet;
         
-        var row = '.row_' + (dataset.Level == 1 ? 'event' : 'subset') + '_' + dataset.ID;
         var args = {
             url: 'users/computeUsersInCollection',
             post: {
@@ -1267,7 +1288,7 @@ DatasetTable.prototype = {
             min: firstTweet,
             max: dataset.LastTweet,
             resolution: 0.25,
-            progress_div: row + ' .cell-Users',
+            progress_div: this.datasetRowID(dataset) + ' .cell-Users',
             progress_text: ' ',
             progress_style: 'full',
             on_chunk_finish: function(result) {
@@ -1275,21 +1296,35 @@ DatasetTable.prototype = {
                 dataset['Users2orMoreTweets'] = parseInt(result[0]['Users2orMoreTweets']);
                 dataset['Users10orMoreTweets'] = parseInt(result[0]['Users10orMoreTweets']);
                 
-                triggers.emit('update_counts', row);
-            }
+                triggers.emit('update_counts', this.datasetRowID(dataset));
+            }.bind(this)
         }
         
         var conn = new Connection(args);
         conn.startStream();
     },
     updateUserCountDisplay: function(dataset, queryResult) {
-        var row = '.row_' + (dataset.Level == 1 ? 'event' : 'subset') + '_' + dataset.ID;
-        
         dataset['Users'] = parseInt(queryResult[0]['Users']);
         dataset['Users2orMoreTweets'] = parseInt(queryResult[0]['Users2orMoreTweets']);
         dataset['Users10orMoreTweets'] = parseInt(queryResult[0]['Users10orMoreTweets']);
 
-        triggers.emit('update_counts', row);
+        triggers.emit('update_counts', this.datasetRowID(dataset));
+    },
+    enqueueUsersToFetchFollowerQueue: function(dataset) {
+        this.connection.phpjson(
+            'users/enqueueToFetchFollowerQueue',
+            {
+                Collection: dataset.Level == 1 ? 'Event' : 'Subset',
+                ID: dataset.ID,
+            },
+            triggers.emitter('alert', {
+                text: 'Sent ' + dataset.Users + ' Users to the Follower Fetching Queue. May take awhile.',
+                style_class: 'info'
+            })
+        );
+    },
+    datasetRowID: function(dataset) {
+        return '.row_' + dataset.CollectionType.toLowerCase() + '_' + dataset.ID;
     },
     openTimeseries: function(d) {
         var state = JSON.stringify({event: d.ID});
@@ -1331,15 +1366,20 @@ DatasetTable.prototype = {
             .text('New Subset')
             .on('click', triggers.emitter('edit collection:new', 'subset'));
         
-        div.append('button')
-            .attr('class', 'btn btn-default new-collection-button')
-            .text('Add Tweets to Event')
-            .on('click', triggers.emitter('alert', 'Sorry this button doesn\'t work yet'));
+//        div.append('button')
+//            .attr('class', 'btn btn-default new-collection-button')
+//            .text('Add Tweets to Event')
+//            .on('click', triggers.emitter('alert', 'Sorry this button doesn\'t work yet'));
+//        
+//        div.append('button')
+//            .attr('class', 'btn btn-default new-collection-button')
+//            .text('Add Tweets to Subset')
+//            .on('click', triggers.emitter('alert', 'Sorry this button doesn\'t work yet'));
         
         div.append('button')
             .attr('class', 'btn btn-default new-collection-button')
-            .text('Add Tweets to Subset')
-            .on('click', triggers.emitter('alert', 'Sorry this button doesn\'t work yet'));
+            .text('End Download')
+            .on('click', this.endDownload.bind(this));
         
         // Only here to move tweets from old version of the tweet table to new version if necessary
 //        div.append('button')
@@ -1363,54 +1403,110 @@ DatasetTable.prototype = {
         connection.startStream();
     },
     fetchDataToDownload: function(dataset, dataType) {
+        var collection_type = dataset.CollectionType;
+        var collection_id = dataset.ID;
+        var url = dataType.includes('tweets') ? 'tweets/get' :
+                  dataType.includes('timeseries') ? 'timeseries/get' :
+                  dataType.includes('users') ? 'tweets/getUsers' : 'tweets/getUsers';
+        var pk_query = dataType.includes('tweets') ? 'tweet_min' :
+                  dataType.includes('timeseries') ? 'time_min' :
+                  dataType.includes('users') ? 'user_min' : 'tweet_min';
+        var pk_table = dataType.includes('tweets') ? 'ID' :
+                  dataType.includes('timeseries') ? 'Time' :
+                  dataType.includes('users') ? 'UserID' : 'ID';
+        var nEntries = dataType.includes('tweets') ? dataset.Tweets :
+                  dataType.includes('timeseries') ? dataset.Minutes :
+                  dataType.includes('users') ? dataset.Users : dataset.Tweets;
         
-        var collectionType = (dataset.Level == 1 ? 'Event' : 'Subset');
-        var url = dataType == 'tweets' ? 'tweets/get' :
-                  dataType == 'timeseries' ? 'timeseries/get' :
-                  dataType == 'users' ? 'tweets/getUsers' : 'tweets/getUsers';
-        var post = {
-            collection: collectionType,
-            collection_id: dataset.ID,
-            csv: true,
-            limit: 100000,
+        if(this.download.stream) {
+            triggers.emit('alert', 'Cannot download data, existing download stream is running');
+        }
+        
+        this.download = {
+            stream: false,
+            dataset: dataset,
+            data: [],
+            datatype: dataType,
+            filename: dataType + '_' + collection_type + '_' + collection_id + '.csv'
         };
-        if(dataType == 'users_details')
-            post.extradata = 'u';
         
-        var fileName = dataType + '_' + collectionType + '_' + dataset.ID + '.csv';
+        var post = {
+            collection: collection_type,
+            collection_id: collection_id,
+            extradata: '',
+            json: true,
+        };
         
-        this.connection.php(url, post, 
-                            this.handleDataForDownload.bind(this, fileName),
-                            triggers.emitter('alert','Unable to retreive tweets'));
-    },
-    handleDataForDownload: function(fileName, stringData) {
-        console.log(stringData);
-        var data = d3.csv.parse(stringData);
+        if(dataType.includes('profiles'))
+            post.extradata += 'u';
+        if(dataType.includes('parents'))
+            post.extradata += 'p';
         
-        // Distinct checker, ignored for now
-//        var tweet_text_unique = new Set();
-//        var tweets_unique = [];
-        
-        data.forEach(function(datum) {
-            if('Text' in datum)
-                datum.Text = datum.Text.replace(/(?:\r\n|\r|\n)/g, ' ');
-            if('Description' in datum)
-                datum.Description = datum.Description.replace(/(?:\r\n|\r|\n)/g, ' ');
-//            var text_no_url = tweet.Text.replace(/(?:http\S+)/g, ' ');
-//            
-//            if(tweet_text_unique.has(text_no_url)) {
-//                tweet.Distinct = 0;
-//            } else {
-//                tweet_text_unique.add(text_no_url);
-//                if(tweets_unique.length < 100) {
-//                    tweets_unique.push(tweet);
-//                }
-//            }
+        // Initialize the connection
+        this.download.stream = new Connection({
+            url: url,
+            post: post,
+            quantity: 'count',
+            resolution: 5000,
+            max: nEntries,
+            pk_query: pk_query,
+            pk_table: pk_table,
+            on_chunk_finish: this.parseNewDownloadData.bind(this),
+            on_finish: this.endDownload.bind(this),
+            progress_text: '{cur}/{max} Fetched for Download',
         });
         
-        this.download(d3.csv.format(data), fileName, 'text/csv');
+        // Start the connection
+        this.download.stream.startStream();
     },
-    download: function(content, fileName, mimeType) {
+    parseNewDownloadData: function(newData) {        
+        // End early if no more data
+        if(newData.length == 0) {
+            this.endDownload();
+        }
+    
+        $.merge(this.download.data, newData);
+    },
+    endDownload: function() {
+        this.download.stream.stop();
+        this.download.stream.progress.end();
+        
+        var data = this.download.data;
+        if(data.length == 0) {
+            triggers.emitter('alert','Unable to downlad ' + this.download.datatype);
+        } else {
+            // Strip some disruptive characters
+            data.forEach(function(datum) {
+                if('Text' in datum)
+                    datum.Text = datum.Text.replace(/(?:\r\n|\r|\n)/g, ' ');
+                if('Description' in datum)
+                    datum.Description = datum.Description.replace(/(?:\r\n|\r|\n)/g, ' ');
+    //            var text_no_url = tweet.Text.replace(/(?:http\S+)/g, ' ');
+    //            
+    //            if(tweet_text_unique.has(text_no_url)) {
+    //                tweet.Distinct = 0;
+    //            } else {
+    //                tweet_text_unique.add(text_no_url);
+    //                if(tweets_unique.length < 100) {
+    //                    tweets_unique.push(tweet);
+    //                }
+    //            }
+            });
+            
+            // Send data to user
+            this.fileDownload(d3.csv.format(data), this.download.filename, 'text/csv');
+        }
+
+        // Erase local data
+        this.download = {
+            stream: false,
+            dataset: false,
+            data: [],
+            datatype: '',
+            filename: ''
+        };
+    },
+    fileDownload: function(content, fileName, mimeType) {
         var a = document.createElement('a');
         var fileName = fileName || 'data.csv';
         var mimeType = mimeType || 'text/csv'; // 'application/octet-stream';

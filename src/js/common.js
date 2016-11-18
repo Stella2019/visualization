@@ -580,7 +580,8 @@ function Connection(args) {
                           'progress_div', 'progress_text', 'progress_style',
                           'quantity', 'min', 'max',
                           'failure_msg',
-                          'on_chunk_finish', 'on_finish', 'on_timeout']
+                          'on_chunk_finish', 'on_finish', 'on_timeout',
+                          'pk_query', 'pk_table'];
 
     // Save args  
     if(args) {
@@ -608,6 +609,8 @@ function Connection(args) {
     this.min             = this.min             || 0;
     this.max             = this.max             || new Date();
     this.lastTweet       = 0;
+    this.pk_query        = this.pk_query        || 'tweet_min'; // Primary key of the PHP query for streaming
+    this.pk_table        = this.pk_table        || 'ID';
     
     this.failure_msg     = this.failure_msg     || 'Problem with data stream';
     this.on_chunk_finish = this.on_chunk_finish || function () {};
@@ -749,7 +752,11 @@ Connection.prototype = {
         if(this.quantity == 'count') {
             this.post['limit'] = this.resolution;
             if(this.lastTweet) {
-                this.post['tweet_min'] = this.lastTweet.add(1).toString();
+                if(this.lastTweet instanceof BigNumber) {
+                    this.post[this.pk_query] = this.lastTweet.add(1).toString();
+                } else {
+                    this.post[this.pk_query] = (this.lastTweet + 1) + "";
+                }
             }
 //            this.post['offset'] = this.chunks[this.chunk_index];
         } else {
@@ -789,11 +796,14 @@ Connection.prototype = {
 
         if(this.quantity == 'count')  { // Makes a LOT of assumptions about the data
             if(this.post.json) {
-                this.lastTweet = new BigNumber(file_data[file_data.length - 1].ID);
+                this.lastTweet = file_data[file_data.length - 1][this.pk_table];
+                if(this.pk_query.includes('tweet')) this.lastTweet = new BigNumber(this.lastTweet);
             } else {
-                var lastTweetStart = file_data.lastIndexOf('"ID":"');
-                if(lastTweetStart >= 0)
-                    this.lastTweet = new BigNumber(file_data.slice(lastTweetStart + 6, lastTweetStart + 24));
+                var lastTweetStart = file_data.lastIndexOf(this.pk_table + ':"');
+                if(lastTweetStart >= 0) {
+                    this.lastTweet = file_data.slice(lastTweetStart + 6, lastTweetStart + 24);
+                    if(this.pk_query.includes('tweet')) this.lastTweet = new BigNumber(this.lastTweet);
+                }
             }
         }
         this.on_chunk_finish(file_data);
