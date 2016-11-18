@@ -1464,8 +1464,7 @@ DatasetTable.prototype = {
         if(newData.length == 0) {
             this.endDownload();
         }
-    
-        console.log(newData);
+        
         $.merge(this.download.data, newData);
     },
     endDownload: function() {
