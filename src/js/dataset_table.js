@@ -707,8 +707,8 @@ DatasetTable.prototype = {
         });
         
         // Add action buttons
-        this.addDatasetAction('DatasetActions', 'edit', this.edit, 'Edit the dataset');
-        this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet', ['event', 'rumorwithsubset', 'subset']);
+        this.addDatasetAction('DatasetActions', 'edit', this.edit, 'Edit the dataset', ['event', 'subset']);
+        this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet');
         this.addDatasetAction('TweetsActions', 'download-alt',
                               dataset => this.fetchDataToDownload(dataset, 'tweets'),
                               'Download Tweets');
@@ -719,6 +719,7 @@ DatasetTable.prototype = {
 //        this.addDatasetAction('TweetsActions', 'new-window', this.openFeatureReport, 'Open Feature Report');
         this.addDatasetAction('TimeseriesActions', 'list', this.computeTimeseries, 'Build Timeseries Data');
         this.addDatasetAction('TimeseriesActions', 'refresh', this.countTimeseriesMinutes, 'Recount Timeseries Datapoints (Minutes)');
+        this.addDatasetAction('TimeseriesActions', 'signal', this.openTimeseries, 'Open timeseries chart in new window');
         this.addDatasetAction('TimeseriesActions', 'scissors action-deletion', this.clearTimeseries, 'Clear Saved Timeseries');
         this.addDatasetAction('TimeseriesActions', 'download-alt',
                               dataset => this.fetchDataToDownload(dataset, 'timeseries'),
@@ -733,7 +734,7 @@ DatasetTable.prototype = {
         this.addDatasetAction('UsersActions', 'download',
                               dataset => this.fetchDataToDownload(dataset, 'users_userprofiles'),
                               'Download User List & User Profiles');
-        this.addDatasetAction('UsersActions', 'user', this.enqueueUsersToFetchFollowerQueue.bind(this), 'Fetch followers for users in this dataset by adding them to the queue for the FetchFollowers python script to download using the Twitter API', ['subset']);
+        this.addDatasetAction('UsersActions', 'user', this.enqueueUsersToFetchFollowerQueue.bind(this), 'Fetch followers for users in this dataset by adding them to the queue for the FetchFollowers python script to download using the Twitter API', ['rumorwithsubset', 'subset']);
         
         // Set initial visibility
         this.event_types_arr.forEach(function(d) { 
@@ -745,7 +746,7 @@ DatasetTable.prototype = {
         triggers.emit('toggle columns');
     },
     addDatasetAction: function(action_group, glyphicon, action, tooltip, dataset_types) {
-        if(dataset_types == undefined) dataset_types = ['subset', 'event'];
+        if(dataset_types == undefined) dataset_types = ['subset', 'rumorwithsubset', 'event'];
         var selector = dataset_types.map(d => '.row_' + d + ' .cell-' + action_group).join(', ');
         d3.select('tbody').selectAll(selector).append('span')
             .attr('class', 'glyphicon glyphicon-' + glyphicon + ' glyphicon-hoverclick action_button')
@@ -791,8 +792,10 @@ DatasetTable.prototype = {
             };
         } else if(collection['CollectionType'] == 'Rumor') {
             return {
-                ID:           collection['ID'],
-                Rumor:        collection['Label'],
+                'Collection Type': 'Rumor',
+                'Rumor ID':   collection['ID'],
+                'Subset ID':  collection['Subset_ID'],
+                'Label':      collection['Label'],
                 Event:        collection['Event']['Label'],
                 'Event Type': collection['Event Type']['Label'],
                 Features:     collection['features_arr'] ? collection['features_arr'].map(function(event) { return event['Label']; }) : null
@@ -1205,7 +1208,7 @@ DatasetTable.prototype = {
             'timeseries/clear',
             {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
-                ID: dataset.ID,
+                ID: dataset.Subset_ID || dataset.ID,
             },
             this.countTimeseriesMinutes.bind(this, dataset)
         );
@@ -1215,7 +1218,7 @@ DatasetTable.prototype = {
             'timeseries/count',
             {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
-                ID: dataset.ID,
+                ID: dataset.Subset_ID || dataset.ID,
             },
             this.updateTimeseriesMinutesDisplay.bind(this, dataset)
         );
@@ -1225,7 +1228,7 @@ DatasetTable.prototype = {
             url: 'timeseries/compute',
             post: {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
-                ID: dataset.ID,
+                ID: dataset.Subset_ID || dataset.ID,
                 json: true,
             },
             quantity: 'tweet',
@@ -1250,7 +1253,7 @@ DatasetTable.prototype = {
             'users/countInCollection',
             {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
-                ID: dataset.ID,
+                ID: dataset.Subset_ID || dataset.ID,
             },
             this.updateUserCountDisplay.bind(this, dataset)
         );
@@ -1260,7 +1263,7 @@ DatasetTable.prototype = {
             'users/clearUsersInCollection',
             {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
-                ID: dataset.ID,
+                ID: dataset.Subset_ID || dataset.ID,
             },
             this.countUsers.bind(this, dataset)
         );
@@ -1270,7 +1273,7 @@ DatasetTable.prototype = {
             'users/getUserLastCounted',
             {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
-                ID: dataset.ID,
+                ID: dataset.Subset_ID || dataset.ID,
             },
             this.computeUserStream.bind(this, dataset)
         );
@@ -1282,7 +1285,7 @@ DatasetTable.prototype = {
             url: 'users/computeUsersInCollection',
             post: {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
-                ID: dataset.ID,
+                ID: dataset.Subset_ID || dataset.ID,
                 json: true,
             },
             quantity: 'tweet',
@@ -1308,7 +1311,7 @@ DatasetTable.prototype = {
         dataset['Users'] = parseInt(queryResult[0]['Users']);
         dataset['Users2orMoreTweets'] = parseInt(queryResult[0]['Users2orMoreTweets']);
         dataset['Users10orMoreTweets'] = parseInt(queryResult[0]['Users10orMoreTweets']);
-
+        console.log('updating', this.datasetRowID(dataset), dataset);
         triggers.emit('update_counts', this.datasetRowID(dataset));
     },
     enqueueUsersToFetchFollowerQueue: function(dataset) {
@@ -1316,7 +1319,7 @@ DatasetTable.prototype = {
             'users/enqueueToFetchFollowerQueue',
             {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
-                ID: dataset.ID,
+                ID: dataset.Subset_ID || dataset.ID,
             },
             triggers.emitter('alert', {
                 text: 'Sent ' + dataset.Users + ' Users to the Follower Fetching Queue. May take awhile.',
@@ -1328,7 +1331,7 @@ DatasetTable.prototype = {
         return '.row_' + dataset.CollectionType.toLowerCase() + '_' + dataset.ID;
     },
     openTimeseries: function(d) {
-        var state = JSON.stringify({event: d.ID});
+        var state = JSON.stringify({Dataset: {Event: d.ID}});
         window.open('timeseries.html#' + state);
     },
     openCodingReport: function(d) {
@@ -1359,11 +1362,13 @@ DatasetTable.prototype = {
         
         div.append('button')
             .attr('class', 'btn btn-default new-collection-button')
+            .data(['Create a new event. This function is in still being worked on.'])
             .text('New Event')
             .on('click', triggers.emitter('edit collection:new', 'event'));
         
         div.append('button')
             .attr('class', 'btn btn-default new-collection-button')
+            .data(['Create a new subset. This function is in still being worked on.'])
             .text('New Subset')
             .on('click', triggers.emitter('edit collection:new', 'subset'));
         
@@ -1379,15 +1384,19 @@ DatasetTable.prototype = {
         
         div.append('button')
             .attr('class', 'btn btn-default new-collection-button')
+            .data(['End any downloads in progress'])
             .text('End Download')
             .on('click', this.endDownload.bind(this));
         
         // Only here to move tweets from old version of the tweet table to new version if necessary
-//        div.append('button')
-//            .attr('id', 'tweet-transfer')
-//            .attr('class', 'btn btn-default new-collection-button')
-//            .text('Transfer Tweets')
-//            .on('click', this.transferTweets.bind(this));
+        div.append('button')
+            .attr('id', 'tweet-transfer')
+            .attr('class', 'btn btn-default new-collection-button')
+            .data(['Transfer tweets from Old Table to New Table. Only Conrad should press this'])
+            .text('Transfer Tweets')
+            .on('click', this.transferTweets.bind(this));
+        
+        this.tooltip.attach('.new-collection-button', d => d);
     },
     transferTweets: function () {
         
@@ -1404,8 +1413,8 @@ DatasetTable.prototype = {
         connection.startStream();
     },
     fetchDataToDownload: function(dataset, dataType) {
-        var collection_type = dataset.CollectionType;
-        var collection_id = dataset.ID;
+        var collection_type = dataset.Level == 1 ? 'Event' : 'Subset'; // Since rumors are considered subsets
+        var collection_id = dataset.Subset_ID || dataset.ID;
         var url = dataType.includes('tweets') ? 'tweets/get' :
                   dataType.includes('timeseries') ? 'timeseries/get' :
                   dataType.includes('users') ? 'users/get' : 'tweets/getUsers';
@@ -1428,7 +1437,7 @@ DatasetTable.prototype = {
             dataset: dataset,
             data: [],
             datatype: dataType,
-            filename: dataType + '_' + collection_type + '_' + collection_id + '.csv',
+            filename: dataType + '_' + dataset.CollectionType + '_' + collection_id + '.csv',
             page: 0,
             entries: nEntries,
             limit: 5000,
