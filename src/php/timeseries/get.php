@@ -34,7 +34,9 @@
 //    $query = $query .
 //        " ORDER BY Time; ";
 
-    if(isset($_REQUEST["json"])) {
+    if(isset($_REQUEST["csv"])) {
+        include '../exportToCSV.php';
+    } else if(isset($_REQUEST["json"])) {
         include '../printJSON.php';
     } else {
         include '../printResults.php';

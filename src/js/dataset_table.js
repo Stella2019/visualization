@@ -48,7 +48,8 @@ function DatasetTable() {
         stream: false,
         dataset: false,
         data: [],
-        datatype: ''
+        datatype: '',
+        page: 1
     };
 }
 DatasetTable.prototype = {
@@ -1427,7 +1428,11 @@ DatasetTable.prototype = {
             dataset: dataset,
             data: [],
             datatype: dataType,
-            filename: dataType + '_' + collection_type + '_' + collection_id + '.csv'
+            filename: dataType + '_' + collection_type + '_' + collection_id + '.csv',
+            page: 0,
+            entries: nEntries,
+            limit: 5000,
+            entries_in_cache:0
         };
         
         var post = {
@@ -1447,11 +1452,11 @@ DatasetTable.prototype = {
             url: url,
             post: post,
             quantity: 'count',
-            resolution: 5000,
+            resolution: this.download.limit,
             max: nEntries,
             pk_query: pk_query,
             pk_table: pk_table,
-            on_chunk_finish: this.parseNewDownloadData.bind(this),
+            on_chunk_finish: this.mergeDownloadData.bind(this),
             on_finish: this.endDownload.bind(this),
             progress_text: '{cur}/{max} Fetched for Download',
         });
@@ -1459,42 +1464,63 @@ DatasetTable.prototype = {
         // Start the connection
         this.download.stream.startStream();
     },
-    parseNewDownloadData: function(newData) {        
+    mergeDownloadData: function(newData) {        
         // End early if no more data
         if(newData.length == 0) {
             this.endDownload();
         }
         
+//        // Estimate CSV size
+//        this.download.entries_in_cache += this.download.limit;
+        
         $.merge(this.download.data, newData);
+        
+        // Save file if we already have 200k entries, otherwise it starts to slow down significantly
+        if(this.download.data.length >= 100000) {
+            this.submitDownloadedDataToUser(true);
+        }
+    },
+    submitDownloadedDataToUser: function(paged) {
+        var filename = this.download.filename;
+        if(paged) {
+            filename = filename.split(".")[0] + "_page" +  this.download.page + ".csv";
+            this.download.page++;
+        }
+        
+        // Fix any formatting problems with the data
+        var data = this.download.data;
+        data.forEach(function(datum) {
+            if('Text' in datum)
+                datum.Text = datum.Text.replace(/(?:\r\n|\r|\n)/g, ' ');
+            if('Description' in datum && datum.Description)
+                datum.Description = datum.Description.replace(/(?:\r\n|\r|\n)/g, ' ');
+//            var text_no_url = tweet.Text.replace(/(?:http\S+)/g, ' ');
+//            
+//            if(tweet_text_unique.has(text_no_url)) {
+//                tweet.Distinct = 0;
+//            } else {
+//                tweet_text_unique.add(text_no_url);
+//                if(tweets_unique.length < 100) {
+//                    tweets_unique.push(tweet);
+//                }
+//            }
+        });
+
+        // Send data to user
+        data = d3.csv.format(data);
+        if(this.download.datatype == "tweets") // The first column should NOT start with the word ID
+            data = "Tweet " + data;
+        this.fileDownload(data, filename, 'text/csv');
+        this.download.data = [];
     },
     endDownload: function() {
         this.download.stream.stop();
         this.download.stream.progress.end();
         
-        var data = this.download.data;
-        if(data.length == 0) {
-            triggers.emitter('alert','Unable to downlad ' + this.download.datatype);
+        if(this.download.data.length == 0) {
+            triggers.emitter('alert','Unable to download ' + this.download.datatype);
         } else {
-            // Strip some disruptive characters
-            data.forEach(function(datum) {
-                if('Text' in datum)
-                    datum.Text = datum.Text.replace(/(?:\r\n|\r|\n)/g, ' ');
-                if('Description' in datum && datum.Description)
-                    datum.Description = datum.Description.replace(/(?:\r\n|\r|\n)/g, ' ');
-    //            var text_no_url = tweet.Text.replace(/(?:http\S+)/g, ' ');
-    //            
-    //            if(tweet_text_unique.has(text_no_url)) {
-    //                tweet.Distinct = 0;
-    //            } else {
-    //                tweet_text_unique.add(text_no_url);
-    //                if(tweets_unique.length < 100) {
-    //                    tweets_unique.push(tweet);
-    //                }
-    //            }
-            });
-            
-            // Send data to user
-            this.fileDownload(d3.csv.format(data), this.download.filename, 'text/csv');
+            this.submitDownloadedDataToUser(this.download.page > 0);
         }
 
         // Erase local data
@@ -1503,7 +1529,11 @@ DatasetTable.prototype = {
             dataset: false,
             data: [],
             datatype: '',
-            filename: ''
+            filename: '',
+            page: 0,
+            entries: 0,
+            limit: 5000,
+            entries_in_cache:0
         };
     },
     fileDownload: function(content, fileName, mimeType) {
