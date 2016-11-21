@@ -1601,6 +1601,7 @@ DatasetTable.prototype = {
             .enter()
             .append('div')
             .attr('class', 'col-floating')
+            .style('display', 'none')
             .html(dataset => dataset.Label)
             .each(function(dataset) {
                 dataset.static_header = d3.select('.col-' + dataset.ID).node().parentNode;
