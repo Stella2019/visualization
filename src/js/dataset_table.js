@@ -1610,9 +1610,15 @@ DatasetTable.prototype = {
         
     },
     perserveHeader: function() {
-        var pageAt = $(window).scrollTop();
-        var tablebodyOffset = $('thead').offset().top;
-        if(pageAt > tablebodyOffset) {
+        var scrollTop = $(window).scrollTop();
+        var scrollLeft = $(window).scrollLeft();
+        var tableTop = $('thead').offset().top;
+        
+        this.floating_header
+            .style('opacity', scrollTop > tableTop ? 1 : 0)
+            .style('left', '-' + scrollLeft + 'px');
+        
+        if(scrollTop > tableTop) {
             // Turn on the floating header
             this.floating_header
                 .style('opacity', 1);
@@ -1633,11 +1639,6 @@ DatasetTable.prototype = {
                         })
                     }
                 });
-            
-        } else {
-            // Turn off the floating header
-            this.floating_header
-                .style('opacity', 0);
         }
     }
 };

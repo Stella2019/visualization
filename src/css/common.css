@@ -30,6 +30,7 @@ body {
     overflow-Y: scroll;
     height: 100%;
     padding: 5px;
+    z-index: 1;
 }
 .sidebar:hover, .sidebar-pinned {
     left: 0px;
