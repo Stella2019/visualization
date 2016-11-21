@@ -143,7 +143,7 @@ def fetchUsersFollowers(user_id):
             if len(ids) >= follower_list_cap + 1:
                 break
                 
-        if(len(ids) < user.followers_count):
+        if(len(ids) < user.followers_count and len(ids) >= follower_list_cap):
             ids.append('Capped')
         else:
             ids.append('Retrieved')
