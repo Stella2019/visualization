@@ -3,10 +3,11 @@
     width: auto;
 }
 
-#status_table td, #status_table th {
+#status_table td, #status_table th, .col-floating {
     white-space: nowrap;
+    padding: 4px 6px;
 }
-td div, th div {   
+td div, th div {
     display: flex;
 }
 .cell-count {
@@ -52,6 +53,19 @@ th:hover .glyphicon-hiddenclick {
 .col-sortable .glyphicon-hoverclick {
     padding-left: 5px;
     margin-left: auto;
+}
+.thead-floating {
+    margin-left: 215px;
+    position: fixed;
+    top: 0px;
+    background-color: white;
+    border-bottom: 2px solid #ddd;
+    pointer-events: none;
+    font-size: .9em;
+    font-weight: bold;
+}
+.col-floating {
+    display: inline-block;
 }
 div .action_button:not(:first-child) {
     padding-left: 5px;
@@ -99,6 +113,6 @@ div .action_button:not(:last-child) {
 }
 
 #contextMenu {
-  position: absolute;
-  display:none;
+    position: absolute;
+    display:none;
 }

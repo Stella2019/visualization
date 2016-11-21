@@ -68,6 +68,9 @@ DatasetTable.prototype = {
         
         triggers.on('dataset table:build', this.buildTable.bind(this));
         triggers.on('new dataset:build', this.buildNewDatasetOption.bind(this));
+        
+//        d3.select('#body').on('scroll', this.perserveHeader.bind(this));
+        $(window).on('scroll', this.perserveHeader.bind(this));
     },
     getData: function() {
         var datasets = 3;
@@ -740,6 +743,7 @@ DatasetTable.prototype = {
         this.event_types_arr.forEach(function(d) { 
             this.setVisibility_Rows_children(d, 'perserve'); 
         }.bind(this), this);
+        this.makeScrollHeader();
         
         // Set the counts
         triggers.emit('new_counts');
@@ -1588,6 +1592,53 @@ DatasetTable.prototype = {
 //            return true;
 //        }
     },
+    makeScrollHeader: function() {
+        this.floating_header = d3.select('body').append('div')
+            .attr('class', 'thead-floating');
+        
+        this.floating_header.selectAll('div')
+            .data(this.column_headers)
+            .enter()
+            .append('div')
+            .attr('class', 'col-floating')
+            .html(dataset => dataset.Label)
+            .each(function(dataset) {
+                dataset.static_header = d3.select('.col-' + dataset.ID).node().parentNode;
+                dataset.floating_header = d3.select(this);
+            });
+        
+    },
+    perserveHeader: function() {
+        var pageAt = $(window).scrollTop();
+        var tablebodyOffset = $('thead').offset().top;
+        if(pageAt > tablebodyOffset) {
+            // Turn on the floating header
+            this.floating_header
+                .style('opacity', 1);
+            
+            // Fix inner cells TODO this doesn't need to be redone every time
+            this.floating_header.selectAll('div')
+                .each(function(dataset, i) {
+                    var box = dataset.static_header.getBoundingClientRect();
+                    if(box.width > 0) {
+                        dataset.floating_header.style({
+                            width: box.width + 'px',
+                            display: 'inline-block'
+                        });
+                    } else {
+                        dataset.floating_header.style({
+                            left: '0px',
+                            display: 'none'
+                        })
+                    }
+                });
+            
+        } else {
+            // Turn off the floating header
+            this.floating_header
+                .style('opacity', 0);
+        }
+    }
 };
 
 function initialize() {

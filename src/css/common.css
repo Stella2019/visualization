@@ -1,4 +1,7 @@
 /* Body */
+body {
+    font-family: Helvetica-Light, Helvetica Neue, Helvetica, Arial, sans-serif
+}
 #body {
     margin-left: 200px;
 }
