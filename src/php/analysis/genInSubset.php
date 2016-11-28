@@ -111,7 +111,7 @@
                 "	ON Tweet.`ID` = TweetUser.`Tweet` " .
                 "INNER JOIN UserInSubset " .
                 "	ON TweetUser.`UserID` = UserInSubset.`UserID` " .
-                "   AND UserInSubset.Subset = " . $_REQUEST["userinsubset"] . "  ";
+                "   AND UserInSubset.`SubsetID` = " . $_REQUEST["userinsubset"] . "  ";
     }
     if(isset($_REQUEST["excludeset"])) {
         $query .= "LEFT JOIN TweetInSubset ExcludeSet " .
