@@ -106,6 +106,13 @@
 
         $conds[] = "TweetInSubset2.Subset = " . $_REQUEST["superset2"];
     }
+    if(isset($_REQUEST["userinsubset"])) {
+        $query .= "LEFT JOIN TweetUser " .
+                "	ON Tweet.`ID` = TweetUser.`Tweet` " .
+                "INNER JOIN UserInSubset " .
+                "	ON TweetUser.`UserID` = UserInSubset.`UserID` " .
+                "   AND UserInSubset.Subset = " . $_REQUEST["userinsubset"] . "  ";
+    }
     if(isset($_REQUEST["excludeset"])) {
         $query .= "LEFT JOIN TweetInSubset ExcludeSet " .
                 "	ON Tweet.`ID` = ExcludeSet.Tweet " .
