@@ -10,7 +10,7 @@ from pprint import pprint
 
 # Parameters
 wait_time = 15
-config_file = '../../local.conf'
+config_file = 'leo.conf'
 follower_list_cap = 25000
 followers_per_packet = 5000
 users_reserved = 10

@@ -19,7 +19,7 @@ storage = mysql.connector.connect(
     database=config["storage"]["database"]
 )
 cursor = storage.cursor(dictionary=True)
-query = "CALL GetFollowerList_forXLM()"
+query = "CALL GetFollowerList_forOrlandoShooting()" # forXLM
 
 users = []
 for result in cursor.execute(query, multi=True):
@@ -45,7 +45,8 @@ def union(l1, l2):
 
 def write_edges(users, output_filename):
     writer = csv.writer(open(output_filename, 'w+'))
-    users_writer = csv.writer(open('xlm_sharedaudience_users.csv', 'w+'))
+#    users_writer = csv.writer(open('xlm_sharedaudience_users.csv', 'w+'))
+    users_writer = csv.writer(open('orlandoshooting_nodelist.csv', 'w+'))
     n_sharedAudience_abovethreshold = 0
 
     for index1 in range(len(users)):
@@ -54,15 +55,16 @@ def write_edges(users, output_filename):
         uid   = user1['UserID']
         followers = user1['Followers'].split(',')
         
-        whoslivematter = ''
-        if(user1['BLM Tweets'] > 0):
-            whoslivematter += 'black'
-        if(user1['ALM Tweets'] > 0):
-            whoslivematter += 'all'
-        if(user1['BlueLM Tweets'] > 0):
-            whoslivematter += 'blue'
+#        whoslivematter = ''
+#        if(user1['BLM Tweets'] > 0):
+#            whoslivematter += 'black'
+#        if(user1['ALM Tweets'] > 0):
+#            whoslivematter += 'all'
+#        if(user1['BlueLM Tweets'] > 0):
+#            whoslivematter += 'blue'
         
-        users_writer.writerow([uid, uname, user1['BLM Tweets'], user1['ALM Tweets'], user1['BlueLM Tweets'], user1['ActualFollowers'], whoslivematter])
+#        users_writer.writerow([uid, uname, user1['BLM Tweets'], user1['ALM Tweets'], user1['BlueLM Tweets'], user1['ActualFollowers'], whoslivematter])
+        users_writer.writerow([uid, uname, user1['Tweets'], user1['ActualFollowers']])
         
         if len(followers) > 0:
             print (output_filename + '\t' + str(index1) + '/' + str(len(users)))
@@ -93,5 +95,5 @@ def write_edges(users, output_filename):
 #write_edges(uname_to_friend_id, 'data/weights_friends.csv', lambda x: int(uname_to_udata[x]['friends_count']))
 #write_edges(uname_to_all_ids, 'data/weights.csv', lambda x: int(uname_to_udata[x]['followers_count']) + int(uname_to_udata[x]['friends_count']))
 
-write_edges(users, 'xlm_sharedaudience.csv')
+write_edges(users, 'orlandoshooting_edgelist_sharedaudience_0p01.csv')
 
