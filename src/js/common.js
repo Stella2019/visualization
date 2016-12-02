@@ -964,22 +964,24 @@ standardConnections = {
         // Hardcoded for now, can be customized later
         var baseid = 2510;
         var nClusters = 15;
-        var groups = [{
-            id: 2525,
-            startdate: new Date('2016-07-01 00:00:00'),
-            enddate: new Date('2016-07-25 00:00:00')
+        var groups = [
+//            {
+//            id: 2525,
+//            startdate: new Date('2016-07-01 00:00:00'),
+//            enddate: new Date('2016-07-25 00:00:00')
+//        },{
+//            id: 2570,
+//            startdate: new Date('2016-03-27 00:00:00'),
+//            enddate: new Date('2016-04-06 00:00:00')
+//        },
+            {
+            id: 2540,
+            startdate: new Date('2016-09-10 00:00:00'),
+            enddate: new Date('2016-10-04 00:00:00')
         },{
             id: 2555,
             startdate: new Date('2016-03-12 00:00:00'),
             enddate: new Date('2016-03-21 00:00:00')
-        },{
-            id: 2545,
-            startdate: new Date('2016-09-10 00:00:00'),
-            enddate: new Date('2016-10-04 00:00:00')
-        },{
-            id: 2570,
-            startdate: new Date('2016-03-27 00:00:00'),
-            enddate: new Date('2016-04-06 00:00:00')
         }];
         
         groups.forEach(function(group) {

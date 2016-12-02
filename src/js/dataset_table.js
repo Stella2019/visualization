@@ -587,16 +587,16 @@ DatasetTable.prototype = {
                         .data([rumor])
                         .attr('class', d => 'row_rumor row_haschildren row_rumor_' + d.ID + (d.CollectionType == 'Rumor' ? ' row_rumorwithsubset row_subset_' + d.Subset_ID : ''));
                     
-                    rumor.features_arr.forEach(function(feature) {
+                    rumor.features_arr.forEach(function(feature, feature_ichild) {
                         if(feature.Label != 'Rumor') {
                             feature.row = table_body.append('tr')
                                 .data([feature])
-                                .attr('class', d => 'row_feature row_haschildren');
+                                .attr('class', d => 'row_feature row_haschildren row_feature-' + (feature_ichild % 2 ? 'odd' : 'even'));
 
-                            feature.subsets_arr.forEach(function(subset) {
+                            feature.subsets_arr.forEach(function(subset, subset_ichild) {
                                 subset.row = table_body.append('tr')
                                     .data([subset])
-                                    .attr('class', d => 'row_subset row_subset_' + d.ID);
+                                    .attr('class', d => 'row_subset row_subset_' + d.ID + ' row_feature-' + (feature_ichild % 2 ? 'odd' : 'even') + '-subset-' + (subset_ichild % 2 ? 'odd' : 'even'));
                             });
                         }
                     });
@@ -622,7 +622,6 @@ DatasetTable.prototype = {
         table_body.selectAll('.cell-Collection')
             .append('span')
             .attr('class', 'value')
-            .style('margin-left', dataset => dataset.Level * 10 + 'px')
             .html(dataset => dataset.Label);
         
         var level_names = ['events', 'rumors', 'features', 'matches', 'N/A'];
@@ -712,6 +711,7 @@ DatasetTable.prototype = {
         // Add action buttons
         this.addDatasetAction('DatasetActions', 'edit', this.edit, 'Edit the dataset', ['event', 'subset']);
         this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet');
+        this.addDatasetAction('TweetsActions', 'scissors action-deletion', dataset => this.clearItems('tweets', dataset), 'Clear Tweet to Collection Mapping');
         this.addDatasetAction('TweetsActions', 'download-alt',
                               dataset => this.fetchDataToDownload(dataset, 'tweets'),
                               'Download Tweets');
@@ -722,15 +722,14 @@ DatasetTable.prototype = {
 //        this.addDatasetAction('TweetsActions', 'new-window', this.openFeatureReport, 'Open Feature Report');
         this.addDatasetAction('TimeseriesActions', 'list', this.computeTimeseries, 'Build Timeseries Data');
         this.addDatasetAction('TimeseriesActions', 'refresh', this.countTimeseriesMinutes, 'Recount Timeseries Datapoints (Minutes)');
-        this.addDatasetAction('TimeseriesActions', 'signal', this.openTimeseries, 'Open timeseries chart in new window');
-        this.addDatasetAction('TimeseriesActions', 'scissors action-deletion', this.clearTimeseries, 'Clear Saved Timeseries');
+        this.addDatasetAction('TimeseriesActions', 'scissors action-deletion', dataset => this.clearItems('timeseries', dataset), 'Clear Saved Timeseries');
         this.addDatasetAction('TimeseriesActions', 'download-alt',
                               dataset => this.fetchDataToDownload(dataset, 'timeseries'),
                               'Download Timeseries');
-//        this.addDatasetAction('TimeseriesActions', 'new-window', this.openTimeseries, 'Open Timeseries Chart in new window');
+        this.addDatasetAction('TimeseriesActions', 'new-window', this.openTimeseries, 'Open timeseries chart in new window');
         this.addDatasetAction('UsersActions', 'list', this.computeUserList, 'Build User List');
         this.addDatasetAction('UsersActions', 'refresh', this.countUsers, 'Recount Users');
-        this.addDatasetAction('UsersActions', 'scissors action-deletion', this.clearUserList, 'Clear Saved User List');
+        this.addDatasetAction('UsersActions', 'scissors action-deletion', dataset => this.clearItems('users', dataset), 'Clear Saved User List');
         this.addDatasetAction('UsersActions', 'download-alt',
                               dataset => this.fetchDataToDownload(dataset, 'users'),
                               'Download User List');
@@ -738,6 +737,10 @@ DatasetTable.prototype = {
                               dataset => this.fetchDataToDownload(dataset, 'users_userprofiles'),
                               'Download User List & User Profiles');
         this.addDatasetAction('UsersActions', 'user', this.enqueueUsersToFetchFollowerQueue.bind(this), 'Fetch followers for users in this dataset by adding them to the queue for the FetchFollowers python script to download using the Twitter API', ['rumorwithsubset', 'subset']);
+        
+        // Add borders between dataset actions
+        table_body.selectAll('.cell-TweetsActions').each(function(d) { d3.select(this.parentNode).style('border-right', 'solid 1px gray'); });
+        table_body.selectAll('.cell-TimeseriesActions').each(function(d) { d3.select(this.parentNode).style('border-right', 'solid 1px gray'); });
         
         // Set initial visibility
         this.event_types_arr.forEach(function(d) { 
@@ -781,9 +784,9 @@ DatasetTable.prototype = {
         return menu_options;
     },
     prepareCollectionTooltip: function(collection) {
-        if(collection['CollectionType'] == 'Event Type') {
+        if(collection['CollectionType'] == 'EventType') {
             return {
-                ID:           collection['ID'],
+                'Click':   'to expand',
                 'Event Type': collection['Label'],
                 Events:       collection['events_arr'] ? collection['events_arr'].map(function(event) { return event['Label']; }) : null
             };
@@ -1207,14 +1210,23 @@ DatasetTable.prototype = {
             prog_bar.update(100, 'Error');
         });
     },
-    clearTimeseries: function(dataset) {
+    clearItems: function(item_type, dataset) {
         this.connection.phpjson(
-            'timeseries/clear',
+            'collection/clearItems',
             {
-                Collection: dataset.Level == 1 ? 'Event' : 'Subset',
-                ID: dataset.Subset_ID || dataset.ID,
+                collection_type: dataset.Level == 1 ? 'Event' : 'Subset',
+                collection_id: dataset.Subset_ID || dataset.ID,
+                item_type: item_type
             },
-            this.countTimeseriesMinutes.bind(this, dataset)
+            function(result) {
+                if(item_type == 'tweets')
+                    this.recount(dataset);
+                else if(item_type == 'timeseries')
+                    this.countTimeseriesMinutes(dataset);
+                else if(item_type == 'users')
+                    this.countUsers(dataset);
+                console.log('Cleared ' + result[0]['Items Cleared'] + ' ' + item_type + ' from ' + dataset.CollectionType + ' ' + dataset.ID + ' (' + dataset.Label + ')');
+            }.bind(this)
         );
     },
     countTimeseriesMinutes: function(dataset) {
@@ -1260,16 +1272,6 @@ DatasetTable.prototype = {
                 ID: dataset.Subset_ID || dataset.ID,
             },
             this.updateUserCountDisplay.bind(this, dataset)
-        );
-    },
-    clearUserList: function(dataset) {
-        this.connection.phpjson(
-            'users/clearUsersInCollection',
-            {
-                Collection: dataset.Level == 1 ? 'Event' : 'Subset',
-                ID: dataset.Subset_ID || dataset.ID,
-            },
-            this.countUsers.bind(this, dataset)
         );
     },
     computeUserList: function(dataset) {

@@ -80,34 +80,67 @@ div .action_button:not(:last-child) {
 }
 
 .row_type {
-    background-color: #eee;
-    border-top: solid 2px #ddd;
+    background-color: #9ac;
+    border-top: solid 2px #78a;
 }
 .row_event {
-    background-color: aliceblue;
-    border-top: solid 2px #def;
+    background-color: #bce;
+    border-top: solid 2px #abd;
+}
+.row_rumor {
+    background-color: #ddd;
+    border-top: solid 2px #ccc;
+}
+.row_feature {
+    background-color: #eee;
 }
 .row_subset {
     border-top: solid 2px #fff;
 }
 
-.row_type .cell-label .value {
+.cell-Collection {
+    cursor: pointer;
+}
+
+.row_type .cell-Collection .value {
     padding-left: 10px;
     font-weight: bold;
 }
-.row_event .cell-label .value {
+.row_event .cell-Collection .value {
     padding-left: 20px;
 }
-.row_rumor .cell-label .value {
+.row_rumor .cell-Collection .value {
     padding-left: 30px;
 }
-.row_feature .cell-label .value {
+.row_feature .cell-Collection .value {
     font-style: italic;
     padding-left: 40px;
 }
-.row_subset .cell-label .value {
+.row_subset .cell-Collection .value {
     padding-left: 50px;
 }
+
+/* This breaks when the order changes
+.row_feature-even {
+    background-color: #9f9;
+}
+.row_feature-even-subset-odd {
+    background-color: #cfc;
+}
+.row_feature-even-subset-even {
+    background-color: #6f6;
+}
+.row_feature-odd {
+    background-color: #f99;
+}
+.row_feature-odd-subset-odd {
+    background-color: #fcc;
+}
+.row_feature-odd-subset-even {
+    background-color: #f66;
+}
+*/
+
 
 .new-collection-button {
     margin: 10px;
