@@ -710,6 +710,7 @@ DatasetTable.prototype = {
         
         // Add action buttons
         this.addDatasetAction('DatasetActions', 'edit', this.edit, 'Edit the dataset', ['event', 'subset']);
+        this.addDatasetAction('DatasetActions', 'remove action-deletion', this.deleteCollection, 'Delete Collection (warning: inreversible)', ['subset']);
         this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet');
         this.addDatasetAction('TweetsActions', 'scissors action-deletion', dataset => this.clearItems('tweets', dataset), 'Clear Tweet to Collection Mapping');
         this.addDatasetAction('TweetsActions', 'download-alt',
@@ -1173,6 +1174,25 @@ DatasetTable.prototype = {
                 header.select('span').attr('class', 'glyphicon glyphicon-sort-by-attributes-alt glyphicon-hoverclick');
             }
         }
+    },
+    deleteCollection: function(dataset) {
+        // Refuse to delete rumors right now since that will affect multiple tables
+        if(dataset.CollectionType == 'Rumor') {
+            triggers.emit('alert', 'Unable to remove rumors');
+            return;
+        }
+        
+        this.connection.phpjson(
+            'collection/delete',
+            {
+                collection_type: dataset.Level == 1 ? 'Event' : 'Subset',
+                collection_id: dataset.Subset_ID || dataset.ID
+            },
+            function(result) {
+                d3.select(this.datasetRowID(dataset)).remove();
+                console.log('Deleted ' + dataset.CollectionType + ' ' + dataset.ID + ' (' + dataset.Label + ')');
+            }.bind(this)
+        );
     },
     recount: function(dataset) {
         // Prepare statement

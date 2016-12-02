@@ -1,13 +1,10 @@
 import csv
 import json
 import time
+import math
 import mysql.connector
 
-#uname_to_follower_id = json.load(open('data/username_to_follower_id.json'))
-#uname_to_friend_id = json.load(open('data/username_to_friend_id.json'))
-#uname_to_udata = json.load(open('data/username_to_user_data.json'))
-
-threshold = 0.01
+thresholds = [0.05, 0.1, 0.2, 0.5]
 
 # Connect to MySQL Storage
 config_file = 'somelab.conf'
@@ -19,7 +16,9 @@ storage = mysql.connector.connect(
     database=config["storage"]["database"]
 )
 cursor = storage.cursor(dictionary=True)
-query = "CALL GetFollowerList_forOrlandoShooting()" # forXLM
+collection = 'xlm' # XLM orlandoshooting
+#query = "CALL GetFollowerList_forOrlandoShooting()"
+query = "CALL GetFollowerList_forXLM()"
 
 users = []
 for result in cursor.execute(query, multi=True):
@@ -43,57 +42,100 @@ def intersection(l1, l2):
 def union(l1, l2):
     return set(l1) | set(l2)
 
-def write_edges(users, output_filename):
-    writer = csv.writer(open(output_filename, 'w+'))
-#    users_writer = csv.writer(open('xlm_sharedaudience_users.csv', 'w+'))
-    users_writer = csv.writer(open('orlandoshooting_nodelist.csv', 'w+'))
+def write_edges(users):
+    edge_writers = [csv.writer(open(collection + '_edgelist_sharedaudience_0p05.csv', 'w+')),
+                    csv.writer(open(collection + '_edgelist_sharedaudience_0p10.csv', 'w+')),
+                    csv.writer(open(collection + '_edgelist_sharedaudience_0p20.csv', 'w+')),
+                    csv.writer(open(collection + '_edgelist_sharedaudience_0p50.csv', 'w+'))]
+#    writer_uni = csv.writer(open(collection + '_edgelist_sharedaudience_0p50_unidirectional.csv', 'w+'))
+    users_writer = csv.writer(open(collection + '_nodelist.csv', 'w+'))
     n_sharedAudience_abovethreshold = 0
+    n_sharedAudience_uni_abovethreshold = 0
+    nUsers = len(users)
+    orphans = [[1] * nUsers, [1] * nUsers, [1] * nUsers, [1] * nUsers]
+    edge_density = [0] * 101
+    nEdges_abovethreshold = [0] * len(thresholds)
 
-    for index1 in range(len(users)):
+    for index1 in range(nUsers):
         user1 = users[index1]
         uname = user1['Screenname']
         uid   = user1['UserID']
         followers = user1['Followers'].split(',')
+        nFollowers = len(followers)
+        nFollowersActual = max(user1['ActualFollowers'], nFollowers)
         
-#        whoslivematter = ''
-#        if(user1['BLM Tweets'] > 0):
-#            whoslivematter += 'black'
-#        if(user1['ALM Tweets'] > 0):
-#            whoslivematter += 'all'
-#        if(user1['BlueLM Tweets'] > 0):
-#            whoslivematter += 'blue'
+        if(collection == 'xlm'):
+            whoslivematter = ''
+            if(user1['BLM Tweets'] > 0):
+                whoslivematter += 'black'
+            if(user1['ALM Tweets'] > 0):
+                whoslivematter += 'all'
+            if(user1['BlueLM Tweets'] > 0):
+                whoslivematter += 'blue'
         
-#        users_writer.writerow([uid, uname, user1['BLM Tweets'], user1['ALM Tweets'], user1['BlueLM Tweets'], user1['ActualFollowers'], whoslivematter])
-        users_writer.writerow([uid, uname, user1['Tweets'], user1['ActualFollowers']])
+            users_writer.writerow([uid, uname, user1['BLM Tweets'], user1['ALM Tweets'], user1['BlueLM Tweets'], nFollowers, user1['ActualFollowers'], whoslivematter])
+        else:
+            users_writer.writerow([uid, uname, user1['Tweets'], user1['ActualFollowers']])
         
-        if len(followers) > 0:
-            print (output_filename + '\t' + str(index1) + '/' + str(len(users)))
+        if nFollowers > 0:
 
-            for index2 in range(index1 + 1, len(users)):
+            for index2 in range(index1 + 1, nUsers):
                 user2 = users[index2];
                 uname2 = user2['Screenname']
                 uid2   = user2['UserID']
                 followers2 = user2['Followers'].split(',')
+                nFollowers2 = len(followers2)
+                nFollowersActual2 = max(user2['ActualFollowers'], nFollowers2)
                 
-                if len(followers2) > 0:
+                if nFollowers2 > 0:
                     # print uname + ', ' + uname2
                     lIntersect = intersection(followers, followers2)
-                    nIntersect_weighted = float(len(lIntersect)) * (float(user1['ActualFollowers']) / user1['RetrievedFollowers']) * (float(user2['ActualFollowers']) / user2['RetrievedFollowers'])
-                    nUnion = max(user1['ActualFollowers'] + user2['ActualFollowers'] - nIntersect_weighted, 0)
+                    nIntersect = len(lIntersect)
+                    correctionUser1 = float(nFollowersActual) / nFollowers
+                    correctionUser2 = float(nFollowersActual2) / nFollowers2
+                    nIntersect_weighted = float(nIntersect) * correctionUser1 * correctionUser2
+                    nIntersect_weighted = min(nIntersect_weighted, nFollowersActual, nFollowersActual2)
+                    nUnion = max(nFollowersActual + nFollowersActual2 - nIntersect_weighted, 1)
                     
                     sharedAudience_bi = nIntersect_weighted / nUnion
-#                    sharedAudience_uni = nIntersect_weighted / user1['ActualFollowers']
-#                    sharedAudience_uni2 = nIntersect_weighted / user2['ActualFollowers']
+                    sharedAudience_uni = nIntersect_weighted / nFollowersActual
+                    sharedAudience_uni2 = nIntersect_weighted / nFollowersActual2
+                    
+                    edge_density[int(math.floor(sharedAudience_bi * 100))] += 1
+                    for i_thresh in range(len(thresholds)):
+                        threshold = thresholds[i_thresh]
+                        if(sharedAudience_bi > threshold):
+                            nEdges_abovethreshold[i_thresh] += 1
+                            edge_writers[i_thresh].writerow([uid, uid2, sharedAudience_bi])
+                            orphans[i_thresh][index1] = 0
+                            orphans[i_thresh][index2] = 0
+                    
 #                    print([uid, uid2, len(lIntersect), nIntersect_weighted, nUnion, sharedAudience_bi])
-                    if(sharedAudience_bi > threshold):
-                        n_sharedAudience_abovethreshold += 1
-                        writer.writerow([uid, uid2, sharedAudience_bi])
+#                    if(sharedAudience_bi > threshold):
+##                        print('Connect {0: 5d} <-> {1: 5d}, SA {2:.0f} / {3:.0f} = {4:.1f}. Unweighted: {5:d}'.format(index1, index2, nIntersect_weighted, nUnion, sharedAudience_bi, nIntersect))
+#                        n_sharedAudience_abovethreshold += 1
+#                        nEdges += 1
+#                        writer.writerow([uid, uid2, sharedAudience_bi])
+#                    if(sharedAudience_uni > threshold_uni):
+#                        n_sharedAudience_uni_abovethreshold += 1
+#                        nEdges_uni += 1
+#                        writer_uni.writerow([uid, uid2, sharedAudience_uni])
+#                    if(sharedAudience_uni2 > threshold_uni):
+#                        n_sharedAudience_uni_abovethreshold += 1
+#                        nEdges_uni += 1
+#                        writer_uni.writerow([uid2, uid, sharedAudience_uni2])
             
-            print ('\t\t\t\t\t\tShared Audience with: ' + str(n_sharedAudience_abovethreshold))
+            
+#            print('Users: {0: 5d}/{1: 5d}\tSA-bi Edges: {2:d}\tOrphans: {3:d}\tSA-uni Edges: {4:d}\tOrphans: {5:d}'.format(index1, nUsers, n_sharedAudience_abovethreshold, nOrphans, n_sharedAudience_uni_abovethreshold, nOrphans_uni))
+            print('Users: {0: 5d}/{1: 5d}\tEdges: {2:d} > .05,  {3:d} > .1,  {4:d} > .2,  {5:d} > .5'.format(index1, nUsers, nEdges_abovethreshold[0], nEdges_abovethreshold[1], nEdges_abovethreshold[2], nEdges_abovethreshold[3]))
+    
+    print('Orphans -- 0.05: {0:d}\t0.1: {1:d}\t0.2: {2:d}\t0.5: {3:d}'.format(sum(orphans[0]), sum(orphans[1]), sum(orphans[2]), sum(orphans[3])))
 
-#write_edges(uname_to_follower_id, 'data/weights_followers.csv', lambda x: int(uname_to_udata[x]['followers_count']))
-#write_edges(uname_to_friend_id, 'data/weights_friends.csv', lambda x: int(uname_to_udata[x]['friends_count']))
-#write_edges(uname_to_all_ids, 'data/weights.csv', lambda x: int(uname_to_udata[x]['followers_count']) + int(uname_to_udata[x]['friends_count']))
+    print('Weight\tEdges')
+    for i in range(101):
+        print(str(i / 100) + '\t' + str(edge_density[i]))
 
-write_edges(users, 'orlandoshooting_edgelist_sharedaudience_0p01.csv')
+# Run!
+write_edges(users)
+
 
