@@ -132,3 +132,7 @@
 .inspect-value {
     text-align: 'right';
 }
+
+.hidden-table {
+    display: none;
+}

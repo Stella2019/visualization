@@ -40,6 +40,19 @@ function FeatureDistribution() {
             'Favorites':    ['Start', 'Growth', 'Growth &ne; 0'],
         }
     };
+    this.hierarchy_major = {
+        'Tweet Based': {
+            'Categories':   ['Type', 'Distinct'],
+            'Text N-Grams': ['Unigrams', 'Bigrams'],
+            'URLs':         ['Expanded URL Domain'],
+            'Origin':       ['Screenname / User ID'],
+            'Mentions':     ['Users Retweeted'], // + Users Mentioned?
+        },
+        'User Based': {
+            'Identity':     ['Description Unigrams', 'Verified'],
+            'Localization': ['Location', 'Timezone'],
+        }
+    };
     this.hierarchy_flatted = [];
     Object.keys(this.hierarchy).forEach(function(level1) {
         var counters1 = this.hierarchy[level1];
@@ -80,6 +93,7 @@ FeatureDistribution.prototype = {
         triggers.on('counters:count', this.countFeatures.bind(this));
         triggers.on('counters:place', this.placeCounts.bind(this));
         triggers.on('counters:show', this.showCounts.bind(this));
+        triggers.on('counters:visibility', this.toggleCounterVisibility.bind(this));
     },
     buildPage: function() {
         this.body = d3.select('body').append('div')
@@ -252,6 +266,14 @@ FeatureDistribution.prototype = {
             })
         };
         this.ops['Display'] = {
+            'Show Major': new Option({
+                title: "Show Tables",
+                labels: ['only Major', 'All'],
+                ids:    ['only Major', 'All'],
+                type: 'toggle',
+                tooltip: 'Toggle to show all tables or JUST the major ones for feature analysis',
+                callback: triggers.emitter('counters:visibility')
+            }),
             TopX: new Option({
                 title: "Top",
                 labels: ['1', '5', '10', '20', '100', '200', '1000'],
@@ -1544,6 +1566,33 @@ FeatureDistribution.prototype = {
         } else {
             this.feature_divs.selectAll('.cell-cmp')
                 .classed('cell-hidden', true);
+        }
+        
+        triggers.emit('counters:visibility');
+    },
+    toggleCounterVisibility: function() {
+        if(this.ops['Display']['Show Major'].is('only Major')) {
+            d3.selectAll('.feat_type, .feature')
+                .classed('hidden-table', true);
+            
+            // Iterate through the hierachy of tables & only show ones that are considered major
+            // TODO, in the future, don't even count them to speed up the process
+            Object.keys(this.hierarchy_major).forEach(function(level1) {
+                var counters1 = this.hierarchy_major[level1];
+                Object.keys(counters1).forEach(function(level2) {
+                    d3.select('.feat_type-' + util.simplify(level1 + '__' + level2))
+                        .classed('hidden-table', false);
+                    var counters2 = counters1[level2];
+                    counters2.forEach(function(counter) {
+                        d3.select('.feature-' + util.simplify(level1 + '__' + level2 + '__' + counter))
+                            .classed('hidden-table', false);
+                    }, this);
+                }, this);
+            }, this);
+            
+        } else {
+            d3.selectAll('.feat_type, .feature')
+                .classed('hidden-table', false);
         }
     },
     inspectUser: function(row) {
