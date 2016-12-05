@@ -347,38 +347,27 @@ DatasetTable.prototype = {
                 children = [d.subsets['Uncodable'], d.subsets['Codable']];
             }
             
-            this.quantities.forEach(function(count) {
-                d[count] = d3.sum(children,e => e[count] || 0);
-            });
-            
-            d.FirstTweet_Min    = d3.min(children, e => !e.FirstTweet || e.FirstTweet == 0 ? new BigNumber(1e20) : e.FirstTweet);
-            d.LastTweet_Min     = d3.min(children, e => !e.LastTweet  || e.LastTweet  == 0 ? new BigNumber(1e20) : e.LastTweet );
-            d.FirstTweet_Max    = d3.max(children, e =>  e.FirstTweet || new BigNumber(0));
-            d.LastTweet_Max     = d3.max(children, e =>  e.LastTweet  || new BigNumber(0));
-            
-            d.FirstTweet        = d.FirstTweet_Min;
-            d.LastTweet         = d.LastTweet_Max;
-            d.ID_Min            = d3.min(children, e => parseInt(e.ID) || 0);
-            d.ID_Max            = d3.max(children, e => parseInt(e.ID) || 1e10);
+            this.aggregateSetChildrenCounts(d);
         }, this);
         
-        this.event_types_arr.forEach(function(d) {
-            this.quantities.forEach(function(count) {
-                d[count] = d3.sum(d.children, e => e[count] || 0);
-            });
-            
-            d.FirstTweet_Min    = d3.min(d.children, e => !e.FirstTweet || e.FirstTweet == 0 ? new BigNumber(1e20) : e.FirstTweet);
-            d.LastTweet_Min     = d3.min(d.children, e => !e.LastTweet  || e.LastTweet  == 0 ? new BigNumber(1e20) : e.LastTweet );
-            d.FirstTweet_Max    = d3.max(d.children, e =>  e.FirstTweet || new BigNumber(0));
-            d.LastTweet_Max     = d3.max(d.children, e =>  e.LastTweet  || new BigNumber(0));
-            
-            d.FirstTweet        = d.FirstTweet_Min;
-            d.LastTweet         = d.LastTweet_Max;
-            d.ID_Min            = d3.min(d.children, e => parseInt(e.ID) || 0);
-            d.ID_Max            = d3.max(d.children, e => parseInt(e.ID) || 1e10);
-        }, this);
+        this.event_types_arr.forEach(this.aggregateSetChildrenCounts.bind(this));
         
         triggers.emit('update_counts');
+    },
+    aggregateSetChildrenCounts: function(d) {
+        this.quantities.forEach(function(count) {
+            d[count] = d3.sum(d.children, e => e[count] || 0);
+        });
+
+        d.FirstTweet_Min    = d3.min(d.children, e => !e.FirstTweet || e.FirstTweet == 0 ? new BigNumber(1e20) : e.FirstTweet);
+        d.LastTweet_Min     = d3.min(d.children, e => !e.LastTweet  || e.LastTweet  == 0 ? new BigNumber(1e20) : e.LastTweet );
+        d.FirstTweet_Max    = d3.max(d.children, e =>  e.FirstTweet || new BigNumber(0));
+        d.LastTweet_Max     = d3.max(d.children, e =>  e.LastTweet  || new BigNumber(0));
+
+        d.FirstTweet        = d.FirstTweet_Min;
+        d.LastTweet         = d.LastTweet_Max;
+        d.ID_Min            = d3.min(d.children, e => parseInt(e.ID) || 0);
+        d.ID_Max            = d3.max(d.children, e => parseInt(e.ID) || 1e10);
     },
     buildOptions: function() {
         this.ops.updateCollectionCallback = this.getData;
@@ -496,6 +485,14 @@ DatasetTable.prototype = {
                 type: "toggle",
                 callback: triggers.emitter('refresh_visibility')
             }),
+//            Deactivated: new Option({
+//                title: 'Deactivated Rows',
+//                labels: ['Hidden', 'Shown'],
+//                ids:    ['none', 'table-row'],
+//                default: 0,
+//                type: "toggle",
+//                callback: triggers.emitter('refresh_visibility')
+//            }),
 //            Unopened: new Option({
 //                title: 'Unopened Rows',
 //                labels: ['Hidden', 'Shown'],
@@ -575,7 +572,7 @@ DatasetTable.prototype = {
         this.event_types_arr.forEach(function(event_type) {
             event_type.row = table_body.append('tr')
                 .data([event_type])
-                .attr('class', 'row_type row_haschildren');
+                .attr('class', d => 'row_eventtype row_haschildren row_eventtype_' + d.ID);
             
             event_type.events_arr.forEach(function(event) {
                 event.row = table_body.append('tr')
@@ -591,7 +588,8 @@ DatasetTable.prototype = {
                         if(feature.Label != 'Rumor') {
                             feature.row = table_body.append('tr')
                                 .data([feature])
-                                .attr('class', d => 'row_feature row_haschildren row_feature-' + (feature_ichild % 2 ? 'odd' : 'even'));
+                                .attr('class', d => 'row_feature row_haschildren row_feature_' + d.ID);
+//                                .attr('class', d => 'row_feature row_haschildren row_feature-' + (feature_ichild % 2 ? 'odd' : 'even'));
 
                             feature.subsets_arr.forEach(function(subset, subset_ichild) {
                                 subset.row = table_body.append('tr')
@@ -709,9 +707,27 @@ DatasetTable.prototype = {
         });
         
         // Add action buttons
+        this.addAllDatasetActions();
+        
+        // Add borders between dataset actions
+        table_body.selectAll('.cell-DatasetActions').each(function(d) { d3.select(this.parentNode).style('border-right', 'solid 1px gray'); });
+        table_body.selectAll('.cell-TweetsActions').each(function(d) { d3.select(this.parentNode).style('border-right', 'solid 1px gray'); });
+        table_body.selectAll('.cell-TimeseriesActions').each(function(d) { d3.select(this.parentNode).style('border-right', 'solid 1px gray'); });
+        
+        // Set initial visibility
+        this.event_types_arr.forEach(function(d) { 
+            this.setVisibility_Rows_children(d, 'perserve'); 
+        }.bind(this), this);
+        this.makeScrollHeader();
+        
+        // Set the counts
+        triggers.emit('new_counts');
+        triggers.emit('toggle columns');
+    },
+    addAllDatasetActions: function() {
         this.addDatasetAction('DatasetActions', 'edit', this.edit, 'Edit the dataset', ['event', 'subset']);
         this.addDatasetAction('DatasetActions', 'remove action-deletion', this.deleteCollection, 'Delete Collection (warning: inreversible)', ['subset']);
-        this.addDatasetAction('TweetsActions', 'refresh', this.recount, 'Recount Tweets, Tweet Types, and Start/End Tweet');
+        this.addDatasetAction('TweetsActions', 'refresh', this.countTweets, 'Recount Tweets, Tweet Types, and Start/End Tweet', ['eventtype', 'event', 'subset', 'rumor','feature']);
         this.addDatasetAction('TweetsActions', 'scissors action-deletion', dataset => this.clearItems('tweets', dataset), 'Clear Tweet to Collection Mapping');
         this.addDatasetAction('TweetsActions', 'download-alt',
                               dataset => this.fetchDataToDownload(dataset, 'tweets'),
@@ -738,20 +754,6 @@ DatasetTable.prototype = {
                               dataset => this.fetchDataToDownload(dataset, 'users_userprofiles'),
                               'Download User List & User Profiles');
         this.addDatasetAction('UsersActions', 'user', this.enqueueUsersToFetchFollowerQueue.bind(this), 'Fetch followers for users in this dataset by adding them to the queue for the FetchFollowers python script to download using the Twitter API', ['rumorwithsubset', 'subset']);
-        
-        // Add borders between dataset actions
-        table_body.selectAll('.cell-TweetsActions').each(function(d) { d3.select(this.parentNode).style('border-right', 'solid 1px gray'); });
-        table_body.selectAll('.cell-TimeseriesActions').each(function(d) { d3.select(this.parentNode).style('border-right', 'solid 1px gray'); });
-        
-        // Set initial visibility
-        this.event_types_arr.forEach(function(d) { 
-            this.setVisibility_Rows_children(d, 'perserve'); 
-        }.bind(this), this);
-        this.makeScrollHeader();
-        
-        // Set the counts
-        triggers.emit('new_counts');
-        triggers.emit('toggle columns');
     },
     addDatasetAction: function(action_group, glyphicon, action, tooltip, dataset_types) {
         if(dataset_types == undefined) dataset_types = ['subset', 'rumorwithsubset', 'event'];
@@ -771,10 +773,7 @@ DatasetTable.prototype = {
             }.bind(this));;
     },
     prepareCollectionContextMenu: function(set) { 
-        var collectionType = (set.Level == 1 ? 'Event' : 'Subset')
-        var countText_Tweets = set.Tweets ? 'Recount' : 'Count';
-        var countText_Timeseries = set.Minutes ? 'Recount' : 'Count';
-        var countText_Users = set.Users ? 'Recount' : 'Count';
+        var collectionType = (set.Level == 1 ? 'Event' : 'Subset');
 
         var menu_options = [{
                 label: collectionType + ' ' + set.ID
@@ -1194,7 +1193,14 @@ DatasetTable.prototype = {
             }.bind(this)
         );
     },
-    recount: function(dataset) {
+    countTweets: function(dataset) {
+        // If aggregate, then re-aggregate
+        if(['EventType', 'Feature'].includes(dataset.CollectionType)) {
+            this.aggregateSetChildrenCounts(dataset);
+            this.updateTableCounts(this.datasetRowID(dataset)); // make labels for event features
+            return;
+        }
+        
         // Prepare statement
         var post = {
             Collection: dataset.Level == 1 ? 'event' : 'subset',
@@ -1240,7 +1246,7 @@ DatasetTable.prototype = {
             },
             function(result) {
                 if(item_type == 'tweets')
-                    this.recount(dataset);
+                    this.countTweets(dataset);
                 else if(item_type == 'timeseries')
                     this.countTimeseriesMinutes(dataset);
                 else if(item_type == 'users')
@@ -1415,12 +1421,12 @@ DatasetTable.prototype = {
             .on('click', this.endDownload.bind(this));
         
         // Only here to move tweets from old version of the tweet table to new version if necessary
-        div.append('button')
-            .attr('id', 'tweet-transfer')
-            .attr('class', 'btn btn-default new-collection-button')
-            .data(['Transfer tweets from Old Table to New Table. Only Conrad should press this'])
-            .text('Transfer Tweets')
-            .on('click', this.transferTweets.bind(this));
+//        div.append('button')
+//            .attr('id', 'tweet-transfer')
+//            .attr('class', 'btn btn-default new-collection-button')
+//            .data(['Transfer tweets from Old Table to New Table. Only Conrad should press this'])
+//            .text('Transfer Tweets')
+//            .on('click', this.transferTweets.bind(this));
         
         this.tooltip.attach('.new-collection-button', d => d);
     },

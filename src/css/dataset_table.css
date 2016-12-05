@@ -79,7 +79,7 @@ div .action_button:not(:last-child) {
     cursor: pointer;
 }
 
-.row_type {
+.row_eventtype {
     background-color: #9ac;
     border-top: solid 2px #78a;
 }
@@ -102,7 +102,7 @@ div .action_button:not(:last-child) {
     cursor: pointer;
 }
 
-.row_type .cell-Collection .value {
+.row_eventtype .cell-Collection .value {
     padding-left: 10px;
     font-weight: bold;
 }
