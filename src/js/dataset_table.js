@@ -753,7 +753,7 @@ DatasetTable.prototype = {
         this.addDatasetAction('UsersActions', 'download',
                               dataset => this.fetchDataToDownload(dataset, 'users_userprofiles'),
                               'Download User List & User Profiles');
-        this.addDatasetAction('UsersActions', 'user', this.enqueueUsersToFetchFollowerQueue.bind(this), 'Fetch followers for users in this dataset by adding them to the queue for the FetchFollowers python script to download using the Twitter API', ['rumorwithsubset', 'subset']);
+        this.addDatasetAction('UsersActions', 'user', this.enqueueUsersToFetchData.bind(this), 'Fetch followers, friends, and recent tweets for users in this dataset by adding them to the queue for the FetchUserData python script to download using the Twitter API', ['rumorwithsubset', 'subset']);
     },
     addDatasetAction: function(action_group, glyphicon, action, tooltip, dataset_types) {
         if(dataset_types == undefined) dataset_types = ['subset', 'rumorwithsubset', 'event'];
@@ -1346,15 +1346,15 @@ DatasetTable.prototype = {
         console.log('updating', this.datasetRowID(dataset), dataset);
         triggers.emit('update_counts', this.datasetRowID(dataset));
     },
-    enqueueUsersToFetchFollowerQueue: function(dataset) {
+    enqueueUsersToFetchData: function(dataset) {
         this.connection.phpjson(
-            'users/enqueueToFetchFollowerQueue',
+            'users/enqueueToFetchData',
             {
                 Collection: dataset.Level == 1 ? 'Event' : 'Subset',
                 ID: dataset.Subset_ID || dataset.ID,
             },
             triggers.emitter('alert', {
-                text: 'Sent ' + dataset.Users + ' Users to the Follower Fetching Queue. May take awhile.',
+                text: 'Sent ' + dataset.Users + ' Users to the Follower, Friend, & Tweet Fetching Queue. May take awhile.',
                 style_class: 'info'
             })
         );

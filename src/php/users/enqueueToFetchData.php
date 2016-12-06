@@ -15,7 +15,7 @@
     assert("is_numeric($collection_id)");
 
     # Execute Query
-    $query = "CALL enqueue_users_in_${collection}_to_fetch_followers_queue(${collection_id});";
+    $query = "CALL enqueue_users_in_${collection}_to_fetch_user_data_queue(${collection_id});";
 
     include '../printJSON.php';
 ?>

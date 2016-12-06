@@ -16,9 +16,14 @@ storage = mysql.connector.connect(
     database=config["storage"]["database"]
 )
 cursor = storage.cursor(dictionary=True)
-collection = 'xlm' # XLM orlandoshooting
-#query = "CALL GetFollowerList_forOrlandoShooting()"
-query = "CALL GetFollowerList_forXLM()"
+collection = 'shootingAN' # xlm orlando shootingAN
+# Subsets with follower lists
+# 2455 orlando shooting
+# ??? xlm
+# 2590 crisis actors (any users, no filter yet)
+subset = 2590
+query = "CALL get_follower_list_for_subset(" + str(subset) + ")"
+#query = "CALL GetFollowerList_forXLM()"
 
 users = []
 for result in cursor.execute(query, multi=True):
@@ -43,12 +48,12 @@ def union(l1, l2):
     return set(l1) | set(l2)
 
 def write_edges(users):
-    edge_writers = [csv.writer(open(collection + '_edgelist_sharedaudience_0p05.csv', 'w+')),
-                    csv.writer(open(collection + '_edgelist_sharedaudience_0p10.csv', 'w+')),
-                    csv.writer(open(collection + '_edgelist_sharedaudience_0p20.csv', 'w+')),
-                    csv.writer(open(collection + '_edgelist_sharedaudience_0p50.csv', 'w+'))]
+    edge_writers = [csv.writer(open('SA-Graphs/' + collection + '_edgelist_sharedaudience_0p05.csv', 'w+')),
+                    csv.writer(open('SA-Graphs/' + collection + '_edgelist_sharedaudience_0p10.csv', 'w+')),
+                    csv.writer(open('SA-Graphs/' + collection + '_edgelist_sharedaudience_0p20.csv', 'w+')),
+                    csv.writer(open('SA-Graphs/' + collection + '_edgelist_sharedaudience_0p50.csv', 'w+'))]
 #    writer_uni = csv.writer(open(collection + '_edgelist_sharedaudience_0p50_unidirectional.csv', 'w+'))
-    users_writer = csv.writer(open(collection + '_nodelist.csv', 'w+'))
+    users_writer = csv.writer(open('SA-Graphs/' + collection + '_nodelist.csv', 'w+'))
     n_sharedAudience_abovethreshold = 0
     n_sharedAudience_uni_abovethreshold = 0
     nUsers = len(users)
@@ -106,7 +111,7 @@ def write_edges(users):
                         threshold = thresholds[i_thresh]
                         if(sharedAudience_bi > threshold):
                             nEdges_abovethreshold[i_thresh] += 1
-                            edge_writers[i_thresh].writerow([uid, uid2, sharedAudience_bi])
+                            edge_writers[i_thresh].writerow([uid, uid2, round(sharedAudience_bi, 3)])
                             orphans[i_thresh][index1] = 0
                             orphans[i_thresh][index2] = 0
                     
@@ -133,7 +138,7 @@ def write_edges(users):
 
     print('Weight\tEdges')
     for i in range(101):
-        print(str(i / 100) + '\t' + str(edge_density[i]))
+        print('{0:.2f}\t{1:d}'.format(i / 100,edge_density[i]))
 
 # Run!
 write_edges(users)
