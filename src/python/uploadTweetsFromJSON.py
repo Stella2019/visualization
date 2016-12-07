@@ -8,6 +8,12 @@ from server_messenger import ServerMessenger
 from utils.TwitterTextRemover import TwitterTextRemover
 import mysql.connector
 
+# Fix Python 2.x.
+try:
+    UNICODE_EXISTS = bool(type(unicode))
+except NameError:
+    unicode = lambda s: str(s)
+
 serverCapture = None
 serverStorage = None
 options = {}
@@ -15,10 +21,10 @@ collection = {'name': None}
 subsets = []
 stripTweetText = TwitterTextRemover()
 distinct_set = set()
-timing = {'parseMetadata': 0,
-          'parseSubsets': 0,
-          'N': 0,
-          'uploadTweet': 0}
+#timing = {'parseMetadata': 0,
+#          'parseSubsets': 0,
+#          'N': 0,
+#          'uploadTweet': 0}
 
 # Queries
 queries = {
@@ -168,14 +174,14 @@ def parseFile(filename):
 #                    parent = parseTweetJSON(tweet['Parent'])
 #                    uploadTweet(cursor, parent, 1)
                 
-                global timing
-                start = time.time()
+#                global timing
+#                start = time.time()
                 uploadTweet(cursor, tweet, 0)
-                end = time.time()
-                timing['uploadTweet'] += end - start
+#                end = time.time()
+#                timing['uploadTweet'] += end - start
                 
-                if(timing['N'] % 1000 == 0):
-                    print('Time report (' + str(timing['N']) + '): ' + str(timing['uploadTweet']   / timing['N']))
+#                if(timing['N'] % 1000 == 0):
+#                    print('Time report (' + str(timing['N']) + '): ' + str(timing['uploadTweet']   / timing['N']))
                 
         
         if(not options.test):
@@ -573,7 +579,7 @@ def compareSubsets(data):
     return matched_subsets
 
 def parseTweetJSON(data):
-    start = time.time()
+#    start = time.time()
     
     if(type(data) is str or type(data) is unicode):
         data = json.loads(data)
@@ -710,14 +716,13 @@ def parseTweetJSON(data):
             
 
     # Search for keywords
-    subsettime = time.time()
+#    subsettime = time.time()
     tweet['Subsets'] = compareSubsets(tweet)
-    end = time.time()
     
-    global timing
-    timing['parseMetadata'] += subsettime - start
-    timing['parseSubsets'] += end - subsettime
-    timing['N'] += 1
+#    global timing
+#    timing['parseMetadata'] += subsettime - start
+#    timing['parseSubsets'] += end - subsettime
+#    timing['N'] += 1
     
     return tweet
 

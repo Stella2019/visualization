@@ -1,3 +1,4 @@
+from __future__ import print_function
 import datetime
 import json
 import sys
@@ -7,6 +8,7 @@ from datetime import datetime
 import tweepy
 import mysql.connector
 from pprint import pprint
+import uploadTweetsFromJSON
 
 # Parameters
 wait_time = 15
@@ -14,7 +16,11 @@ wait_time = 15
 config_file = 'twitter_api1.conf'
 follower_list_cap = 25000
 followers_per_packet = 5000
-users_reserved = 2
+MAX_TWEETS_FETCHED = 3000
+TWEETS_PER_PACKET = 200
+USERS_PER_ITERATION = 1
+DEFAULT_ATTEMPTS = 16
+WAIT_TO_RETRY = 1 # minute
 
 # Data storage
 storage = False
@@ -28,6 +34,7 @@ openConnection = False
 
 # Load server
 def main():
+    global cancelled
     # Set parameters
     if (len(sys.argv) > 1 and sys.argv[1] == 'friends'):
         global config_file
@@ -38,7 +45,11 @@ def main():
     checkUsersToFetch()
     
     while(len(users_to_fetch) > 0  and not cancelled):
-        iterateThroughFollowerList()
+        try: # Catch all outstanding errors here
+            iterateThroughUsers()
+        except:
+            closeConnections()
+            raise
         
         # Grab another group of followers to fetch
         print ('** Fetch more users **')
@@ -51,10 +62,8 @@ def main():
 
 # Every so often check MySQL for new followers to fetch
 def checkUsersToFetch():
-    # Get the next 10 users
-    query = "SELECT * FROM UserDataQueue WHERE `Status`='Pending' ORDER BY `Priority` DESC LIMIT " + str(users_reserved)
-    if(config_file == 'twitter_api2.conf'):
-        query = "SELECT * FROM UserDataQueue WHERE `FriendsStatus`='Pending' ORDER BY `Priority` DESC LIMIT " + str(users_reserved)
+    # Get the next <USERS_PER_ITERATION> users
+    query = "SELECT * FROM UserDataQueue WHERE `TweetsStatus`='Pending' ORDER BY `Priority` DESC LIMIT " + str(USERS_PER_ITERATION)
     cursor.execute(query)
     
     global users_to_fetch
@@ -68,7 +77,7 @@ def checkUsersToFetch():
     storage.commit()
 
 # If we have user follower lists to fetch, upload it!
-def iterateThroughFollowerList():
+def iterateThroughUsers():
     global cancelled
     n_users = len(users_to_fetch)
     if(n_users > 0):
@@ -77,8 +86,7 @@ def iterateThroughFollowerList():
                 if(cancelled):
                     return
                 user = users_to_fetch[user_index]
-                user_id = user['UserID']
-                print('Fetching User Data ({0: 5d}/{1: 5d}): {2:.0f}'.format(user_index, n_users, user_id))
+#                print('Fetching User Data ({0: 5d}/{1: 5d}): {2:.0f}'.format(user_index, n_users, user['UserID']))
 
                 # Get & push follower list
                 fetchUsersData(user)
@@ -96,14 +104,22 @@ def iterateThroughFollowerList():
 def fetchUsersData(user):
     global cancelled
     if(cancelled):
-        return {'user_id': user_id}
-    
-    defaultAttempts = 16
-    waitTime = 1 # minute
+        return
     
     # Check user profile from tweet
-    attemptsLeft = defaultAttempts
-    protected = False
+    checkUser(user)
+    fetchFollowers(user)
+    fetchFriends(user)
+    fetchTweets(user)
+    
+    # Wrap up
+    if(user['Status'] == 'Pending'):
+        user['Status'] = 'Retrieved'
+        
+        
+def checkUser(user):
+    global cancelled
+    attemptsLeft = DEFAULT_ATTEMPTS
     while(attemptsLeft > 0 and not cancelled):
         try:
             userFromAPI = twitter_api.get_user(user_id=user['UserID'])
@@ -119,7 +135,7 @@ def fetchUsersData(user):
             err = str(err)
             if('429' in err or 'Rate limit' in err): # Rate limit error
                 print('429: Rated Limited - wait and try again') 
-                count_down(waitTime)
+                count_down(WAIT_TO_RETRY)
                 keepOnTrying = True
                 attemptsLeft -= 1
             else:
@@ -129,95 +145,158 @@ def fetchUsersData(user):
                     user['Status'] = 'Suspended'
                 elif('404' in err or 'does not exist' in err or 'not found' in err):
                     user['Status'] = 'Removed'
+                elif('104' in err or 'Connection reset' in err):
+                    print('104: Connection reset - wait and try again') 
+                    attemptsLeft -= 1
                 else:
                     print("!!! Unhandled Tweepy error: " + err)
                     user['Status'] = 'Other'
                     aborted = True
-                protected = True
                 attemptsLeft = 0
         except KeyboardInterrupt:
             print('** Cancelled **\t\t\t\t\t ')
             cancelled = True
             closeConnections()
             return
-    
-    # Get follower IDs
-    if(user['FollowersStatus'] == 'Pending' or user['FollowersStatus'] == 'Capped'):
-        attemptsLeft = defaultAttempts
-        while(not protected and attemptsLeft > 0 and not cancelled):
-            try:
-                user['FollowerList'] = []
-                for page in tweepy.Cursor(twitter_api.followers_ids, user_id=user['UserID']).pages():
-                    user['FollowerList'].extend(page)
-                    if len(user['FollowerList']) >= follower_list_cap + 1:
-                        break
-
-                if(len(user['FollowerList']) < user['FollowersActual'] and len(user['FollowerList']) >= follower_list_cap):
-                    user['FollowersStatus'] = 'Capped'
-                else:
-                    user['FollowersStatus'] = 'Retrieved'
-                user['FollowersRetrieved'] = len(user['FollowerList'])
-                attemptsLeft = 0
-            except tweepy.error.TweepError as err:
-                err = str(err)
-                if('429' in err or 'Rate limit' in err): # Rate limit error
-                    print('429: Rated Limited - wait and try again') 
-                    attemptsLeft -= 1
-                elif('401' in err or 'Not authorized' in err):
-                    user['FollowerStatus'] = 'Protected'
-                    user['FollowersRetrieved'] = len(user['FollowerList'])
-                    attemptsLeft = 0
-                else:
-                    print("!!! Unhandled Tweepy error: " + err)
-                    attemptsLeft = 0
-                count_down(waitTime)
-            except KeyboardInterrupt:
-                print('** Cancelled **\t\t\t\t\t ')
-                cancelled = True
-                closeConnections()
-                return
+    print('User ' + str(user['UserID']) + ' ' + user['Status'])
         
-    # Fetch friends (users this user is following)
-    if(user['FriendsStatus'] == 'Pending' or user['FriendsStatus'] == 'Capped'):
-        attemptsLeft = defaultAttempts
-        while(not protected and attemptsLeft > 0 and not cancelled):
-            try:
-                user['FriendList'] = []
-                for page in tweepy.Cursor(twitter_api.friends_ids, user_id=user['UserID']).pages():
-                    user['FriendList'].extend(page)
-                    if len(user['FriendList']) >= follower_list_cap + 1:
-                        break
+def fetchFollowers(user):
+    global cancelled
+    if(not cancelled and user['FollowersStatus'] == 'Pending' or user['FollowersStatus'] == 'Capped'):
+        print('\tFetch Followers (' + str(user['FollowersActual']) + ')', end='')
+        attemptsLeft = DEFAULT_ATTEMPTS
+        if(user['Status'] in ['Protected', 'Suspended', 'Removed', 'Other']):
+            user['FollowersStatus'] = 'Protected'
+        else:
+            while(attemptsLeft > 0 and not cancelled):
+                try:
+                    user['FollowerList'] = []
+                    for page in tweepy.Cursor(twitter_api.followers_ids, user_id=user['UserID']).pages():
+                        user['FollowerList'].extend(page)
+                        if len(user['FollowerList']) >= follower_list_cap:
+                            break
 
-                if(len(user['FriendList']) < user['FriendsActual'] and len(user['FriendList']) >= follower_list_cap):
-                    user['FriendsStatus'] = 'Capped'
-                else:
-                    user['FriendsStatus'] = 'Retrieved'
-                user['FriendsRetrieved'] = len(user['FriendList'])
-                attemptsLeft = 0
-            except tweepy.error.TweepError as err:
-                err = str(err)
-                if('429' in err or 'Rate limit' in err): # Rate limit error
-                    print('429: Rated Limited - wait and try again') 
-                    attemptsLeft -= 1
-                elif('401' in err or 'Not authorized' in err):
-                    user['FriendStatus'] = 'Protected'
+                    if(len(user['FollowerList']) < user['FollowersActual'] and len(user['FollowerList']) >= follower_list_cap):
+                        user['FollowersStatus'] = 'Capped'
+                    else:
+                        user['FollowersStatus'] = 'Retrieved'
+                    user['FollowersRetrieved'] = len(user['FollowerList'])
+                    print(' got ' + str(user['FollowersRetrieved']), end='')
+                    attemptsLeft = 0
+                except tweepy.error.TweepError as err:
+                    err = str(err)
+                    if('429' in err or 'Rate limit' in err): # Rate limit error
+                        print('429: Rated Limited - wait and try again') 
+                        attemptsLeft -= 1
+                    elif('104' in err or 'Connection reset' in err):
+                        print('104: Connection reset - wait and try again') 
+                        attemptsLeft -= 1
+                    elif('401' in err or 'Not authorized' in err):
+                        user['FollowerStatus'] = 'Protected'
+                        user['FollowersRetrieved'] = len(user['FollowerList'])
+                        attemptsLeft = 0
+                    else:
+                        print("!!! Unhandled Tweepy error: " + err)
+                        attemptsLeft = 0
+                    count_down(WAIT_TO_RETRY)
+                except KeyboardInterrupt:
+                    print('** Cancelled **\t\t\t\t\t ')
+                    cancelled = True
+                    closeConnections()
+                    return
+        print('')
+                
+def fetchFriends(user):
+    global cancelled
+    if(not cancelled and user['FriendsStatus'] == 'Pending' or user['FriendsStatus'] == 'Capped'):
+        print('\tFetch Friends (' + str(user['FriendsActual']) + ')', end='')
+        attemptsLeft = DEFAULT_ATTEMPTS
+        if(user['Status'] in ['Protected', 'Suspended', 'Removed', 'Other']):
+            user['FriendsStatus'] = 'Protected'
+        else:
+            while(attemptsLeft > 0 and not cancelled):
+                try:
+                    user['FriendList'] = []
+                    for page in tweepy.Cursor(twitter_api.friends_ids, user_id=user['UserID']).pages():
+                        user['FriendList'].extend(page)
+                        if len(user['FriendList']) >= follower_list_cap:
+                            break
+
+                    if(len(user['FriendList']) < user['FriendsActual'] and len(user['FriendList']) >= follower_list_cap):
+                        user['FriendsStatus'] = 'Capped'
+                    else:
+                        user['FriendsStatus'] = 'Retrieved'
                     user['FriendsRetrieved'] = len(user['FriendList'])
+                    print(' got ' + str(user['FriendsRetrieved']), end='')
                     attemptsLeft = 0
-                else:
-                    print("!!! Unhandled Tweepy error: " + err)
+                except tweepy.error.TweepError as err:
+                    err = str(err)
+                    if('429' in err or 'Rate limit' in err): # Rate limit error
+                        print('429: Rated Limited - wait and try again') 
+                        attemptsLeft -= 1
+                    elif('104' in err or 'Connection reset' in err):
+                        print('104: Connection reset - wait and try again') 
+                        attemptsLeft -= 1
+                    elif('401' in err or 'Not authorized' in err):
+                        user['FriendStatus'] = 'Protected'
+                        user['FriendsRetrieved'] = len(user['FriendList'])
+                        attemptsLeft = 0
+                    else:
+                        print("!!! Unhandled Tweepy error: " + err)
+                        attemptsLeft = 0
+                    count_down(WAIT_TO_RETRY)
+                except KeyboardInterrupt:
+                    print('** Cancelled **\t\t\t\t\t ')
+                    cancelled = True
+                    closeConnections()
+                    return
+        print('')
+
+def fetchTweets(user):
+    global cancelled
+    if(not cancelled and user['TweetsStatus'] == 'Pending'):
+        print('\tFetch Tweets (' + str(user['TweetsActual']) + ')', end='')
+        attemptsLeft = DEFAULT_ATTEMPTS
+        if(user['Status'] in ['Protected', 'Suspended', 'Removed', 'Other']):
+            user['TweetsStatus'] = 'Protected'
+        else:
+            while(attemptsLeft > 0 and not cancelled):
+                try:
+                    user['TweetList'] = []
+                    for page in tweepy.Cursor(twitter_api.user_timeline, user_id=user['UserID'], count=TWEETS_PER_PACKET, exclude_replies=False, include_rts=True).pages():
+                        user['TweetList'].extend(page)
+                        if len(user['TweetList']) >= MAX_TWEETS_FETCHED:
+                            break
+
+                    if(len(user['TweetList']) < user['TweetsActual'] and len(user['TweetList']) >= MAX_TWEETS_FETCHED):
+                        user['TweetsStatus'] = 'Capped'
+                    else:
+                        user['TweetsStatus'] = 'Retrieved'
+                    user['TweetsRetrieved'] = len(user['TweetList'])
+                    print(' got ' + str(user['TweetsRetrieved']), end='')
                     attemptsLeft = 0
-                count_down(waitTime)
-            except KeyboardInterrupt:
-                print('** Cancelled **\t\t\t\t\t ')
-                cancelled = True
-                closeConnections()
-                return
-    
-    # Fetch tweets
-    
-    # Wrap up
-    if(user['Status'] == 'Pending'):
-        user['Status'] = 'Retrieved'
+                except tweepy.error.TweepError as err:
+                    err = str(err)
+                    if('429' in err or 'Rate limit' in err): # Rate limit error
+                        print('429: Rated Limited - wait and try again') 
+                        attemptsLeft -= 1
+                    elif('104' in err or 'Connection reset' in err):
+                        print('104: Connection reset - wait and try again') 
+                        attemptsLeft -= 1
+                    elif('401' in err or 'Not authorized' in err):
+                        user['TweetsStatus'] = 'Protected'
+                        user['TweetsRetrieved'] = len(user['TweetList'])
+                        attemptsLeft = 0
+                    else:
+                        print("!!! Unhandled Tweepy error: " + err)
+                        attemptsLeft = 0
+                    count_down(WAIT_TO_RETRY)
+                except KeyboardInterrupt:
+                    print('** Cancelled **\t\t\t\t\t ')
+                    cancelled = True
+                    closeConnections()
+                    return
+        print('')
         
 def submitDataToStorage(user):
     # Get the status of the retrieval & update accordingly
@@ -234,15 +313,19 @@ def submitDataToStorage(user):
             uploadFriends(user['UserID'], user['FriendList'])
         else:
             user['FriendsStatus'] = 'Protected'
-        
-        
-    # TODO handle friends & tweets
+            
+    if('TweetList' in user):
+        user['TweetsRetrievalDate'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        if(len(user['TweetList']) > 0):
+            uploadTweets(user['UserID'], user['TweetList'])
+        else:
+            user['TweetsStatus'] = 'Protected'
     
     updateUserStatus(user)
     storage.commit()
             
 def updateUserStatus(user):
-    print('\t\t\t\t\t\t {0:s}: {1:s} of {2:s} Followers, {3:s} of {4:s} Friends'.format(user['Status'], str(user['FollowersRetrieved']), str(user['FollowersActual']), str(user['FriendsRetrieved']), str(user['FriendsActual'])))
+#    print('\t\t\t\t\t\t {0:s}: {1:s} of {2:s} Followers, {3:s} of {4:s} Friends'.format(user['Status'], str(user['FollowersRetrieved']), str(user['FollowersActual']), str(user['FriendsRetrieved']), str(user['FriendsActual'])))
     query = "UPDATE UserDataQueue SET `Status`=%(Status)s "
     
     query += ", `FollowersStatus`=%(FollowersStatus)s, `FollowersActual`=%(FollowersActual)s "
@@ -257,6 +340,12 @@ def updateUserStatus(user):
             query += ", `FriendsRetrieved`=%(FriendsRetrieved)s, `FriendsRetrievalDate`=%(FriendsRetrievalDate)s "
         del user['FriendList']
         
+    query += ", `TweetsStatus`=%(TweetsStatus)s, `TweetsActual`=%(TweetsActual)s "
+    if('TweetList' in user):
+        if(len(user['TweetList']) > 0):
+            query += ", `TweetsRetrieved`=%(TweetsRetrieved)s, `TweetsRetrievalDate`=%(TweetsRetrievalDate)s "
+        del user['TweetList']
+    
     query += "WHERE `UserID` = %(UserID)s"
     cursor.execute(query, user)
 
@@ -266,7 +355,7 @@ def uploadFollowers(user_id, follower_ids):
     combined_ids = ",".join("(" + str(user_id) + ", " + str(follower_id) + ")" for follower_id in follower_ids)
     query = "INSERT IGNORE INTO Follow (UserID, Follower) VALUES " + combined_ids
     
-    attemptsLeft = 16
+    attemptsLeft = DEFAULT_ATTEMPTS
     while(attemptsLeft > 0):
         try:
             cursor.execute(query)
@@ -287,7 +376,7 @@ def uploadFriends(user_id, friend_ids):
     combined_ids = ",".join("(" + str(friend_id) + ", " + str(user_id) + ")" for friend_id in friend_ids)
     query = "INSERT IGNORE INTO Follow (UserID, Follower) VALUES " + combined_ids
     
-    attemptsLeft = 16
+    attemptsLeft = DEFAULT_ATTEMPTS
     while(attemptsLeft > 0):
         try:
             cursor.execute(query)
@@ -301,6 +390,63 @@ def uploadFriends(user_id, friend_ids):
             else:
                 print('MySQL error: ' + err)
                 return
+            
+def uploadTweets(user_id, tweets):
+    query_addtweet = ("INSERT IGNORE INTO Tweet "
+                      "(ID, Timestamp, Lang, Text, TextStripped, `Distinct`, "
+                      "    Type, Source, ParentID, ExpandedURL, MediaURL) "
+                      "VALUES (%(ID)s, %(Timestamp)s, %(Lang)s, %(Text)s, %(TextStripped)s, %(Distinct)s, "
+                      "    %(Type)s, %(Source)s, %(ParentID)s, %(ExpandedURL)s, %(MediaURL)s) ")
+    query_addtweetuser = ("INSERT IGNORE INTO TweetUser "
+                          "(Tweet, UserID, Username, Screenname, CreatedAt, "
+                          "    Description, Location, UTCOffset, Timezone, Lang, "
+                          "    StatusesCount, FollowersCount, FriendsCount, "
+                          "    ListedCount, FavouritesCount, Verified) "
+                          "VALUES (%(ID)s, %(UserID)s, %(Username)s, %(Screenname)s, %(UserCreatedAt)s, "
+                          "    %(UserDescription)s, %(UserLocation)s, %(UserUTCOffset)s, %(UserTimezone)s, %(UserLang)s, "
+                          "    %(UserStatusesCount)s, %(UserFollowersCount)s, %(UserFriendsCount)s, "
+                          "    %(UserListedCount)s, %(UserFavouritesCount)s, %(UserVerified)s) "
+                          "ON DUPLICATE KEY UPDATE "
+                          "    FavouritesCount = %(UserFavouritesCount)s, "
+                          "    UserID = %(UserID)s ")
+    query_addtousertimeline = ("INSERT IGNORE INTO TweetInUserTimeline "
+                               "(TweetID, UserID) "
+                               "VALUES (%(ID)s, %(UserID)s)")
+    
+    sys.stdout.flush()
+    sys.stdout.write('\tUploaded {0: 5d}/{1: 5d} Tweets \r'.format(0, len(tweets)))
+    for i_tweet in range(len(tweets)):
+        
+        raw_tweet = tweets[i_tweet]
+        # Get extra tweet fields
+        tweet = uploadTweetsFromJSON.parseTweetJSON(raw_tweet._json)
+        
+        # Clear inner dictionaries used by other programs, we aren't using them
+        if 'Parent' in tweet: del tweet['Parent']
+        if 'Subsets' in tweet: del tweet['Subsets']
+        
+        # Send query to database
+        attemptsLeft = DEFAULT_ATTEMPTS
+        while(attemptsLeft > 0):
+            try:
+                cursor.execute(query_addtweet, tweet)
+                cursor.execute(query_addtweetuser, tweet)
+                cursor.execute(query_addtousertimeline, tweet)
+                storage.commit()
+                attemptsLeft = 0
+            except mysql.connector.errors.InternalError as err:
+                err = str(err)
+                if('1213' in err or 'Deadlock' in err):
+                    # Deadlock while inserting into table, try again a second time
+                    count_down(0.16) # 10 seconds
+                    attemptsLeft -= 1
+                else:
+                    print('MySQL error: ' + err)
+                    return
+        
+        sys.stdout.write('\tUploaded {0: 5d}/{1: 5d} Tweets \r'.format(i_tweet + 1, len(tweets)))
+        sys.stdout.flush()
+    print('')
     
 def checkRateLimit():
     try:
@@ -315,6 +461,7 @@ def checkRateLimit():
             main()
 
 def count_down(minutes):
+    sys.stdout.flush()
     try:
         for i in range(minutes * 60,0,-1):
             time.sleep(1)
