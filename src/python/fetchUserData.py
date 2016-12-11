@@ -9,6 +9,7 @@ import tweepy
 import mysql.connector
 from pprint import pprint
 import uploadTweetsFromJSON
+import random
 
 # Parameters
 wait_time = 15
@@ -18,7 +19,7 @@ follower_list_cap = 25000
 followers_per_packet = 5000
 MAX_TWEETS_FETCHED = 3000
 TWEETS_PER_PACKET = 200
-USERS_PER_ITERATION = 1
+USERS_PER_ITERATION = 10 # Now hard coded in MySQL
 DEFAULT_ATTEMPTS = 16
 WAIT_TO_RETRY = 1 # minute
 
@@ -27,7 +28,6 @@ storage = False
 cursor = False
 twitter_api = False
 users_to_fetch = []
-#n_users_to_fetch = 0
 
 cancelled = False
 openConnection = False
@@ -36,7 +36,7 @@ openConnection = False
 def main():
     global cancelled
     # Set parameters
-    if (len(sys.argv) > 1 and sys.argv[1] == 'friends'):
+    if (len(sys.argv) > 1 and sys.argv[1] == 'conf2'):
         global config_file
         config_file = 'twitter_api2.conf'
     
@@ -62,19 +62,33 @@ def main():
 
 # Every so often check MySQL for new followers to fetch
 def checkUsersToFetch():
-    # Get the next <USERS_PER_ITERATION> users
-    query = "SELECT * FROM UserDataQueue WHERE `TweetsStatus`='Pending' ORDER BY `Priority` DESC LIMIT " + str(USERS_PER_ITERATION)
-    cursor.execute(query)
-    
+    # Get the next <USERS_PER_ITERATION> users    
     global users_to_fetch
-    users_to_fetch = cursor.fetchall()
     
-    # Mark them as being reserved by this python script to be fetched 
-    # Note, there is a potential non-destructive race condition here
-    query = "UPDATE UserDataQueue SET `Status`='Reserved' WHERE `UserID` = %(UserID)s"
-    for user in users_to_fetch:
-        cursor.execute(query, user)
-    storage.commit()
+    attemptsLeft = DEFAULT_ATTEMPTS
+    while(attemptsLeft > 0):
+        try:
+            for result in cursor.execute("CALL get_next_in_user_data_queue()", multi=True):
+                if result.with_rows:
+                    users_to_fetch = result.fetchall()
+            storage.commit()
+            attemptsLeft = 0
+        except mysql.connector.errors.InternalError as err:
+            err = str(err)
+            if('1213' in err or 'Deadlock' in err):
+                # Deadlock while inserting into table, try again a second time
+                count_down(0.16 + random.random()) # 10 to 70 seconds
+                attemptsLeft -= 1
+            else:
+                print('MySQL error: ' + err)
+                return
+        except mysql.connector.errors.DatabaseError as err:
+            if('1205' in err or 'Lock wait timeout' in err):
+                count_down(0.16 + random.random()) # 10 to 70 seconds
+                attemptsLeft -= 1
+            else:
+                print('MySQL error: ' + err)
+                return
 
 # If we have user follower lists to fetch, upload it!
 def iterateThroughUsers():
@@ -108,8 +122,8 @@ def fetchUsersData(user):
     
     # Check user profile from tweet
     checkUser(user)
-    fetchFollowers(user)
-    fetchFriends(user)
+    #fetchFollowers(user)
+    #fetchFriends(user)
     fetchTweets(user)
     
     # Wrap up
@@ -364,7 +378,14 @@ def uploadFollowers(user_id, follower_ids):
             err = str(err)
             if('1213' in err or 'Deadlock' in err):
                 # Deadlock while inserting into table, try again a second time
-                count_down(0.16) # 10 seconds
+                count_down(0.16 + random.random()) # 10 to 70 seconds
+                attemptsLeft -= 1
+            else:
+                print('MySQL error: ' + err)
+                return
+        except mysql.connector.errors.DatabaseError as err:
+            if('1205' in err or 'Lock wait timeout' in err):
+                count_down(0.16 + random.random()) # 10 to 70 seconds
                 attemptsLeft -= 1
             else:
                 print('MySQL error: ' + err)
@@ -385,7 +406,14 @@ def uploadFriends(user_id, friend_ids):
             err = str(err)
             if('1213' in err or 'Deadlock' in err):
                 # Deadlock while inserting into table, try again a second time
-                count_down(0.16) # 10 seconds
+                count_down(0.16 + random.random()) # 10 to 70 seconds
+                attemptsLeft -= 1
+            else:
+                print('MySQL error: ' + err)
+                return
+        except mysql.connector.errors.DatabaseError as err:
+            if('1205' in err or 'Lock wait timeout' in err):
+                count_down(0.16 + random.random()) # 10 to 70 seconds
                 attemptsLeft -= 1
             else:
                 print('MySQL error: ' + err)
@@ -438,7 +466,15 @@ def uploadTweets(user_id, tweets):
                 err = str(err)
                 if('1213' in err or 'Deadlock' in err):
                     # Deadlock while inserting into table, try again a second time
-                    count_down(0.16) # 10 seconds
+                    count_down(0.16 + random.random()) # 10 to 70 seconds
+                    attemptsLeft -= 1
+                else:
+                    print('MySQL error: ' + err)
+                    return
+                err = str(err)
+            except mysql.connector.errors.DatabaseError as err:
+                if('1205' in err or 'Lock wait timeout' in err):
+                    count_down(0.16 + random.random()) # 10 to 70 seconds
                     attemptsLeft -= 1
                 else:
                     print('MySQL error: ' + err)
@@ -463,7 +499,7 @@ def checkRateLimit():
 def count_down(minutes):
     sys.stdout.flush()
     try:
-        for i in range(minutes * 60,0,-1):
+        for i in range(int(minutes * 60),0,-1):
             time.sleep(1)
             time_str = '\tTime until next request: {0:02.0f}:{1:02.0f}               \r'.format(math.floor(i/60), i%60)
             sys.stdout.write(time_str + ' ')

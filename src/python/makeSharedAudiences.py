@@ -16,12 +16,13 @@ storage = mysql.connector.connect(
     database=config["storage"]["database"]
 )
 cursor = storage.cursor(dictionary=True)
-collection = 'shootingAN' # xlm orlando shootingAN
+collection = 'shooting3disc' # xlm orlando shootingAN
 # Subsets with follower lists
 # 2455 orlando shooting
-# ??? xlm
+# 2454 xlm / 2586 for focus
 # 2590 crisis actors (any users, no filter yet)
-subset = 2590
+# 2636 for all 3
+subset = 2636
 query = "CALL get_follower_list_for_subset(" + str(subset) + ")"
 #query = "CALL GetFollowerList_forXLM()"
 
