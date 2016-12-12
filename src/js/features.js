@@ -543,8 +543,9 @@ FeatureDistribution.prototype = {
     },
     countFeatures: function(setname) {
         var set = this.data[setname];
-        
         if(!set) return;
+        
+        var processAllFeatures = this.ops['Display']['Show Major'].is('All');
         
         // Remake counting attributes if they haven't been counted yet
         if(!set.counted || set.counted == set.tweets_arr.length) {
@@ -578,11 +579,13 @@ FeatureDistribution.prototype = {
             // Increased
             set.counter['Tweet Based__Text N-Grams__Co-Occur'].purgeBelow(10);
             set.counter['Tweet Based__Text N-Grams__Bigrams'].purgeBelow(5);
-            set.counter['Tweet Based__Text N-Grams__Trigrams'].purgeBelow(5);
+            if(processAllFeatures)
+                set.counter['Tweet Based__Text N-Grams__Trigrams'].purgeBelow(5);
         } else {
             set.counter['Tweet Based__Text N-Grams__Co-Occur'].purgeBelow(5);
             set.counter['Tweet Based__Text N-Grams__Bigrams'].purgeBelow(2);
-            set.counter['Tweet Based__Text N-Grams__Trigrams'].purgeBelow(2);
+            if(processAllFeatures)
+                set.counter['Tweet Based__Text N-Grams__Trigrams'].purgeBelow(2);
             
 //            set.counter['UserDescription Unigrams'].purgeBelow(2);
         }
@@ -590,6 +593,7 @@ FeatureDistribution.prototype = {
         triggers.emit('counters:place', setname);
     },
     countTweet: function(set, tweet) {
+        var processAllFeatures = this.ops['Display']['Show Major'].is('All');
         var repeatTextOK = this.ops['Display']['Filter'].is('none');
         var newTweetText = !set.counter['Tweet Based__Whole Text__Text Stripped'].has(tweet.TextStripped);
 
@@ -611,26 +615,32 @@ FeatureDistribution.prototype = {
             time = time.getTime();
             tweet['Timestamp Minute'] = time;
 
-            // Count features
+            // Count Major features
             set.counter['Tweet Based__Categories__Type'].incr(tweet['Type']);
             set.counter['Tweet Based__Categories__Distinct'].incr(tweet['Distinct']);
-            set.counter['Tweet Based__Whole Text__Text'].incr(tweet['Text']);
-            set.counter['Tweet Based__Whole Text__Text Stripped'].incr(tweet['TextStripped']);
-            set.counter['Tweet Based__Text Other__Language'].incr(util.subsetName({feature: 'Lang', match: (tweet['Lang'] || '').toLowerCase()}));
-            set.counter['Tweet Based__Text Other__User Language'].incr(util.subsetName({feature: 'Lang', match: (tweet['UserLang'] || '').toLowerCase()}));
-            set.counter['Tweet Based__Text Other__Using Pipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
             if(tweet['Expanded URL Domain']) {
                 set.counter['Tweet Based__URLs__Expanded URL Domain'].incr(tweet['Expanded URL Domain']);
             } else {
                 set.counter['Tweet Based__URLs__Expanded URL Domain'].not_applicable++;
             }
-            set.counter['Tweet Based__URLs__Expanded URL'].incr(tweet['ExpandedURL']);
-            set.counter['Tweet Based__URLs__Media URL'].incr(tweet['MediaURL']);
             set.counter['Tweet Based__Origin__Screenname / User ID'].incr(tweet['Screenname'] + ' - ' + tweet['UserID']);
-            set.counter['Tweet Based__Origin__Parent Tweet'].incr(tweet['ParentID']);
-            set.counter['Tweet Based__Origin__Source'].incr(tweet['Source']);
-            set.counter['Tweet Based__Temporal__Time Posted (PT)'].incr(tweet['Timestamp Minute']);
-            set.counter['Tweet Based__Temporal__User\'s Timezone'].incr(tweet['UserTimezone']);
+            
+            // Count other features
+            if (processAllFeatures) {
+                set.counter['Tweet Based__Whole Text__Text'].incr(tweet['Text']);
+                set.counter['Tweet Based__Whole Text__Text Stripped'].incr(tweet['TextStripped']);
+                
+                set.counter['Tweet Based__Text Other__Language'].incr(util.subsetName({feature: 'Lang', match: (tweet['Lang'] || '').toLowerCase()}));
+                set.counter['Tweet Based__Text Other__User Language'].incr(util.subsetName({feature: 'Lang', match: (tweet['UserLang'] || '').toLowerCase()}));
+                set.counter['Tweet Based__Text Other__Using Pipe'].incr(tweet['Text'].includes('|') ? 1 : 0);
+                
+                set.counter['Tweet Based__URLs__Expanded URL'].incr(tweet['ExpandedURL']);
+                set.counter['Tweet Based__URLs__Media URL'].incr(tweet['MediaURL']);
+                set.counter['Tweet Based__Origin__Parent Tweet'].incr(tweet['ParentID']);
+                set.counter['Tweet Based__Origin__Source'].incr(tweet['Source']);
+                set.counter['Tweet Based__Temporal__Time Posted (PT)'].incr(tweet['Timestamp Minute']);
+                set.counter['Tweet Based__Temporal__User\'s Timezone'].incr(tweet['UserTimezone']);
+            }
 
             // Count N-Grams
             var text = tweet.TextStripped.toLowerCase();
@@ -654,7 +664,7 @@ FeatureDistribution.prototype = {
                             tweetgrams[1].add(gram);
 //                                ngrams.NGramHasCounter[1].incr(gram);
                         }
-                        if(words[wi + 2]) {
+                        if(words[wi + 2] && processAllFeatures) {
                             gram += " " + words[wi + 2];
                             set.counter['Tweet Based__Text N-Grams__Trigrams'].incr(gram);
                             if(!tweetgrams[2].has(gram)) {
@@ -663,16 +673,18 @@ FeatureDistribution.prototype = {
                             }
                         }
                     }
-                    for(var wj = wi + 1; wj < words.length; wj++) { 
-                        gram = word + ' & ' + words[wj];
-                        if(words[wj] < word)
-                            gram = words[wj] + ' & ' + word;
-                        // Add co-occurance
-                        if(words[wj]) {
-                            set.counter['Tweet Based__Text N-Grams__Co-Occur'].incr(gram);
-                            if(!tweetgrams[3].has(gram)) {
-                                tweetgrams[3].add(gram);
-//                                    ngrams.CoOccurHasCounter.incr(gram);
+                    if(processAllFeatures) {
+                        for(var wj = wi + 1; wj < words.length; wj++) { 
+                            gram = word + ' & ' + words[wj];
+                            if(words[wj] < word)
+                                gram = words[wj] + ' & ' + word;
+                            // Add co-occurance
+                            if(words[wj]) {
+                                set.counter['Tweet Based__Text N-Grams__Co-Occur'].incr(gram);
+                                if(!tweetgrams[3].has(gram)) {
+                                    tweetgrams[3].add(gram);
+    //                                    ngrams.CoOccurHasCounter.incr(gram);
+                                }
                             }
                         }
                     }
@@ -680,11 +692,13 @@ FeatureDistribution.prototype = {
             });
             
             // Parent Tweet & User Mentions
-            var parentVerified = tweet['ParentVerified'];
-            if(parentVerified == undefined) {
-                set.counter['Tweet Based__Mentions__Parent Verified'].not_applicable++;
-            } else {
-                set.counter['Tweet Based__Mentions__Parent Verified'].incr(parentVerified);
+            if(processAllFeatures) {
+                var parentVerified = tweet['ParentVerified'];
+                if(parentVerified == undefined) {
+                    set.counter['Tweet Based__Mentions__Parent Verified'].not_applicable++;
+                } else {
+                    set.counter['Tweet Based__Mentions__Parent Verified'].incr(parentVerified);
+                }
             }
             
             // User Mentions
@@ -757,6 +771,7 @@ FeatureDistribution.prototype = {
         if(!tweet['UserID']) {
             return;
         }
+        var processAllFeatures = this.ops['Display']['Show Major'].is('All');
         
         this.screenname2ID[tweet['Screenname'].toLowerCase()] = tweet['UserID'];
         var userscreenid = tweet['Screenname'] + ' - ' + tweet['UserID'];
@@ -886,201 +901,210 @@ FeatureDistribution.prototype = {
 
             set.users[user.UserID] = user;
 
-            set.counter['User Based__Identity__Username'].incr(user['Username']);
-            set.counter['User Based__Identity__Lang'].incr(util.subsetName({feature: 'Lang', match: (user['Lang'] || '').toLowerCase()}));
-            set.counter['User Based__Identity__Verified'].incr(user['Verified']);
-            set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
-            set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
-            set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable++;
-            set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable++;
-            set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable++;
-//                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval']);
-            set.counter['User Based__Temporal__Account Creation Date'].incr(creation.getTime());
-            set.counter['User Based__Temporal__Age of Account'].incr(age);
-            set.counter['User Based__Localization__Location'].incr(user['Location']);
-            set.counter['User Based__Localization__UTC Offset'].incr(user['UTCOffset']);
-            set.counter['User Based__Localization__Timezone'].incr(user['Timezone']);
-            set.counter['User Based__Tweet Text__Words'].incr(user['Words']);
-            set.counter['User Based__Tweet Text__Words Per Tweet'].incr(user['WordsPerTweet']);
-            set.counter['User Based__Tweet Text__Distinct Words'].incr(user['DistinctWords']);
-            set.counter['User Based__Tweet Text__Distinct Words Per Tweet'].incr(user['DistinctWordsPerTweet']);
-            set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe']);
-
+            // Major features
             // User Description Unigrams
             desc_words.forEach(function(word) {
                 set.counter['User Based__Identity__Description Unigrams'].incr(word);
             });
-
-            // Counts
-            ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
-                set.counter['User Based__' + feature + '__Start'].incr(user[feature]['Start']);
-                set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth']);
-                set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
-            });
+            set.counter['User Based__Identity__Verified'].incr(user['Verified']);
+            set.counter['User Based__Localization__Location'].incr(user['Location']);
+            set.counter['User Based__Localization__Timezone'].incr(user['Timezone']);
             
-            // URLs
-            if(user['URLs'] == 0) {
-                set.counter['User Based__URLs__URLs'].not_applicable++;
-                set.counter['User Based__URLs__URLs Per Tweet'].not_applicable++;
-                set.counter['User Based__URLs__Distinct Domains'].not_applicable++;
-                set.counter['User Based__URLs__Distinct Domains Per URL'].not_applicable++;
-            } else {
-                user['Domains'].incr(domain);
-                set.counter['User Based__URLs__Domains'].incr(domain);
-                set.counter['User Based__URLs__URLs'].incr(user['URLs']);
-                set.counter['User Based__URLs__URLs Per Tweet'].incr(user['URLsPerTweet']);
-                set.counter['User Based__URLs__Distinct Domains'].incr(user['DistinctDomains']);
-                set.counter['User Based__URLs__Distinct Domains Per URL'].incr(user['DistinctDomainsPerURL']);
+            // Other features
+            if(processAllFeatures) {
+                set.counter['User Based__Identity__Username'].incr(user['Username']);
+                set.counter['User Based__Identity__Lang'].incr(util.subsetName({feature: 'Lang', match: (user['Lang'] || '').toLowerCase()}));
+                set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
+                set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
+                set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable++;
+                set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable++;
+                set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable++;
+    //                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['MedianTweetInterval']);
+                set.counter['User Based__Temporal__Account Creation Date'].incr(creation.getTime());
+                set.counter['User Based__Temporal__Age of Account'].incr(age);
+                set.counter['User Based__Localization__UTC Offset'].incr(user['UTCOffset']);
+                set.counter['User Based__Tweet Text__Words'].incr(user['Words']);
+                set.counter['User Based__Tweet Text__Words Per Tweet'].incr(user['WordsPerTweet']);
+                set.counter['User Based__Tweet Text__Distinct Words'].incr(user['DistinctWords']);
+                set.counter['User Based__Tweet Text__Distinct Words Per Tweet'].incr(user['DistinctWordsPerTweet']);
+                set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe']);
+
+
+                // Counts
+                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                    set.counter['User Based__' + feature + '__Start'].incr(user[feature]['Start']);
+                    set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth']);
+                    set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
+                });
+
+                // URLs
+                if(user['URLs'] == 0) {
+                    set.counter['User Based__URLs__URLs'].not_applicable++;
+                    set.counter['User Based__URLs__URLs Per Tweet'].not_applicable++;
+                    set.counter['User Based__URLs__Distinct Domains'].not_applicable++;
+                    set.counter['User Based__URLs__Distinct Domains Per URL'].not_applicable++;
+                } else {
+                    user['Domains'].incr(domain);
+                    set.counter['User Based__URLs__Domains'].incr(domain);
+                    set.counter['User Based__URLs__URLs'].incr(user['URLs']);
+                    set.counter['User Based__URLs__URLs Per Tweet'].incr(user['URLsPerTweet']);
+                    set.counter['User Based__URLs__Distinct Domains'].incr(user['DistinctDomains']);
+                    set.counter['User Based__URLs__Distinct Domains Per URL'].incr(user['DistinctDomainsPerURL']);
+                }
+                user['Sources'].incr(tweet['Source'].replace(/.*>(.*)<.*/, '$1'));
             }
-            user['Sources'].incr(tweet['Source'].replace(/.*>(.*)<.*/, '$1'));
         } else { // Old user
             user = set.users[tweet.UserID];
 
-            // Tweets
-            set.counter['User Based__Activity__Tweets'].decr(user['Tweets']);
-            user['Tweets']++;
-            set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
+            // Other features (all major have already been accounted for)
+            if(processAllFeatures) {
 
-            // Major metrics
-            set.counter['User Based__Activity__Tweets Per Day'].decr(user['TweetsPerDay']);
-            user['MinuteEnded'] = (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000;
-            user['MinutesInSet'] = user['MinuteEnded'] - user['MinuteStarted'];
-            user['TweetsPerDay'] = user['Tweets'] / Math.floor(user['MinutesInSet'] / 60 / 24 + 1);
-            set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
+                // Tweets
+                set.counter['User Based__Activity__Tweets'].decr(user['Tweets']);
+                user['Tweets']++;
+                set.counter['User Based__Activity__Tweets'].incr(user['Tweets']);
 
-            // Count user's tweet's unigrams
-            var text = tweet.TextStripped.toLowerCase();
-            text = text.replace(/[^\w']+/g, ' ');
-            text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
-            var words = text.split(' ').filter(function(word) { return word.length > 0; });
-            words.forEach(function(word) {
-                user['TweetWords'].incr(word);
-            });
+                // Major metrics
+                set.counter['User Based__Activity__Tweets Per Day'].decr(user['TweetsPerDay']);
+                user['MinuteEnded'] = (util.twitterID2Timestamp(tweet['ID']).getTime() - util.twitterID2Timestamp(set.FirstTweet).getTime()) / 60 / 1000;
+                user['MinutesInSet'] = user['MinuteEnded'] - user['MinuteStarted'];
+                user['TweetsPerDay'] = user['Tweets'] / Math.floor(user['MinutesInSet'] / 60 / 24 + 1);
+                set.counter['User Based__Activity__Tweets Per Day'].incr(user['TweetsPerDay']);
 
-            set.counter['User Based__Tweet Text__Words'].decr(user['Words']);
-            set.counter['User Based__Tweet Text__Words Per Tweet'].decr(user['WordsPerTweet']);
-            set.counter['User Based__Tweet Text__Distinct Words'].decr(user['DistinctWords']);
-            set.counter['User Based__Tweet Text__Distinct Words Per Tweet'].decr(user['DistinctWordsPerTweet']);
-            user['Words'] = user['TweetWords'].total_count
-            user['WordsPerTweet'] = user['TweetWords'].total_count / user['Tweets'];
-            user['DistinctWords'] = user['TweetWords'].tokens
-            user['DistinctWordsPerTweet'] = user['TweetWords'].tokens / user['Tweets'];
-            set.counter['User Based__Tweet Text__Words'].incr(user['Words']);
-            set.counter['User Based__Tweet Text__Words Per Tweet'].incr(user['WordsPerTweet']);
-            set.counter['User Based__Tweet Text__Distinct Words'].incr(user['DistinctWords']);
-            set.counter['User Based__Tweet Text__Distinct Words Per Tweet'].incr(user['DistinctWordsPerTweet']);
+                // Count user's tweet's unigrams
+                var text = tweet.TextStripped.toLowerCase();
+                text = text.replace(/[^\w']+/g, ' ');
+                text = text.replace(/(\w)' /g, '$1 ').replace(/ '(\w)/g, ' $1');
+                var words = text.split(' ').filter(function(word) { return word.length > 0; });
+                words.forEach(function(word) {
+                    user['TweetWords'].incr(word);
+                });
 
-            // Median Interval between tweets
-            var thisTimeTweeted = util.twitterID2Timestamp(tweet['ID']).getTime();
-            var interval = (thisTimeTweeted -
-                            util.twitterID2Timestamp(user['LastTweet']).getTime())
-                            / 60 / 1000;
-            user['LastTweet'] = tweet['ID'];
-            user['TweetInterval']['All'].push(interval);
-            if(user['Tweets'] > 3) {
-                set.counter['User Based__Activity__Median Interval Between Tweets'].decr(user['TweetInterval']['Med']);
-                set.counter['User Based__Activity__Deviation Interval Between Tweets'].decr(user['TweetInterval']['Dev']);
-                set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].decr(user['TweetInterval']['NormDev']);
-            } else if(user['Tweets'] == 3) {
-                set.counter['User Based__Activity__Median Interval Between Tweets'].decr(user['TweetInterval']['Med']);
-                set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable--;
-                set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable--;
-            } else if(user['Tweets'] == 2) {
-                set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable--;
+                set.counter['User Based__Tweet Text__Words'].decr(user['Words']);
+                set.counter['User Based__Tweet Text__Words Per Tweet'].decr(user['WordsPerTweet']);
+                set.counter['User Based__Tweet Text__Distinct Words'].decr(user['DistinctWords']);
+                set.counter['User Based__Tweet Text__Distinct Words Per Tweet'].decr(user['DistinctWordsPerTweet']);
+                user['Words'] = user['TweetWords'].total_count
+                user['WordsPerTweet'] = user['TweetWords'].total_count / user['Tweets'];
+                user['DistinctWords'] = user['TweetWords'].tokens
+                user['DistinctWordsPerTweet'] = user['TweetWords'].tokens / user['Tweets'];
+                set.counter['User Based__Tweet Text__Words'].incr(user['Words']);
+                set.counter['User Based__Tweet Text__Words Per Tweet'].incr(user['WordsPerTweet']);
+                set.counter['User Based__Tweet Text__Distinct Words'].incr(user['DistinctWords']);
+                set.counter['User Based__Tweet Text__Distinct Words Per Tweet'].incr(user['DistinctWordsPerTweet']);
+
+                // Median Interval between tweets
+                var thisTimeTweeted = util.twitterID2Timestamp(tweet['ID']).getTime();
+                var interval = (thisTimeTweeted -
+                                util.twitterID2Timestamp(user['LastTweet']).getTime())
+                                / 60 / 1000;
+                user['LastTweet'] = tweet['ID'];
+                user['TweetInterval']['All'].push(interval);
+                if(user['Tweets'] > 3) {
+                    set.counter['User Based__Activity__Median Interval Between Tweets'].decr(user['TweetInterval']['Med']);
+                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].decr(user['TweetInterval']['Dev']);
+                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].decr(user['TweetInterval']['NormDev']);
+                } else if(user['Tweets'] == 3) {
+                    set.counter['User Based__Activity__Median Interval Between Tweets'].decr(user['TweetInterval']['Med']);
+                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].not_applicable--;
+                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].not_applicable--;
+                } else if(user['Tweets'] == 2) {
+                    set.counter['User Based__Activity__Median Interval Between Tweets'].not_applicable--;
+                }
+                user['TweetInterval']['Min'] = d3.min(user['TweetInterval']['All']);
+                user['TweetInterval']['Max'] = d3.max(user['TweetInterval']['All']);
+                user['TweetInterval']['Med'] = d3.median(user['TweetInterval']['All']);
+                user['TweetInterval']['Ave'] = d3.mean(user['TweetInterval']['All']);
+                set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['TweetInterval']['Med']);
+                if(user['Tweets'] >= 3) {
+                    user['TweetInterval']['Dev'] = d3.deviation(user['TweetInterval']['All']);
+                    user['TweetInterval']['NormDev'] = user['TweetInterval']['Dev'] * 1.0 / user['TweetInterval']['Ave'];
+                    set.counter['User Based__Activity__Deviation Interval Between Tweets'].incr(user['TweetInterval']['Dev']);
+                    set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].incr(user['TweetInterval']['NormDev']);
+                }
+
+                // Using Pipe
+                set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], -1);
+                user['UsingPipe'] = (user['UsingPipe'] * (user['Tweets'] - 1) + tweet['Text'].includes('|') ? 1 : 0) / user['Tweets'];
+                set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], 1);
+
+                /* Counts */
+
+                // Uncount the user's previous entry
+                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                    set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], -1);
+                    if(user[feature]['Growth'] == 0) {
+                        set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable--;
+                    } else {
+                        set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], -1);
+                    }
+                });
+
+                // Get their new values
+                user['Statuses']['End']  = parseInt(tweet['UserStatusesCount']);
+                user['Followers']['End'] = parseInt(tweet['UserFollowersCount']);
+                user['Following']['End'] = parseInt(tweet['UserFriendsCount']);
+                user['Listed']['End']    = parseInt(tweet['UserListedCount']);
+                user['Favorites']['End'] = parseInt(tweet['UserFavouritesCount']);
+                ['Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
+                    if(tweet['Type'].includes(type.slice(0,4).toLowerCase())) {
+                        user[type]['Count']++;
+                    }
+                    user[type]['Fraction'] = user[type]['Count'] / user['Tweets'];
+                });
+                user['Distinct']['Count'] += tweet['Distinct'] == '1' ? 1 : 0;
+                user['Distinct']['Fraction'] = user['Distinct']['Count'] / user['Tweets'];
+
+                // Social feature counts
+                ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
+                    user[feature]['Growth'] = user[feature]['End'] - user[feature]['Start'];
+                    user[feature]['PerDay'] = user[feature]['Growth'] * 24 * 60 / user['MinutesInSet'];
+
+                    set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], 1);
+
+                    if(user[feature]['Growth'] == 0) {
+                        set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
+                    } else {
+                        set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], 1);
+                    }
+                });
+
+                // URLs
+                var domain = tweet['ExpandedURL'];
+                if(domain) {
+                    if(user['URLs'] == 0) {
+                        set.counter['User Based__URLs__URLs'].not_applicable--;
+                        set.counter['User Based__URLs__URLs Per Tweet'].not_applicable--;
+                        set.counter['User Based__URLs__Distinct Domains'].not_applicable--;
+                        set.counter['User Based__URLs__Distinct Domains Per URL'].not_applicable--;
+                    } else {
+                        set.counter['User Based__URLs__URLs'].decr(user['URLs']);
+                        set.counter['User Based__URLs__URLs Per Tweet'].decr(user['URLsPerTweet']);
+                        set.counter['User Based__URLs__Distinct Domains'].decr(user['DistinctDomains']);
+                        set.counter['User Based__URLs__Distinct Domains Per URL'].decr(user['DistinctDomainsPerURL']);
+                    }
+
+                    domain = util.URL2Domain(domain);
+                    var hasDomain = user['Domains'].has(domain);
+                    user['Domains'].incr(domain);
+                    if(user['Domains'].get(domain) == 1) {
+                        set.counter['User Based__URLs__Domains'].incr(domain);
+                    }
+
+                    user['URLs']++;
+                    user['URLsPerTweet'] = user['URLs'] / user['Tweets'];
+                    user['DistinctDomains'] = user['Domains'].tokens;
+                    user['DistinctDomainsPerURL'] = user['DistinctDomains'] / user['URLs'];
+
+                    set.counter['User Based__URLs__URLs'].incr(user['URLs']);
+                    set.counter['User Based__URLs__URLs Per Tweet'].incr(user['URLsPerTweet']);
+                    set.counter['User Based__URLs__Distinct Domains'].incr(user['DistinctDomains']);
+                    set.counter['User Based__URLs__Distinct Domains Per URL'].incr(user['DistinctDomainsPerURL']);
+                }
+                user['Sources'].incr(tweet['Source'].replace(/.*>(.*)<.*/, '$1'));
             }
-            user['TweetInterval']['Min'] = d3.min(user['TweetInterval']['All']);
-            user['TweetInterval']['Max'] = d3.max(user['TweetInterval']['All']);
-            user['TweetInterval']['Med'] = d3.median(user['TweetInterval']['All']);
-            user['TweetInterval']['Ave'] = d3.mean(user['TweetInterval']['All']);
-            set.counter['User Based__Activity__Median Interval Between Tweets'].incr(user['TweetInterval']['Med']);
-            if(user['Tweets'] >= 3) {
-                user['TweetInterval']['Dev'] = d3.deviation(user['TweetInterval']['All']);
-                user['TweetInterval']['NormDev'] = user['TweetInterval']['Dev'] * 1.0 / user['TweetInterval']['Ave'];
-                set.counter['User Based__Activity__Deviation Interval Between Tweets'].incr(user['TweetInterval']['Dev']);
-                set.counter['User Based__Activity__Normal Deviation Interval Between Tweets'].incr(user['TweetInterval']['NormDev']);
-            }
-
-            // Using Pipe
-            set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], -1);
-            user['UsingPipe'] = (user['UsingPipe'] * (user['Tweets'] - 1) + tweet['Text'].includes('|') ? 1 : 0) / user['Tweets'];
-            set.counter['User Based__Tweet Text__Using Pipe'].incr(user['UsingPipe'], 1);
-
-            /* Counts */
-
-            // Uncount the user's previous entry
-            ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
-                set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], -1);
-                if(user[feature]['Growth'] == 0) {
-                    set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable--;
-                } else {
-                    set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], -1);
-                }
-            });
-
-            // Get their new values
-            user['Statuses']['End']  = parseInt(tweet['UserStatusesCount']);
-            user['Followers']['End'] = parseInt(tweet['UserFollowersCount']);
-            user['Following']['End'] = parseInt(tweet['UserFriendsCount']);
-            user['Listed']['End']    = parseInt(tweet['UserListedCount']);
-            user['Favorites']['End'] = parseInt(tweet['UserFavouritesCount']);
-            ['Originals', 'Retweets', 'Replies', 'Quotes'].forEach(function(type) {
-                if(tweet['Type'].includes(type.slice(0,4).toLowerCase())) {
-                    user[type]['Count']++;
-                }
-                user[type]['Fraction'] = user[type]['Count'] / user['Tweets'];
-            });
-            user['Distinct']['Count'] += tweet['Distinct'] == '1' ? 1 : 0;
-            user['Distinct']['Fraction'] = user['Distinct']['Count'] / user['Tweets'];
-
-            // Social feature counts
-            ['Statuses', 'Followers', 'Following', 'Listed', 'Favorites'].forEach(function(feature) {
-                user[feature]['Growth'] = user[feature]['End'] - user[feature]['Start'];
-                user[feature]['PerDay'] = user[feature]['Growth'] * 24 * 60 / user['MinutesInSet'];
-
-                set.counter['User Based__' + feature + '__Growth'].incr(user[feature]['Growth'], 1);
-
-                if(user[feature]['Growth'] == 0) {
-                    set.counter['User Based__' + feature + '__Growth &ne; 0'].not_applicable++;
-                } else {
-                    set.counter['User Based__' + feature + '__Growth &ne; 0'].incr(user[feature]['Growth'], 1);
-                }
-            });
-            
-            // URLs
-            var domain = tweet['ExpandedURL'];
-            if(domain) {
-                if(user['URLs'] == 0) {
-                    set.counter['User Based__URLs__URLs'].not_applicable--;
-                    set.counter['User Based__URLs__URLs Per Tweet'].not_applicable--;
-                    set.counter['User Based__URLs__Distinct Domains'].not_applicable--;
-                    set.counter['User Based__URLs__Distinct Domains Per URL'].not_applicable--;
-                } else {
-                    set.counter['User Based__URLs__URLs'].decr(user['URLs']);
-                    set.counter['User Based__URLs__URLs Per Tweet'].decr(user['URLsPerTweet']);
-                    set.counter['User Based__URLs__Distinct Domains'].decr(user['DistinctDomains']);
-                    set.counter['User Based__URLs__Distinct Domains Per URL'].decr(user['DistinctDomainsPerURL']);
-                }
-                
-                domain = util.URL2Domain(domain);
-                var hasDomain = user['Domains'].has(domain);
-                user['Domains'].incr(domain);
-                if(user['Domains'].get(domain) == 1) {
-                    set.counter['User Based__URLs__Domains'].incr(domain);
-                }
-                
-                user['URLs']++;
-                user['URLsPerTweet'] = user['URLs'] / user['Tweets'];
-                user['DistinctDomains'] = user['Domains'].tokens;
-                user['DistinctDomainsPerURL'] = user['DistinctDomains'] / user['URLs'];
-                
-                set.counter['User Based__URLs__URLs'].incr(user['URLs']);
-                set.counter['User Based__URLs__URLs Per Tweet'].incr(user['URLsPerTweet']);
-                set.counter['User Based__URLs__Distinct Domains'].incr(user['DistinctDomains']);
-                set.counter['User Based__URLs__Distinct Domains Per URL'].incr(user['DistinctDomainsPerURL']);
-            }
-            user['Sources'].incr(tweet['Source'].replace(/.*>(.*)<.*/, '$1'));
         }
-        
+
         // Users mentioned
         if(tweet['Text']) {
             var direct_mentions = new Set();
@@ -1114,7 +1138,7 @@ FeatureDistribution.prototype = {
                     });
                 }
             }
-            
+
             var mentions = (tweet['Text'].match(/@[A-Za-z_0-9]*/gi) || []).map(m => m.slice(1).toLowerCase());
             if(mentions) {
                 mentions.forEach(function(mention) {
@@ -1127,7 +1151,7 @@ FeatureDistribution.prototype = {
                     user['UsersSimplyMentioned'].incr(mention);
                 });
             }
-            
+
             // Add counters to user
             user['Mentions'] += mentions.length;
             user['SimpleMentions'] += simple_mentions.length;
