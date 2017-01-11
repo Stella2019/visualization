@@ -861,6 +861,106 @@ Connection.prototype = {
     }
 };
 standardConnections = {
+    transferFollows: function() {
+        // Get User List
+        var connection = new Connection();
+        connection.php('follows/getUserIDs', {}, function(userIDs) {
+            userIDs = userIDs.split('\n');
+            userIDs.shift(); // Remove the title
+            userIDs.pop(); // Remove the last entry
+//            userIDs = userIDs.slice(0, 10);
+            var nUsers = userIDs.length;
+//            var users = [];
+            var progress = new Progress({steps: nUsers});
+            progress.start();
+            var nConnections = 0;
+            
+            var transferUser = function(iUser) {
+                var userID = userIDs[iUser];
+                progress.update(iUser, 'Connections so far: ' + nConnections + '. Fetching ' + userID + ". ");
+                // Get Follows from old table
+                connection.php('follows/getFollows', {userID: userID},//, following: 1},
+                    function(followers) {
+                        followers = followers.split('\n');
+                        followers.shift(); // Remove the title
+                        followers.pop(); // Remove the last entry
+                        if(followers.length > 0) {
+                            nConnections = nConnections + followers.length;
+                            followers = followers.join(',');
+                            
+                            progress.update(iUser, 'Connections so far: ' + nConnections + '. Sending  ' + userID + ". ");
+                            
+                            connection.php('follows/addFollows', 
+                                {userID: userID, followers: followers},//, following: 1},
+                                function(result) {
+                                
+                                    if(iUser < nUsers) {
+                                        setTimeout(function() {
+                                            transferUser(iUser + 1);
+                                        }, 10);
+                                    } else {
+                                        progress.end();
+                                        console.log('nConnections', nConnections);
+                                    }
+                                });
+                        } else {
+                            if(iUser < nUsers) {
+                                setTimeout(function() {
+                                    transferUser(iUser + 1);
+                                }, 10);
+                            } else {
+                                progress.end();
+                                console.log('nConnections', nConnections);
+                            }
+                        }
+                    });
+            };
+            
+            transferUser(0);
+            
+//            // Get all followers
+//            userIDs.forEach(function(userID, i) {
+//                console.log('get', userID, i, nUsers);
+//                // Get Follows from old table
+//                connection.php('follows/getFollows', {userID: userID}, function(followers) {
+//                    followers = followers.split('\n');
+//                    followers.shift(); // Remove the title
+//                    followers.pop(); // Remove the last entry
+//                    if(followers.length > 0) {
+//                        followers = followers.join(',');
+////                        users.push({UserID: userID, Followers: followers});
+//                        
+//                        console.log('send', userID, i, 'followers:', followers.length);
+//                        setTimeout(function() {
+//                            connection.php('follows/addFollows', 
+//                                           {userID: userID, followers: followers},
+//                                           function(result) {
+//                                            console.log('sent', userID, i, result);
+//                            });
+//                        }, Math.min(10 * i, 10000));
+//                    }
+//                });
+                
+//                // Add Follows to new table
+//                users.forEach(function(user) {
+//                    console.log('send', user.UserID, i, users.length);
+//                    
+//                    setTimeout(function() {
+//                        connection.php('follows/addFollows', 
+//                                       {userID: userID, followers: followers},
+//                                       function(result) {
+//                                        console.log('sent', userID, i, result);
+//                        });
+//                    }, 1000);
+//                })
+//            });
+            
+            // Put followers in new table
+        });
+    },
+    transferNextFollow: function(connection, followers) {
+        
+    },
     genInCombinedEvent: function(event, new_event, tweet_min, tweet_max) {
         var connection = new Connection({
             url: 'analysis/genInCombinedEvent',
