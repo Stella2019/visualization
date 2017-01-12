@@ -886,14 +886,18 @@ standardConnections = {
                             nConnections = nConnections + followers.length;
                             
                             // Handle problem if there are too many followers to push (it will crowd the php)
-                            while (followers.length > 25000) {
-                                var followers_slice = followers.slice(0, 25000);
+                            if(followers.length > 25000) {
+                                console.info('User has too many followers, sending slices of their follower list', userID, followers.length);
+                            }
+                            
+                            while (followers.length > 25000) 
+                                var followers_slice = followers.slice(0, 25000).join(',');
                                 followers = followers.slice(25000);
                                 
                                 connection.php('follows/addFollows', 
                                     {userID: userID, followers: followers_slice},//, following: 1},
                                     function(result) {
-                                        console.log('User had too many followers, sending slices of their follower list', userID, followers.length);
+                                        console.log(result);
                                     });
                             }
                             
@@ -905,6 +909,7 @@ standardConnections = {
                             connection.php('follows/addFollows', 
                                 {userID: userID, followers: followers},//, following: 1},
                                 function(result) {
+                                        console.log(result);
                                 
                                     if(iUser < nUsers) {
                                         setTimeout(function() {
