@@ -890,7 +890,7 @@ standardConnections = {
                                 console.info('User has too many followers, sending slices of their follower list', userID, followers.length);
                             }
                             
-                            while (followers.length > 25000) 
+                            while (followers.length > 25000) {
                                 var followers_slice = followers.slice(0, 25000).join(',');
                                 followers = followers.slice(25000);
                                 
