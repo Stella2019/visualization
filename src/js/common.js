@@ -1,6 +1,6 @@
-String.prototype.hashCode = function() {
+String.prototype.hashCode = function () {
     var hash = 0, i, chr, len;
-    if (this.length === 0) return hash;
+    if (this.length === 0) { return hash; }
     for (i = 0, len = this.length; i < len; i++) {
         chr   = this.charCodeAt(i);
         hash  = ((hash << 5) - hash) + chr;
@@ -864,13 +864,11 @@ standardConnections = {
     transferFollows: function() {
         // Get User List
         var connection = new Connection();
-        connection.php('follows/getUserIDs', {}, function(userIDs) {
+        connection.php('follows/getUserIDs', {}, function (userIDs) {
             userIDs = userIDs.split('\n');
             userIDs.shift(); // Remove the title
             userIDs.pop(); // Remove the last entry
-//            userIDs = userIDs.slice(0, 10);
             var nUsers = userIDs.length;
-//            var users = [];
             var progress = new Progress({steps: nUsers});
             progress.start();
             var nConnections = 0;
@@ -886,6 +884,20 @@ standardConnections = {
                         followers.pop(); // Remove the last entry
                         if(followers.length > 0) {
                             nConnections = nConnections + followers.length;
+                            
+                            // Handle problem if there are too many followers to push (it will crowd the php)
+                            while (followers.length > 25000) {
+                                var followers_slice = followers.slice(0, 25000);
+                                followers = followers.slice(25000);
+                                
+                                connection.php('follows/addFollows', 
+                                    {userID: userID, followers: followers_slice},//, following: 1},
+                                    function(result) {
+                                        console.log('User had too many followers, sending slices of their follower list', userID, followers.length);
+                                    });
+                            }
+                            
+                            
                             followers = followers.join(',');
                             
                             progress.update(iUser, 'Connections so far: ' + nConnections + '. Sending  ' + userID + ". ");
@@ -917,49 +929,37 @@ standardConnections = {
             };
             
             transferUser(0);
-            
-//            // Get all followers
-//            userIDs.forEach(function(userID, i) {
-//                console.log('get', userID, i, nUsers);
-//                // Get Follows from old table
-//                connection.php('follows/getFollows', {userID: userID}, function(followers) {
-//                    followers = followers.split('\n');
-//                    followers.shift(); // Remove the title
-//                    followers.pop(); // Remove the last entry
-//                    if(followers.length > 0) {
-//                        followers = followers.join(',');
-////                        users.push({UserID: userID, Followers: followers});
-//                        
-//                        console.log('send', userID, i, 'followers:', followers.length);
-//                        setTimeout(function() {
-//                            connection.php('follows/addFollows', 
-//                                           {userID: userID, followers: followers},
-//                                           function(result) {
-//                                            console.log('sent', userID, i, result);
-//                            });
-//                        }, Math.min(10 * i, 10000));
-//                    }
-//                });
-                
-//                // Add Follows to new table
-//                users.forEach(function(user) {
-//                    console.log('send', user.UserID, i, users.length);
-//                    
-//                    setTimeout(function() {
-//                        connection.php('follows/addFollows', 
-//                                       {userID: userID, followers: followers},
-//                                       function(result) {
-//                                        console.log('sent', userID, i, result);
-//                        });
-//                    }, 1000);
-//                })
-//            });
-            
-            // Put followers in new table
         });
     },
-    transferNextFollow: function(connection, followers) {
-        
+    calcFollowersRetrieved: function(connection, followers) {
+        var connection = new Connection();
+        connection.phpjson('follows/getSharedAudienceUsers', {}, function (users) {
+            
+            var nUsers = users.length;
+            var progress = new Progress({steps: nUsers});
+            progress.start();
+            
+            var countUserFollowersRetrieved = function(iUser) {
+                var user = users[iUser];
+                progress.update(iUser, 'Counting Followers Retrieved for  ' + user['UserID'] + ". ");
+                connection.php('follows/countFollowersRetrieved', {userID: user['UserID']}, function(followersRetrieved) {
+                    console.log(user['UserID'], followersRetrieved);
+                    
+                    if(iUser < nUsers) {
+                        setTimeout(function() {
+                            countUserFollowersRetrieved(iUser + 1);
+                        }, 1);
+                    } else {
+                        progress.end();
+                    }
+                });
+            }
+            countUserFollowersRetrieved(0);
+            
+//            users.forEach(function(user, i) {
+//                connection.php('follows/countFollowersRetrieved', {userID: user['UserID']}, console.log);
+//            });
+        });
     },
     genInCombinedEvent: function(event, new_event, tweet_min, tweet_max) {
         var connection = new Connection({
