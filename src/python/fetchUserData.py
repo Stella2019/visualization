@@ -420,12 +420,12 @@ def uploadFriends(user_id, friend_ids):
                 return
             
 def uploadTweets(user_id, tweets):
-    query_addtweet = ("INSERT IGNORE INTO Tweet "
+    query_addtweet = ("INSERT IGNORE INTO TimelineTweet "
                       "(ID, Timestamp, Lang, Text, TextStripped, `Distinct`, "
                       "    Type, Source, ParentID, ExpandedURL, MediaURL) "
                       "VALUES (%(ID)s, %(Timestamp)s, %(Lang)s, %(Text)s, %(TextStripped)s, %(Distinct)s, "
                       "    %(Type)s, %(Source)s, %(ParentID)s, %(ExpandedURL)s, %(MediaURL)s) ")
-    query_addtweetuser = ("INSERT IGNORE INTO TweetUser "
+    query_addtweetuser = ("INSERT IGNORE INTO TimelineTweetUser "
                           "(Tweet, UserID, Username, Screenname, CreatedAt, "
                           "    Description, Location, UTCOffset, Timezone, Lang, "
                           "    StatusesCount, FollowersCount, FriendsCount, "
