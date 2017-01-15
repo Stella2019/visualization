@@ -1,4 +1,5 @@
 from __future__ import print_function
+import argparse
 import datetime
 import json
 import sys
@@ -13,10 +14,10 @@ import random
 
 # Parameters
 wait_time = 15
-#config_file = '../../local.conf'
-config_file = 'twitter_api1.conf'
-follower_list_cap = 25000
-followers_per_packet = 5000
+config_file = '../../local.conf'
+FOLLOWER_LIST_CAP = 100000
+FOLLOWERS_PER_PACKET = 5000
+FRIEND_LIST_CAP = 25000
 MAX_TWEETS_FETCHED = 3000
 TWEETS_PER_PACKET = 200
 USERS_PER_ITERATION = 10 # Now hard coded in MySQL
@@ -34,13 +35,39 @@ openConnection = False
 
 # Load server
 def main():
+    parser = argparse.ArgumentParser(description='Fetch the follower list, friend list, and recent tweets for users on Twitter.',
+                                add_help=True)
+    parser.add_argument("-c", "--config", required=False, default='1',
+                        help='Name (or ID) of configuration file')
+    parser.add_argument("--tweetcounts", action="store_true",
+                        help="Just get Tweet Counts instead")
+    
+    options = parser.parse_args()
+    
     global cancelled
+    global config_file
     # Set parameters
-    if (len(sys.argv) > 1 and sys.argv[1] == 'conf2'):
-        global config_file
-        config_file = 'twitter_api2.conf'
+    if(options.config in ['1', '2', 1, 2]):
+        config_file = 'twitter_api' + str(options.config) + '.conf'
     
     connectToServer()
+    
+    # Adding way to just get counts of tweet types
+    if (options.tweetcounts):
+        usercounts = []
+        for result in cursor.execute("CALL shootingnarratives_gettweetcounts()", multi=True):
+            if result.with_rows:
+                usercounts = result.fetchall()
+        
+        out = csv.writer(open('shootingnarrative_tweetcounts.csv', 'w'))
+        out.writerow(usercounts[0].keys())
+        
+        for row in usercounts:
+            out.writerow(row.values())
+        
+        closeConnections()
+        return
+    
     print ('** Check users to fetch **')
     checkUsersToFetch()
     
@@ -54,7 +81,11 @@ def main():
         # Grab another group of followers to fetch
         print ('** Fetch more users **')
         if(openConnection and not cancelled):
-            checkUsersToFetch()
+            try:
+                checkUsersToFetch()
+            except:
+                closeConnections()
+                raise
     
     # Wrap up
     print ('** All done! **')
@@ -83,6 +114,7 @@ def checkUsersToFetch():
                 print('MySQL error: ' + err)
                 return
         except mysql.connector.errors.DatabaseError as err:
+            err = str(err)
             if('1205' in err or 'Lock wait timeout' in err):
                 count_down(0.16 + random.random()) # 10 to 70 seconds
                 attemptsLeft -= 1
@@ -122,8 +154,8 @@ def fetchUsersData(user):
     
     # Check user profile from tweet
     checkUser(user)
-    #fetchFollowers(user)
-    #fetchFriends(user)
+    fetchFollowers(user)
+    fetchFriends(user)
     fetchTweets(user)
     
     # Wrap up
@@ -177,25 +209,53 @@ def checkUser(user):
 def fetchFollowers(user):
     global cancelled
     if(not cancelled and user['FollowersStatus'] == 'Pending' or user['FollowersStatus'] == 'Capped'):
-        print('\tFetch Followers (' + str(user['FollowersActual']) + ')', end='')
-        attemptsLeft = DEFAULT_ATTEMPTS
+        print('\tFetch Followers (' + str(user['FollowersActual']) + ')', end='\n')
         if(user['Status'] in ['Protected', 'Suspended', 'Removed', 'Other']):
             user['FollowersStatus'] = 'Protected'
         else:
+            attemptsLeft = DEFAULT_ATTEMPTS
+            queryCursor = -1
+            pagesLeft = math.ceil(min(FOLLOWER_LIST_CAP, user['FollowersActual']) / FOLLOWERS_PER_PACKET)
+            
             while(attemptsLeft > 0 and not cancelled):
+                user['FollowerList'] = []
+                
                 try:
-                    user['FollowerList'] = []
-                    for page in tweepy.Cursor(twitter_api.followers_ids, user_id=user['UserID']).pages():
-                        user['FollowerList'].extend(page)
-                        if len(user['FollowerList']) >= follower_list_cap:
-                            break
-
-                    if(len(user['FollowerList']) < user['FollowersActual'] and len(user['FollowerList']) >= follower_list_cap):
+                    while(pagesLeft > 0 and attemptsLeft > 0 and not cancelled):
+                        try:
+                            response = twitter_api.followers_ids(user_id=user['UserID'], cursor=queryCursor, count=FOLLOWERS_PER_PACKET, wait_on_rate_limit = True, wait_on_rate_limit_notify = True)
+                            
+                            user['FollowerList'].extend(response[0])
+                            queryCursor = response[1][1] # It's 0 if we have reached the end of their follower list
+                            pagesLeft -= 1
+                            #print(response[1])
+                            
+                            print("\t\t" + str(len(set(user['FollowerList']))) + " Followers Gathered")
+                            if (len(user['FollowerList']) >= FOLLOWER_LIST_CAP or pagesLeft == 0 or queryCursor == 0):
+                                 break
+                        except tweepy.error.TweepError as err:
+                            err = str(err)
+                            if('429' in err or 'Rate limit' in err): # Rate limit error
+                                print('429: Rated Limited - wait and try again') 
+                                attemptsLeft -= 1
+                            elif('104' in err or 'Connection reset' in err):
+                                print('104: Connection reset - wait and try again') 
+                                attemptsLeft -= 1
+                            elif('401' in err or 'Not authorized' in err):
+                                user['FollowerStatus'] = 'Protected'
+                                user['FollowersRetrieved'] = len(user['FollowerList'])
+                                attemptsLeft = 0
+                            else:
+                                print("!!! Unhandled Tweepy error: " + err)
+                                attemptsLeft = 0
+                            count_down(WAIT_TO_RETRY)
+                    
+                    if(len(user['FollowerList']) < user['FollowersActual'] and len(user['FollowerList']) >= FOLLOWER_LIST_CAP):
                         user['FollowersStatus'] = 'Capped'
                     else:
                         user['FollowersStatus'] = 'Retrieved'
                     user['FollowersRetrieved'] = len(user['FollowerList'])
-                    print(' got ' + str(user['FollowersRetrieved']), end='')
+                    #print(' got ' + str(user['FollowersRetrieved']), end='')
                     attemptsLeft = 0
                 except tweepy.error.TweepError as err:
                     err = str(err)
@@ -233,10 +293,10 @@ def fetchFriends(user):
                     user['FriendList'] = []
                     for page in tweepy.Cursor(twitter_api.friends_ids, user_id=user['UserID']).pages():
                         user['FriendList'].extend(page)
-                        if len(user['FriendList']) >= follower_list_cap:
+                        if len(user['FriendList']) >= FRIEND_LIST_CAP:
                             break
 
-                    if(len(user['FriendList']) < user['FriendsActual'] and len(user['FriendList']) >= follower_list_cap):
+                    if(len(user['FriendList']) < user['FriendsActual'] and len(user['FriendList']) >= FRIEND_LIST_CAP):
                         user['FriendsStatus'] = 'Capped'
                     else:
                         user['FriendsStatus'] = 'Retrieved'
