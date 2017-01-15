@@ -629,6 +629,7 @@ function Connection(args) {
     this.progress_style  = this.progress_style  || 'pagemiddle';
     
     this.quantity        = this.quantity        || 'tweet';
+    this.useOffset       = this.useOffset == undefined ? true : this.useOffset;
     this.chunks          = [];
     this.chunk_index     = 0;
     this.min             = this.min             || 0;
@@ -776,7 +777,9 @@ Connection.prototype = {
         // Define what it's loading
         if(this.quantity == 'count') {
             this.post['limit'] = this.resolution;
-            if(this.lastTweet) {
+            if(this.useOffset) {
+                this.post['offset'] = this.chunks[this.chunk_index];
+            } else if(this.lastTweet) {
                 if(this.lastTweet instanceof BigNumber) {
                     this.post[this.pk_query] = this.lastTweet.add(1).toString();
                 } else if(this.lastTweet instanceof Date) {
@@ -788,10 +791,9 @@ Connection.prototype = {
                 }
                 console.log(this.post, this.post[this.pk_query]);
             }
-//            this.post['offset'] = this.chunks[this.chunk_index];
         } else {
             this.post[this.quantity + '_min'] = this.chunks[this.chunk_index];
-        this.post[this.quantity + '_max'] = this.chunks[this.chunk_index + 1];
+            this.post[this.quantity + '_max'] = this.chunks[this.chunk_index + 1];
         }
 
         if(this.post.json) {
@@ -824,7 +826,7 @@ Connection.prototype = {
         }
         this.progress.update(this.chunk_index + 1, progress_text);
 
-        if(this.quantity == 'count')  { // Makes a LOT of assumptions about the data
+        if(this.quantity == 'count' && !this.useOffset)  { // Makes a LOT of assumptions about the data
             if(this.post.json && file_data[file_data.length - 1]) {
                 this.lastTweet = file_data[file_data.length - 1][this.pk_table];
                 if(this.pk_query.includes('time')) 
@@ -861,111 +863,6 @@ Connection.prototype = {
     }
 };
 standardConnections = {
-    transferFollows: function() {
-        // Get User List
-        var connection = new Connection();
-        connection.php('follows/getUserIDs', {}, function (userIDs) {
-            userIDs = userIDs.split('\n');
-            userIDs.shift(); // Remove the title
-            userIDs.pop(); // Remove the last entry
-            var nUsers = userIDs.length;
-            var progress = new Progress({steps: nUsers});
-            progress.start();
-            var nConnections = 0;
-            
-            var transferUser = function(iUser) {
-                var userID = userIDs[iUser];
-                progress.update(iUser, 'Connections so far: ' + nConnections + '. Fetching ' + userID + ". ");
-                // Get Follows from old table
-                connection.php('follows/getFollows', {userID: userID},//, following: 1},
-                    function(followers) {
-                        followers = followers.split('\n');
-                        followers.shift(); // Remove the title
-                        followers.pop(); // Remove the last entry
-                        if(followers.length > 0) {
-                            nConnections = nConnections + followers.length;
-                            
-                            // Handle problem if there are too many followers to push (it will crowd the php)
-                            if(followers.length > 25000) {
-                                console.info('User has too many followers, sending slices of their follower list', userID, followers.length);
-                            }
-                            
-                            while (followers.length > 25000) {
-                                var followers_slice = followers.slice(0, 25000).join(',');
-                                followers = followers.slice(25000);
-                                
-                                connection.php('follows/addFollows', 
-                                    {userID: userID, followers: followers_slice},//, following: 1},
-                                    function(result) {
-                                        console.log(result);
-                                    });
-                            }
-                            
-                            
-                            followers = followers.join(',');
-                            
-                            progress.update(iUser, 'Connections so far: ' + nConnections + '. Sending  ' + userID + ". ");
-                            
-                            connection.php('follows/addFollows', 
-                                {userID: userID, followers: followers},//, following: 1},
-                                function(result) {
-                                        console.log(result);
-                                
-                                    if(iUser < nUsers) {
-                                        setTimeout(function() {
-                                            transferUser(iUser + 1);
-                                        }, 10);
-                                    } else {
-                                        progress.end();
-                                        console.log('nConnections', nConnections);
-                                    }
-                                });
-                        } else {
-                            if(iUser < nUsers) {
-                                setTimeout(function() {
-                                    transferUser(iUser + 1);
-                                }, 10);
-                            } else {
-                                progress.end();
-                                console.log('nConnections', nConnections);
-                            }
-                        }
-                    });
-            };
-            
-            transferUser(0);
-        });
-    },
-    calcFollowersRetrieved: function(connection, followers) {
-        var connection = new Connection();
-        connection.phpjson('follows/getSharedAudienceUsers', {}, function (users) {
-            
-            var nUsers = users.length;
-            var progress = new Progress({steps: nUsers});
-            progress.start();
-            
-            var countUserFollowersRetrieved = function(iUser) {
-                var user = users[iUser];
-                progress.update(iUser, 'Counting Followers Retrieved for  ' + user['UserID'] + ". ");
-                connection.php('follows/countFollowersRetrieved', {userID: user['UserID']}, function(followersRetrieved) {
-                    console.log(user['UserID'], followersRetrieved);
-                    
-                    if(iUser < nUsers) {
-                        setTimeout(function() {
-                            countUserFollowersRetrieved(iUser + 1);
-                        }, 1);
-                    } else {
-                        progress.end();
-                    }
-                });
-            }
-            countUserFollowersRetrieved(0);
-            
-//            users.forEach(function(user, i) {
-//                connection.php('follows/countFollowersRetrieved', {userID: user['UserID']}, console.log);
-//            });
-        });
-    },
     genInCombinedEvent: function(event, new_event, tweet_min, tweet_max) {
         var connection = new Connection({
             url: 'analysis/genInCombinedEvent',
@@ -1098,6 +995,263 @@ standardConnections = {
             }
         });
     },
+};
+
+function SharedAudienceSuite() {
+    this.connection = new Connection();
+    this.users = false;
+    this.adjacentUsers = false;
+
+    this.progress = false;
+    this.stopped = true;
+    
+    this.nUsers = 0;
+    this.iUser = 0;
+    this.jUser = 0;
+
+    this.nEdges = 0;
+    this.iEdge = 0;
+    this.edgeStream = false;
+}
+SharedAudienceSuite.prototype = {
+    transferFollows: function() {
+        // Get User List
+        var connection = new Connection();
+        connection.php('follows/getUserIDs', {}, function (userIDs) {
+            userIDs = userIDs.split('\n');
+            userIDs.shift(); // Remove the title
+            userIDs.pop(); // Remove the last entry
+            var nUsers = userIDs.length;
+            var progress = new Progress({steps: nUsers});
+            progress.start();
+            var nConnections = 0;
+            
+            var transferUser = function(iUser) {
+                var userID = userIDs[iUser];
+                progress.update(iUser, 'Connections so far: ' + nConnections + '. Fetching ' + userID + ". ");
+                // Get Follows from old table
+                connection.php('follows/getFollows', {userID: userID},//, following: 1},
+                    function(followers) {
+                        followers = followers.split('\n');
+                        followers.shift(); // Remove the title
+                        followers.pop(); // Remove the last entry
+                        if(followers.length > 0) {
+                            nConnections = nConnections + followers.length;
+                            
+                            // Handle problem if there are too many followers to push (it will crowd the php)
+                            if(followers.length > 25000) {
+                                console.info('User has too many followers, sending slices of their follower list', userID, followers.length);
+                            }
+                            
+                            while (followers.length > 25000) {
+                                var followers_slice = followers.slice(0, 25000).join(',');
+                                followers = followers.slice(25000);
+                                
+                                connection.php('follows/addFollows', 
+                                    {userID: userID, followers: followers_slice},//, following: 1},
+                                    function(result) {
+                                        console.log(result);
+                                    });
+                            }
+                            
+                            
+                            followers = followers.join(',');
+                            
+                            progress.update(iUser, 'Connections so far: ' + nConnections + '. Sending  ' + userID + ". ");
+                            
+                            connection.php('follows/addFollows', 
+                                {userID: userID, followers: followers},//, following: 1},
+                                function(result) {
+                                        console.log(result);
+                                
+                                    if(iUser < nUsers) {
+                                        setTimeout(function() {
+                                            transferUser(iUser + 1);
+                                        }, 10);
+                                    } else {
+                                        progress.end();
+                                        console.log('nConnections', nConnections);
+                                    }
+                                });
+                        } else {
+                            if(iUser < nUsers) {
+                                setTimeout(function() {
+                                    transferUser(iUser + 1);
+                                }, 10);
+                            } else {
+                                progress.end();
+                                console.log('nConnections', nConnections);
+                            }
+                        }
+                    });
+            };
+            
+            transferUser(0);
+        });
+    },
+    computeFollowersRetrieved: function() {
+        this.connection.phpjson('follows/getSharedAudienceUsers', {}, function (users) {
+            this.users = users;
+            this.nUsers = users.length;
+            this.iUser = 0;
+            this.progress = new Progress({steps: this.nUsers});
+            this.progress.start();
+            this.computeFollowersRetrieved_ForUser();
+        }.bind(this));
+    },
+    computeFollowersRetrieved_ForUser: function() {
+        var user = this.users[this.iUser];
+        this.progress.update(this.iUser, 'Counting Followers Retrieved for User' + this.iUser + " (ID: " + user['UserID'] + ") ");
+        this.connection.php('follows/countFollowersRetrieved',
+                            {userID: user['UserID']},
+                            computeFollowersRetrieved_ForUser_Result.bind(this));
+    },
+    computeFollowersRetrieved_ForUser_Result: function(followersRetrieved) {
+        // Continue with next user
+        if(this.iUser < this.nUsers -1) {
+            this.iUser = this.iUser + 1;
+            setTimeout(this.computeFollowersRetrieved_ForUser.bind(this), 1);
+            
+        } else {// Or we are done, wrap up
+            this.progress.end();
+        }
+    },
+    computePairwiseSharedAudience: function() {
+        this.stopped = false;
+        this.progress = new Progress();
+        this.progress.start();
+        
+        this.progress.update(100, "Get User List");
+        this.connection.phpjson('follows/getSharedAudienceUsers', {},
+                                this.computePSA_ParseUsers.bind(this));
+    },
+    computePSA_ParseUsers: function(users) {
+        this.users = users;
+        this.nUsers = users.length;
+        console.log('Compute Pairwise Shared Audience', 'Users: ', this.nUsers);
+        this.progress.steps = this.nUsers * (this.nUsers - 1) / 2;
+
+        // Initialize Adjacency List
+        this.adjacentUsers = {};
+        this.users.forEach(function(user) {
+            this.adjacentUsers[user['UserID']] = new Set();
+        }, this);
+        
+        // Start getting edges
+        this.progress.update(0, "Get Existing Edge List");
+        this.connection.phpjson('follows/getExistingEdges',
+                                {'count': true},
+                               this.computePSA_startEdgeStream.bind(this));
+    },
+    computePSA_startEdgeStream: function(result) {
+        this.nEdges = parseInt(result[0]['nEdges']);
+        console.log('Compute Pairwise Shared Audience', 'Existing edges: ', this.nEdges);
+        this.edgeStream = new Connection({
+            url: 'follows/getExistingEdges',
+            post: {json: true},
+            resolution: 1000,
+            quantity: 'count',
+            useOffset: true,
+            max: this.nEdges,
+            progress_text: '{cur}/{max} Existing Edges Retrieved',
+            on_chunk_finish: this.computePSA_addEdgesInStream.bind(this),
+            on_finish: this.computePSA_startUserPairStream.bind(this)
+        });
+        this.edgeStream.startStream();
+    },
+    computePSA_addEdgesInStream: function(edgelist) {
+        console.log('Compute Pairwise Shared Audience', 'Adding edges: ', edgelist.length);
+        edgelist.forEach(function(edge) {
+            this.adjacentUsers[edge['UserID1']].add(edge['UserID2']);
+        }, this);
+    },
+    computePSA_startUserPairStream: function() {
+        this.iUser = 1;
+        this.jUser = 0;
+        this.iEdge = 0;
+        
+        this.computePSA_ForPair();
+    },
+    computePairwiseSharedAudience_GetEdges: function() {
+        this.progress.update(0, "Get Existing Edge List");
+        this.connection.phpjson('follows/getExistingEdges', {}, function (edges) {
+            this.progress.update(0, "Process Existing Edge List into Adjacency List");
+            // Progress edge list to adjacency list
+            this.adjacentUsers = {};
+            this.users.forEach(function(user) {
+                this.adjacentUsers[user['UserID']] = new Set();
+            }, this);
+            edges.forEach(function(edge) {
+                this.adjacentUsers[edge['UserID1']].add(edge['UserID2']);
+            }, this);
+            
+            this.computePSA_ForPair();
+        }.bind(this));
+    },
+    computePSA_ForPair: function() {
+        var userA = this.users[this.iUser];
+        var userB = this.users[this.jUser];
+        
+        this.progress.update(this.iEdge, "Counting SharedAudience between User " +
+                             this.iUser + " (ID: " + userA['UserID'] + ") and User " +
+                             this.jUser + " (ID: " + userB['UserID'] + ") ");
+        
+        // Swap to make sure user IDs are ascending
+        if(new BigNumber(userA['UserID']) > new BigNumber(userB['UserID'])) {
+            var userTemp = userA;
+            userA = userB;
+            userB = userTemp;
+        }
+        var existingEdge = this.adjacentUsers[userA['UserID']].has(userB['UserID']) ? 1 : 0;
+        
+        this.connection.php('follows/countPairwiseSharedAudience', {
+                                userID1: userA['UserID'], 
+                                userID2: userB['UserID'],
+                                SumOfAudiences_Observed: parseInt(userA['FollowersRetrieved']) + parseInt(userB['FollowersRetrieved']),
+                                userID1_Audience_Actual: userA['FollowersActual'],
+                                userID2_Audience_Actual: userB['FollowersActual'],
+                                correction1: userA['Correction100k'],
+                                correction2: userB['Correction100k'],
+                                existingEdge: existingEdge,
+                            },
+                            this.computePSA_ForPair_Result.bind(this));
+        
+    },
+    computePSA_ForPair_Result: function(CorrectedWeight) {
+        if(CorrectedWeight != undefined || CorrectedWeight != "") {
+            this.iEdge_AboveThreshold = this.iEdge_AboveThreshold + 1;
+            console.log(CorrectedWeight);
+        }
+        
+        if(this.stopped) {
+            this.progress.end();
+            return;
+        }
+    
+        // If we are finished with this user (no more other users to pair with
+        if(this.jUser == 0) {
+            if(this.iUser >= this.nUsers - 1) {
+                // There are no more users, wrap up
+                this.progress.end();
+                return;
+            }
+            
+            // Move to the next starting User
+            this.jUser = this.iUser;
+            this.iUser = this.iUser + 1;
+            
+            // && theorectically update the user saying we've counted them
+        } else {
+            // Next User!
+            this.jUser = this.jUser - 1;
+        }
+        this.iEdge = this.iEdge + 1;
+        setTimeout(this.computePSA_ForPair.bind(this), 5);
+    },
+    stop: function() {
+        this.stopped = true;
+        this.progress.end();
+    }
 };
 
 function Tooltip() {
@@ -1372,6 +1526,7 @@ triggers.on('alert', function(ops) {
 });
 
 function Progress(args) {
+    if(!args) args = {};
     // Grab parameters
     var valid_param = ['name', 'parent_id', 'style', 'text', 'steps', 'initial', 'color'];
     Object.keys(args).forEach(function (item) {
