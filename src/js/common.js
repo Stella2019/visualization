@@ -1001,6 +1001,7 @@ function SharedAudienceSuite() {
     this.connection = new Connection();
     this.users = false;
     this.adjacentUsers = false;
+    this.edges = false;
 
     this.progress = false;
     this.stopped = true;
@@ -1172,22 +1173,6 @@ SharedAudienceSuite.prototype = {
         
         this.computePSA_ForPair();
     },
-    computePairwiseSharedAudience_GetEdges: function() {
-        this.progress.update(0, "Get Existing Edge List");
-        this.connection.phpjson('follows/getExistingEdges', {}, function (edges) {
-            this.progress.update(0, "Process Existing Edge List into Adjacency List");
-            // Progress edge list to adjacency list
-            this.adjacentUsers = {};
-            this.users.forEach(function(user) {
-                this.adjacentUsers[user['UserID']] = new Set();
-            }, this);
-            edges.forEach(function(edge) {
-                this.adjacentUsers[edge['UserID1']].add(edge['UserID2']);
-            }, this);
-            
-            this.computePSA_ForPair();
-        }.bind(this));
-    },
     computePSA_ForPair: function() {
         var userA = this.users[this.iUser];
         var userB = this.users[this.jUser];
@@ -1247,6 +1232,97 @@ SharedAudienceSuite.prototype = {
         }
         this.iEdge = this.iEdge + 1;
         setTimeout(this.computePSA_ForPair.bind(this), 5);
+    },
+    recomputePairwiseSharedAudience: function() {
+        // For recalculing already calculated shared audience edges (IE not trying to find new ones)
+        this.stopped = false;
+        this.progress = new Progress();
+        this.progress.start();
+        
+        this.progress.update(100, "Get User List");
+        this.connection.phpjson('follows/getSharedAudienceUsers', {},
+                                this.recomputePSA_ParseUsers.bind(this));
+    },
+    recomputePSA_ParseUsers: function(users) {
+        this.nUsers = users.length;
+        console.log('Compute Pairwise Shared Audience', 'Users: ', this.nUsers);
+        
+        // Make users a dictionary (as opposed to an array)
+        this.users = {}
+        users.forEach(function(user) {
+            this.users[user['UserID']] = user;
+        })
+        
+        // Start getting edges
+        this.progress.update(0, "Get Existing Edge List");
+        this.connection.phpjson('follows/getExistingEdges',
+                                {'count': true},
+                               this.recomputePSA_startEdgeStream.bind(this));
+    },
+    recomputePSA_startEdgeStream: function(result) {
+        this.edges = [];
+        this.nEdges = parseInt(result[0]['nEdges']);
+        this.progress.steps = this.nEdges;
+        console.log('Compute Pairwise Shared Audience', 'Existing edges: ', this.nEdges);
+        
+        this.edgeStream = new Connection({
+            url: 'follows/getExistingEdges',
+            post: {json: true},
+            resolution: 1000,
+            quantity: 'count',
+            useOffset: true,
+            max: this.nEdges,
+            progress_text: '{cur}/{max} Existing Edges Retrieved',
+            on_chunk_finish: this.recomputePSA_addEdgesInStream.bind(this),
+            on_finish: this.recomputePSA_startUserPairStream.bind(this)
+        });
+        this.edgeStream.startStream();
+    },
+    recomputePSA_addEdgesInStream: function(edgelist) {
+        console.log('Compute Pairwise Shared Audience', 'Adding edges: ', edgelist.length);
+        edgelist.forEach(function(edge) {
+            this.edges.push(edge);
+        }, this);
+    },
+    recomputePSA_startUserPairStream: function() {
+        this.iEdge = 0;
+        
+        this.recomputePSA_ForPair();
+    },
+    recomputePSA_ForPair: function() {
+        var edge = this.edges[this.iEdge];
+        var userA = this.users[edge['UserID1']];
+        var userB = this.users[edge['UserID2']];
+        
+        this.progress.update(this.iEdge, "Counting SharedAudience # " + this.iEdge + 
+                                         " between Users " + edge['UserID1'] + 
+                                         " and " + edge['UserID2']);
+        
+        this.connection.php('follows/countPairwiseSharedAudience', {
+                                userID1: userA['UserID'], 
+                                userID2: userB['UserID'],
+                                SumOfAudiences_Observed: parseInt(userA['FollowersRetrieved']) + parseInt(userB['FollowersRetrieved']),
+                                userID1_Audience_Actual: userA['FollowersActual'],
+                                userID2_Audience_Actual: userB['FollowersActual'],
+                                correction1: userA['Correction100k'],
+                                correction2: userB['Correction100k'],
+                                existingEdge: true,
+                            },
+                            this.recomputePSA_ForPair_Result.bind(this));
+        
+    },
+    recomputePSA_ForPair_Result: function(CorrectedWeight) {
+        if(CorrectedWeight != undefined || CorrectedWeight != "") {
+            console.log(CorrectedWeight);
+        }
+        
+        if(this.stopped || this.iEdge >= this.nEdges - 1) {
+            this.progress.end();
+            return;
+        }
+        
+        this.iEdge = this.iEdge + 1;
+        setTimeout(this.recomputePSA_ForPair.bind(this), 5);
     },
     stop: function() {
         this.stopped = true;

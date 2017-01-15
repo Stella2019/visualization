@@ -33,7 +33,7 @@
         $SharedAudience_Predicted = min($userID1_Audience_Actual, $userID2_Audience_Actual, $SharedAudience_Observed * $Correction);
         
         // Compute predicted weight & total audience from these numbers
-        $TotalAudience_Predicted = $SumOfAudiences_Actual - $SharedAudience_Predicted;
+        $TotalAudience_Predicted = max($TotalAudience_Observed, $SumOfAudiences_Actual - $SharedAudience_Predicted);
         $Weight_Predicted = min(1, $SharedAudience_Predicted / $TotalAudience_Predicted);
         
         // If the predicted weight is above threshold or already in the table, record it
