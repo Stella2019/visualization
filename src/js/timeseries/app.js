@@ -115,6 +115,9 @@ function Timeseries () {
     this.modal = new Modal(this);
     this.tooltip = new Tooltip();
     this.connection = new Connection();
+    this.constants = {
+        ideal_max_time_buckets: 10000
+    };
     
     this.collection = new CollectionManager(this);
     this.model = new TimeseriesModel(this);
@@ -125,7 +128,7 @@ function Timeseries () {
 }
 Timeseries.prototype = {
     setOptions: function() {
-        this.ops.panels = ['Dataset', 'Series', 'View', 'Axes', 'Analysis'];
+        this.ops.panels = ['Dataset', 'Series', 'View', 'Axes', 'Analysis', 'Other'];
         var options = this.ops;
         
         this.ops['Dataset'] = { };
@@ -227,7 +230,7 @@ Timeseries.prototype = {
             Resolution: new Option({
                 title: "Resolution",
                 labels: ["Day", "Hour", "10 Minutes", "Minute"],
-                ids:    ["day", "hour", "tenminute", "minute"],
+                ids:    [1440, 60, 10, 1],
                 default: 2,
                 callback: triggers.emitter('chart:resolution change')
             }),
@@ -330,14 +333,23 @@ Timeseries.prototype = {
                 callback: triggers.emitter('alert', 'Sorry this doesn\'t work right now')
             }),
         };
-//        this.ops['Dataset']['Autoload'] = new Option({
-//            title: 'Load',
-//            labels: ['Pause', 'Automatic'],
-//            ids: ['pause', 'automatic'],
-//            default: 1,
-//            type: 'toggle',
-//            callback: triggers.emit('autoload')
-//        });
+        this.ops['Other'] = {
+            Autoload: new Option({
+                title: 'Load',
+                labels: ['Pause', 'Automatic'],
+                ids: ['pause', 'automatic'],
+                default: 1,
+                type: 'toggle',
+                callback: triggers.emitter('autoload')
+            }),
+            'Download Resolution': new Option({
+                title: 'Download Resolution',
+                labels: ['1 day', '1 hour', '10 Minutes', '1 Minute'],
+                ids: [1440, 60, 10, 1],
+                default: 3,
+                callback: triggers.emitter('time_window:updated')
+            })
+        };
         
         // Add dataset options
         triggers.emit('collectionManager:setOptions');

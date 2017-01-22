@@ -1263,8 +1263,8 @@ Options.prototype = {
         }
         option.click = function(choice) {
             option.updateInInterface(choice);
-            option.displayChoice(choice);
-            option.set(option.ids[choice]);
+//            option.displayChoice(choice);
+//            option.set(option.ids[choice]);
             this.recordState();
 
             option.callback();

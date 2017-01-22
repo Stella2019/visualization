@@ -807,7 +807,7 @@ Connection.prototype = {
         }
     },
     chunk_success: function (file_data) {
-        if (file_data.includes('<b>Notice</b>') || file_data.includes('<b>Error</b>')) {
+        if (file_data.includes('<b>Notice</b>') || file_data.includes('<b>Error</b>') || file_data.includes('<b>Parse error</b>')) {
             console.debug(file_data);
 
             // Abort

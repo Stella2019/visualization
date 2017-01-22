@@ -531,27 +531,50 @@ TimeseriesLegend.prototype = {
         this.tooltip.off();
         triggers.emit('series:unhighlight');
     },
-    chartClickGetTweets: function(series) {
+    getCursorPositionOnChart: function(series) {
         // Get parent objects
+        var cursor = {};
+        
         var chart = this.app[series.chart];
         var time_obj = this.app.model.time;
         
         // Get position
-        var time = chart.x.invert(series.cursor_xy[0]);
-        time.setSeconds(0);
+        cursor.time = chart.x.invert(series.cursor_xy[0]);
+        cursor.time.setSeconds(0);
         var resolution = this.app.ops['View']['Resolution'].get();
-        var i_r = ['minute', 'tenminute', 'hour', 'day'].indexOf(resolution);
-        var i_t = time_obj.stamp_index[util.formatDate(time)];
+        var i_r = [1, 10, 60, 1440].indexOf(resolution);
+        var resolution_str = ['minutes', 'tenminutes', 'hours', 'days'][i_r];
+        
+        var minutes_per_bucket = this.app.ops['Other']['Download Resolution'].get();
+        if(minutes_per_bucket > 1) {
+            cursor.time_bucket = new Date(Math.floor(cursor.time / 60000 / minutes_per_bucket) * 60000 * minutes_per_bucket);
+            // Temporary UTC cast - until I figure out a better way to do this / use UTC time
+            cursor.time_bucket.setTime(cursor.time_bucket.getTime() + cursor.time_bucket.getTimezoneOffset()*60*1000);
+        } else {
+            cursor.time_bucket = cursor.time;
+        }
+        var i_t = time_obj.stamp_index[util.formatDate(cursor.time_bucket)];
+        
+        // Get time bucket start & end
         var value_i = time_obj.indices[i_t][i_r];
-        var time_min = time_obj[resolution + 's'][value_i];
-        var time_max = time_obj[resolution + 's'][value_i + 1];
+        cursor.time_min = time_obj[resolution_str][value_i];
+        cursor.time_max = time_obj[resolution_str][value_i + 1];
+        
+        // Get data values
+        cursor.value = series.values[value_i].value;
+        cursor.value0 = series.values[value_i].value0;
+        
+        return cursor;
+    },
+    chartClickGetTweets: function(series) {
+        var cursor = this.getCursorPositionOnChart(series);
         
         triggers.emit('fetch tweets', {
             collection: series.chart == 'context' ? 'Event' : 'Subset',
             Event_id: this.app.collection.event.ID,
             Subset_id: series.ID,
-            time_min: time_min,
-            time_max: time_max,
+            time_min: cursor.time_min,
+            time_max: cursor.time_max,
             label: series.Label,
         });
     },
@@ -562,49 +585,32 @@ TimeseriesLegend.prototype = {
     },
     chartHoverMove: function(series) {
         this.tooltip.move(d3.event.x, d3.event.y);
-//        triggers.emit('tooltip:move', [d3.event.x, d3.event.y]);
-        
-        // Get parent objects
+        var cursor = this.getCursorPositionOnChart(series);
         var chart = this.app[series.chart];
-        var time_obj = this.app.model.time;
         
-        // Get position
-        var time = chart.x.invert(series.cursor_xy[0]);
-        time.setSeconds(0);
-        var resolution = this.app.ops['View']['Resolution'].get();
-        var i_r = ['minute', 'tenminute', 'hour', 'day'].indexOf(resolution);
-        var i_t = time_obj.stamp_index[util.formatDate(time)];
-        var value_i = time_obj.indices[i_t][i_r];
-        var time_min = time_obj[resolution + 's'][value_i];
-        var time_max = time_obj[resolution + 's'][value_i + 1];
-
         // Fetch column
         var focus_column = chart.column_highlight;
         var old_data = focus_column.data();
-
-        // Get data values
-        var value = series.values[value_i].value;
-        var value0 = series.values[value_i].value0;
         
         // Set tooltip data
         this.tooltip.setData({
             series: series.Label,
-            from: util.formatDate(time_min),
-            to: util.formatDate(time_max),
-            tweets: util.formatThousands(value),
+            from: util.formatDate(cursor.time_min),
+            to: util.formatDate(cursor.time_max),
+            tweets: util.formatThousands(cursor.value),
             ' ': '<i>Click to get tweets</i>'
         });
         
         if(!old_data || old_data.series != series.Label ||
-           util.compareDates(old_data.startTime, time_min) ||
-           util.compareDates(old_data.stopTime,  time_max) ) {
+           util.compareDates(old_data.startTime, cursor.time_min) ||
+           util.compareDates(old_data.stopTime,  cursor.time_max) ) {
 
             focus_column.data([{
                 series: series.Label,
-                startTime: time_min,
-                stopTime: time_max,
-                value: value,
-                value0: value0
+                startTime: cursor.time_min,
+                stopTime: cursor.time_max,
+                value: cursor.value,
+                value0: cursor.value0
             }]);
 
             focus_column
@@ -612,14 +618,14 @@ TimeseriesLegend.prototype = {
                 .duration(50)
                 .attr("d", 
                     chart.area([
-                        {timestamp: time_min, value: value, value0: value0},
-                        {timestamp: time_max, value: value, value0: value0}
+                        {timestamp: cursor.time_min, value: cursor.value, value0: cursor.value0},
+                        {timestamp: cursor.time_max, value: cursor.value, value0: cursor.value0}
                     ]))
                 .style('display', 'block');
         }
 
         if(!old_data || old_data.series != series.id)
-            trigger.emit('series:highlight', series);
+            triggers.emit('series:highlight', series);
     },
     chartHoverEnd: function(series) {
         this.app[series.chart].column_highlight.style('display', 'none');

@@ -13,7 +13,7 @@ function TimeseriesModel (app) {
         hours: [],
         days: [],
         indices: [],
-    }
+    };
     this.series_count = {};
     this.series_distinct = {};
     this.series_exposure = {};
@@ -88,10 +88,11 @@ TimeseriesModel.prototype = {
 
         // Clear the raw data objects
         this.download = [];
-        
         if(type == 'Event') {
             d3.select('#choose_Dataset_Event button')
                 .attr('disabled', true);
+            // Change time resolution if there is just too much data to load for the current resolution
+            this.validateTimeResolution();
         }
         
         // Send a signal to start loading the event
@@ -100,12 +101,13 @@ TimeseriesModel.prototype = {
             url: 'timeseries/get',
             post: {
                 collection: type,
-                collection_id: id
+                collection_id: id,
+                time_resolution: this.app.ops['Other']['Download Resolution'].get(),
             },
             quantity: 'time',
             min: new Date(this.app.ops['Dataset']['Time Min'].date),
             max: new Date(this.app.ops['Dataset']['Time Max'].date),
-            time_res: 3,
+            time_res: 3 * this.app.ops['Other']['Download Resolution'].get(), // This is in hours
             failure_msg: 'Error loading data',
             progress_text: 'Getting ' + type + ' ' + id + ' Timeseries',
             on_finish: triggers.emitter('timeseries:loaded', type == 'Event' ? 'Event' : id),
@@ -316,7 +318,31 @@ TimeseriesModel.prototype = {
         // Now get the subsets
         triggers.emit('subset_load:ready');
     },
+    validateTimeResolution: function() {
+        var minutes_per_bucket = this.app.ops['Other']['Download Resolution'].get(); // Usually 1
+        var minutes = Math.round((this.app.ops['Dataset']['Time Max'].date - this.app.ops['Dataset']['Time Min'].date) / 60000);
+        
+        if(minutes / minutes_per_bucket > this.app.constants.ideal_max_time_buckets) {
+            var message = "There are too many points in time (" + minutes + "), loading this much data may overload the system. IT is recommended to change download and visual resolution to ";
+            if(minutes / 10 <= this.app.constants.ideal_max_time_buckets) {
+                minutes_per_bucket = 10;
+            } else if(minutes / 60 <= this.app.constants.ideal_max_time_buckets) {
+                minutes_per_bucket = 60;
+            } else {
+                minutes_per_bucket = 1440;
+            }
+            message += minutes_per_bucket + " minutes in each bucket";
+            
+            var decision = confirm(message);
+            if(decision) {
+                this.app.ops['View']['Resolution'].updateInInterface_id(minutes_per_bucket);
+                this.app.ops['Other']['Download Resolution'].updateInInterface_id(minutes_per_bucket);
+            }
+        }
+    },
     buildTimeArrays: function() {
+        var minutes_per_bucket = this.app.ops['Other']['Download Resolution'].get(); // Usually 1
+        
         // Populate array of timestamps
         this.time.stamps = [];
         this.time.stamp_index = {};
@@ -327,12 +353,13 @@ TimeseriesModel.prototype = {
         this.time.indices = [];
         for(var timestamp = new Date(this.time.min);
             timestamp <= this.time.max;
-            timestamp.setMinutes(timestamp.getMinutes() + 1)) {
+            timestamp.setMinutes(timestamp.getMinutes() + minutes_per_bucket)) {
             var formattedTime = util.formatDate(timestamp);
             this.time.stamps.push(formattedTime);
             this.time.stamp_index[formattedTime] = this.time.minutes.length;
             
             // Add map to values for different resolutions
+            //if(this.time.minutes_per_bucket <= 1)
             this.time.minutes.push(new Date(timestamp));
             
             var roundedTime = new Date(timestamp);
@@ -363,21 +390,20 @@ TimeseriesModel.prototype = {
     },
     timepoints2Series: function(timepoints) {
         var resolution = this.app.ops['View']['Resolution'].get();
-        var i_r = ['minute', 'tenminute', 'hour', 'day'].indexOf(resolution);
-        var timepoints_rolled = util.zeros(this.time[resolution + 's'].length);
+        var i_r = [1, 10, 60, 1440].indexOf(resolution);
+        var resolution_str = ['minutes', 'tenminutes', 'hours', 'days'][i_r];
+        var timepoints_rolled = util.zeros(this.time[resolution_str].length);
     
         // Roll up timepoints
         timepoints.forEach(function(val, i_t) {
-//            console.log(val, i_t, this.time.indices[i_t], i_r, this.time.indices[i_t][i_r]);
             timepoints_rolled[this.time.indices[i_t][i_r]] += val;
         }, this)
         
         // Convert to array of tuples
         var values = timepoints_rolled.map(function(val, i_tr) {
-//            console.log(val, i_tr, this.time[resolution + 's'][i_tr]);
             return {
                 value: val,
-                timestamp: new Date(this.time[resolution + 's'][i_tr])
+                timestamp: new Date(this.time[resolution_str][i_tr])
             };
         }, this);
         
